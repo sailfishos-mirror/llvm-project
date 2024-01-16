@@ -65,7 +65,7 @@ jobs:
       # lldb.  Using this setup-python action to make 3.10 the default
       # python fixes this.
       - name: Setup Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
       - name: Install Ninja
@@ -73,7 +73,7 @@ jobs:
       # actions/checkout deletes any existing files in the new git directory,
       # so this needs to either run before ccache-action or it has to use
       # clean: false.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.1.1
         with:
           fetch-depth: 250
       - name: Setup ccache
