@@ -1662,34 +1662,6 @@ void Clang::AddAArch64TargetArgs(const ArgList &Args,
 
   AddUnalignedAccessWarning(CmdArgs);
 
-  Args.addOptInFlag(CmdArgs, options::OPT_fptrauth_intrinsics,
-                    options::OPT_fno_ptrauth_intrinsics);
-  Args.addOptInFlag(CmdArgs, options::OPT_fptrauth_calls,
-                    options::OPT_fno_ptrauth_calls);
-  Args.addOptInFlag(CmdArgs, options::OPT_fptrauth_returns,
-                    options::OPT_fno_ptrauth_returns);
-  Args.addOptInFlag(CmdArgs, options::OPT_fptrauth_auth_traps,
-                    options::OPT_fno_ptrauth_auth_traps);
-  Args.addOptInFlag(
-      CmdArgs, options::OPT_fptrauth_vtable_pointer_address_discrimination,
-      options::OPT_fno_ptrauth_vtable_pointer_address_discrimination);
-  Args.addOptInFlag(
-      CmdArgs, options::OPT_fptrauth_vtable_pointer_type_discrimination,
-      options::OPT_fno_ptrauth_vtable_pointer_type_discrimination);
-  Args.addOptInFlag(
-      CmdArgs, options::OPT_fptrauth_type_info_vtable_pointer_discrimination,
-      options::OPT_fno_ptrauth_type_info_vtable_pointer_discrimination);
-  Args.addOptInFlag(
-      CmdArgs, options::OPT_fptrauth_function_pointer_type_discrimination,
-      options::OPT_fno_ptrauth_function_pointer_type_discrimination);
-
-  Args.addOptInFlag(CmdArgs, options::OPT_fptrauth_indirect_gotos,
-                    options::OPT_fno_ptrauth_indirect_gotos);
-  Args.addOptInFlag(CmdArgs, options::OPT_fptrauth_init_fini,
-                    options::OPT_fno_ptrauth_init_fini);
-  Args.addOptInFlag(CmdArgs,
-                    options::OPT_fptrauth_init_fini_address_discrimination,
-                    options::OPT_fno_ptrauth_init_fini_address_discrimination);
   Args.addOptInFlag(CmdArgs, options::OPT_faarch64_jump_table_hardening,
                     options::OPT_fno_aarch64_jump_table_hardening);
 
