@@ -484,49 +484,16 @@ std::string Linux::ComputeEffectiveClangTriple(const llvm::opt::ArgList &Args,
 // options represent the default signing schema.
 static void handlePAuthABI(const Driver &D, const ArgList &DriverArgs,
                            ArgStringList &CC1Args) {
-  if (!DriverArgs.hasArg(options::OPT_fptrauth_intrinsics,
-                         options::OPT_fno_ptrauth_intrinsics))
-    CC1Args.push_back("-fptrauth-intrinsics");
-
-  if (!DriverArgs.hasArg(options::OPT_fptrauth_calls,
-                         options::OPT_fno_ptrauth_calls))
-    CC1Args.push_back("-fptrauth-calls");
-
-  if (!DriverArgs.hasArg(options::OPT_fptrauth_returns,
-                         options::OPT_fno_ptrauth_returns))
-    CC1Args.push_back("-fptrauth-returns");
-
-  if (!DriverArgs.hasArg(options::OPT_fptrauth_auth_traps,
-                         options::OPT_fno_ptrauth_auth_traps))
-    CC1Args.push_back("-fptrauth-auth-traps");
-
-  if (!DriverArgs.hasArg(
-          options::OPT_fptrauth_vtable_pointer_address_discrimination,
-          options::OPT_fno_ptrauth_vtable_pointer_address_discrimination))
-    CC1Args.push_back("-fptrauth-vtable-pointer-address-discrimination");
-
-  if (!DriverArgs.hasArg(
-          options::OPT_fptrauth_vtable_pointer_type_discrimination,
-          options::OPT_fno_ptrauth_vtable_pointer_type_discrimination))
-    CC1Args.push_back("-fptrauth-vtable-pointer-type-discrimination");
-
-  if (!DriverArgs.hasArg(
-          options::OPT_fptrauth_type_info_vtable_pointer_discrimination,
-          options::OPT_fno_ptrauth_type_info_vtable_pointer_discrimination))
-    CC1Args.push_back("-fptrauth-type-info-vtable-pointer-discrimination");
-
-  if (!DriverArgs.hasArg(options::OPT_fptrauth_indirect_gotos,
-                         options::OPT_fno_ptrauth_indirect_gotos))
-    CC1Args.push_back("-fptrauth-indirect-gotos");
-
-  if (!DriverArgs.hasArg(options::OPT_fptrauth_init_fini,
-                         options::OPT_fno_ptrauth_init_fini))
-    CC1Args.push_back("-fptrauth-init-fini");
-
-  if (!DriverArgs.hasArg(
-          options::OPT_fptrauth_init_fini_address_discrimination,
-          options::OPT_fno_ptrauth_init_fini_address_discrimination))
-    CC1Args.push_back("-fptrauth-init-fini-address-discrimination");
+  CC1Args.push_back("-fptrauth-intrinsics");
+  CC1Args.push_back("-fptrauth-calls");
+  CC1Args.push_back("-fptrauth-returns");
+  CC1Args.push_back("-fptrauth-auth-traps");
+  CC1Args.push_back("-fptrauth-vtable-pointer-address-discrimination");
+  CC1Args.push_back("-fptrauth-vtable-pointer-type-discrimination");
+  CC1Args.push_back("-fptrauth-type-info-vtable-pointer-discrimination");
+  CC1Args.push_back("-fptrauth-indirect-gotos");
+  CC1Args.push_back("-fptrauth-init-fini");
+  CC1Args.push_back("-fptrauth-init-fini-address-discrimination");
 
   if (!DriverArgs.hasArg(options::OPT_faarch64_jump_table_hardening,
                          options::OPT_fno_aarch64_jump_table_hardening))
