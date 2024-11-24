@@ -484,28 +484,108 @@ std::string Linux::ComputeEffectiveClangTriple(const llvm::opt::ArgList &Args,
 // options represent the default signing schema.
 static void handlePAuthABI(const Driver &D, const ArgList &DriverArgs,
                            ArgStringList &CC1Args) {
-  CC1Args.push_back("-fptrauth-intrinsics");
-  CC1Args.push_back("-fptrauth-calls");
-  CC1Args.push_back("-fptrauth-returns");
-  CC1Args.push_back("-fptrauth-auth-traps");
-  CC1Args.push_back("-fptrauth-vtable-pointer-address-discrimination");
-  CC1Args.push_back("-fptrauth-vtable-pointer-type-discrimination");
-  CC1Args.push_back("-fptrauth-type-info-vtable-pointer-discrimination");
-  CC1Args.push_back("-fptrauth-indirect-gotos");
-  CC1Args.push_back("-fptrauth-init-fini");
-  CC1Args.push_back("-fptrauth-init-fini-address-discrimination");
+  if (!DriverArgs.hasArg(options::OPT_fptrauth_intrinsics,
+                         options::OPT_fno_ptrauth_intrinsics))
+    CC1Args.push_back("-fptrauth-intrinsics");
+
+  if (!DriverArgs.hasArg(options::OPT_fptrauth_calls,
+                         options::OPT_fno_ptrauth_calls))
+    CC1Args.push_back("-fptrauth-calls");
+
+  if (!DriverArgs.hasArg(options::OPT_fptrauth_returns,
+                         options::OPT_fno_ptrauth_returns))
+    CC1Args.push_back("-fptrauth-returns");
+
+  if (!DriverArgs.hasArg(options::OPT_fptrauth_auth_traps,
+                         options::OPT_fno_ptrauth_auth_traps))
+    CC1Args.push_back("-fptrauth-auth-traps");
+
+  if (!DriverArgs.hasArg(
+          options::OPT_fptrauth_vtable_pointer_address_discrimination,
+          options::OPT_fno_ptrauth_vtable_pointer_address_discrimination))
+    CC1Args.push_back("-fptrauth-vtable-pointer-address-discrimination");
+
+  if (!DriverArgs.hasArg(
+          options::OPT_fptrauth_vtable_pointer_type_discrimination,
+          options::OPT_fno_ptrauth_vtable_pointer_type_discrimination))
+    CC1Args.push_back("-fptrauth-vtable-pointer-type-discrimination");
+
+  if (!DriverArgs.hasArg(
+          options::OPT_fptrauth_type_info_vtable_pointer_discrimination,
+          options::OPT_fno_ptrauth_type_info_vtable_pointer_discrimination))
+    CC1Args.push_back("-fptrauth-type-info-vtable-pointer-discrimination");
+
+  if (!DriverArgs.hasArg(options::OPT_fptrauth_indirect_gotos,
+                         options::OPT_fno_ptrauth_indirect_gotos))
+    CC1Args.push_back("-fptrauth-indirect-gotos");
+
+  if (!DriverArgs.hasArg(options::OPT_fptrauth_init_fini,
+                         options::OPT_fno_ptrauth_init_fini))
+    CC1Args.push_back("-fptrauth-init-fini");
+
+  if (!DriverArgs.hasArg(
+          options::OPT_fptrauth_init_fini_address_discrimination,
+          options::OPT_fno_ptrauth_init_fini_address_discrimination))
+    CC1Args.push_back("-fptrauth-init-fini-address-discrimination");
 
   if (!DriverArgs.hasArg(options::OPT_faarch64_jump_table_hardening,
                          options::OPT_fno_aarch64_jump_table_hardening))
     CC1Args.push_back("-faarch64-jump-table-hardening");
 }
 
+static void addPointerAuthFlags(const llvm::opt::ArgList &DriverArgs,
+                                llvm::opt::ArgStringList &CC1Args) {
+  DriverArgs.addOptInFlag(CC1Args, options::OPT_fptrauth_intrinsics,
+                          options::OPT_fno_ptrauth_intrinsics);
+
+  DriverArgs.addOptInFlag(CC1Args, options::OPT_fptrauth_calls,
+                          options::OPT_fno_ptrauth_calls);
+
+  DriverArgs.addOptInFlag(CC1Args, options::OPT_fptrauth_returns,
+                          options::OPT_fno_ptrauth_returns);
+
+  DriverArgs.addOptInFlag(CC1Args, options::OPT_fptrauth_auth_traps,
+                          options::OPT_fno_ptrauth_auth_traps);
+
+  DriverArgs.addOptInFlag(
+      CC1Args, options::OPT_fptrauth_vtable_pointer_address_discrimination,
+      options::OPT_fno_ptrauth_vtable_pointer_address_discrimination);
+
+  DriverArgs.addOptInFlag(
+      CC1Args, options::OPT_fptrauth_vtable_pointer_type_discrimination,
+      options::OPT_fno_ptrauth_vtable_pointer_type_discrimination);
+
+  DriverArgs.addOptInFlag(
+      CC1Args, options::OPT_fptrauth_type_info_vtable_pointer_discrimination,
+      options::OPT_fno_ptrauth_type_info_vtable_pointer_discrimination);
+
+  DriverArgs.addOptInFlag(
+      CC1Args, options::OPT_fptrauth_function_pointer_type_discrimination,
+      options::OPT_fno_ptrauth_function_pointer_type_discrimination);
+
+  DriverArgs.addOptInFlag(CC1Args, options::OPT_fptrauth_indirect_gotos,
+                          options::OPT_fno_ptrauth_indirect_gotos);
+
+  DriverArgs.addOptInFlag(CC1Args, options::OPT_fptrauth_init_fini,
+                          options::OPT_fno_ptrauth_init_fini);
+
+  DriverArgs.addOptInFlag(
+      CC1Args, options::OPT_fptrauth_init_fini_address_discrimination,
+      options::OPT_fno_ptrauth_init_fini_address_discrimination);
+
+  DriverArgs.addOptInFlag(CC1Args, options::OPT_fptrauth_elf_got,
+                          options::OPT_fno_ptrauth_elf_got);
+}
+
 void Linux::addClangTargetOptions(const llvm::opt::ArgList &DriverArgs,
                                   llvm::opt::ArgStringList &CC1Args,
                                   Action::OffloadKind DeviceOffloadKind) const {
   llvm::Triple Triple(ComputeEffectiveClangTriple(DriverArgs));
-  if (Triple.isAArch64() && Triple.getEnvironment() == llvm::Triple::PAuthTest)
+  if (Triple.isAArch64() &&
+      Triple.getEnvironment() == llvm::Triple::PAuthTest) {
+    addPointerAuthFlags(DriverArgs, CC1Args);
     handlePAuthABI(getDriver(), DriverArgs, CC1Args);
+  }
   Generic_ELF::addClangTargetOptions(DriverArgs, CC1Args, DeviceOffloadKind);
 }
 
