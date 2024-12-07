@@ -533,38 +533,9 @@ static void handlePAuthABI(const Driver &D, const ArgList &DriverArgs,
     CC1Args.push_back("-faarch64-jump-table-hardening");
 }
 
-static void addPointerAuthFlags(const llvm::opt::ArgList &DriverArgs,
-                                llvm::opt::ArgStringList &CC1Args) {
-  DriverArgs.addOptInFlag(CC1Args, options::OPT_fptrauth_intrinsics,
-                          options::OPT_fno_ptrauth_intrinsics);
-
-  DriverArgs.addOptInFlag(CC1Args, options::OPT_fptrauth_calls,
-                          options::OPT_fno_ptrauth_calls);
-
-  DriverArgs.addOptInFlag(CC1Args, options::OPT_fptrauth_returns,
-                          options::OPT_fno_ptrauth_returns);
-
-  DriverArgs.addOptInFlag(CC1Args, options::OPT_fptrauth_auth_traps,
-                          options::OPT_fno_ptrauth_auth_traps);
-
-  DriverArgs.addOptInFlag(
-      CC1Args, options::OPT_fptrauth_vtable_pointer_address_discrimination,
-      options::OPT_fno_ptrauth_vtable_pointer_address_discrimination);
-
-  DriverArgs.addOptInFlag(
-      CC1Args, options::OPT_fptrauth_vtable_pointer_type_discrimination,
-      options::OPT_fno_ptrauth_vtable_pointer_type_discrimination);
-
-  DriverArgs.addOptInFlag(
-      CC1Args, options::OPT_fptrauth_type_info_vtable_pointer_discrimination,
-      options::OPT_fno_ptrauth_type_info_vtable_pointer_discrimination);
-
-  DriverArgs.addOptInFlag(
-      CC1Args, options::OPT_fptrauth_function_pointer_type_discrimination,
-      options::OPT_fno_ptrauth_function_pointer_type_discrimination);
-
-  DriverArgs.addOptInFlag(CC1Args, options::OPT_fptrauth_indirect_gotos,
-                          options::OPT_fno_ptrauth_indirect_gotos);
+void Linux::addPointerAuthFlags(const llvm::opt::ArgList &DriverArgs,
+                                llvm::opt::ArgStringList &CC1Args) const {
+  ToolChain::addPointerAuthFlags(DriverArgs, CC1Args);
 
   DriverArgs.addOptInFlag(CC1Args, options::OPT_fptrauth_init_fini,
                           options::OPT_fno_ptrauth_init_fini);

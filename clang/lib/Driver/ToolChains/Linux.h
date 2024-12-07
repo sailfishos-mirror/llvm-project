@@ -74,6 +74,8 @@ protected:
   Tool *buildAssembler() const override;
   Tool *buildLinker() const override;
   Tool *buildStaticLibTool() const override;
+  void addPointerAuthFlags(const llvm::opt::ArgList &DriverArgs,
+                           llvm::opt::ArgStringList &CC1Args) const override;
 };
 
 } // end namespace toolchains
