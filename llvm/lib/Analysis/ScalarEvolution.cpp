@@ -10702,7 +10702,8 @@ ScalarEvolution::ExitLimit ScalarEvolution::howFarToZero(SCEVUse V,
   if (!CountDown && !isKnownNonNegative(StepWLG))
     return getCouldNotCompute();
 
-  const SCEV *Distance = CountDown ? Start : getNegativeSCEV(Start);
+  const SCEV *Distance =
+      CountDown ? Start : getNegativeSCEV(Start).getPointer();
   // Handle unitary steps, which cannot wraparound.
   // 1*N = -Start; -1*N = Start (mod 2^BW), so:
   //   N = Distance (as unsigned)
@@ -10745,8 +10746,8 @@ ScalarEvolution::ExitLimit ScalarEvolution::howFarToZero(SCEVUse V,
     if (!loopIsFiniteByAssumption(L) && !isKnownNonZero(StepWLG))
       return getCouldNotCompute();
 
-    SCEVUse Exact =
-        getUDivExpr(Distance, CountDown ? getNegativeSCEV(Step) : Step);
+    SCEVUse Exact = getUDivExpr(
+        Distance, CountDown ? getNegativeSCEV(Step).getPointer() : Step);
     SCEVUse ConstantMax = getCouldNotCompute();
     if (Exact != getCouldNotCompute()) {
       APInt MaxInt = getUnsignedRangeMax(applyLoopGuards(Exact, Guards));
