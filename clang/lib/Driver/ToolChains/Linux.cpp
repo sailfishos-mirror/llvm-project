@@ -533,30 +533,12 @@ static void handlePAuthABI(const Driver &D, const ArgList &DriverArgs,
     CC1Args.push_back("-faarch64-jump-table-hardening");
 }
 
-void Linux::addPointerAuthFlags(const llvm::opt::ArgList &DriverArgs,
-                                llvm::opt::ArgStringList &CC1Args) const {
-  ToolChain::addPointerAuthFlags(DriverArgs, CC1Args);
-
-  DriverArgs.addOptInFlag(CC1Args, options::OPT_fptrauth_init_fini,
-                          options::OPT_fno_ptrauth_init_fini);
-
-  DriverArgs.addOptInFlag(
-      CC1Args, options::OPT_fptrauth_init_fini_address_discrimination,
-      options::OPT_fno_ptrauth_init_fini_address_discrimination);
-
-  DriverArgs.addOptInFlag(CC1Args, options::OPT_fptrauth_elf_got,
-                          options::OPT_fno_ptrauth_elf_got);
-}
-
 void Linux::addClangTargetOptions(const llvm::opt::ArgList &DriverArgs,
                                   llvm::opt::ArgStringList &CC1Args,
                                   Action::OffloadKind DeviceOffloadKind) const {
   llvm::Triple Triple(ComputeEffectiveClangTriple(DriverArgs));
-  if (Triple.isAArch64() &&
-      Triple.getEnvironment() == llvm::Triple::PAuthTest) {
-    addPointerAuthFlags(DriverArgs, CC1Args);
+  if (Triple.isAArch64() && Triple.getEnvironment() == llvm::Triple::PAuthTest)
     handlePAuthABI(getDriver(), DriverArgs, CC1Args);
-  }
   Generic_ELF::addClangTargetOptions(DriverArgs, CC1Args, DeviceOffloadKind);
 }
 
