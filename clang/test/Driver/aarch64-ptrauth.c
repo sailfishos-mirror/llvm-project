@@ -54,7 +54,6 @@
 // RUN:   %s 2>&1 | FileCheck %s --check-prefix=ALL-DARWIN
 // ALL-DARWIN: "-cc1"{{.*}} "-fptrauth-intrinsics" "-fptrauth-calls" "-fptrauth-returns" "-fptrauth-auth-traps" "-fptrauth-vtable-pointer-address-discrimination" "-fptrauth-vtable-pointer-type-discrimination" "-fptrauth-type-info-vtable-pointer-discrimination" "-fptrauth-indirect-gotos"{{.*}} "-faarch64-jump-table-hardening"
 
-<<<<<<< HEAD
 // RUN: %clang -### -c --target=aarch64-linux -mabi=pauthtest %s 2>&1 | FileCheck %s --check-prefix=PAUTHABI1
 // RUN: %clang -### -c --target=aarch64-linux-pauthtest %s 2>&1 | FileCheck %s --check-prefix=PAUTHABI1
 // RUN: %clang -### -c --target=aarch64-linux -mabi=pauthtest -fptrauth-abi-version=0 %s 2>&1 | FileCheck %s --check-prefix=PAUTHABI1
@@ -72,21 +71,6 @@
 // PAUTHTESTV1-SAME: "-fptrauth-intrinsics" "-fptrauth-calls" "-fptrauth-returns" "-fptrauth-auth-traps" "-fptrauth-vtable-pointer-address-discrimination" "-fptrauth-vtable-pointer-type-discrimination" "-fptrauth-type-info-vtable-pointer-discrimination" "-fptrauth-indirect-gotos" "-fptrauth-init-fini" "-fptrauth-init-fini-address-discrimination" "-fptrauth-elf-got" "-faarch64-jump-table-hardening"
 // PAUTHTESTV1-SAME: "-target-abi" "pauthtest"
 // PAUTHTESTV1-NOT:  "-fptrauth-function-pointer-type-discrimination"
-||||||| parent of 928c63818ade (Minor test enhancement)
-// RUN: %clang -### -c --target=aarch64-linux -mabi=pauthtest %s 2>&1 | FileCheck %s --check-prefix=PAUTHTEST1
-// RUN: %clang -### -c --target=aarch64-linux-pauthtest %s 2>&1 | FileCheck %s --check-prefix=PAUTHTEST1
-// PAUTHTEST1:      "-cc1"{{.*}} "-triple" "aarch64-unknown-linux-pauthtest"
-// PAUTHTEST1-SAME: "-fptrauth-intrinsics" "-fptrauth-calls" "-fptrauth-returns" "-fptrauth-auth-traps" "-fptrauth-vtable-pointer-address-discrimination" "-fptrauth-vtable-pointer-type-discrimination" "-fptrauth-type-info-vtable-pointer-discrimination" "-fptrauth-indirect-gotos" "-fptrauth-init-fini" "-fptrauth-init-fini-address-discrimination" "-faarch64-jump-table-hardening"
-// PAUTHTEST1-SAME: "-target-abi" "pauthtest"
-// PAUTHTEST1-NOT: "-fptrauth-function-pointer-type-discrimination"
-=======
-// RUN: %clang -### -c --target=aarch64-linux -mabi=pauthtest %s 2>&1 | FileCheck %s --check-prefix=PAUTHTEST1
-// RUN: %clang -### -c --target=aarch64-linux-pauthtest %s 2>&1 | FileCheck %s --check-prefix=PAUTHTEST1
-// PAUTHTEST1:      "-cc1"{{.*}} "-triple" "aarch64-unknown-linux-pauthtest"
-// PAUTHTEST1-SAME: "-fptrauth-intrinsics" "-fptrauth-calls" "-fptrauth-returns" "-fptrauth-auth-traps" "-fptrauth-vtable-pointer-address-discrimination" "-fptrauth-vtable-pointer-type-discrimination" "-fptrauth-type-info-vtable-pointer-discrimination" "-fptrauth-indirect-gotos" "-fptrauth-init-fini" "-fptrauth-init-fini-address-discrimination" "-faarch64-jump-table-hardening"
-// PAUTHTEST1-SAME: "-target-abi" "pauthtest"
-// PAUTHTEST1-NOT:  "-fptrauth-function-pointer-type-discrimination"
->>>>>>> 928c63818ade (Minor test enhancement)
 
 // RUN: %clang -### -c --target=aarch64-linux -mabi=pauthtest -fno-ptrauth-intrinsics \
 // RUN:   -fno-ptrauth-calls -fno-ptrauth-returns -fno-ptrauth-auth-traps \
@@ -103,51 +87,19 @@
 
 //// Non-linux OS: pauthtest ABI has no effect in terms of passing ptrauth cc1 flags.
 //// An error about unsupported ABI will be emitted later in pipeline (see ERR3 below)
-<<<<<<< HEAD
 // RUN: %clang -### -c --target=aarch64 -mabi=pauthtest %s 2>&1 | FileCheck %s --check-prefix=PAUTHABI2
-||||||| parent of 928c63818ade (Minor test enhancement)
-// RUN: %clang -### -c --target=aarch64 -mabi=pauthtest %s 2>&1 | FileCheck %s --check-prefixes=PAUTHTEST2
-=======
-// RUN: %clang -### -c --target=aarch64 -mabi=pauthtest %s 2>&1 | FileCheck %s --check-prefix=PAUTHTEST2
->>>>>>> 928c63818ade (Minor test enhancement)
 
-<<<<<<< HEAD
 // PAUTHABI2:      "-cc1"
 // PAUTHABI2-SAME: "-target-abi" "pauthtest"
 // PAUTHABI2-NOT:  "-fptrauth-
 // PAUTHABI2-NOT: "-faarch64-jump-table-hardening"
-||||||| parent of 928c63818ade (Minor test enhancement)
-// PAUTHTEST2:      "-cc1"
-// PAUTHTEST2-SAME: "-target-abi" "pauthtest"
-// PAUTHTEST2-NOT:  "-fptrauth-
-// PAUTHTEST2-NOT: "-faarch64-jump-table-hardening"
-=======
-// PAUTHTEST2:      "-cc1"
-// PAUTHTEST2-SAME: "-target-abi" "pauthtest"
-// PAUTHTEST2-NOT:  "-fptrauth-
-// PAUTHTEST2-NOT:  "-faarch64-jump-table-hardening"
->>>>>>> 928c63818ade (Minor test enhancement)
 
 //// Non-linux OS: pauthtest environment does not correspond to pauthtest ABI; aapcs is the default.
-<<<<<<< HEAD
 // RUN: %clang -### -c --target=aarch64-pauthtest %s 2>&1 | FileCheck %s --check-prefix=PAUTHABI3
 // PAUTHABI3:      "-cc1"
 // PAUTHABI3-SAME: "-target-abi" "aapcs"
 // PAUTHABI3-NOT:  "-fptrauth-
 // PAUTHABI3-NOT: "-faarch64-jump-table-hardening"
-||||||| parent of 928c63818ade (Minor test enhancement)
-// RUN: %clang -### -c --target=aarch64-pauthtest %s 2>&1 | FileCheck %s --check-prefix=PAUTHTEST3
-// PAUTHTEST3:      "-cc1"
-// PAUTHTEST3-SAME: "-target-abi" "aapcs"
-// PAUTHTEST3-NOT:  "-fptrauth-
-// PAUTHTEST3-NOT: "-faarch64-jump-table-hardening"
-=======
-// RUN: %clang -### -c --target=aarch64-pauthtest %s 2>&1 | FileCheck %s --check-prefix=PAUTHTEST3
-// PAUTHTEST3:      "-cc1"
-// PAUTHTEST3-SAME: "-target-abi" "aapcs"
-// PAUTHTEST3-NOT:  "-fptrauth-
-// PAUTHTEST3-NOT:  "-faarch64-jump-table-hardening"
->>>>>>> 928c63818ade (Minor test enhancement)
 
 //// Non-pauthtest ABI.
 // RUN: not %clang -### -c --target=aarch64-linux -fptrauth-intrinsics -fptrauth-calls -fptrauth-returns -fptrauth-auth-traps \
