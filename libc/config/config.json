@@ -56,6 +56,10 @@
     "LIBC_CONF_PRINTF_DISABLE_WIDE": {
       "value": false,
       "doc": "Disable handling wide characters for printf and friends."
+    },
+    "LIBC_CONF_PRINTF_MODULAR": {
+      "value": false,
+      "doc": "Split printf implementation into modules that can be lazily linked in."
     }
   },
   "scanf": {
