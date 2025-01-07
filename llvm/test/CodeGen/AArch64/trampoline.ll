@@ -176,19 +176,21 @@ define i64 @func2() {
 ; CHECK-LINUX-NEXT:    .cfi_offset w30, -16
 ; CHECK-LINUX-NEXT:    adrp x8, :got:f
 ; CHECK-LINUX-NEXT:    mov w9, #544 // =0x220
-; CHECK-LINUX-NEXT:    adrp x0, trampg
-; CHECK-LINUX-NEXT:    add x0, x0, :lo12:trampg
+; CHECK-LINUX-NEXT:    adrp x10, trampg
+; CHECK-LINUX-NEXT:    add x10, x10, :lo12:trampg
 ; CHECK-LINUX-NEXT:    ldr x8, [x8, :got_lo12:f]
 ; CHECK-LINUX-NEXT:    movk w9, #54815, lsl #16
-; CHECK-LINUX-NEXT:    str w9, [x0, #8]
+; CHECK-LINUX-NEXT:    str w9, [x10, #8]
 ; CHECK-LINUX-NEXT:    add x9, sp, #8
-; CHECK-LINUX-NEXT:    add x1, x0, #12
-; CHECK-LINUX-NEXT:    stp x9, x8, [x0, #16]
+; CHECK-LINUX-NEXT:    add x1, x10, #12
+; CHECK-LINUX-NEXT:    stp x9, x8, [x10, #16]
 ; CHECK-LINUX-NEXT:    mov x8, #143 // =0x8f
+; CHECK-LINUX-NEXT:    adrp x0, trampg
+; CHECK-LINUX-NEXT:    add x0, x0, :lo12:trampg
 ; CHECK-LINUX-NEXT:    movk x8, #22528, lsl #16
 ; CHECK-LINUX-NEXT:    movk x8, #177, lsl #32
 ; CHECK-LINUX-NEXT:    movk x8, #22528, lsl #48
-; CHECK-LINUX-NEXT:    str x8, [x0]
+; CHECK-LINUX-NEXT:    str x8, [x10]
 ; CHECK-LINUX-NEXT:    bl __clear_cache
 ; CHECK-LINUX-NEXT:    mov x0, xzr
 ; CHECK-LINUX-NEXT:    ldr x30, [sp], #16 // 8-byte Folded Reload
@@ -200,21 +202,23 @@ define i64 @func2() {
 ; CHECK-PC-NEXT:    str x30, [sp, #-16]! // 8-byte Folded Spill
 ; CHECK-PC-NEXT:    .seh_save_reg_x x30, 16
 ; CHECK-PC-NEXT:    .seh_endprologue
+; CHECK-PC-NEXT:    adrp x8, trampg
+; CHECK-PC-NEXT:    add x8, x8, :lo12:trampg
+; CHECK-PC-NEXT:    adrp x9, f
+; CHECK-PC-NEXT:    add x9, x9, :lo12:f
+; CHECK-PC-NEXT:    add x10, sp, #8
+; CHECK-PC-NEXT:    add x1, x8, #12
+; CHECK-PC-NEXT:    stp x10, x9, [x8, #16]
+; CHECK-PC-NEXT:    mov w9, #544 // =0x220
 ; CHECK-PC-NEXT:    adrp x0, trampg
 ; CHECK-PC-NEXT:    add x0, x0, :lo12:trampg
-; CHECK-PC-NEXT:    adrp x8, f
-; CHECK-PC-NEXT:    add x8, x8, :lo12:f
-; CHECK-PC-NEXT:    add x9, sp, #8
-; CHECK-PC-NEXT:    add x1, x0, #12
-; CHECK-PC-NEXT:    stp x9, x8, [x0, #16]
-; CHECK-PC-NEXT:    mov w8, #544 // =0x220
-; CHECK-PC-NEXT:    movk w8, #54815, lsl #16
-; CHECK-PC-NEXT:    str w8, [x0, #8]
-; CHECK-PC-NEXT:    mov x8, #143 // =0x8f
-; CHECK-PC-NEXT:    movk x8, #22528, lsl #16
-; CHECK-PC-NEXT:    movk x8, #177, lsl #32
-; CHECK-PC-NEXT:    movk x8, #22528, lsl #48
-; CHECK-PC-NEXT:    str x8, [x0]
+; CHECK-PC-NEXT:    movk w9, #54815, lsl #16
+; CHECK-PC-NEXT:    str w9, [x8, #8]
+; CHECK-PC-NEXT:    mov x9, #143 // =0x8f
+; CHECK-PC-NEXT:    movk x9, #22528, lsl #16
+; CHECK-PC-NEXT:    movk x9, #177, lsl #32
+; CHECK-PC-NEXT:    movk x9, #22528, lsl #48
+; CHECK-PC-NEXT:    str x9, [x8]
 ; CHECK-PC-NEXT:    bl __clear_cache
 ; CHECK-PC-NEXT:    mov x0, xzr
 ; CHECK-PC-NEXT:    .seh_startepilogue
@@ -233,29 +237,34 @@ define i64 @func2() {
 ; CHECK-APPLE-NEXT:    .cfi_offset w30, -8
 ; CHECK-APPLE-NEXT:    .cfi_offset w29, -16
 ; CHECK-APPLE-NEXT:  Lloh2:
-; CHECK-APPLE-NEXT:    adrp x0, _trampg@PAGE
+; CHECK-APPLE-NEXT:    adrp x8, _trampg@PAGE
 ; CHECK-APPLE-NEXT:  Lloh3:
-; CHECK-APPLE-NEXT:    add x0, x0, _trampg@PAGEOFF
+; CHECK-APPLE-NEXT:    add x8, x8, _trampg@PAGEOFF
 ; CHECK-APPLE-NEXT:  Lloh4:
-; CHECK-APPLE-NEXT:    adrp x8, _f@PAGE
+; CHECK-APPLE-NEXT:    adrp x9, _f@PAGE
 ; CHECK-APPLE-NEXT:  Lloh5:
-; CHECK-APPLE-NEXT:    add x8, x8, _f@PAGEOFF
-; CHECK-APPLE-NEXT:    add x9, sp, #8
-; CHECK-APPLE-NEXT:    add x1, x0, #12
-; CHECK-APPLE-NEXT:    stp x9, x8, [x0, #16]
-; CHECK-APPLE-NEXT:    mov w8, #544 ; =0x220
-; CHECK-APPLE-NEXT:    movk w8, #54815, lsl #16
-; CHECK-APPLE-NEXT:    str w8, [x0, #8]
-; CHECK-APPLE-NEXT:    mov x8, #143 ; =0x8f
-; CHECK-APPLE-NEXT:    movk x8, #22528, lsl #16
-; CHECK-APPLE-NEXT:    movk x8, #177, lsl #32
-; CHECK-APPLE-NEXT:    movk x8, #22528, lsl #48
-; CHECK-APPLE-NEXT:    str x8, [x0]
+; CHECK-APPLE-NEXT:    add x9, x9, _f@PAGEOFF
+; CHECK-APPLE-NEXT:    add x10, sp, #8
+; CHECK-APPLE-NEXT:    add x1, x8, #12
+; CHECK-APPLE-NEXT:    stp x10, x9, [x8, #16]
+; CHECK-APPLE-NEXT:    mov w9, #544 ; =0x220
+; CHECK-APPLE-NEXT:  Lloh6:
+; CHECK-APPLE-NEXT:    adrp x0, _trampg@PAGE
+; CHECK-APPLE-NEXT:  Lloh7:
+; CHECK-APPLE-NEXT:    add x0, x0, _trampg@PAGEOFF
+; CHECK-APPLE-NEXT:    movk w9, #54815, lsl #16
+; CHECK-APPLE-NEXT:    str w9, [x8, #8]
+; CHECK-APPLE-NEXT:    mov x9, #143 ; =0x8f
+; CHECK-APPLE-NEXT:    movk x9, #22528, lsl #16
+; CHECK-APPLE-NEXT:    movk x9, #177, lsl #32
+; CHECK-APPLE-NEXT:    movk x9, #22528, lsl #48
+; CHECK-APPLE-NEXT:    str x9, [x8]
 ; CHECK-APPLE-NEXT:    bl ___clear_cache
 ; CHECK-APPLE-NEXT:    ldp x29, x30, [sp, #16] ; 16-byte Folded Reload
 ; CHECK-APPLE-NEXT:    mov x0, xzr
 ; CHECK-APPLE-NEXT:    add sp, sp, #32
 ; CHECK-APPLE-NEXT:    ret
+; CHECK-APPLE-NEXT:    .loh AdrpAdd Lloh6, Lloh7
 ; CHECK-APPLE-NEXT:    .loh AdrpAdd Lloh4, Lloh5
 ; CHECK-APPLE-NEXT:    .loh AdrpAdd Lloh2, Lloh3
   %val = alloca i64

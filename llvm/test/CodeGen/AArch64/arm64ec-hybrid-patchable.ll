@@ -82,12 +82,14 @@ define dso_local void @caller() nounwind {
 ; CHECK-NEXT:      bl      "#func"
 ; CHECK-NEXT:      bl      static_func
 ; CHECK-NEXT:      adrp    x8, __os_arm64x_check_icall
+; CHECK-NEXT:      adrp    x9, func
+; CHECK-NEXT:      add     x9, x9, :lo12:func
+; CHECK-NEXT:      ldr     x8, [x8, :lo12:__os_arm64x_check_icall]
 ; CHECK-NEXT:      adrp    x11, func
 ; CHECK-NEXT:      add     x11, x11, :lo12:func
-; CHECK-NEXT:      ldr     x8, [x8, :lo12:__os_arm64x_check_icall]
 ; CHECK-NEXT:      adrp    x10, $iexit_thunk$cdecl$v$v
 ; CHECK-NEXT:      add     x10, x10, :lo12:$iexit_thunk$cdecl$v$v
-; CHECK-NEXT:      str     x11, [sp, #8]
+; CHECK-NEXT:      str     x9, [sp, #8]
 ; CHECK-NEXT:      blr     x8
 ; CHECK-NEXT:      blr     x11
 ; CHECK-NEXT:      ldr     x30, [sp], #16                  // 8-byte Folded Reload

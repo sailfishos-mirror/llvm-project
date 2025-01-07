@@ -1280,6 +1280,18 @@ bool AArch64InstrInfo::isAsCheapAsAMove(const MachineInstr &MI) const {
     return isCheapImmediate(MI, 32);
   case AArch64::MOVi64imm:
     return isCheapImmediate(MI, 64);
+
+  case AArch64::MOVaddr:
+  case AArch64::MOVaddrJT:
+  case AArch64::MOVaddrCP:
+  case AArch64::MOVaddrBA:
+  case AArch64::MOVaddrTLS:
+  case AArch64::MOVaddrEXT:
+    // When the address is tagged, an extra MOVK is inserted between the ADRP
+    // and ADD instructions during the expansion, which won't allow them to
+    // fuse.
+    return Subtarget.hasFuseAdrpAdd() &&
+           !(MI.getOperand(1).getTargetFlags() & AArch64II::MO_TAGGED);
   }
 }
 

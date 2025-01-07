@@ -148,9 +148,10 @@ define void @call_copy_pod() {
 ; CHECK-NEXT:    stp x19, x30, [sp] // 16-byte Folded Spill
 ; CHECK-NEXT:    .seh_save_lrpair x19, 0
 ; CHECK-NEXT:    .seh_endprologue
+; CHECK-NEXT:    adrp x0, Pod
+; CHECK-NEXT:    add x0, x0, :lo12:Pod
 ; CHECK-NEXT:    adrp x19, Pod
 ; CHECK-NEXT:    add x19, x19, :lo12:Pod
-; CHECK-NEXT:    mov x0, x19
 ; CHECK-NEXT:    bl copy_pod
 ; CHECK-NEXT:    stp d0, d1, [x19]
 ; CHECK-NEXT:    .seh_startepilogue
@@ -178,10 +179,11 @@ define void @call_copy_notcxx14aggregate() {
 ; CHECK-NEXT:    stp x19, x30, [sp, #16] // 16-byte Folded Spill
 ; CHECK-NEXT:    .seh_save_lrpair x19, 16
 ; CHECK-NEXT:    .seh_endprologue
+; CHECK-NEXT:    mov x0, sp
+; CHECK-NEXT:    adrp x1, NotCXX14Aggregate
+; CHECK-NEXT:    add x1, x1, :lo12:NotCXX14Aggregate
 ; CHECK-NEXT:    adrp x19, NotCXX14Aggregate
 ; CHECK-NEXT:    add x19, x19, :lo12:NotCXX14Aggregate
-; CHECK-NEXT:    mov x0, sp
-; CHECK-NEXT:    mov x1, x19
 ; CHECK-NEXT:    bl copy_notcxx14aggregate
 ; CHECK-NEXT:    ldp d0, d1, [sp]
 ; CHECK-NEXT:    stp d0, d1, [x19]
@@ -212,9 +214,10 @@ define void @call_copy_notpod() {
 ; CHECK-NEXT:    stp x19, x30, [sp] // 16-byte Folded Spill
 ; CHECK-NEXT:    .seh_save_lrpair x19, 0
 ; CHECK-NEXT:    .seh_endprologue
+; CHECK-NEXT:    adrp x0, NotPod
+; CHECK-NEXT:    add x0, x0, :lo12:NotPod
 ; CHECK-NEXT:    adrp x19, NotPod
 ; CHECK-NEXT:    add x19, x19, :lo12:NotPod
-; CHECK-NEXT:    mov x0, x19
 ; CHECK-NEXT:    bl copy_notpod
 ; CHECK-NEXT:    stp x0, x1, [x19]
 ; CHECK-NEXT:    .seh_startepilogue
