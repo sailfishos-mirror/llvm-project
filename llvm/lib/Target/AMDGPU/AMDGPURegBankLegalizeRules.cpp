@@ -231,6 +231,7 @@ SetOfRulesForOpcode::findMappingForMI(const MachineInstr &MI,
       return Rule.OperandMapping;
   }
 
+  MI.dump();
   LLVM_DEBUG(dbgs() << "MI: "; MI.dump(););
   llvm_unreachable("None of the rules defined for MI's opcode matched MI");
 }
