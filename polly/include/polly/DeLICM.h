@@ -17,33 +17,14 @@
 #ifndef POLLY_DELICM_H
 #define POLLY_DELICM_H
 
-#include "polly/ScopPass.h"
 #include "isl/isl-noexceptions.h"
 
 namespace llvm {
-class PassRegistry;
-class Pass;
 class raw_ostream;
 } // namespace llvm
 
 namespace polly {
-
-struct DeLICMPass final : llvm::PassInfoMixin<DeLICMPass> {
-  DeLICMPass() {}
-
-  llvm::PreservedAnalyses run(Scop &S, ScopAnalysisManager &SAM,
-                              ScopStandardAnalysisResults &SAR, SPMUpdater &U);
-};
-
-struct DeLICMPrinterPass final : llvm::PassInfoMixin<DeLICMPrinterPass> {
-  DeLICMPrinterPass(raw_ostream &OS) : OS(OS) {}
-
-  PreservedAnalyses run(Scop &S, ScopAnalysisManager &,
-                        ScopStandardAnalysisResults &SAR, SPMUpdater &);
-
-private:
-  llvm::raw_ostream &OS;
-};
+class Scop;
 
 /// Determine whether two lifetimes are conflicting.
 ///
