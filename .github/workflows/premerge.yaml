@@ -17,13 +17,6 @@ on:
     paths:
       - .github/workflows/premerge.yaml
   push:
-    branches:
-      - 'main'
-      - 'release/**'
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
-  cancel-in-progress: true
 
 jobs:
   premerge-checks-linux:
