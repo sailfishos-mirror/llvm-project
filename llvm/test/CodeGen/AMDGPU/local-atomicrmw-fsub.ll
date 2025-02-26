@@ -883,18 +883,18 @@ define double @local_atomic_fsub_ret_f64(ptr addrspace(3) %ptr) nounwind {
 ; GFX942-LABEL: local_atomic_fsub_ret_f64:
 ; GFX942:       ; %bb.0:
 ; GFX942-NEXT:    s_waitcnt vmcnt(0) expcnt(0) lgkmcnt(0)
+; GFX942-NEXT:    ds_read_b64 v[4:5], v0
 ; GFX942-NEXT:    v_mov_b32_e32 v2, v0
-; GFX942-NEXT:    ds_read_b64 v[0:1], v0
 ; GFX942-NEXT:    s_mov_b64 s[0:1], 0
 ; GFX942-NEXT:  .LBB4_1: ; %atomicrmw.start
 ; GFX942-NEXT:    ; =>This Inner Loop Header: Depth=1
 ; GFX942-NEXT:    s_waitcnt lgkmcnt(0)
-; GFX942-NEXT:    v_mov_b64_e32 v[4:5], v[0:1]
 ; GFX942-NEXT:    v_add_f64 v[0:1], v[4:5], -4.0
 ; GFX942-NEXT:    ds_cmpst_rtn_b64 v[0:1], v2, v[4:5], v[0:1]
 ; GFX942-NEXT:    s_waitcnt lgkmcnt(0)
 ; GFX942-NEXT:    v_cmp_eq_u64_e32 vcc, v[0:1], v[4:5]
 ; GFX942-NEXT:    s_or_b64 s[0:1], vcc, s[0:1]
+; GFX942-NEXT:    v_mov_b64_e32 v[4:5], v[0:1]
 ; GFX942-NEXT:    s_andn2_b64 exec, exec, s[0:1]
 ; GFX942-NEXT:    s_cbranch_execnz .LBB4_1
 ; GFX942-NEXT:  ; %bb.2: ; %atomicrmw.end
@@ -953,18 +953,18 @@ define double @local_atomic_fsub_ret_f64(ptr addrspace(3) %ptr) nounwind {
 ; GFX90A-LABEL: local_atomic_fsub_ret_f64:
 ; GFX90A:       ; %bb.0:
 ; GFX90A-NEXT:    s_waitcnt vmcnt(0) expcnt(0) lgkmcnt(0)
+; GFX90A-NEXT:    ds_read_b64 v[4:5], v0
 ; GFX90A-NEXT:    v_mov_b32_e32 v2, v0
-; GFX90A-NEXT:    ds_read_b64 v[0:1], v0
 ; GFX90A-NEXT:    s_mov_b64 s[4:5], 0
 ; GFX90A-NEXT:  .LBB4_1: ; %atomicrmw.start
 ; GFX90A-NEXT:    ; =>This Inner Loop Header: Depth=1
 ; GFX90A-NEXT:    s_waitcnt lgkmcnt(0)
-; GFX90A-NEXT:    v_pk_mov_b32 v[4:5], v[0:1], v[0:1] op_sel:[0,1]
 ; GFX90A-NEXT:    v_add_f64 v[0:1], v[4:5], -4.0
 ; GFX90A-NEXT:    ds_cmpst_rtn_b64 v[0:1], v2, v[4:5], v[0:1]
 ; GFX90A-NEXT:    s_waitcnt lgkmcnt(0)
 ; GFX90A-NEXT:    v_cmp_eq_u64_e32 vcc, v[0:1], v[4:5]
 ; GFX90A-NEXT:    s_or_b64 s[4:5], vcc, s[4:5]
+; GFX90A-NEXT:    v_pk_mov_b32 v[4:5], v[0:1], v[0:1] op_sel:[0,1]
 ; GFX90A-NEXT:    s_andn2_b64 exec, exec, s[4:5]
 ; GFX90A-NEXT:    s_cbranch_execnz .LBB4_1
 ; GFX90A-NEXT:  ; %bb.2: ; %atomicrmw.end
@@ -1100,18 +1100,18 @@ define double @local_atomic_fsub_ret_f64__offset(ptr addrspace(3) %ptr) nounwind
 ; GFX942-LABEL: local_atomic_fsub_ret_f64__offset:
 ; GFX942:       ; %bb.0:
 ; GFX942-NEXT:    s_waitcnt vmcnt(0) expcnt(0) lgkmcnt(0)
+; GFX942-NEXT:    ds_read_b64 v[4:5], v0 offset:65528
 ; GFX942-NEXT:    v_mov_b32_e32 v2, v0
-; GFX942-NEXT:    ds_read_b64 v[0:1], v0 offset:65528
 ; GFX942-NEXT:    s_mov_b64 s[0:1], 0
 ; GFX942-NEXT:  .LBB5_1: ; %atomicrmw.start
 ; GFX942-NEXT:    ; =>This Inner Loop Header: Depth=1
 ; GFX942-NEXT:    s_waitcnt lgkmcnt(0)
-; GFX942-NEXT:    v_mov_b64_e32 v[4:5], v[0:1]
 ; GFX942-NEXT:    v_add_f64 v[0:1], v[4:5], -4.0
 ; GFX942-NEXT:    ds_cmpst_rtn_b64 v[0:1], v2, v[4:5], v[0:1] offset:65528
 ; GFX942-NEXT:    s_waitcnt lgkmcnt(0)
 ; GFX942-NEXT:    v_cmp_eq_u64_e32 vcc, v[0:1], v[4:5]
 ; GFX942-NEXT:    s_or_b64 s[0:1], vcc, s[0:1]
+; GFX942-NEXT:    v_mov_b64_e32 v[4:5], v[0:1]
 ; GFX942-NEXT:    s_andn2_b64 exec, exec, s[0:1]
 ; GFX942-NEXT:    s_cbranch_execnz .LBB5_1
 ; GFX942-NEXT:  ; %bb.2: ; %atomicrmw.end
@@ -1170,18 +1170,18 @@ define double @local_atomic_fsub_ret_f64__offset(ptr addrspace(3) %ptr) nounwind
 ; GFX90A-LABEL: local_atomic_fsub_ret_f64__offset:
 ; GFX90A:       ; %bb.0:
 ; GFX90A-NEXT:    s_waitcnt vmcnt(0) expcnt(0) lgkmcnt(0)
+; GFX90A-NEXT:    ds_read_b64 v[4:5], v0 offset:65528
 ; GFX90A-NEXT:    v_mov_b32_e32 v2, v0
-; GFX90A-NEXT:    ds_read_b64 v[0:1], v0 offset:65528
 ; GFX90A-NEXT:    s_mov_b64 s[4:5], 0
 ; GFX90A-NEXT:  .LBB5_1: ; %atomicrmw.start
 ; GFX90A-NEXT:    ; =>This Inner Loop Header: Depth=1
 ; GFX90A-NEXT:    s_waitcnt lgkmcnt(0)
-; GFX90A-NEXT:    v_pk_mov_b32 v[4:5], v[0:1], v[0:1] op_sel:[0,1]
 ; GFX90A-NEXT:    v_add_f64 v[0:1], v[4:5], -4.0
 ; GFX90A-NEXT:    ds_cmpst_rtn_b64 v[0:1], v2, v[4:5], v[0:1] offset:65528
 ; GFX90A-NEXT:    s_waitcnt lgkmcnt(0)
 ; GFX90A-NEXT:    v_cmp_eq_u64_e32 vcc, v[0:1], v[4:5]
 ; GFX90A-NEXT:    s_or_b64 s[4:5], vcc, s[4:5]
+; GFX90A-NEXT:    v_pk_mov_b32 v[4:5], v[0:1], v[0:1] op_sel:[0,1]
 ; GFX90A-NEXT:    s_andn2_b64 exec, exec, s[4:5]
 ; GFX90A-NEXT:    s_cbranch_execnz .LBB5_1
 ; GFX90A-NEXT:  ; %bb.2: ; %atomicrmw.end
