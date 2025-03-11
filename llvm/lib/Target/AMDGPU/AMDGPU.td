@@ -1319,12 +1319,6 @@ def FeatureMemToLDSLoad : SubtargetFeature<"vmem-to-lds-load-insts",
   "The platform has memory to lds instructions (global_load w/lds bit set, buffer_load w/lds bit set or global_load_lds. This does not include scratch_load_lds."
 >;
 
-def FeatureWholeWaveFunction : SubtargetFeature<"whole-wave-function",
-  "IsWholeWaveFunction",
-  "true",
-  "Current function is a whole wave function (runs with all lanes enabled)"
-  >;
-
 // Dummy feature used to disable assembler instructions.
 def FeatureDisable : SubtargetFeature<"",
   "FeatureDisable","true",
