@@ -2690,8 +2690,6 @@ def HasLshlAddU64Inst : Predicate<"Subtarget->hasLshlAddU64Inst()">,
 def HasSetPrioIncWgInst : Predicate<"Subtarget->hasSetPrioIncWgInst()">,
  AssemblerPredicate<(all_of FeatureSetPrioIncWgInst)>;
 
-def IsWholeWaveFunction : Predicate<"Subtarget->isWholeWaveFunction()">;
-
 // Include AMDGPU TD files
 include "SISchedule.td"
 include "GCNProcessors.td"
