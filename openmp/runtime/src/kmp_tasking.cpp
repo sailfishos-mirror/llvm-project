@@ -1431,7 +1431,7 @@ kmp_task_t *__kmp_task_alloc(ident_t *loc_ref, kmp_int32 gtid,
   }
 
 #if OMP_TASKGRAPH_EXPERIMENTAL
-  kmp_tdg_info_t *tdg = __kmp_find_tdg(__kmp_curr_tdg_id);
+  kmp_tdg_info_t *tdg = __kmp_curr_tdg;
   if (tdg && __kmp_tdg_is_recording(tdg->tdg_status) &&
       (task_entry != (kmp_routine_entry_t)__kmp_taskloop_task)) {
     taskdata->is_taskgraph = 1;
@@ -2374,14 +2374,11 @@ without help of the runtime library.
 */
 void *__kmpc_task_reduction_init(int gtid, int num, void *data) {
 #if OMP_TASKGRAPH_EXPERIMENTAL
-  kmp_tdg_info_t *tdg = __kmp_find_tdg(__kmp_curr_tdg_id);
+  kmp_tdg_info_t *tdg = __kmp_curr_tdg;
   if (tdg && __kmp_tdg_is_recording(tdg->tdg_status)) {
-    kmp_tdg_info_t *this_tdg = __kmp_find_tdg(__kmp_curr_tdg_id);
-    this_tdg->rec_taskred_data =
-        __kmp_allocate(sizeof(kmp_task_red_input_t) * num);
-    this_tdg->rec_num_taskred = num;
-    KMP_MEMCPY(this_tdg->rec_taskred_data, data,
-               sizeof(kmp_task_red_input_t) * num);
+    tdg->rec_taskred_data = __kmp_allocate(sizeof(kmp_task_red_input_t) * num);
+    tdg->rec_num_taskred = num;
+    KMP_MEMCPY(tdg->rec_taskred_data, data, sizeof(kmp_task_red_input_t) * num);
   }
 #endif
   return __kmp_task_reduction_init(gtid, num, (kmp_task_red_input_t *)data);
@@ -2401,7 +2398,7 @@ has two parameters, pointer to object to be initialized and pointer to omp_orig
 */
 void *__kmpc_taskred_init(int gtid, int num, void *data) {
 #if OMP_TASKGRAPH_EXPERIMENTAL
-  kmp_tdg_info_t *tdg = __kmp_find_tdg(__kmp_curr_tdg_id);
+  kmp_tdg_info_t *tdg = __kmp_curr_tdg;
   if (tdg && __kmp_tdg_is_recording(tdg->tdg_status)) {
     tdg->rec_taskred_data = __kmp_allocate(sizeof(kmp_task_red_input_t) * num);
     tdg->rec_num_taskred = num;
@@ -2456,8 +2453,7 @@ void *__kmpc_task_reduction_get_th_data(int gtid, void *tskgrp, void *data) {
 
 #if OMP_TASKGRAPH_EXPERIMENTAL
   if ((thread->th.th_current_task->is_taskgraph) &&
-      (!__kmp_tdg_is_recording(
-          __kmp_find_tdg(__kmp_curr_tdg_id)->tdg_status))) {
+      (!__kmp_tdg_is_recording(__kmp_curr_tdg->tdg_status))) {
     tg = thread->th.th_current_task->td_taskgroup;
     KMP_ASSERT(tg != NULL);
     KMP_ASSERT(tg->reduce_data != NULL);
@@ -5268,15 +5264,69 @@ static kmp_tdg_info_t *__kmp_find_tdg(kmp_int32 tdg_id) {
     __kmp_global_tdgs = (kmp_tdg_info_t **)__kmp_allocate(
         sizeof(kmp_tdg_info_t *) * __kmp_max_tdgs);
 
-  for (kmp_int32 i = 0; i < __kmp_num_tdg; ++i) {
-    if ((__kmp_global_tdgs[i]) && (__kmp_global_tdgs[i]->tdg_id == tdg_id) &&
-        (__kmp_global_tdgs[i]->tdg_status != KMP_TDG_NONE)) {
-      res = __kmp_global_tdgs[i];
-      __kmp_curr_tdg_id = tdg_id;
+  for (kmp_int32 tdg_idx = 0; tdg_idx < __kmp_max_tdgs; tdg_idx++) {
+    if (__kmp_global_tdgs[tdg_idx] &&
+        __kmp_global_tdgs[tdg_idx]->tdg_id == tdg_id) {
+      if (__kmp_global_tdgs[tdg_idx]->tdg_status != KMP_TDG_NONE)
+        res = __kmp_global_tdgs[tdg_idx];
       break;
     }
   }
   return res;
+}
+
+// __kmp_alloc_tdg: Allocates a TDG if it doesn't already exist.
+// tdg_id: ID of the TDG.
+// returns: A pointer to the TDG if it already exists. Otherwise,
+// allocates a new TDG if the maximum limit has not been reached.
+// Returns nullptr if no TDG can be allocated.
+static kmp_tdg_info_t *__kmp_alloc_tdg(kmp_int32 tdg_id) {
+  kmp_tdg_info_t *res = nullptr;
+  if ((res = __kmp_find_tdg(tdg_id)))
+    return res;
+
+  if (__kmp_num_tdg > __kmp_max_tdgs)
+    return res;
+
+  for (kmp_int32 tdg_idx = 0; tdg_idx < __kmp_max_tdgs; tdg_idx++) {
+    if (!__kmp_global_tdgs[tdg_idx]) {
+      kmp_tdg_info_t *tdg =
+          (kmp_tdg_info_t *)__kmp_allocate(sizeof(kmp_tdg_info_t));
+      __kmp_global_tdgs[tdg_idx] = tdg;
+      __kmp_curr_tdg = tdg;
+      res = __kmp_global_tdgs[tdg_idx];
+      break;
+    }
+  }
+  return res;
+}
+
+// __kmp_free_tdg: Frees a TDG if it exists.
+// tdg_id:  ID of the TDG to be freed.
+// returns: true if a TDG with the given ID was found and successfully freed,
+// false if no such TDG exists.
+static bool __kmp_free_tdg(kmp_int32 tdg_id) {
+  kmp_tdg_info_t *tdg = nullptr;
+  if (__kmp_global_tdgs == NULL)
+    return false;
+
+  for (kmp_int32 tdg_idx = 0; tdg_idx < __kmp_max_tdgs; tdg_idx++) {
+    if (__kmp_global_tdgs[tdg_idx] &&
+        __kmp_global_tdgs[tdg_idx]->tdg_id == tdg_id) {
+      tdg = __kmp_global_tdgs[tdg_idx];
+      for (kmp_int map_idx = 0; map_idx < tdg->map_size; map_idx++) {
+        __kmp_free(tdg->record_map[map_idx].successors);
+      }
+      __kmp_free(tdg->record_map);
+      if (tdg->root_tasks)
+        __kmp_free(tdg->root_tasks);
+
+      __kmp_free(tdg);
+      __kmp_global_tdgs[tdg_idx] = NULL;
+      return true;
+    }
+  }
+  return false;
 }
 
 // __kmp_print_tdg_dot: prints the TDG to a dot file
@@ -5384,9 +5434,7 @@ void __kmp_exec_tdg(kmp_int32 gtid, kmp_tdg_info_t *tdg) {
 static inline void __kmp_start_record(kmp_int32 gtid,
                                       kmp_taskgraph_flags_t *flags,
                                       kmp_int32 tdg_id) {
-  kmp_tdg_info_t *tdg =
-      (kmp_tdg_info_t *)__kmp_allocate(sizeof(kmp_tdg_info_t));
-  __kmp_global_tdgs[__kmp_num_tdg - 1] = tdg;
+  kmp_tdg_info_t *tdg = __kmp_alloc_tdg(tdg_id);
   // Initializing the TDG structure
   tdg->tdg_id = tdg_id;
   tdg->map_size = INIT_MAPSIZE;
@@ -5418,42 +5466,36 @@ static inline void __kmp_start_record(kmp_int32 gtid,
 // loc_ref:     Location of TDG, not used yet
 // gtid:        Global Thread ID of the encountering thread
 // input_flags: Flags associated with the TDG
-// tdg_id:      ID of the TDG to record, for now, incremental integer
+// tdg_id:      ID of the TDG to record
 // returns:     1 if we record, otherwise, 0
 kmp_int32 __kmpc_start_record_task(ident_t *loc_ref, kmp_int32 gtid,
                                    kmp_int32 input_flags, kmp_int32 tdg_id) {
-
   kmp_int32 res;
   kmp_taskgraph_flags_t *flags = (kmp_taskgraph_flags_t *)&input_flags;
-  KA_TRACE(10,
-           ("__kmpc_start_record_task(enter): T#%d loc=%p flags=%d tdg_id=%d\n",
-            gtid, loc_ref, input_flags, tdg_id));
+  KA_TRACE(10, ("__kmpc_start_record_task(enter): T#%d loc=%p flags=%d "
+                "tdg_id=%d\n",
+                gtid, loc_ref, input_flags, tdg_id));
 
   if (__kmp_max_tdgs == 0) {
-    KA_TRACE(
-        10,
-        ("__kmpc_start_record_task(abandon): T#%d loc=%p flags=%d tdg_id = %d, "
-         "__kmp_max_tdgs = 0\n",
-         gtid, loc_ref, input_flags, tdg_id));
+    KA_TRACE(10, ("__kmpc_start_record_task(abandon): T#%d loc=%p flags=%d "
+                  "tdg_id = %d, __kmp_max_tdgs = 0\n",
+                  gtid, loc_ref, input_flags, tdg_id));
     return 1;
   }
 
-  if (!flags->nowait)
-    __kmpc_taskgroup(loc_ref, gtid);
-  kmp_tdg_info_t *tdg = __kmp_find_tdg(tdg_id);
-  if (!flags->re_record && tdg) {
-    // TODO: remove old if re_record
+  __kmpc_taskgroup(loc_ref, gtid);
+  if (flags->graph_reset) {
+    __kmp_free_tdg(tdg_id);
+    __kmp_num_tdg--;
+  }
+  if (kmp_tdg_info_t *tdg = __kmp_find_tdg(tdg_id)) {
+    // TODO: use re_record flag
     __kmp_exec_tdg(gtid, tdg);
     res = 0;
   } else {
-    if (__kmp_num_tdg < __kmp_max_tdgs) {
-      __kmp_curr_tdg_id = tdg_id;
-      __kmp_num_tdg++;
-      KMP_DEBUG_ASSERT(__kmp_num_tdg <= __kmp_max_tdgs);
-      __kmp_start_record(gtid, flags, tdg_id);
-    }
-    // if no TDG found, need to execute the task
-    // even not recording
+    KMP_DEBUG_ASSERT(__kmp_num_tdg < __kmp_max_tdgs);
+    __kmp_start_record(gtid, flags, tdg_id);
+    __kmp_num_tdg++;
     res = 1;
   }
   KA_TRACE(10, ("__kmpc_start_record_task(exit): T#%d TDG %d starts to %s\n",
@@ -5519,6 +5561,7 @@ void __kmpc_end_record_task(ident_t *loc_ref, kmp_int32 gtid,
   kmp_tdg_info_t *tdg = __kmp_find_tdg(tdg_id);
   kmp_taskgraph_flags_t *flags = (kmp_taskgraph_flags_t *)&input_flags;
 
+  KMP_DEBUG_ASSERT(tdg != NULL);
   KA_TRACE(10, ("__kmpc_end_record_task(enter): T#%d loc=%p finishes recording"
                 " tdg=%d with flags=%d\n",
                 gtid, loc_ref, tdg_id, input_flags));
