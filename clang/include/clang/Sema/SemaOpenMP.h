@@ -943,6 +943,10 @@ public:
   ActOnOpenMPOrderedClause(SourceLocation StartLoc, SourceLocation EndLoc,
                            SourceLocation LParenLoc = SourceLocation(),
                            Expr *NumForLoops = nullptr);
+  /// Called on well-formed 'graph_id' clause.
+  OMPClause *ActOnOpenMPGraphIdClause(Expr *Condition, SourceLocation StartLoc,
+                                      SourceLocation LParenLoc,
+                                      SourceLocation EndLoc);
   /// Called on well-formed 'grainsize' clause.
   OMPClause *ActOnOpenMPGrainsizeClause(OpenMPGrainsizeClauseModifier Modifier,
                                         Expr *Size, SourceLocation StartLoc,

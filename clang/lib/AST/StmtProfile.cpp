@@ -910,6 +910,11 @@ void OMPClauseProfiler::VisitOMPGrainsizeClause(const OMPGrainsizeClause *C) {
   if (C->getGrainsize())
     Profiler->VisitStmt(C->getGrainsize());
 }
+void OMPClauseProfiler::VisitOMPGraphIdClause(const OMPGraphIdClause *C) {
+  VistOMPClauseWithPreInit(C);
+  if (C->getCondition())
+    Profiler->VisitStmt(C->getCondition());
+}
 void OMPClauseProfiler::VisitOMPNumTasksClause(const OMPNumTasksClause *C) {
   VisitOMPClauseWithPreInit(C);
   if (C->getNumTasks())

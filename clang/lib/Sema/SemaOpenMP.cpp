@@ -6793,6 +6793,7 @@ StmtResult SemaOpenMP::ActOnOpenMPExecutableDirective(
       case OMPC_final:
       case OMPC_priority:
       case OMPC_novariants:
+      case OMPC_graph_id:
       case OMPC_nocontext:
         // Do not analyze if no parent parallel directive.
         if (isOpenMPParallelDirective(Kind))
@@ -16615,6 +16616,9 @@ OMPClause *SemaOpenMP::ActOnOpenMPSingleExprClause(OpenMPClauseKind Kind,
   case OMPC_detach:
     Res = ActOnOpenMPDetachClause(Expr, StartLoc, LParenLoc, EndLoc);
     break;
+  case OMPC_graph_id:
+    Res = ActOnOpenMPGraphIdClause(Expr, StartLoc, LParenLoc, EndLoc);
+    break;
   case OMPC_novariants:
     Res = ActOnOpenMPNovariantsClause(Expr, StartLoc, LParenLoc, EndLoc);
     break;
@@ -17403,6 +17407,7 @@ OMPClause *SemaOpenMP::ActOnOpenMPSimpleClause(
   case OMPC_match:
   case OMPC_nontemporal:
   case OMPC_destroy:
+  case OMPC_graph_id:
   case OMPC_novariants:
   case OMPC_nocontext:
   case OMPC_detach:
@@ -18109,6 +18114,7 @@ OMPClause *SemaOpenMP::ActOnOpenMPSingleExprWithArgClause(
   case OMPC_severity:
   case OMPC_message:
   case OMPC_destroy:
+  case OMPC_graph_id:
   case OMPC_novariants:
   case OMPC_nocontext:
   case OMPC_detach:
@@ -18382,6 +18388,7 @@ OMPClause *SemaOpenMP::ActOnOpenMPClause(OpenMPClauseKind Kind,
   case OMPC_at:
   case OMPC_severity:
   case OMPC_message:
+  case OMPC_graph_id:
   case OMPC_novariants:
   case OMPC_nocontext:
   case OMPC_detach:
@@ -18739,6 +18746,38 @@ OMPClause *SemaOpenMP::ActOnOpenMPDestroyClause(Expr *InteropVar,
       OMPDestroyClause(InteropVar, StartLoc, LParenLoc, VarLoc, EndLoc);
 }
 
+OMPClause *SemaOpenMP::ActOnOpenMPGraphIdClause(Expr *Condition,
+                                                SourceLocation StartLoc,
+                                                SourceLocation LParenLoc,
+                                                SourceLocation EndLoc) {
+  Expr *ValExpr = Condition;
+  Stmt *HelperValStmt = nullptr;
+  OpenMPDirectiveKind CaptureRegion = OMPD_unknown;
+  if (!Condition->isValueDependent() && !Condition->isTypeDependent() &&
+      !Condition->isInstantiationDependent() &&
+      !Condition->containsUnexpandedParameterPack()) {
+    ExprResult Val = SemaRef.CheckBooleanCondition(StartLoc, Condition);
+    if (Val.isInvalid())
+      return nullptr;
+
+    ValExpr = SemaRef.MakeFullExpr(Val.get()).get();
+
+    OpenMPDirectiveKind DKind = DSAStack->getCurrentDirective();
+    CaptureRegion = getOpenMPCaptureRegionForClause(DKind, OMPC_graph_id,
+                                                    getLangOpts().OpenMP);
+    if (CaptureRegion != OMPD_unknown &&
+        !SemaRef.CurContext->isDependentContext()) {
+      ValExpr = SemaRef.MakeFullExpr(ValExpr).get();
+      llvm::MapVector<const Expr *, DeclRefExpr *> Captures;
+      ValExpr = tryBuildCapture(SemaRef, ValExpr, Captures).get();
+      HelperValStmt = buildPreInits(getASTContext(), Captures);
+    }
+  }
+
+  return new (getASTContext()) OMPGraphIdClause(
+      ValExpr, HelperValStmt, CaptureRegion, StartLoc, LParenLoc, EndLoc);
+}
+
 OMPClause *SemaOpenMP::ActOnOpenMPNovariantsClause(Expr *Condition,
                                                    SourceLocation StartLoc,
                                                    SourceLocation LParenLoc,
@@ -19039,6 +19078,7 @@ OMPClause *SemaOpenMP::ActOnOpenMPVarListClause(OpenMPClauseKind Kind,
   case OMPC_severity:
   case OMPC_message:
   case OMPC_destroy:
+  case OMPC_graph_id:
   case OMPC_novariants:
   case OMPC_nocontext:
   case OMPC_detach:

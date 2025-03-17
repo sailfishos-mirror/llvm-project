@@ -246,6 +246,7 @@ def OMPC_GrainSize : Clause<[Spelling<"grainsize">]> {
   ];
 }
 def OMPC_GraphId : Clause<[Spelling<"graph_id">]> {
+  let clangClass = "OMPGraphIdClause";
   let flangClass = "OmpGraphIdClause";
 }
 def OMPC_GraphReset : Clause<[Spelling<"graph_reset">]> {
