@@ -8484,6 +8484,51 @@ public:
   }
 };
 
+// This represents clause 'graph_reset' in the '#pragma omp taskgraph"
+/// directives.
+///
+/// \code
+/// #pragma omp taskgraph graph_reset(true)
+class OMPGraphResetClause final
+    : public OMPOneStmtClause<llvm::omp::OMPC_graph_reset, OMPClause>,
+      public OMPClauseWithPreInit {
+  friend class OMPClauseReader;
+
+  /// Set condition.
+  void setCondition(Expr *Cond) { setStmt(Cond); }
+
+public:
+  /// Build 'grpah_id' clause with condition \a Cond.
+  ///
+  /// \param Cond Condition of the clause.
+  /// \param HelperCond Helper condition for the construct.
+  /// \param CaptureRegion Innermost OpenMP region where expressions in this
+  /// clause must be captured.
+  /// \param StartLoc Starting location of the clause.
+  /// \param LParenLoc Location of '('.
+  /// \param EndLoc Ending location of the clause.
+  OMPGraphResetClause(Expr *Cond, Stmt *HelperCond,
+                      OpenMPDirectiveKind CaptureRegion,
+                      SourceLocation StartLoc, SourceLocation LParenLoc,
+                      SourceLocation EndLoc)
+      : OMPOneStmtClause(Cond, StartLoc, LParenLoc, EndLoc),
+        OMPClauseWithPreInit(this) {
+    setPreInitStmt(HelperCond, CaptureRegion);
+  }
+
+  /// Build an empty clause.
+  OMPGraphResetClause() : OMPOneStmtClause(), OMPClauseWithPreInit(this) {}
+
+  /// Returns condition.
+  Expr *getCondition() const { return getStmtAs<Expr>(); }
+
+  child_range used_children();
+  const_child_range used_children() const {
+    auto Children = const_cast<OMPGraphResetClause *>(this)->used_children();
+    return const_child_range(Children.begin(), Children.end());
+  }
+};
+
 /// This represents clause 'has_device_ptr' in the '#pragma omp ...'
 /// directives.
 ///

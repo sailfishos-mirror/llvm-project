@@ -250,6 +250,7 @@ def OMPC_GraphId : Clause<[Spelling<"graph_id">]> {
   let flangClass = "OmpGraphIdClause";
 }
 def OMPC_GraphReset : Clause<[Spelling<"graph_reset">]> {
+  let clangClass = "OMPGraphResetClause";
   let flangClass = "OmpGraphResetClause";
   let isValueOptional = true;
 }

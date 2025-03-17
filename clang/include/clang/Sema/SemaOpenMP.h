@@ -947,6 +947,11 @@ public:
   OMPClause *ActOnOpenMPGraphIdClause(Expr *Condition, SourceLocation StartLoc,
                                       SourceLocation LParenLoc,
                                       SourceLocation EndLoc);
+  /// Called on well-formed 'graph_reset' clause.
+  OMPClause *ActOnOpenMPGraphResetClause(Expr *Condition,
+                                         SourceLocation StartLoc,
+                                         SourceLocation LParenLoc,
+                                         SourceLocation EndLoc);
   /// Called on well-formed 'grainsize' clause.
   OMPClause *ActOnOpenMPGrainsizeClause(OpenMPGrainsizeClauseModifier Modifier,
                                         Expr *Size, SourceLocation StartLoc,
