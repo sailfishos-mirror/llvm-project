@@ -27,7 +27,8 @@
 using namespace mlir;
 
 static void
-getForwardSliceImpl(Operation *op, SetVector<Operation *> *forwardSlice,
+getForwardSliceImpl(Operation *op, DenseSet<Operation *> &visited,
+                    SetVector<Operation *> *forwardSlice,
                     const SliceOptions::TransitiveFilter &filter = nullptr) {
   if (!op)
     return;
@@ -42,19 +43,23 @@ getForwardSliceImpl(Operation *op, SetVector<Operation *> *forwardSlice,
     for (Block &block : region)
       for (Operation &blockOp : block)
         if (forwardSlice->count(&blockOp) == 0)
-          getForwardSliceImpl(&blockOp, forwardSlice, filter);
-  for (Value result : op->getResults()) {
-    for (Operation *userOp : result.getUsers())
-      if (forwardSlice->count(userOp) == 0)
-        getForwardSliceImpl(userOp, forwardSlice, filter);
-  }
+          getForwardSliceImpl(&blockOp, visited, forwardSlice, filter);
+
+  for (Value result : op->getResults())
+    for (Operation *userOp : result.getUsers()) {
+      if (forwardSlice->count(userOp) == 0 && visited.insert(userOp).second)
+        getForwardSliceImpl(userOp, visited, forwardSlice, filter);
+
+      visited.erase(userOp);
+    }
 
   forwardSlice->insert(op);
 }
 
 void mlir::getForwardSlice(Operation *op, SetVector<Operation *> *forwardSlice,
                            const ForwardSliceOptions &options) {
-  getForwardSliceImpl(op, forwardSlice, options.filter);
+  DenseSet<Operation *> visited;
+  getForwardSliceImpl(op, visited, forwardSlice, options.filter);
   if (!options.inclusive) {
     // Don't insert the top level operation, we just queried on it and don't
     // want it in the results.
@@ -70,8 +75,9 @@ void mlir::getForwardSlice(Operation *op, SetVector<Operation *> *forwardSlice,
 
 void mlir::getForwardSlice(Value root, SetVector<Operation *> *forwardSlice,
                            const SliceOptions &options) {
+  DenseSet<Operation *> visited;
   for (Operation *user : root.getUsers())
-    getForwardSliceImpl(user, forwardSlice, options.filter);
+    getForwardSliceImpl(user, visited, forwardSlice, options.filter);
 
   // Reverse to get back the actual topological order.
   // std::reverse does not work out of the box on SetVector and I want an
@@ -80,7 +86,7 @@ void mlir::getForwardSlice(Value root, SetVector<Operation *> *forwardSlice,
   forwardSlice->insert(v.rbegin(), v.rend());
 }
 
-static void getBackwardSliceImpl(Operation *op,
+static void getBackwardSliceImpl(Operation *op, DenseSet<Operation *> &visited,
                                  SetVector<Operation *> *backwardSlice,
                                  const BackwardSliceOptions &options) {
   if (!op || op->hasTrait<OpTrait::IsIsolatedFromAbove>())
@@ -94,8 +100,11 @@ static void getBackwardSliceImpl(Operation *op,
 
   auto processValue = [&](Value value) {
     if (auto *definingOp = value.getDefiningOp()) {
-      if (backwardSlice->count(definingOp) == 0)
-        getBackwardSliceImpl(definingOp, backwardSlice, options);
+      if (backwardSlice->count(definingOp) == 0 &&
+          visited.insert(definingOp).second)
+        getBackwardSliceImpl(definingOp, visited, backwardSlice, options);
+
+      visited.erase(definingOp);
     } else if (auto blockArg = dyn_cast<BlockArgument>(value)) {
       if (options.omitBlockArguments)
         return;
@@ -108,7 +117,7 @@ static void getBackwardSliceImpl(Operation *op,
       if (parentOp && backwardSlice->count(parentOp) == 0) {
         assert(parentOp->getNumRegions() == 1 &&
                llvm::hasSingleElement(parentOp->getRegion(0).getBlocks()));
-        getBackwardSliceImpl(parentOp, backwardSlice, options);
+        getBackwardSliceImpl(parentOp, visited, backwardSlice, options);
       }
     } else {
       llvm_unreachable("No definingOp and not a block argument.");
@@ -138,7 +147,8 @@ static void getBackwardSliceImpl(Operation *op,
 void mlir::getBackwardSlice(Operation *op,
                             SetVector<Operation *> *backwardSlice,
                             const BackwardSliceOptions &options) {
-  getBackwardSliceImpl(op, backwardSlice, options);
+  DenseSet<Operation *> visited;
+  getBackwardSliceImpl(op, visited, backwardSlice, options);
 
   if (!options.inclusive) {
     // Don't insert the top level operation, we just queried on it and don't
