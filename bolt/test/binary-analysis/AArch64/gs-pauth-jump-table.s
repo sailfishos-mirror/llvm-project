@@ -22,7 +22,7 @@
         .type   good_jump_table,@function
 good_jump_table:
 // CHECK-NOT: good_jump_table
-// CFG:       GS-PAUTH: Warning: the function has unreachable basic blocks (possibly incomplete CFG) in function good_jump_table
+// CFG:       GS-PAUTH: Warning: possibly imprecise CFG, the analysis quality may be degraded in this function. According to BOLT, unreachable code is found in function good_jump_table
 // CHECK-NOT: good_jump_table
         paciasp
         cmp     x16, #0x2
@@ -56,7 +56,7 @@ good_jump_table:
         .type   jump_table_relaxed_adrp_add,@function
 jump_table_relaxed_adrp_add:
 // CHECK-NOT: jump_table_relaxed_adrp_add
-// CFG:       GS-PAUTH: Warning: the function has unreachable basic blocks (possibly incomplete CFG) in function jump_table_relaxed_adrp_add
+// CFG:       GS-PAUTH: Warning: possibly imprecise CFG, the analysis quality may be degraded in this function. According to BOLT, unreachable code is found in function jump_table_relaxed_adrp_add
 // CHECK-NOT: jump_table_relaxed_adrp_add
         paciasp
         cmp     x16, #0x2
@@ -126,7 +126,7 @@ jump_table_wrong_hint:
         .type   jump_table_unsafe_reg_1,@function
 jump_table_unsafe_reg_1:
 // CHECK-NOT: jump_table_unsafe_reg_1
-// CFG:       GS-PAUTH: Warning: the function has unreachable basic blocks (possibly incomplete CFG) in function jump_table_unsafe_reg_1
+// CFG:       GS-PAUTH: Warning: possibly imprecise CFG, the analysis quality may be degraded in this function. According to BOLT, unreachable code is found in function jump_table_unsafe_reg_1
 // CHECK-NOT: jump_table_unsafe_reg_1
         paciasp
         cmp     x1, #0x2
@@ -157,7 +157,7 @@ jump_table_unsafe_reg_1:
         .type   jump_table_unsafe_reg_2,@function
 jump_table_unsafe_reg_2:
 // CHECK-NOT: jump_table_unsafe_reg_2
-// CFG:       GS-PAUTH: Warning: the function has unreachable basic blocks (possibly incomplete CFG) in function jump_table_unsafe_reg_2
+// CFG:       GS-PAUTH: Warning: possibly imprecise CFG, the analysis quality may be degraded in this function. According to BOLT, unreachable code is found in function jump_table_unsafe_reg_2
 // CHECK-NOT: jump_table_unsafe_reg_2
         paciasp
         cmp     x16, #0x2
@@ -189,7 +189,7 @@ jump_table_unsafe_reg_2:
         .type   jump_table_wrong_limit,@function
 jump_table_wrong_limit:
 // CHECK-NOT: jump_table_wrong_limit
-// CFG:       GS-PAUTH: Warning: the function has unreachable basic blocks (possibly incomplete CFG) in function jump_table_wrong_limit
+// CFG:       GS-PAUTH: Warning: possibly imprecise CFG, the analysis quality may be degraded in this function. According to BOLT, unreachable code is found in function jump_table_wrong_limit
 // CHECK-NOT: jump_table_wrong_limit
         paciasp
         cmp     x16, #0x1000
@@ -634,7 +634,7 @@ jump_table_wrong_imm_3:
 skip_cfi_instructions:
         .cfi_startproc
 // CHECK-NOT: skip_cfi_instructions
-// CFG:       GS-PAUTH: Warning: the function has unreachable basic blocks (possibly incomplete CFG) in function skip_cfi_instructions
+// CFG:       GS-PAUTH: Warning: possibly imprecise CFG, the analysis quality may be degraded in this function. According to BOLT, unreachable code is found in function skip_cfi_instructions
 // CHECK-NOT: skip_cfi_instructions
         paciasp
         cmp     x16, #0x2
