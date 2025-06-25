@@ -1332,6 +1332,7 @@ void TargetInstrInfo::reassociateOps(
   // recycling RegB because the MachineCombiner's computation of the critical
   // path requires a new register definition rather than an existing one.
   Register NewVR = MRI.createVirtualRegister(RC);
+  unsigned SubRegNewVR = 0;
   InstrIdxForVirtReg.insert(std::make_pair(NewVR, 0));
 
   auto [NewRootOpc, NewPrevOpc] = getReassociationOpcodes(Pattern, Root, Prev);
@@ -1407,6 +1408,7 @@ void TargetInstrInfo::reassociateOps(
 
   if (SwapRootOperands) {
     std::swap(RegA, NewVR);
+    std::swap(SubRegA, SubRegNewVR);
     std::swap(KillA, KillNewVR);
   }
 
@@ -1420,7 +1422,7 @@ void TargetInstrInfo::reassociateOps(
     if (Idx == RootFirstOpIdx)
       MIB2 = MIB2.addReg(RegA, getKillRegState(KillA), SubRegA);
     else if (Idx == RootSecondOpIdx)
-      MIB2 = MIB2.addReg(NewVR, getKillRegState(KillNewVR));
+      MIB2 = MIB2.addReg(NewVR, getKillRegState(KillNewVR), SubRegNewVR);
     else
       MIB2 = MIB2.add(MO);
   }
