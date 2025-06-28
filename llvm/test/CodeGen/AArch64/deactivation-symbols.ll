@@ -46,9 +46,11 @@ define i64 @pauth_sign(i64 %p, i64 %d) {
 
 ; CHECK: pauth_auth_zero:
 define i64 @pauth_auth_zero(i64 %p) {
+  ; O0: mov x9, xzr
   ; CHECK: [[LABEL:.L.*]]:
   ; CHECK-NEXT: .reloc [[LABEL]], R_AARCH64_PATCHINST, ds
-  ; CHECK-NEXT: autiza x0
+  ; O0-NEXT: autia x0, x9
+  ; O2-NEXT: autiza x0
   %authed = call i64 @llvm.ptrauth.auth(i64 %p, i32 0, i64 0) [ "deactivation-symbol"(ptr @ds) ]
   ret i64 %authed
 }
