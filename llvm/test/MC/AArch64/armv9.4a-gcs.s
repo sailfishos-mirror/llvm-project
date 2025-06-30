@@ -5,13 +5,13 @@
 // RUN: llvm-mc -triple=aarch64 -filetype=obj -mattr=+gcs < %s \
 // RUN:        | llvm-objdump -d --mattr=+gcs --no-print-imm-hex - | FileCheck %s --check-prefix=CHECK-INST
 // RUN: llvm-mc -triple=aarch64 -filetype=obj -mattr=+gcs < %s \
-// RUN:   | llvm-objdump -d --mattr=-gcs --no-print-imm-hex - | FileCheck %s --check-prefix=CHECK-UNKNOWN
+// RUN:        | llvm-objdump -d --mattr=-gcs --no-print-imm-hex - | FileCheck %s --check-prefix=CHECK-UNKNOWN
 // Disassemble encoding and check the re-encoding (-show-encoding) matches.
 // RUN: llvm-mc -triple=aarch64 -show-encoding -mattr=+gcs < %s \
 // RUN:        | sed '/.text/d' | sed 's/.*encoding: //g' \
 // RUN:        | llvm-mc -triple=aarch64 -mattr=+gcs -disassemble -show-encoding \
 // RUN:        | FileCheck %s --check-prefixes=CHECK-ENCODING,CHECK-INST
-
+// RUN: not llvm-mc -triple aarch64 -show-encoding %s 2>%t | FileCheck %s --check-prefix=NO-GCS
 
 
 msr GCSCR_EL1, x0
@@ -154,11 +154,13 @@ gcsb dsync
 // CHECK-INST: gcsb dsync
 // CHECK-ENCODING: encoding: [0x7f,0x22,0x03,0xd5]
 // CHECK-UNKNOWN:  d503227f hint #19
+// NO-GCS: hint #19                              // encoding: [0x7f,0x22,0x03,0xd5]
 
 hint #19
 // CHECK-INST: gcsb dsync
 // CHECK-ENCODING: encoding: [0x7f,0x22,0x03,0xd5]
 // CHECK-UNKNOWN:  d503227f hint #19
+// NO-GCS: hint #19                              // encoding: [0x7f,0x22,0x03,0xd5]
 
 gcsstr x26, [x27]
 // CHECK-INST: gcsstr x26, [x27]

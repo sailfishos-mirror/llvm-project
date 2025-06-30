@@ -3,15 +3,18 @@
 
 ldclrpl  x22, xzr, [sp]
 // CHECK-ERROR: error: invalid operand for instruction
+
 ldclrpl  xzr, x22, [sp]
 // CHECK-ERROR: error: invalid operand for instruction
 
 ldsetpl  x22, xzr, [sp]
 // CHECK-ERROR: error: invalid operand for instruction
+
 ldsetpl  xzr, x22, [sp]
 // CHECK-ERROR: error: invalid operand for instruction
 
 swppl    x22, xzr, [sp]
 // CHECK-ERROR: error: invalid operand for instruction
+
 swppl    xzr, x22, [sp]
 // CHECK-ERROR: error: invalid operand for instruction

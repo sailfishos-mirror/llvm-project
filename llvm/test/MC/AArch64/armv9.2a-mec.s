@@ -5,13 +5,13 @@
 // RUN: llvm-mc -triple=aarch64 -filetype=obj -mattr=+mec < %s \
 // RUN:        | llvm-objdump -d --mattr=+mec --no-print-imm-hex - | FileCheck %s --check-prefix=CHECK-INST
 // RUN: llvm-mc -triple=aarch64 -filetype=obj -mattr=+mec < %s \
-// RUN:   | llvm-objdump -d --mattr=-mec --no-print-imm-hex - | FileCheck %s --check-prefix=CHECK-UNKNOWN
+// RUN:        | llvm-objdump -d --mattr=-mec --no-print-imm-hex - | FileCheck %s --check-prefix=CHECK-UNKNOWN
 // Disassemble encoding and check the re-encoding (-show-encoding) matches.
 // RUN: llvm-mc -triple=aarch64 -show-encoding -mattr=+mec < %s \
 // RUN:        | sed '/.text/d' | sed 's/.*encoding: //g' \
 // RUN:        | llvm-mc -triple=aarch64 -mattr=+mec -disassemble -show-encoding \
 // RUN:        | FileCheck %s --check-prefixes=CHECK-ENCODING,CHECK-INST
-
+// RUN: llvm-mc -triple aarch64 -disassemble < %s 2>&1 | FileCheck --check-prefix=CHECK-NO-MEC %s
 
 
 mrs x0, MECIDR_EL2
@@ -109,9 +109,21 @@ dc cigdpae, x0
 // CHECK-ENCODING: encoding: [0xe0,0x7e,0x0c,0xd5]
 // CHECK-ERROR: :[[@LINE-3]]:4: error: DC CIGDPAE requires: mec
 // CHECK-UNKNOWN:  d50c7ee0 sys #4, c7, c14, #7, x0
+// CHECK-NO-MEC: sys #4, c7, c14, #7, x0
 
 dc cipae, x0
 // CHECK-INST: dc cipae, x0
 // CHECK-ENCODING: encoding: [0x00,0x7e,0x0c,0xd5]
 // CHECK-ERROR: :[[@LINE-3]]:4: error: DC CIPAE requires: mec
+// CHECK-UNKNOWN:  d50c7e00 sys #4, c7, c14, #0, x0
+// CHECK-NO-MEC: sys #4, c7, c14, #0, x0
+
+sys #4, c7, c14, #7, x0
+// CHECK-INST: dc cigdpae, x0
+// CHECK-ENCODING: encoding: [0xe0,0x7e,0x0c,0xd5]
+// CHECK-UNKNOWN:  d50c7ee0 sys #4, c7, c14, #7, x0
+
+sys #4, c7, c14, #0, x0
+// CHECK-INST: dc cipae, x0
+// CHECK-ENCODING: encoding: [0x00,0x7e,0x0c,0xd5]
 // CHECK-UNKNOWN:  d50c7e00 sys #4, c7, c14, #0, x0
