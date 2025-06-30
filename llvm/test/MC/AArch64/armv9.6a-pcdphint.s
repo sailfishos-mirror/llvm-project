@@ -5,7 +5,7 @@
 // RUN: llvm-mc -triple=aarch64 -filetype=obj -mattr=+pcdphint < %s \
 // RUN:        | llvm-objdump -d --mattr=+pcdphint - | FileCheck %s --check-prefix=CHECK-INST
 // RUN: llvm-mc -triple=aarch64 -filetype=obj -mattr=+pcdphint < %s \
-// RUN:   | llvm-objdump -d --mattr=-pcdphint - | FileCheck %s --check-prefix=CHECK-UNKNOWN
+// RUN:        | llvm-objdump -d --mattr=-pcdphint - | FileCheck %s --check-prefix=CHECK-UNKNOWN
 // Disassemble encoding and check the re-encoding (-show-encoding) matches.
 // RUN: llvm-mc -triple=aarch64 -show-encoding -mattr=+pcdphint < %s \
 // RUN:        | sed '/.text/d' | sed 's/.*encoding: //g' \
@@ -18,6 +18,7 @@ stshh keep
 // CHECK-ERROR: error: instruction requires: pcdphint
 // CHECK-UNKNOWN:  d501961f      msr S0_1_C9_C6_0, xzr
 // ERROR: :[[@LINE-3]]:3: error: instruction requires: pcdphint
+
 stshh strm
 // CHECK-INST: stshh strm
 // CHECK-ENCODING: encoding: [0x3f,0x96,0x01,0xd5]
