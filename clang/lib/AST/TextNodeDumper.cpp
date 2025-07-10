@@ -2109,19 +2109,32 @@ void TextNodeDumper::VisitFunctionProtoType(const FunctionProtoType *T) {
 }
 
 void TextNodeDumper::VisitUnresolvedUsingType(const UnresolvedUsingType *T) {
+  if (ElaboratedTypeKeyword K = T->getKeyword();
+      K != ElaboratedTypeKeyword::None)
+    OS << ' ' << TypeWithKeyword::getKeywordName(K);
+  dumpNestedNameSpecifier(T->getQualifier());
   dumpDeclRef(T->getDecl());
 }
 
 void TextNodeDumper::VisitUsingType(const UsingType *T) {
-  dumpDeclRef(T->getFoundDecl());
-  if (!T->typeMatchesDecl())
-    OS << " divergent";
+  if (ElaboratedTypeKeyword K = T->getKeyword();
+      K != ElaboratedTypeKeyword::None)
+    OS << ' ' << TypeWithKeyword::getKeywordName(K);
+  dumpNestedNameSpecifier(T->getQualifier());
+  dumpDeclRef(T->getDecl());
+  dumpType(T->desugar());
 }
 
 void TextNodeDumper::VisitTypedefType(const TypedefType *T) {
+  if (ElaboratedTypeKeyword K = T->getKeyword();
+      K != ElaboratedTypeKeyword::None)
+    OS << ' ' << TypeWithKeyword::getKeywordName(K);
+  dumpNestedNameSpecifier(T->getQualifier());
   dumpDeclRef(T->getDecl());
-  if (!T->typeMatchesDecl())
+  if (!T->typeMatchesDecl()) {
     OS << " divergent";
+    dumpType(T->desugar());
+  }
 }
 
 void TextNodeDumper::VisitUnaryTransformType(const UnaryTransformType *T) {
@@ -2135,7 +2148,17 @@ void TextNodeDumper::VisitUnaryTransformType(const UnaryTransformType *T) {
 }
 
 void TextNodeDumper::VisitTagType(const TagType *T) {
-  dumpDeclRef(T->getDecl());
+  if (T->isCanonicalUnqualified())
+    OS << " canonical";
+  if (T->isTagOwned())
+    OS << " owns_tag";
+  if (T->isInjected())
+    OS << " injected";
+  if (ElaboratedTypeKeyword K = T->getKeyword();
+      K != ElaboratedTypeKeyword::None)
+    OS << ' ' << TypeWithKeyword::getKeywordName(K);
+  dumpNestedNameSpecifier(T->getQualifier());
+  dumpDeclRef(T->getOriginalDecl());
 }
 
 void TextNodeDumper::VisitTemplateTypeParmType(const TemplateTypeParmType *T) {
@@ -2179,6 +2202,9 @@ void TextNodeDumper::VisitTemplateSpecializationType(
     const TemplateSpecializationType *T) {
   if (T->isTypeAlias())
     OS << " alias";
+  if (ElaboratedTypeKeyword K = T->getKeyword();
+      K != ElaboratedTypeKeyword::None)
+    OS << ' ' << TypeWithKeyword::getKeywordName(K);
   dumpTemplateName(T->getTemplateName(), "name");
 }
 
@@ -2789,16 +2815,14 @@ void TextNodeDumper::VisitUsingEnumDecl(const UsingEnumDecl *D) {
 void TextNodeDumper::VisitUnresolvedUsingTypenameDecl(
     const UnresolvedUsingTypenameDecl *D) {
   OS << ' ';
-  if (D->getQualifier())
-    D->getQualifier()->print(OS, D->getASTContext().getPrintingPolicy());
+  D->getQualifier().print(OS, D->getASTContext().getPrintingPolicy());
   OS << D->getDeclName();
 }
 
 void TextNodeDumper::VisitUnresolvedUsingValueDecl(
     const UnresolvedUsingValueDecl *D) {
   OS << ' ';
-  if (D->getQualifier())
-    D->getQualifier()->print(OS, D->getASTContext().getPrintingPolicy());
+  D->getQualifier().print(OS, D->getASTContext().getPrintingPolicy());
   OS << D->getDeclName();
   dumpType(D->getType());
 }
