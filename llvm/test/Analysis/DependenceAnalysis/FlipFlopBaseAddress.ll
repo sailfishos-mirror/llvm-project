@@ -166,7 +166,7 @@ for.end:                                          ; preds = %for.cond.cleanup
 ;       (j % 2 == 0 ? A[i][j] : A[i][j+1]) = 1;
 ; }
 ;
-; FIXME: There are loop-carried dependencies between the store instruction. For
+; There are loop-carried dependencies between the store instruction. For
 ; example, the value of %ptr0 when (i, j) = (0, 1) is %A+8, which is the same
 ; as when (i, j) = (0, 2).
 
@@ -216,8 +216,8 @@ exit:
 ; Similar to the above case, but ptr0 is loop-invariant with respsect to the
 ; k-loop.
 ;
-; FIXME: Same as the above case, there are loop-carried dependencies between
-; the store.
+; Same as the above case, there are loop-carried dependencies between the
+; store.
 
 define void @non_invariant_baseptr_with_identical_obj2(ptr %A) {
 ; CHECK-LABEL: 'non_invariant_baseptr_with_identical_obj2'
