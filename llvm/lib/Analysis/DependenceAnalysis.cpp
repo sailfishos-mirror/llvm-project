@@ -3672,7 +3672,8 @@ DependenceInfo::depends(Instruction *Src, Instruction *Dst,
 
   // Even if the base pointers are the same, they may not be loop-invariant. It
   // could lead to incorrect results, as we're analyzing loop-carried
-  // dependencies.
+  // dependencies. Src and Dst can be in different loops, so we need to check
+  // the base pointer is invariant in both loops.
   Loop *SrcLoop = LI->getLoopFor(Src->getParent());
   Loop *DstLoop = LI->getLoopFor(Dst->getParent());
   if (!isLoopInvariant(SrcBase, SrcLoop) ||
