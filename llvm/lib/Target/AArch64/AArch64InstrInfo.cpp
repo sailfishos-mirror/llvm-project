@@ -7329,9 +7329,9 @@ bool AArch64InstrInfo::isThroughputPattern(unsigned Pattern) const {
   case AArch64MachineCombinerPattern::MULSUBv2i32_indexed_OP2:
   case AArch64MachineCombinerPattern::MULSUBv4i32_indexed_OP1:
   case AArch64MachineCombinerPattern::MULSUBv4i32_indexed_OP2:
-  case AArch64MachineCombinerPattern::GATHER_i32:
-  case AArch64MachineCombinerPattern::GATHER_i16:
-  case AArch64MachineCombinerPattern::GATHER_i8:
+  case AArch64MachineCombinerPattern::GATHER_LANE_i32:
+  case AArch64MachineCombinerPattern::GATHER_LANE_i16:
+  case AArch64MachineCombinerPattern::GATHER_LANE_i8:
     return true;
   } // end switch (Pattern)
   return false;
@@ -7375,6 +7375,10 @@ static bool getMiscPatterns(MachineInstr &Root,
 static bool getGatherPattern(MachineInstr &Root,
                              SmallVectorImpl<unsigned> &Patterns,
                              unsigned LoadLaneOpCode, unsigned NumLanes) {
+  // Early exit if optimizing for size.
+  if (Root.getMF()->getFunction().hasMinSize())
+    return false;
+
   const MachineRegisterInfo &MRI = Root.getMF()->getRegInfo();
   const TargetRegisterInfo *TRI =
       Root.getMF()->getSubtarget().getRegisterInfo();
@@ -7391,7 +7395,7 @@ static bool getGatherPattern(MachineInstr &Root,
   auto *CurrInstr = MRI.getUniqueVRegDef(Root.getOperand(1).getReg());
   auto Range = llvm::seq<unsigned>(1, NumLanes - 1);
   SmallSet<unsigned, 4> RemainingLanes(Range.begin(), Range.end());
-  while (RemainingLanes.begin() != RemainingLanes.end() &&
+  while (!RemainingLanes.empty() && CurrInstr &&
          CurrInstr->getOpcode() == LoadLaneOpCode &&
          MRI.hasOneNonDBGUse(CurrInstr->getOperand(0).getReg()) &&
          CurrInstr->getNumOperands() == 4) {
@@ -7418,13 +7422,13 @@ static bool getGatherPattern(MachineInstr &Root,
 
   switch (NumLanes) {
   case 4:
-    Patterns.push_back(AArch64MachineCombinerPattern::GATHER_i32);
+    Patterns.push_back(AArch64MachineCombinerPattern::GATHER_LANE_i32);
     break;
   case 8:
-    Patterns.push_back(AArch64MachineCombinerPattern::GATHER_i16);
+    Patterns.push_back(AArch64MachineCombinerPattern::GATHER_LANE_i16);
     break;
   case 16:
-    Patterns.push_back(AArch64MachineCombinerPattern::GATHER_i8);
+    Patterns.push_back(AArch64MachineCombinerPattern::GATHER_LANE_i8);
     break;
   default:
     llvm_unreachable("Got bad number of lanes for gather pattern.");
@@ -7434,8 +7438,8 @@ static bool getGatherPattern(MachineInstr &Root,
 }
 
 /// Search for patterns where we use LD1 instructions to load into
-/// separate lanes of an 128 bit Neon register. We can increase MLP
-/// by loading into 2 Neon registers instead.
+/// separate lanes of an 128 bit Neon register. We can increase Memory Level
+/// Parallelism by loading into 2 Neon registers instead.
 static bool getLoadPatterns(MachineInstr &Root,
                             SmallVectorImpl<unsigned> &Patterns) {
 
@@ -7604,9 +7608,9 @@ AArch64InstrInfo::getCombinerObjective(unsigned Pattern) const {
   switch (Pattern) {
   case AArch64MachineCombinerPattern::SUBADD_OP1:
   case AArch64MachineCombinerPattern::SUBADD_OP2:
-  case AArch64MachineCombinerPattern::GATHER_i32:
-  case AArch64MachineCombinerPattern::GATHER_i16:
-  case AArch64MachineCombinerPattern::GATHER_i8:
+  case AArch64MachineCombinerPattern::GATHER_LANE_i32:
+  case AArch64MachineCombinerPattern::GATHER_LANE_i16:
+  case AArch64MachineCombinerPattern::GATHER_LANE_i8:
     return CombinerObjective::MustReduceDepth;
   default:
     return TargetInstrInfo::getCombinerObjective(Pattern);
@@ -8895,17 +8899,17 @@ void AArch64InstrInfo::genAlternativeCodeSequence(
     MUL = genFNegatedMAD(MF, MRI, TII, Root, InsInstrs);
     break;
   }
-  case AArch64MachineCombinerPattern::GATHER_i32: {
+  case AArch64MachineCombinerPattern::GATHER_LANE_i32: {
     generateGatherPattern(Root, InsInstrs, DelInstrs, InstrIdxForVirtReg,
                           Pattern, 4);
     break;
   }
-  case AArch64MachineCombinerPattern::GATHER_i16: {
+  case AArch64MachineCombinerPattern::GATHER_LANE_i16: {
     generateGatherPattern(Root, InsInstrs, DelInstrs, InstrIdxForVirtReg,
                           Pattern, 8);
     break;
   }
-  case AArch64MachineCombinerPattern::GATHER_i8: {
+  case AArch64MachineCombinerPattern::GATHER_LANE_i8: {
     generateGatherPattern(Root, InsInstrs, DelInstrs, InstrIdxForVirtReg,
                           Pattern, 16);
     break;
