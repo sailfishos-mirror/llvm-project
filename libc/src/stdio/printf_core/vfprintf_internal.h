@@ -87,7 +87,7 @@ LIBC_INLINE int vfprintf_internal_modular(::FILE *__restrict stream,
 LIBC_INLINE int vfprintf_internal(::FILE *__restrict stream,
                                   const char *__restrict format,
                                   internal::ArgList &args) {
-#ifdef LIBC_COPT_PRINTF_SPLIT
+#ifdef LIBC_COPT_PRINTF_MODULAR
   __asm__ __volatile__(".reloc ., BFD_RELOC_NONE, __printf_float");
 #endif
   return vfprintf_internal_modular(stream, format, args);
