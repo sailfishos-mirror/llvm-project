@@ -31,8 +31,8 @@ LIBC_PRINTF_MODULAR_DECL int convert_float_hex_exp(Writer<write_mode> *writer,
 
 #ifdef LIBC_PRINTF_DEFINE_MODULAR
 template <WriteMode write_mode>
-int convert_float_hex_exp(Writer<write_mode> *writer,
-                          const FormatSection &to_conv) {
+LIBC_INLINE int convert_float_hex_exp(Writer<write_mode> *writer,
+                                      const FormatSection &to_conv) {
   using LDBits = fputil::FPBits<long double>;
   using StorageType = LDBits::StorageType;
 

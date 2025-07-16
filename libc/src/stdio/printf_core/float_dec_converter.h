@@ -1137,8 +1137,8 @@ convert_float_dec_auto(Writer<write_mode> *writer,
 // TODO: unify the float converters to remove the duplicated checks for inf/nan.
 
 template <WriteMode write_mode>
-int convert_float_decimal(Writer<write_mode> *writer,
-                          const FormatSection &to_conv) {
+LIBC_INLINE int convert_float_decimal(Writer<write_mode> *writer,
+                                      const FormatSection &to_conv) {
   if (to_conv.length_modifier == LengthModifier::L) {
     fputil::FPBits<long double>::StorageType float_raw = to_conv.conv_val_raw;
     fputil::FPBits<long double> float_bits(float_raw);
@@ -1159,8 +1159,8 @@ int convert_float_decimal(Writer<write_mode> *writer,
 }
 
 template <WriteMode write_mode>
-int convert_float_dec_exp(Writer<write_mode> *writer,
-                          const FormatSection &to_conv) {
+LIBC_INLINE int convert_float_dec_exp(Writer<write_mode> *writer,
+                                      const FormatSection &to_conv) {
   if (to_conv.length_modifier == LengthModifier::L) {
     fputil::FPBits<long double>::StorageType float_raw = to_conv.conv_val_raw;
     fputil::FPBits<long double> float_bits(float_raw);
@@ -1181,8 +1181,8 @@ int convert_float_dec_exp(Writer<write_mode> *writer,
 }
 
 template <WriteMode write_mode>
-int convert_float_dec_auto(Writer<write_mode> *writer,
-                           const FormatSection &to_conv) {
+LIBC_INLINE int convert_float_dec_auto(Writer<write_mode> *writer,
+                                       const FormatSection &to_conv) {
   if (to_conv.length_modifier == LengthModifier::L) {
     fputil::FPBits<long double>::StorageType float_raw = to_conv.conv_val_raw;
     fputil::FPBits<long double> float_bits(float_raw);

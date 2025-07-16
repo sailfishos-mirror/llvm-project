@@ -682,9 +682,9 @@ private:
 
 #ifdef LIBC_PRINTF_DEFINE_MODULAR
 template <typename ArgParser>
-void Parser<ArgParser>::write_float_arg_val(FormatSection &section,
-                                            LengthModifier lm,
-                                            size_t conv_index) {
+LIBC_INLINE void Parser<ArgParser>::write_float_arg_val(FormatSection &section,
+                                                        LengthModifier lm,
+                                                        size_t conv_index) {
   if (lm != LengthModifier::L) {
     WRITE_ARG_VAL_SIMPLEST(section.conv_val_raw, double, conv_index);
   } else {
@@ -693,7 +693,7 @@ void Parser<ArgParser>::write_float_arg_val(FormatSection &section,
 }
 
 template <typename ArgParser>
-TypeDesc Parser<ArgParser>::float_type_desc(LengthModifier lm) {
+LIBC_INLINE TypeDesc Parser<ArgParser>::float_type_desc(LengthModifier lm) {
   if (lm != LengthModifier::L)
     return type_desc_from_type<double>();
   else
@@ -701,7 +701,8 @@ TypeDesc Parser<ArgParser>::float_type_desc(LengthModifier lm) {
 }
 
 template <typename ArgParser>
-bool Parser<ArgParser>::advance_arg_if_float(TypeDesc cur_type_desc) {
+LIBC_INLINE bool
+Parser<ArgParser>::advance_arg_if_float(TypeDesc cur_type_desc) {
   if (cur_type_desc == type_desc_from_type<double>())
     args_cur.template next_var<double>();
   else if (cur_type_desc == type_desc_from_type<long double>())

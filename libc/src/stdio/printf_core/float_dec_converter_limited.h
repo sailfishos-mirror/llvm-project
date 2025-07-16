@@ -687,20 +687,20 @@ LIBC_PRINTF_MODULAR_DECL int convert_float_dec_auto(Writer<write_mode> *writer,
 
 #ifdef LIBC_PRINTF_DEFINE_MODULAR
 template <WriteMode write_mode>
-int convert_float_decimal(Writer<write_mode> *writer,
-                          const FormatSection &to_conv) {
+LIBC_INLINE int convert_float_decimal(Writer<write_mode> *writer,
+                                      const FormatSection &to_conv) {
   return convert_float_outer(writer, to_conv, ConversionType::F);
 }
 
 template <WriteMode write_mode>
-int convert_float_dec_exp(Writer<write_mode> *writer,
-                          const FormatSection &to_conv) {
+LIBC_INLINE int convert_float_dec_exp(Writer<write_mode> *writer,
+                                      const FormatSection &to_conv) {
   return convert_float_outer(writer, to_conv, ConversionType::E);
 }
 
 template <WriteMode write_mode>
-int convert_float_dec_auto(Writer<write_mode> *writer,
-                           const FormatSection &to_conv) {
+LIBC_INLINE int convert_float_dec_auto(Writer<write_mode> *writer,
+                                       const FormatSection &to_conv) {
   return convert_float_outer(writer, to_conv, ConversionType::G);
 }
 #endif
