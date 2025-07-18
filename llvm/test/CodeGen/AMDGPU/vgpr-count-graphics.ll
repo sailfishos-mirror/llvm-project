@@ -1,4 +1,4 @@
-; RUN: llc -mcpu=gfx1200 -o - < %s | FileCheck %s
+; RUN: llc -mcpu=gfx1200 < %s | FileCheck %s
 ; Check that reads of a VGPR in kernels counts towards VGPR count, but in functions, only writes of VGPRs count towards VGPR count.
 target triple = "amdgcn--amdpal"
 
