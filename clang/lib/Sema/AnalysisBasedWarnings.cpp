@@ -2779,6 +2779,33 @@ public:
   }
 };
 
+namespace {
+
+class LifetimeSafetyReporterImpl
+    : public clang::lifetimes::LifetimeSafetyReporter {
+
+public:
+  LifetimeSafetyReporterImpl(Sema &S) : S(S) {}
+
+  void reportUseAfterFree(const Expr *IssueExpr, const Expr *UseExpr,
+                          SourceLocation FreeLoc,
+                          lifetimes::Confidence Confidence) override {
+    unsigned DiagID;
+    if (Confidence == lifetimes::Confidence::Definite)
+      DiagID = diag::warn_lifetime_safety_use_after_free_permissive;
+    else // Confidence::Maybe
+      DiagID = diag::warn_lifetime_safety_use_after_free_strict;
+    S.Diag(IssueExpr->getExprLoc(), DiagID) << IssueExpr->getEndLoc();
+    S.Diag(FreeLoc, diag::note_lifetime_safety_destroyed_here);
+    S.Diag(UseExpr->getExprLoc(), diag::note_lifetime_safety_used_here)
+        << UseExpr->getEndLoc();
+  }
+
+private:
+  Sema &S;
+};
+} // namespace
+
 void clang::sema::AnalysisBasedWarnings::IssueWarnings(
      TranslationUnitDecl *TU) {
   if (!TU)
@@ -2902,7 +2929,7 @@ void clang::sema::AnalysisBasedWarnings::IssueWarnings(
   }
 
   bool EnableLifetimeSafetyAnalysis = !Diags.isIgnored(
-      diag::warn_experimental_lifetime_safety_dummy_warning, D->getBeginLoc());
+      diag::warn_lifetime_safety_use_after_free_permissive, D->getBeginLoc());
   // Install the logical handler.
   std::optional<LogicalErrorHandler> LEH;
   if (LogicalErrorHandler::hasActiveDiagnostics(Diags, D->getBeginLoc())) {
@@ -3029,8 +3056,10 @@ void clang::sema::AnalysisBasedWarnings::IssueWarnings(
   // TODO: Enable lifetime safety analysis for other languages once it is
   // stable.
   if (EnableLifetimeSafetyAnalysis && S.getLangOpts().CPlusPlus) {
-    if (AC.getCFG())
-      lifetimes::runLifetimeSafetyAnalysis(AC);
+    if (AC.getCFG()) {
+      LifetimeSafetyReporterImpl LifetimeSafetyReporter(S);
+      lifetimes::runLifetimeSafetyAnalysis(AC, &LifetimeSafetyReporter);
+    }
   }
   // Check for violations of "called once" parameter properties.
   if (S.getLangOpts().ObjC && !S.getLangOpts().CPlusPlus &&
