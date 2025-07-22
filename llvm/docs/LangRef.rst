@@ -2620,7 +2620,7 @@ For example:
     This attribute indicates that outlining passes should not modify the
     function.
 
-``"modular_format"="<string_idx>,<first_idx_to_check>,<modular_impl_fn>,<impl_name>,<aspects...>"``
+``"modular-format"="<string_idx>,<first_idx_to_check>,<modular_impl_fn>,<impl_name>,<aspects...>"``
     This attribute indicates that the implementation is modular on a particular
     format string argument . When the argument for a given call is constant, the
     compiler may redirect the call to a modular implementation function
