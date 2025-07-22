@@ -2620,7 +2620,7 @@ For example:
     This attribute indicates that outlining passes should not modify the
     function.
 
-``"modular-format"="<string_idx>,<first_idx_to_check>,<modular_impl_fn>,<impl_name>,<aspects...>"``
+``"modular-format"="<type>,<string_idx>,<first_idx_to_check>,<modular_impl_fn>,<impl_name>,<aspects...>"``
     This attribute indicates that the implementation is modular on a particular
     format string argument . When the argument for a given call is constant, the
     compiler may redirect the call to a modular implementation function
@@ -2633,12 +2633,14 @@ For example:
     brought into the link to satisfy weak references in the modular
     implemenation function.
 
-    The first two arguments have the same semantics as the arguments to the C
+    The first three arguments have the same semantics as the arguments to the C
     ``format`` attribute.
 
     The following aspects are currently supported:
 
     - ``float``: The call has a floating point argument
+
+
 
 Call Site Attributes
 ----------------------
