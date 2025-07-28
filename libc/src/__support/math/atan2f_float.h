@@ -1,4 +1,4 @@
-//===-- Single-precision atan2f function ----------------------------------===//
+//===-- Single-precision atan2f float function ----------------------------===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -6,18 +6,20 @@
 //
 //===----------------------------------------------------------------------===//
 
+#pragma once
+
 #include "src/__support/FPUtil/FPBits.h"
 #include "src/__support/FPUtil/double_double.h"
 #include "src/__support/FPUtil/multiply_add.h"
 #include "src/__support/FPUtil/nearest_integer.h"
-#include "src/__support/FPUtil/rounding_mode.h"
 #include "src/__support/macros/config.h"
 #include "src/__support/macros/optimization.h" // LIBC_UNLIKELY
-#include "src/math/atan2f.h"
 
 namespace LIBC_NAMESPACE_DECL {
 
-namespace {
+namespace math {
+
+namespace atan2f_internal {
 
 using FloatFloat = fputil::FloatFloat;
 
@@ -27,7 +29,7 @@ using FloatFloat = fputil::FloatFloat;
 //     b = round(atan(i/16) - a, SG, RN);
 //     print("{", b, ",", a, "},");
 //   };
-constexpr FloatFloat ATAN_I[17] = {
+static constexpr FloatFloat ATAN_I[17] = {
     {0.0f, 0.0f},
     {-0x1.1a6042p-30f, 0x1.ff55bcp-5f},
     {-0x1.54f424p-30f, 0x1.fd5baap-4f},
@@ -57,7 +59,7 @@ constexpr FloatFloat ATAN_I[17] = {
 // For x = x_hi + x_lo, fully expand the polynomial and drop any terms less than
 //   ulp(x_hi^3 / 3) gives us:
 // P(x) ~ x_hi - x_hi^3/3 + x_lo * (1 - x_hi^2)
-FloatFloat atan_eval(const FloatFloat &x) {
+LIBC_INLINE static constexpr FloatFloat atan_eval(const FloatFloat &x) {
   FloatFloat p;
   p.hi = x.hi;
   float x_hi_sq = x.hi * x.hi;
@@ -70,7 +72,7 @@ FloatFloat atan_eval(const FloatFloat &x) {
   return p;
 }
 
-} // anonymous namespace
+} // namespace atan2f_internal
 
 // There are several range reduction steps we can take for atan2(y, x) as
 // follow:
@@ -121,7 +123,8 @@ FloatFloat atan_eval(const FloatFloat &x) {
 // > dirtyinfnorm(atan(x) - P, [-2^-5, 2^-5]);
 // 0x1.995...p-28.
 
-LLVM_LIBC_FUNCTION(float, atan2f, (float y, float x)) {
+LIBC_INLINE static constexpr float atan2f(float y, float x) {
+  using namespace atan2f_internal;
   using FPBits = typename fputil::FPBits<float>;
   constexpr float IS_NEG[2] = {1.0f, -1.0f};
   constexpr FloatFloat ZERO = {0.0f, 0.0f};
@@ -233,5 +236,7 @@ LLVM_LIBC_FUNCTION(float, atan2f, (float y, float x)) {
   FloatFloat r = fputil::add(const_term, fputil::add(ATAN_I[idx], p));
   return final_sign * r.hi;
 }
+
+} // namespace math
 
 } // namespace LIBC_NAMESPACE_DECL
