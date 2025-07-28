@@ -4066,13 +4066,7 @@ add_entrypoint_object(
   HDRS
     ../atan2.h
   DEPENDS
-    libc.src.__support.math.atan_utils
-    libc.src.__support.FPUtil.double_double
-    libc.src.__support.FPUtil.fenv_impl
-    libc.src.__support.FPUtil.fp_bits
-    libc.src.__support.FPUtil.multiply_add
-    libc.src.__support.FPUtil.nearest_integer
-    libc.src.__support.macros.optimization
+    
 )
 
 add_entrypoint_object(
