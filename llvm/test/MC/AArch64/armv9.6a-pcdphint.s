@@ -17,11 +17,9 @@ stshh keep
 // CHECK-ENCODING: encoding: [0x1f,0x96,0x01,0xd5]
 // CHECK-ERROR: error: instruction requires: pcdphint
 // CHECK-UNKNOWN:  d501961f      msr S0_1_C9_C6_0, xzr
-// ERROR: :[[@LINE-3]]:3: error: instruction requires: pcdphint
 
 stshh strm
 // CHECK-INST: stshh strm
 // CHECK-ENCODING: encoding: [0x3f,0x96,0x01,0xd5]
 // CHECK-ERROR: error: instruction requires: pcdphint
 // CHECK-UNKNOWN:  d501963f      msr S0_1_C9_C6_1, xzr
-// ERROR: :[[@LINE-3]]:3: error: instruction requires: pcdphint

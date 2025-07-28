@@ -25,18 +25,15 @@ dc cigdvaoc, x0
 // CHECK-ENCODING: encoding: [0xe0,0x7f,0x0b,0xd5]
 // CHECK-ERROR: error: DC CIGDVAOC requires: mte, memtag, occmo
 // CHECK-UNKNOWN:  d50b7fe0      sys #3, c7, c15, #7, x0
-// ERROR: :[[@LINE-3]]:4: error: DC CIGDVAOC requires: mte, memtag, occmo
 
 dc cvaoc, x13
 // CHECK-INST: dc cvaoc, x13
 // CHECK-ENCODING: encoding: [0x0d,0x7b,0x0b,0xd5]
 // CHECK-ERROR: error: DC CVAOC requires: occmo
 // CHECK-UNKNOWN:  d50b7b0d      sys #3, c7, c11, #0, x13
-// ERROR: :[[@LINE-3]]:4: error: DC CVAOC requires: occmo
 
 dc cgdvaoc, x1
 // CHECK-INST: dc cgdvaoc, x1
 // CHECK-ENCODING: encoding: [0xe1,0x7b,0x0b,0xd5]
 // CHECK-ERROR: error: DC CGDVAOC requires: mte, memtag, occmo
 // CHECK-UNKNOWN:  d50b7be1      sys #3, c7, c11, #7, x1
-// ERROR: :[[@LINE-3]]:4: error: DC CGDVAOC requires: mte, memtag, occmo
