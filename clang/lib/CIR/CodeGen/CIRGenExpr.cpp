@@ -303,8 +303,7 @@ void CIRGenFunction::emitStoreOfScalar(mlir::Value value, Address addr,
 
   // Update the alloca with more info on initialization.
   assert(addr.getPointer() && "expected pointer to exist");
-  auto srcAlloca =
-      dyn_cast_or_null<cir::AllocaOp>(addr.getPointer().getDefiningOp());
+  auto srcAlloca = addr.getDefiningOp<cir::AllocaOp>();
   if (currVarDecl && srcAlloca) {
     const VarDecl *vd = currVarDecl;
     assert(vd && "VarDecl expected");
@@ -626,10 +625,8 @@ LValue CIRGenFunction::emitUnaryOpLValue(const UnaryOperator *e) {
     // Tag 'load' with deref attribute.
     // FIXME: This misses some derefence cases and has problematic interactions
     // with other operators.
-    if (auto loadOp =
-            dyn_cast<cir::LoadOp>(addr.getPointer().getDefiningOp())) {
+    if (auto loadOp = addr.getDefiningOp<cir::LoadOp>())
       loadOp.setIsDerefAttr(mlir::UnitAttr::get(&getMLIRContext()));
-    }
 
     LValue lv = makeAddrLValue(addr, t, baseInfo);
     assert(!cir::MissingFeatures::addressSpace());
@@ -1812,9 +1809,9 @@ cir::AllocaOp CIRGenFunction::createTempAlloca(mlir::Type ty,
                                                const Twine &name,
                                                mlir::Value arraySize,
                                                bool insertIntoFnEntryBlock) {
-  return cast<cir::AllocaOp>(emitAlloca(name.str(), ty, loc, CharUnits(),
-                                        insertIntoFnEntryBlock, arraySize)
-                                 .getDefiningOp());
+  return emitAlloca(name.str(), ty, loc, CharUnits(), insertIntoFnEntryBlock,
+                    arraySize)
+      .getDefiningOp<cir::AllocaOp>();
 }
 
 /// This creates an alloca and inserts it into the provided insertion point
@@ -1824,9 +1821,8 @@ cir::AllocaOp CIRGenFunction::createTempAlloca(mlir::Type ty,
                                                mlir::OpBuilder::InsertPoint ip,
                                                mlir::Value arraySize) {
   assert(ip.isSet() && "Insertion point is not set");
-  return cast<cir::AllocaOp>(
-      emitAlloca(name.str(), ty, loc, CharUnits(), ip, arraySize)
-          .getDefiningOp());
+  return emitAlloca(name.str(), ty, loc, CharUnits(), ip, arraySize)
+      .getDefiningOp<cir::AllocaOp>();
 }
 
 /// Try to emit a reference to the given value without producing it as
