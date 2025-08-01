@@ -969,7 +969,6 @@ void genLifetimeEnd(mlir::OpBuilder &builder, mlir::Location loc,
 mlir::Value getDescriptorWithNewBaseAddress(fir::FirOpBuilder &builder,
                                             mlir::Location loc, mlir::Value box,
                                             mlir::Value newAddr);
-
 } // namespace fir::factory
 
 #endif // FORTRAN_OPTIMIZER_BUILDER_FIRBUILDER_H
