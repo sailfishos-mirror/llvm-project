@@ -59,6 +59,14 @@ static cl::opt<std::string> PrintBranchProbFuncName(
     cl::desc("The option to specify the name of the function "
              "whose branch probability info is printed."));
 
+// FIXME: Flag used for an ablation performance test, Issue #147390. Placing it
+// here because referencing Analysis should be feasible from anywhere. Will be
+// removed after the ablation test.
+cl::opt<bool> ProfcheckDisableMetadataFixes(
+    "profcheck-disable-metadata-fixes", cl::Hidden, cl::init(false),
+    cl::desc(
+        "Disable metadata propagation fixes discovered through Issue #147390"));
+
 INITIALIZE_PASS_BEGIN(BranchProbabilityInfoWrapperPass, "branch-prob",
                       "Branch Probability Analysis", false, true)
 INITIALIZE_PASS_DEPENDENCY(LoopInfoWrapperPass)
