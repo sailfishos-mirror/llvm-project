@@ -371,13 +371,13 @@ swptal x9, xzr, [sp]
 //------------------------------------------------------------------------------
 
 ldtadd w7, wzr, [x5]
-// CHECK-INST: ldtadd w7, wzr, [x5]
+// CHECK-INST: sttadd w7, [x5]
 // CHECK-ENCODING: encoding: [0xbf,0x04,0x27,0x19]
 // CHECK-ERROR: error: instruction requires: lsui
 // CHECK-UNKNOWN:  192704bf <unknown>
 
 ldtadd x9, xzr, [sp]
-// CHECK-INST: ldtadd x9, xzr, [sp]
+// CHECK-INST: sttadd x9, [sp]
 // CHECK-ENCODING: encoding: [0xff,0x07,0x29,0x59]
 // CHECK-ERROR: error: instruction requires: lsui
 // CHECK-UNKNOWN:  592907ff <unknown>
@@ -395,13 +395,13 @@ ldtadda x9, xzr, [sp]
 // CHECK-UNKNOWN:  59a907ff <unknown>
 
 ldtaddl w7, wzr, [x5]
-// CHECK-INST: ldtaddl w7, wzr, [x5]
+// CHECK-INST: sttaddl w7, [x5]
 // CHECK-ENCODING: encoding: [0xbf,0x04,0x67,0x19]
 // CHECK-ERROR: error: instruction requires: lsui
 // CHECK-UNKNOWN:  196704bf <unknown>
 
 ldtaddl x9, xzr, [sp]
-// CHECK-INST: ldtaddl x9, xzr, [sp]
+// CHECK-INST: sttaddl x9, [sp]
 // CHECK-ENCODING: encoding: [0xff,0x07,0x69,0x59]
 // CHECK-ERROR: error: instruction requires: lsui
 // CHECK-UNKNOWN:  596907ff <unknown>
@@ -419,25 +419,25 @@ ldtaddal x9, xzr, [sp]
 // CHECK-UNKNOWN:  59e907ff <unknown>
 
 ldtclr w7, wzr, [x5]
-// CHECK-INST: ldtclr w7, wzr, [x5]
+// CHECK-INST: sttclr w7, [x5]
 // CHECK-ENCODING: encoding: [0xbf,0x14,0x27,0x19]
 // CHECK-ERROR: error: instruction requires: lsui
 // CHECK-UNKNOWN:  192714bf <unknown>
 
 ldtclr x9, xzr, [sp]
-// CHECK-INST: ldtclr x9, xzr, [sp]
+// CHECK-INST: sttclr x9, [sp]
 // CHECK-ENCODING: encoding: [0xff,0x17,0x29,0x59]
 // CHECK-ERROR: error: instruction requires: lsui
 // CHECK-UNKNOWN:  592917ff <unknown>
 
 ldtclrl w7, wzr, [x5]
-// CHECK-INST: ldtclrl w7, wzr, [x5]
+// CHECK-INST: sttclrl w7, [x5]
 // CHECK-ENCODING: encoding: [0xbf,0x14,0x67,0x19]
 // CHECK-ERROR: error: instruction requires: lsui
 // CHECK-UNKNOWN:  196714bf <unknown>
 
 ldtclrl x9, xzr, [sp]
-// CHECK-INST: ldtclrl x9, xzr, [sp]
+// CHECK-INST: sttclrl x9, [sp]
 // CHECK-ENCODING: encoding: [0xff,0x17,0x69,0x59]
 // CHECK-ERROR: error: instruction requires: lsui
 // CHECK-UNKNOWN:  596917ff <unknown>
@@ -467,25 +467,25 @@ ldtclral x9, xzr, [sp]
 // CHECK-UNKNOWN:  59e917ff <unknown>
 
 ldtset w7, wzr, [x5]
-// CHECK-INST: ldtset w7, wzr, [x5]
+// CHECK-INST: sttset w7, [x5]
 // CHECK-ENCODING: encoding: [0xbf,0x34,0x27,0x19]
 // CHECK-ERROR: error: instruction requires: lsui
 // CHECK-UNKNOWN:  192734bf <unknown>
 
 ldtset x9, xzr, [sp]
-// CHECK-INST: ldtset x9, xzr, [sp]
+// CHECK-INST: sttset x9, [sp]
 // CHECK-ENCODING: encoding: [0xff,0x37,0x29,0x59]
 // CHECK-ERROR: error: instruction requires: lsui
 // CHECK-UNKNOWN:  592937ff <unknown>
 
 ldtsetl w7, wzr, [x5]
-// CHECK-INST: ldtsetl w7, wzr, [x5]
+// CHECK-INST: sttsetl w7, [x5]
 // CHECK-ENCODING: encoding: [0xbf,0x34,0x67,0x19]
 // CHECK-ERROR: error: instruction requires: lsui
 // CHECK-UNKNOWN:  196734bf <unknown>
 
 ldtsetl x9, xzr, [sp]
-// CHECK-INST: ldtsetl x9, xzr, [sp]
+// CHECK-INST: sttsetl x9, [sp]
 // CHECK-ENCODING: encoding: [0xff,0x37,0x69,0x59]
 // CHECK-ERROR: error: instruction requires: lsui
 // CHECK-UNKNOWN:  596937ff <unknown>
@@ -519,145 +519,145 @@ ldtsetal x9, xzr, [sp]
 //------------------------------------------------------------------------------
 
 sttadd w0, [x2]
-// CHECK-INST: ldtadd w0, wzr, [x2]
+// CHECK-INST: sttadd w0, [x2]
 // CHECK-ENCODING: encoding: [0x5f,0x04,0x20,0x19]
 // CHECK-ERROR: error: instruction requires: lsui
 // CHECK-UNKNOWN:  1920045f <unknown>
 
 sttadd w2, [sp]
-// CHECK-INST: ldtadd w2, wzr, [sp]
+// CHECK-INST: sttadd w2, [sp]
 // CHECK-ENCODING: encoding: [0xff,0x07,0x22,0x19]
 // CHECK-ERROR: error: instruction requires: lsui
 // CHECK-UNKNOWN:  192207ff <unknown>
 
 sttadd x0, [x2]
-// CHECK-INST: ldtadd x0, xzr, [x2]
+// CHECK-INST: sttadd x0, [x2]
 // CHECK-ENCODING: encoding: [0x5f,0x04,0x20,0x59]
 // CHECK-ERROR: error: instruction requires: lsui
 // CHECK-UNKNOWN:  5920045f <unknown>
 
 sttadd x2, [sp]
-// CHECK-INST: ldtadd x2, xzr, [sp]
+// CHECK-INST: sttadd x2, [sp]
 // CHECK-ENCODING: encoding: [0xff,0x07,0x22,0x59]
 // CHECK-ERROR: error: instruction requires: lsui
 // CHECK-UNKNOWN:  592207ff <unknown>
 
 sttaddl w0, [x2]
-// CHECK-INST: ldtaddl w0, wzr, [x2]
+// CHECK-INST: sttaddl w0, [x2]
 // CHECK-ENCODING: encoding: [0x5f,0x04,0x60,0x19]
 // CHECK-ERROR: error: instruction requires: lsui
 // CHECK-UNKNOWN:  1960045f <unknown>
 
 sttaddl w2, [sp]
-// CHECK-INST: ldtaddl w2, wzr, [sp]
+// CHECK-INST: sttaddl w2, [sp]
 // CHECK-ENCODING: encoding: [0xff,0x07,0x62,0x19]
 // CHECK-ERROR: error: instruction requires: lsui
 // CHECK-UNKNOWN:  196207ff <unknown>
 
 sttaddl x0, [x2]
-// CHECK-INST: ldtaddl x0, xzr, [x2]
+// CHECK-INST: sttaddl x0, [x2]
 // CHECK-ENCODING: encoding: [0x5f,0x04,0x60,0x59]
 // CHECK-ERROR: error: instruction requires: lsui
 // CHECK-UNKNOWN:  5960045f <unknown>
 
 sttaddl x2, [sp]
-// CHECK-INST: ldtaddl x2, xzr, [sp]
+// CHECK-INST: sttaddl x2, [sp]
 // CHECK-ENCODING: encoding: [0xff,0x07,0x62,0x59]
 // CHECK-ERROR: error: instruction requires: lsui
 // CHECK-UNKNOWN:  596207ff <unknown>
 
 sttclr w0, [x2]
-// CHECK-INST: ldtclr w0, wzr, [x2]
+// CHECK-INST: sttclr w0, [x2]
 // CHECK-ENCODING: encoding: [0x5f,0x14,0x20,0x19]
 // CHECK-ERROR: error: instruction requires: lsui
 // CHECK-UNKNOWN:  1920145f <unknown>
 
 sttclr w2, [sp]
-// CHECK-INST: ldtclr w2, wzr, [sp]
+// CHECK-INST: sttclr w2, [sp]
 // CHECK-ENCODING: encoding: [0xff,0x17,0x22,0x19]
 // CHECK-ERROR: error: instruction requires: lsui
 // CHECK-UNKNOWN:  192217ff <unknown>
 
 sttclr x0, [x2]
-// CHECK-INST: ldtclr x0, xzr, [x2]
+// CHECK-INST: sttclr x0, [x2]
 // CHECK-ENCODING: encoding: [0x5f,0x14,0x20,0x59]
 // CHECK-ERROR: error: instruction requires: lsui
 // CHECK-UNKNOWN:  5920145f <unknown>
 
 sttclr x2, [sp]
-// CHECK-INST: ldtclr x2, xzr, [sp]
+// CHECK-INST: sttclr x2, [sp]
 // CHECK-ENCODING: encoding: [0xff,0x17,0x22,0x59]
 // CHECK-ERROR: error: instruction requires: lsui
 // CHECK-UNKNOWN:  592217ff <unknown>
 
 sttclrl w0, [x2]
-// CHECK-INST: ldtclrl w0, wzr, [x2]
+// CHECK-INST: sttclrl w0, [x2]
 // CHECK-ENCODING: encoding: [0x5f,0x14,0x60,0x19]
 // CHECK-ERROR: error: instruction requires: lsui
 // CHECK-UNKNOWN:  1960145f <unknown>
 
 sttclrl w2, [sp]
-// CHECK-INST: ldtclrl w2, wzr, [sp]
+// CHECK-INST: sttclrl w2, [sp]
 // CHECK-ENCODING: encoding: [0xff,0x17,0x62,0x19]
 // CHECK-ERROR: error: instruction requires: lsui
 // CHECK-UNKNOWN:  196217ff <unknown>
 
 sttclrl x0, [x2]
-// CHECK-INST: ldtclrl x0, xzr, [x2]
+// CHECK-INST: sttclrl x0, [x2]
 // CHECK-ENCODING: encoding: [0x5f,0x14,0x60,0x59]
 // CHECK-ERROR: error: instruction requires: lsui
 // CHECK-UNKNOWN:  5960145f <unknown>
 
 sttclrl x2, [sp]
-// CHECK-INST: ldtclrl x2, xzr, [sp]
+// CHECK-INST: sttclrl x2, [sp]
 // CHECK-ENCODING: encoding: [0xff,0x17,0x62,0x59]
 // CHECK-ERROR: error: instruction requires: lsui
 // CHECK-UNKNOWN:  596217ff <unknown>
 
 sttset w0, [x2]
-// CHECK-INST: ldtset w0, wzr, [x2]
+// CHECK-INST: sttset w0, [x2]
 // CHECK-ENCODING: encoding: [0x5f,0x34,0x20,0x19]
 // CHECK-ERROR: error: instruction requires: lsui
 // CHECK-UNKNOWN:  1920345f <unknown>
 
 sttset w2, [sp]
-// CHECK-INST: ldtset w2, wzr, [sp]
+// CHECK-INST: sttset w2, [sp]
 // CHECK-ENCODING: encoding: [0xff,0x37,0x22,0x19]
 // CHECK-ERROR: error: instruction requires: lsui
 // CHECK-UNKNOWN:  192237ff <unknown>
 
 sttset x0, [x2]
-// CHECK-INST: ldtset x0, xzr, [x2]
+// CHECK-INST: sttset x0, [x2]
 // CHECK-ENCODING: encoding: [0x5f,0x34,0x20,0x59]
 // CHECK-ERROR: error: instruction requires: lsui
 // CHECK-UNKNOWN:  5920345f <unknown>
 
 sttset x2, [sp]
-// CHECK-INST: ldtset x2, xzr, [sp]
+// CHECK-INST: sttset x2, [sp]
 // CHECK-ENCODING: encoding: [0xff,0x37,0x22,0x59]
 // CHECK-ERROR: error: instruction requires: lsui
 // CHECK-UNKNOWN:  592237ff <unknown>
 
 sttsetl w0, [x2]
-// CHECK-INST: ldtsetl w0, wzr, [x2]
+// CHECK-INST: sttsetl w0, [x2]
 // CHECK-ENCODING: encoding: [0x5f,0x34,0x60,0x19]
 // CHECK-ERROR: error: instruction requires: lsui
 // CHECK-UNKNOWN:  1960345f <unknown>
 
 sttsetl w2, [sp]
-// CHECK-INST: ldtsetl w2, wzr, [sp]
+// CHECK-INST: sttsetl w2, [sp]
 // CHECK-ENCODING: encoding: [0xff,0x37,0x62,0x19]
 // CHECK-ERROR: error: instruction requires: lsui
 // CHECK-UNKNOWN:  196237ff <unknown>
 
 sttsetl x0, [x2]
-// CHECK-INST: ldtsetl x0, xzr, [x2]
+// CHECK-INST: sttsetl x0, [x2]
 // CHECK-ENCODING: encoding: [0x5f,0x34,0x60,0x59]
 // CHECK-ERROR: error: instruction requires: lsui
 // CHECK-UNKNOWN:  5960345f <unknown>
 
 sttsetl x2, [sp]
-// CHECK-INST: ldtsetl x2, xzr, [sp]
+// CHECK-INST: sttsetl x2, [sp]
 // CHECK-ENCODING: encoding: [0xff,0x37,0x62,0x59]
 // CHECK-ERROR: error: instruction requires: lsui
 // CHECK-UNKNOWN:  596237ff <unknown>
