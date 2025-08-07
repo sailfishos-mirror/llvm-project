@@ -30,11 +30,15 @@ module {
   }
 }
 
-// CHECK-LABEL: func.func @automap()
-// CHECK: fir.allocmem
-// CHECK: fir.store
-// CHECK: omp.map.info {{.*}}map_clauses(to)
-// CHECK: omp.target_enter_data
-// CHECK: omp.map.info {{.*}}map_clauses(delete)
-// CHECK: omp.target_exit_data
-// CHECK: fir.freemem
+// CHECK:   fir.global @[[AUTOMAP:.*]] {{{.*}} automap = true
+// CHECK-LABEL:   func.func @automap()
+// CHECK:           %[[AUTOMAP_ADDR:.*]] = fir.address_of(@[[AUTOMAP]])
+// CHECK:           %[[AUTOMAP_DECL:.*]]:2 = hlfir.declare %[[AUTOMAP_ADDR]]
+// CHECK:           fir.allocmem
+// CHECK:           fir.store {{.*}} to %[[AUTOMAP_DECL]]#0
+// CHECK:           %[[ENTER_MAP:.*]] = omp.map.info var_ptr(%[[AUTOMAP_DECL]]#0 {{.*}} map_clauses(to) capture(ByCopy)
+// CHECK:           omp.target_enter_data map_entries(%[[ENTER_MAP]]
+// CHECK:           %[[LOAD:.*]] = fir.load %[[AUTOMAP_DECL]]#0
+// CHECK:           %[[EXIT_MAP:.*]] = omp.map.info var_ptr(%[[AUTOMAP_DECL]]#0 {{.*}} map_clauses(delete) capture(ByCopy)
+// CHECK:           omp.target_exit_data map_entries(%[[EXIT_MAP]]
+// CHECK:           fir.freemem
