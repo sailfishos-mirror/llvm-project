@@ -5377,7 +5377,6 @@ static MachineBasicBlock *lowerWaveReduce(MachineInstr &MI,
               BuildMI(BB, MI, DL, TII->get(AMDGPU::S_MUL_I32), DstReg)
                   .addReg(SrcReg)
                   .addReg(ParityRegister);
-              break;
             } else {
               Register DestSub0 =
                   MRI.createVirtualRegister(&AMDGPU::SReg_32RegClass);
@@ -5406,8 +5405,8 @@ static MachineBasicBlock *lowerWaveReduce(MachineInstr &MI,
                   .addImm(AMDGPU::sub0)
                   .addReg(DestSub1)
                   .addImm(AMDGPU::sub1);
-              break;
             }
+            break;
           }
       case AMDGPU::S_SUB_I32: {
         Register NegatedVal = MRI.createVirtualRegister(DstRegClass);
