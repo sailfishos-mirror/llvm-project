@@ -256,13 +256,12 @@ define <vscale x 2 x double> @splice_nxv2f64_last_idx(<vscale x 2 x double> %a, 
 define <vscale x 2 x i1> @splice_nxv2i1_idx(<vscale x 2 x i1> %a, <vscale x 2 x i1> %b) #0 {
 ; CHECK-LABEL: splice_nxv2i1_idx:
 ; CHECK:       // %bb.0:
-; CHECK-NEXT:    mov z1.d, p0/z, #1 // =0x1
 ; CHECK-NEXT:    mov z0.d, p1/z, #1 // =0x1
+; CHECK-NEXT:    mov z1.d, p0/z, #1 // =0x1
 ; CHECK-NEXT:    ptrue p0.d
-; CHECK-NEXT:    mov z0.d, z1.d
-; CHECK-NEXT:    ext z0.b, z0.b, z0.b, #8
-; CHECK-NEXT:    and z0.d, z0.d, #0x1
-; CHECK-NEXT:    cmpne p0.d, p0/z, z0.d, #0
+; CHECK-NEXT:    ext z1.b, z1.b, z0.b, #8
+; CHECK-NEXT:    and z1.d, z1.d, #0x1
+; CHECK-NEXT:    cmpne p0.d, p0/z, z1.d, #0
 ; CHECK-NEXT:    ret
   %res = call <vscale x 2 x i1> @llvm.vector.splice.nxv2i1(<vscale x 2 x i1> %a, <vscale x 2 x i1> %b, i32 1)
   ret <vscale x 2 x i1> %res
@@ -272,13 +271,12 @@ define <vscale x 2 x i1> @splice_nxv2i1_idx(<vscale x 2 x i1> %a, <vscale x 2 x 
 define <vscale x 4 x i1> @splice_nxv4i1_idx(<vscale x 4 x i1> %a, <vscale x 4 x i1> %b) #0 {
 ; CHECK-LABEL: splice_nxv4i1_idx:
 ; CHECK:       // %bb.0:
-; CHECK-NEXT:    mov z1.s, p0/z, #1 // =0x1
 ; CHECK-NEXT:    mov z0.s, p1/z, #1 // =0x1
+; CHECK-NEXT:    mov z1.s, p0/z, #1 // =0x1
 ; CHECK-NEXT:    ptrue p0.s
-; CHECK-NEXT:    mov z0.d, z1.d
-; CHECK-NEXT:    ext z0.b, z0.b, z0.b, #8
-; CHECK-NEXT:    and z0.s, z0.s, #0x1
-; CHECK-NEXT:    cmpne p0.s, p0/z, z0.s, #0
+; CHECK-NEXT:    ext z1.b, z1.b, z0.b, #8
+; CHECK-NEXT:    and z1.s, z1.s, #0x1
+; CHECK-NEXT:    cmpne p0.s, p0/z, z1.s, #0
 ; CHECK-NEXT:    ret
   %res = call <vscale x 4 x i1> @llvm.vector.splice.nxv4i1(<vscale x 4 x i1> %a, <vscale x 4 x i1> %b, i32 2)
   ret <vscale x 4 x i1> %res
@@ -288,13 +286,12 @@ define <vscale x 4 x i1> @splice_nxv4i1_idx(<vscale x 4 x i1> %a, <vscale x 4 x 
 define <vscale x 8 x i1> @splice_nxv8i1_idx(<vscale x 8 x i1> %a, <vscale x 8 x i1> %b) #0 {
 ; CHECK-LABEL: splice_nxv8i1_idx:
 ; CHECK:       // %bb.0:
-; CHECK-NEXT:    mov z1.h, p0/z, #1 // =0x1
 ; CHECK-NEXT:    mov z0.h, p1/z, #1 // =0x1
+; CHECK-NEXT:    mov z1.h, p0/z, #1 // =0x1
 ; CHECK-NEXT:    ptrue p0.h
-; CHECK-NEXT:    mov z0.d, z1.d
-; CHECK-NEXT:    ext z0.b, z0.b, z0.b, #8
-; CHECK-NEXT:    and z0.h, z0.h, #0x1
-; CHECK-NEXT:    cmpne p0.h, p0/z, z0.h, #0
+; CHECK-NEXT:    ext z1.b, z1.b, z0.b, #8
+; CHECK-NEXT:    and z1.h, z1.h, #0x1
+; CHECK-NEXT:    cmpne p0.h, p0/z, z1.h, #0
 ; CHECK-NEXT:    ret
   %res = call <vscale x 8 x i1> @llvm.vector.splice.nxv8i1(<vscale x 8 x i1> %a, <vscale x 8 x i1> %b, i32 4)
   ret <vscale x 8 x i1> %res
@@ -304,13 +301,12 @@ define <vscale x 8 x i1> @splice_nxv8i1_idx(<vscale x 8 x i1> %a, <vscale x 8 x 
 define <vscale x 16 x i1> @splice_nxv16i1_idx(<vscale x 16 x i1> %a, <vscale x 16 x i1> %b) #0 {
 ; CHECK-LABEL: splice_nxv16i1_idx:
 ; CHECK:       // %bb.0:
-; CHECK-NEXT:    mov z1.b, p0/z, #1 // =0x1
 ; CHECK-NEXT:    mov z0.b, p1/z, #1 // =0x1
+; CHECK-NEXT:    mov z1.b, p0/z, #1 // =0x1
 ; CHECK-NEXT:    ptrue p0.b
-; CHECK-NEXT:    mov z0.d, z1.d
-; CHECK-NEXT:    ext z0.b, z0.b, z0.b, #8
-; CHECK-NEXT:    and z0.b, z0.b, #0x1
-; CHECK-NEXT:    cmpne p0.b, p0/z, z0.b, #0
+; CHECK-NEXT:    ext z1.b, z1.b, z0.b, #8
+; CHECK-NEXT:    and z1.b, z1.b, #0x1
+; CHECK-NEXT:    cmpne p0.b, p0/z, z1.b, #0
 ; CHECK-NEXT:    ret
   %res = call <vscale x 16 x i1> @llvm.vector.splice.nxv16i1(<vscale x 16 x i1> %a, <vscale x 16 x i1> %b, i32 8)
   ret <vscale x 16 x i1> %res
