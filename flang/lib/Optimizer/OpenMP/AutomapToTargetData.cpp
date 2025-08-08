@@ -113,15 +113,15 @@ class AutomapToTargetDataPass
     for (fir::GlobalOp globalOp : automapGlobals) {
       if (auto uses = globalOp.getSymbolUses(module.getOperation())) {
         llvm::DenseSet<fir::StoreOp> allocmemStores;
-        llvm::DenseSet<fir::LoadOp> freememloads;
+        llvm::DenseSet<fir::LoadOp> freememLoads;
         for (auto &x : *uses)
           if (auto addrOp = dyn_cast<fir::AddrOfOp>(x.getUser()))
-            findRelatedAllocmemFreemem(addrOp, allocmemStores, freememloads);
+            findRelatedAllocmemFreemem(addrOp, allocmemStores, freememLoads);
 
         for (auto storeOp : allocmemStores)
           addMapInfo(globalOp, storeOp);
 
-        for (auto loadOp : freememloads)
+        for (auto loadOp : freememLoads)
           addMapInfo(globalOp, loadOp);
       }
     }
