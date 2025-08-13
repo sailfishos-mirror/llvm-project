@@ -132,6 +132,6 @@ ConfigManager::getDXContainerConfig() const {
   }
 
   // If a flag is listed here, then it has support for DXContainer:
-  // Common.PreserveDates, Common.ToRemove
+  // Common.PreserveDates
   return DXContainer;
 }
