@@ -268,8 +268,8 @@ define void @test7(i1 %a, i1 %b) {
 ; CHECK-LABEL: @test7(
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[C:%.*]] = or i1 [[B:%.*]], false
-; CHECK-NEXT:    [[BRMERGE:%.*]] = select i1 [[A:%.*]], i1 true, i1 [[C]]
-; CHECK-NEXT:    br i1 [[BRMERGE]], label [[Y:%.*]], label [[Z:%.*]], !prof [[PROF6:![0-9]+]]
+; CHECK-NEXT:    [[BRMERGE:%.*]] = select i1 [[A:%.*]], i1 true, i1 [[C]], !prof [[PROF6:![0-9]+]]
+; CHECK-NEXT:    br i1 [[BRMERGE]], label [[Y:%.*]], label [[Z:%.*]], !prof [[PROF6]]
 ; CHECK:       common.ret:
 ; CHECK-NEXT:    ret void
 ; CHECK:       Y:
@@ -557,9 +557,9 @@ return:
 define i32 @SimplifyCondBranchToCondBranch(i1 %cmpa, i1 %cmpb) {
 ; CHECK-LABEL: @SimplifyCondBranchToCondBranch(
 ; CHECK-NEXT:  block1:
-; CHECK-NEXT:    [[BRMERGE:%.*]] = select i1 [[CMPA:%.*]], i1 true, i1 [[CMPB:%.*]]
-; CHECK-NEXT:    [[DOTMUX:%.*]] = select i1 [[CMPA]], i32 0, i32 2, !prof [[PROF13:![0-9]+]]
-; CHECK-NEXT:    [[OUTVAL:%.*]] = select i1 [[BRMERGE]], i32 [[DOTMUX]], i32 1, !prof [[PROF14:![0-9]+]]
+; CHECK-NEXT:    [[BRMERGE:%.*]] = select i1 [[CMPA:%.*]], i1 true, i1 [[CMPB:%.*]], !prof [[PROF13:![0-9]+]]
+; CHECK-NEXT:    [[DOTMUX:%.*]] = select i1 [[CMPA]], i32 0, i32 2, !prof [[PROF14:![0-9]+]]
+; CHECK-NEXT:    [[OUTVAL:%.*]] = select i1 [[BRMERGE]], i32 [[DOTMUX]], i32 1, !prof [[PROF13]]
 ; CHECK-NEXT:    ret i32 [[OUTVAL]]
 ;
 block1:
@@ -584,9 +584,9 @@ define i32 @SimplifyCondBranchToCondBranchSwap(i1 %cmpa, i1 %cmpb) {
 ; CHECK-NEXT:  block1:
 ; CHECK-NEXT:    [[CMPA_NOT:%.*]] = xor i1 [[CMPA:%.*]], true
 ; CHECK-NEXT:    [[CMPB_NOT:%.*]] = xor i1 [[CMPB:%.*]], true
-; CHECK-NEXT:    [[BRMERGE:%.*]] = select i1 [[CMPA_NOT]], i1 true, i1 [[CMPB_NOT]]
-; CHECK-NEXT:    [[DOTMUX:%.*]] = select i1 [[CMPA_NOT]], i32 0, i32 2, !prof [[PROF15:![0-9]+]]
-; CHECK-NEXT:    [[OUTVAL:%.*]] = select i1 [[BRMERGE]], i32 [[DOTMUX]], i32 1, !prof [[PROF16:![0-9]+]]
+; CHECK-NEXT:    [[BRMERGE:%.*]] = select i1 [[CMPA_NOT]], i1 true, i1 [[CMPB_NOT]], !prof [[PROF15:![0-9]+]]
+; CHECK-NEXT:    [[DOTMUX:%.*]] = select i1 [[CMPA_NOT]], i32 0, i32 2, !prof [[PROF16:![0-9]+]]
+; CHECK-NEXT:    [[OUTVAL:%.*]] = select i1 [[BRMERGE]], i32 [[DOTMUX]], i32 1, !prof [[PROF15]]
 ; CHECK-NEXT:    ret i32 [[OUTVAL]]
 ;
 block1:
@@ -609,9 +609,9 @@ define i32 @SimplifyCondBranchToCondBranchSwapMissingWeight(i1 %cmpa, i1 %cmpb) 
 ; CHECK-NEXT:  block1:
 ; CHECK-NEXT:    [[CMPA_NOT:%.*]] = xor i1 [[CMPA:%.*]], true
 ; CHECK-NEXT:    [[CMPB_NOT:%.*]] = xor i1 [[CMPB:%.*]], true
-; CHECK-NEXT:    [[BRMERGE:%.*]] = select i1 [[CMPA_NOT]], i1 true, i1 [[CMPB_NOT]]
-; CHECK-NEXT:    [[DOTMUX:%.*]] = select i1 [[CMPA_NOT]], i32 0, i32 2, !prof [[PROF17:![0-9]+]]
-; CHECK-NEXT:    [[OUTVAL:%.*]] = select i1 [[BRMERGE]], i32 [[DOTMUX]], i32 1, !prof [[PROF18:![0-9]+]]
+; CHECK-NEXT:    [[BRMERGE:%.*]] = select i1 [[CMPA_NOT]], i1 true, i1 [[CMPB_NOT]], !prof [[PROF17:![0-9]+]]
+; CHECK-NEXT:    [[DOTMUX:%.*]] = select i1 [[CMPA_NOT]], i32 0, i32 2, !prof [[PROF18:![0-9]+]]
+; CHECK-NEXT:    [[OUTVAL:%.*]] = select i1 [[BRMERGE]], i32 [[DOTMUX]], i32 1, !prof [[PROF17]]
 ; CHECK-NEXT:    ret i32 [[OUTVAL]]
 ;
 block1:
@@ -1114,12 +1114,12 @@ exit:
 ; CHECK: [[PROF10]] = !{!"branch_weights", i32 8, i32 33}
 ; CHECK: [[PROF11]] = !{!"branch_weights", i32 112017436, i32 -735157296}
 ; CHECK: [[PROF12]] = !{!"branch_weights", i32 3, i32 5}
-; CHECK: [[PROF13]] = !{!"branch_weights", i32 22, i32 12}
-; CHECK: [[PROF14]] = !{!"branch_weights", i32 34, i32 21}
-; CHECK: [[PROF15]] = !{!"branch_weights", i32 33, i32 14}
-; CHECK: [[PROF16]] = !{!"branch_weights", i32 47, i32 8}
-; CHECK: [[PROF17]] = !{!"branch_weights", i32 6, i32 2}
-; CHECK: [[PROF18]] = !{!"branch_weights", i32 8, i32 2}
+; CHECK: [[PROF13]] = !{!"branch_weights", i32 34, i32 21}
+; CHECK: [[PROF14]] = !{!"branch_weights", i32 22, i32 12}
+; CHECK: [[PROF15]] = !{!"branch_weights", i32 47, i32 8}
+; CHECK: [[PROF16]] = !{!"branch_weights", i32 33, i32 14}
+; CHECK: [[PROF17]] = !{!"branch_weights", i32 8, i32 2}
+; CHECK: [[PROF18]] = !{!"branch_weights", i32 6, i32 2}
 ; CHECK: [[PROF19]] = !{!"branch_weights", i32 99, i32 1}
 ; CHECK: [[PROF20]] = !{!"branch_weights", i32 1, i32 99}
 ; CHECK: [[PROF21]] = !{!"branch_weights", i32 199, i32 1}
