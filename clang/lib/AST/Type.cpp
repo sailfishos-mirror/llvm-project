@@ -670,37 +670,35 @@ const Type *Type::getUnqualifiedDesugaredType() const {
 }
 
 bool Type::isClassType() const {
-  if (const auto *RT = getAs<RecordType>())
+  if (const auto *RT = getAsCanonical<RecordType>())
     return RT->getOriginalDecl()->isClass();
   return false;
 }
 
 bool Type::isStructureType() const {
-  if (const auto *RT = getAs<RecordType>())
+  if (const auto *RT = getAsCanonical<RecordType>())
     return RT->getOriginalDecl()->isStruct();
   return false;
 }
 
 bool Type::isStructureTypeWithFlexibleArrayMember() const {
-  const auto *RT = getAs<RecordType>();
+  const auto *RT = getAsCanonical<RecordType>();
   if (!RT)
     return false;
-  const auto *Decl = RT->getOriginalDecl()->getDefinitionOrSelf();
+  const auto *Decl = RT->getOriginalDecl();
   if (!Decl->isStruct())
     return false;
-  return Decl->hasFlexibleArrayMember();
+  return Decl->getDefinitionOrSelf()->hasFlexibleArrayMember();
 }
 
 bool Type::isObjCBoxableRecordType() const {
-  if (const auto *RT = getAs<RecordType>())
-    return RT->getOriginalDecl()
-        ->getDefinitionOrSelf()
-        ->hasAttr<ObjCBoxableAttr>();
+  if (const auto *RD = getAsRecordDecl())
+    return RD->hasAttr<ObjCBoxableAttr>();
   return false;
 }
 
 bool Type::isInterfaceType() const {
-  if (const auto *RT = getAs<RecordType>())
+  if (const auto *RT = getAsCanonical<RecordType>())
     return RT->getOriginalDecl()->isInterface();
   return false;
 }
@@ -712,19 +710,19 @@ bool Type::isStructureOrClassType() const {
 }
 
 bool Type::isVoidPointerType() const {
-  if (const auto *PT = getAs<PointerType>())
+  if (const auto *PT = getAsCanonical<PointerType>())
     return PT->getPointeeType()->isVoidType();
   return false;
 }
 
 bool Type::isUnionType() const {
-  if (const auto *RT = getAs<RecordType>())
+  if (const auto *RT = getAsCanonical<RecordType>())
     return RT->getOriginalDecl()->isUnion();
   return false;
 }
 
 bool Type::isComplexType() const {
-  if (const auto *CT = dyn_cast<ComplexType>(CanonicalType))
+  if (const auto *CT = getAsCanonical<ComplexType>())
     return CT->getElementType()->isFloatingType();
   return false;
 }
@@ -735,7 +733,7 @@ bool Type::isComplexIntegerType() const {
 }
 
 bool Type::isScopedEnumeralType() const {
-  if (const auto *ET = getAs<EnumType>())
+  if (const auto *ET = getAsCanonical<EnumType>())
     return ET->getOriginalDecl()->isScoped();
   return false;
 }
@@ -1910,18 +1908,13 @@ const ObjCObjectPointerType *Type::getAsObjCInterfacePointerType() const {
 
 const CXXRecordDecl *Type::getPointeeCXXRecordDecl() const {
   QualType PointeeType;
-  if (const auto *PT = getAs<PointerType>())
+  if (const auto *PT = getAsCanonical<PointerType>())
     PointeeType = PT->getPointeeType();
-  else if (const auto *RT = getAs<ReferenceType>())
+  else if (const auto *RT = getAsCanonical<ReferenceType>())
     PointeeType = RT->getPointeeType();
   else
     return nullptr;
-
-  if (const auto *RT = PointeeType->getAs<RecordType>())
-    return dyn_cast<CXXRecordDecl>(
-        RT->getOriginalDecl()->getDefinitionOrSelf());
-
-  return nullptr;
+  return PointeeType->getAsCXXRecordDecl();
 }
 
 CXXRecordDecl *Type::getAsCXXRecordDecl() const {
@@ -2268,10 +2261,9 @@ bool Type::isSignedIntegerType() const {
   if (const auto *BT = dyn_cast<BuiltinType>(CanonicalType))
     return BT->isSignedInteger();
 
-  if (const EnumType *ET = dyn_cast<EnumType>(CanonicalType)) {
+  if (const auto *ED = getAsEnumDecl()) {
     // Incomplete enum types are not treated as integer types.
     // FIXME: In C++, enum types are never integer types.
-    const auto *ED = ET->getOriginalDecl()->getDefinitionOrSelf();
     if (!ED->isComplete() || ED->isScoped())
       return false;
     return ED->getIntegerType()->isSignedIntegerType();
@@ -2289,8 +2281,7 @@ bool Type::isSignedIntegerOrEnumerationType() const {
   if (const auto *BT = dyn_cast<BuiltinType>(CanonicalType))
     return BT->isSignedInteger();
 
-  if (const auto *ET = dyn_cast<EnumType>(CanonicalType)) {
-    const auto *ED = ET->getOriginalDecl()->getDefinitionOrSelf();
+  if (const auto *ED = getAsEnumDecl()) {
     if (!ED->isComplete())
       return false;
     return ED->getIntegerType()->isSignedIntegerType();
@@ -2318,10 +2309,9 @@ bool Type::isUnsignedIntegerType() const {
   if (const auto *BT = dyn_cast<BuiltinType>(CanonicalType))
     return BT->isUnsignedInteger();
 
-  if (const auto *ET = dyn_cast<EnumType>(CanonicalType)) {
+  if (const auto *ED = getAsEnumDecl()) {
     // Incomplete enum types are not treated as integer types.
     // FIXME: In C++, enum types are never integer types.
-    const auto *ED = ET->getOriginalDecl()->getDefinitionOrSelf();
     if (!ED->isComplete() || ED->isScoped())
       return false;
     return ED->getIntegerType()->isUnsignedIntegerType();
@@ -2339,8 +2329,7 @@ bool Type::isUnsignedIntegerOrEnumerationType() const {
   if (const auto *BT = dyn_cast<BuiltinType>(CanonicalType))
     return BT->isUnsignedInteger();
 
-  if (const auto *ET = dyn_cast<EnumType>(CanonicalType)) {
-    const auto *ED = ET->getOriginalDecl()->getDefinitionOrSelf();
+  if (const auto *ED = getAsEnumDecl()) {
     if (!ED->isComplete())
       return false;
     return ED->getIntegerType()->isUnsignedIntegerType();
@@ -2420,10 +2409,8 @@ bool Type::isArithmeticType() const {
 bool Type::hasBooleanRepresentation() const {
   if (const auto *VT = dyn_cast<VectorType>(CanonicalType))
     return VT->getElementType()->isBooleanType();
-  if (const auto *ET = dyn_cast<EnumType>(CanonicalType)) {
-    const auto *ED = ET->getOriginalDecl()->getDefinitionOrSelf();
+  if (const auto *ED = getAsEnumDecl())
     return ED->isComplete() && ED->getIntegerType()->isBooleanType();
-  }
   if (const auto *IT = dyn_cast<BitIntType>(CanonicalType))
     return IT->getNumBits() == 1;
   return isBooleanType();
@@ -2454,10 +2441,7 @@ Type::ScalarTypeKind Type::getScalarTypeKind() const {
   } else if (isa<MemberPointerType>(T)) {
     return STK_MemberPointer;
   } else if (isa<EnumType>(T)) {
-    assert(cast<EnumType>(T)
-               ->getOriginalDecl()
-               ->getDefinitionOrSelf()
-               ->isComplete());
+    assert(T->castAsEnumDecl()->isComplete());
     return STK_Integral;
   } else if (const auto *CT = dyn_cast<ComplexType>(T)) {
     if (CT->getElementType()->isRealFloatingType())
@@ -2516,8 +2500,7 @@ bool Type::isIncompleteType(NamedDecl **Def) const {
     // be completed.
     return isVoidType();
   case Enum: {
-    EnumDecl *EnumD =
-        cast<EnumType>(CanonicalType)->getOriginalDecl()->getDefinitionOrSelf();
+    auto *EnumD = castAsEnumDecl();
     if (Def)
       *Def = EnumD;
     return !EnumD->isComplete();
@@ -2525,17 +2508,13 @@ bool Type::isIncompleteType(NamedDecl **Def) const {
   case Record: {
     // A tagged type (struct/union/enum/class) is incomplete if the decl is a
     // forward declaration, but not a full definition (C99 6.2.5p22).
-    RecordDecl *Rec = cast<RecordType>(CanonicalType)
-                          ->getOriginalDecl()
-                          ->getDefinitionOrSelf();
+    auto *Rec = castAsRecordDecl();
     if (Def)
       *Def = Rec;
     return !Rec->isCompleteDefinition();
   }
   case InjectedClassName: {
-    CXXRecordDecl *Rec = cast<InjectedClassNameType>(CanonicalType)
-                             ->getOriginalDecl()
-                             ->getDefinitionOrSelf();
+    auto *Rec = castAsCXXRecordDecl();
     if (!Rec->isBeingDefined())
       return false;
     if (Def)
@@ -3234,7 +3213,7 @@ bool Type::isNothrowT() const {
 }
 
 bool Type::isAlignValT() const {
-  if (const auto *ET = getAs<EnumType>()) {
+  if (const auto *ET = getAsCanonical<EnumType>()) {
     const auto *ED = ET->getOriginalDecl();
     IdentifierInfo *II = ED->getIdentifier();
     if (II && II->isStr("align_val_t") && ED->isInStdNamespace())
@@ -3244,7 +3223,7 @@ bool Type::isAlignValT() const {
 }
 
 bool Type::isStdByteType() const {
-  if (const auto *ET = getAs<EnumType>()) {
+  if (const auto *ET = getAsCanonical<EnumType>()) {
     const auto *ED = ET->getOriginalDecl();
     IdentifierInfo *II = ED->getIdentifier();
     if (II && II->isStr("byte") && ED->isInStdNamespace())
@@ -4415,7 +4394,7 @@ bool RecordType::hasConstFields() const {
       if (FieldTy.isConstQualified())
         return true;
       FieldTy = FieldTy.getCanonicalType();
-      if (const auto *FieldRecTy = FieldTy->getAs<RecordType>()) {
+      if (const auto *FieldRecTy = FieldTy->getAsCanonical<RecordType>()) {
         if (!llvm::is_contained(RecordTypeList, FieldRecTy))
           RecordTypeList.push_back(FieldRecTy);
       }
@@ -5419,7 +5398,7 @@ bool Type::isObjCARCBridgableType() const {
 
 /// Determine whether the given type T is a "bridgeable" C type.
 bool Type::isCARCBridgableType() const {
-  const auto *Pointer = getAs<PointerType>();
+  const auto *Pointer = getAsCanonical<PointerType>();
   if (!Pointer)
     return false;
 
@@ -5429,7 +5408,7 @@ bool Type::isCARCBridgableType() const {
 
 /// Check if the specified type is the CUDA device builtin surface type.
 bool Type::isCUDADeviceBuiltinSurfaceType() const {
-  if (const auto *RT = getAs<RecordType>())
+  if (const auto *RT = getAsCanonical<RecordType>())
     return RT->getOriginalDecl()
         ->getMostRecentDecl()
         ->hasAttr<CUDADeviceBuiltinSurfaceTypeAttr>();
@@ -5438,7 +5417,7 @@ bool Type::isCUDADeviceBuiltinSurfaceType() const {
 
 /// Check if the specified type is the CUDA device builtin texture type.
 bool Type::isCUDADeviceBuiltinTextureType() const {
-  if (const auto *RT = getAs<RecordType>())
+  if (const auto *RT = getAsCanonical<RecordType>())
     return RT->getOriginalDecl()
         ->getMostRecentDecl()
         ->hasAttr<CUDADeviceBuiltinTextureTypeAttr>();

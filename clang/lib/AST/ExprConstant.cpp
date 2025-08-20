@@ -2614,8 +2614,7 @@ static bool CheckEvaluationResult(CheckEvaluationResultKind CERK,
         Value.getUnionValue(), Kind, Value.getUnionField(), CheckedTemps);
   }
   if (Value.isStruct()) {
-    RecordDecl *RD =
-        Type->castAs<RecordType>()->getOriginalDecl()->getDefinitionOrSelf();
+    auto *RD = Type->castAsRecordDecl();
     if (const CXXRecordDecl *CD = dyn_cast<CXXRecordDecl>(RD)) {
       unsigned BaseIndex = 0;
       for (const CXXBaseSpecifier &BS : CD->bases()) {
@@ -4101,7 +4100,8 @@ findSubobject(EvalInfo &Info, const Expr *E, const CompleteObject &Obj,
       }
 
       // Next subobject is a class, struct or union field.
-      RecordDecl *RD = ObjType->castAs<RecordType>()->getOriginalDecl();
+      RecordDecl *RD =
+          ObjType->castAsCanonical<RecordType>()->getOriginalDecl();
       if (RD->isUnion()) {
         const FieldDecl *UnionField = O->getUnionField();
         if (!UnionField ||
@@ -8582,10 +8582,9 @@ public:
     const FieldDecl *FD = dyn_cast<FieldDecl>(E->getMemberDecl());
     if (!FD) return Error(E);
     assert(!FD->getType()->isReferenceType() && "prvalue reference?");
-    assert(
-        BaseTy->castAs<RecordType>()->getOriginalDecl()->getCanonicalDecl() ==
-            FD->getParent()->getCanonicalDecl() &&
-        "record / field mismatch");
+    assert(BaseTy->castAsCanonical<RecordType>()->getOriginalDecl() ==
+               FD->getParent()->getCanonicalDecl() &&
+           "record / field mismatch");
 
     // Note: there is no lvalue base here. But this case should only ever
     // happen in C or in C++98, where we cannot be evaluating a constexpr
@@ -8812,10 +8811,9 @@ public:
 
     const ValueDecl *MD = E->getMemberDecl();
     if (const FieldDecl *FD = dyn_cast<FieldDecl>(E->getMemberDecl())) {
-      assert(
-          BaseTy->castAs<RecordType>()->getOriginalDecl()->getCanonicalDecl() ==
-              FD->getParent()->getCanonicalDecl() &&
-          "record / field mismatch");
+      assert(BaseTy->castAsCanonical<RecordType>()->getOriginalDecl() ==
+                 FD->getParent()->getCanonicalDecl() &&
+             "record / field mismatch");
       (void)BaseTy;
       if (!HandleLValueMember(this->Info, E, Result, FD))
         return false;
@@ -10769,8 +10767,7 @@ static bool HandleClassZeroInitialization(EvalInfo &Info, const Expr *E,
 }
 
 bool RecordExprEvaluator::ZeroInitialization(const Expr *E, QualType T) {
-  const RecordDecl *RD =
-      T->castAs<RecordType>()->getOriginalDecl()->getDefinitionOrSelf();
+  const auto *RD = T->castAsRecordDecl();
   if (RD->isInvalidDecl()) return false;
   if (RD->isUnion()) {
     // C++11 [dcl.init]p5: If T is a (possibly cv-qualified) union type, the
@@ -10839,10 +10836,7 @@ bool RecordExprEvaluator::VisitInitListExpr(const InitListExpr *E) {
 
 bool RecordExprEvaluator::VisitCXXParenListOrInitListExpr(
     const Expr *ExprToVisit, ArrayRef<Expr *> Args) {
-  const RecordDecl *RD = ExprToVisit->getType()
-                             ->castAs<RecordType>()
-                             ->getOriginalDecl()
-                             ->getDefinitionOrSelf();
+  const auto *RD = ExprToVisit->getType()->castAsRecordDecl();
   if (RD->isInvalidDecl()) return false;
   const ASTRecordLayout &Layout = Info.Ctx.getASTRecordLayout(RD);
   auto *CXXRD = dyn_cast<CXXRecordDecl>(RD);
@@ -11066,10 +11060,7 @@ bool RecordExprEvaluator::VisitCXXStdInitializerListExpr(
   Result = APValue(APValue::UninitStruct(), 0, 2);
   Array.moveInto(Result.getStructField(0));
 
-  RecordDecl *Record = E->getType()
-                           ->castAs<RecordType>()
-                           ->getOriginalDecl()
-                           ->getDefinitionOrSelf();
+  auto *Record = E->getType()->castAsRecordDecl();
   RecordDecl::field_iterator Field = Record->field_begin();
   assert(Field != Record->field_end() &&
          Info.Ctx.hasSameType(Field->getType()->getPointeeType(),
@@ -13113,10 +13104,7 @@ static bool convertUnsignedAPIntToCharUnits(const llvm::APInt &Int,
 static void addFlexibleArrayMemberInitSize(EvalInfo &Info, const QualType &T,
                                            const LValue &LV, CharUnits &Size) {
   if (!T.isNull() && T->isStructureType() &&
-      T->getAsStructureType()
-          ->getOriginalDecl()
-          ->getDefinitionOrSelf()
-          ->hasFlexibleArrayMember())
+      T->castAsRecordDecl()->hasFlexibleArrayMember())
     if (const auto *V = LV.getLValueBase().dyn_cast<const ValueDecl *>())
       if (const auto *VD = dyn_cast<VarDecl>(V))
         if (VD->hasInit())
@@ -15619,8 +15607,7 @@ bool IntExprEvaluator::VisitCastExpr(const CastExpr *E) {
     }
 
     if (Info.Ctx.getLangOpts().CPlusPlus && DestType->isEnumeralType()) {
-      const EnumType *ET = dyn_cast<EnumType>(DestType.getCanonicalType());
-      const EnumDecl *ED = ET->getOriginalDecl()->getDefinitionOrSelf();
+      const auto *ED = DestType->getAsEnumDecl();
       // Check that the value is within the range of the enumeration values.
       //
       // This corressponds to [expr.static.cast]p10 which says:
