@@ -5192,19 +5192,15 @@ static MachineBasicBlock *emitIndirectDst(MachineInstr &MI,
   return LoopBB;
 }
 
-static uint32_t getIdentityValueForWaveReduction(unsigned Opc) {
+static uint32_t getIdentityValueFor32BitWaveReduction(unsigned Opc) {
   switch (Opc) {
   case AMDGPU::S_MIN_U32:
-  case AMDGPU::V_CMP_LT_U64_e64: // umin.u64
     return std::numeric_limits<uint32_t>::max();
   case AMDGPU::S_MIN_I32:
-  case AMDGPU::V_CMP_LT_I64_e64: // min.i64
     return std::numeric_limits<int32_t>::max();
   case AMDGPU::S_MAX_U32:
-  case AMDGPU::V_CMP_GT_U64_e64: // umax.u64
     return std::numeric_limits<uint32_t>::min();
   case AMDGPU::S_MAX_I32:
-  case AMDGPU::V_CMP_GT_I64_e64: // max.i64
     return std::numeric_limits<int32_t>::min();
   case AMDGPU::S_ADD_I32:
   case AMDGPU::S_SUB_I32:
@@ -5214,7 +5210,24 @@ static uint32_t getIdentityValueForWaveReduction(unsigned Opc) {
   case AMDGPU::S_AND_B32:
     return std::numeric_limits<uint32_t>::max();
   default:
-    llvm_unreachable("Unexpected opcode in getIdentityValueForWaveReduction");
+    llvm_unreachable(
+        "Unexpected opcode in getIdentityValueFor32BitWaveReduction");
+  }
+}
+
+static uint64_t getIdentityValueFor64BitWaveReduction(unsigned Opc) {
+  switch (Opc) {
+  case AMDGPU::V_CMP_LT_U64_e64: // umin.u64
+    return std::numeric_limits<uint64_t>::max();
+  case AMDGPU::V_CMP_LT_I64_e64: // min.i64
+    return std::numeric_limits<int64_t>::max();
+  case AMDGPU::V_CMP_GT_U64_e64: // umax.u64
+    return std::numeric_limits<uint64_t>::min();
+  case AMDGPU::V_CMP_GT_I64_e64: // max.i64
+    return std::numeric_limits<int64_t>::min();
+  default:
+    llvm_unreachable(
+        "Unexpected opcode in getIdentityValueFor64BitWaveReduction");
   }
 }
 
@@ -5232,7 +5245,6 @@ static MachineBasicBlock *lowerWaveReduce(MachineInstr &MI,
   bool isSGPR = TRI->isSGPRClass(MRI.getRegClass(SrcReg));
   Register DstReg = MI.getOperand(0).getReg();
   MachineBasicBlock *RetBB = nullptr;
-  bool is32BitOpc = TRI->getRegSizeInBits(*MRI.getRegClass(DstReg)) == 32;
   if (isSGPR) {
     switch (Opc) {
     case AMDGPU::S_MIN_U32:
@@ -5246,9 +5258,9 @@ static MachineBasicBlock *lowerWaveReduce(MachineInstr &MI,
       RetBB = &BB;
       break;
     }
-    case AMDGPU::V_CMP_LT_U64_e64: // umin
-    case AMDGPU::V_CMP_LT_I64_e64: // min
-    case AMDGPU::V_CMP_GT_U64_e64: // umax
+    case AMDGPU::V_CMP_LT_U64_e64:   // umin
+    case AMDGPU::V_CMP_LT_I64_e64:   // min
+    case AMDGPU::V_CMP_GT_U64_e64:   // umax
     case AMDGPU::V_CMP_GT_I64_e64: { // max
       // Idempotent operations.
       BuildMI(BB, MI, DL, TII->get(AMDGPU::S_MOV_B64), DstReg).addReg(SrcReg);
@@ -5327,6 +5339,11 @@ static MachineBasicBlock *lowerWaveReduce(MachineInstr &MI,
     // so that we will get the next active lane for next iteration.
     MachineBasicBlock::iterator I = BB.end();
     Register SrcReg = MI.getOperand(1).getReg();
+    bool is32BitOpc = (Opc == AMDGPU::S_MIN_U32 || Opc == AMDGPU::S_MIN_I32 ||
+                       Opc == AMDGPU::S_MAX_U32 || Opc == AMDGPU::S_MAX_I32 ||
+                       Opc == AMDGPU::S_ADD_I32 || Opc == AMDGPU::S_SUB_I32 ||
+                       Opc == AMDGPU::S_AND_B32 || Opc == AMDGPU::S_OR_B32 ||
+                       Opc == AMDGPU::S_XOR_B32);
 
     // Create Control flow for loop
     // Split MI's Machine Basic block into For loop
@@ -5349,33 +5366,15 @@ static MachineBasicBlock *lowerWaveReduce(MachineInstr &MI,
 
     // Create initial values of induction variable from Exec, Accumulator and
     // insert branch instr to newly created ComputeBlock
-    uint32_t IdentityValue = getIdentityValueForWaveReduction(Opc);
     BuildMI(BB, I, DL, TII->get(MovOpcForExec), LoopIterator).addReg(ExecReg);
     if (is32BitOpc) {
+      uint32_t IdentityValue = getIdentityValueFor32BitWaveReduction(Opc);
       BuildMI(BB, I, DL, TII->get(AMDGPU::S_MOV_B32), IdentityValReg)
           .addImm(IdentityValue);
     } else {
-      Register Identitylo = MRI.createVirtualRegister(&AMDGPU::SReg_32RegClass);
-      Register Identityhi = MRI.createVirtualRegister(&AMDGPU::SReg_32RegClass);
-      BuildMI(BB, I, DL, TII->get(AMDGPU::S_MOV_B32), Identityhi)
+      uint64_t IdentityValue = getIdentityValueFor64BitWaveReduction(Opc);
+      BuildMI(BB, I, DL, TII->get(AMDGPU::S_MOV_B64_IMM_PSEUDO), IdentityValReg)
           .addImm(IdentityValue);
-      switch (Opc) {
-      case AMDGPU::V_CMP_LT_U64_e64:
-      case AMDGPU::V_CMP_LT_I64_e64:
-        IdentityValue = int32_t(-1); // u|min
-        break;
-      case AMDGPU::V_CMP_GT_U64_e64:
-      case AMDGPU::V_CMP_GT_I64_e64:
-        IdentityValue = int32_t(0); // u|max
-        break;
-      }
-      BuildMI(BB, I, DL, TII->get(AMDGPU::S_MOV_B32), Identitylo)
-          .addImm(IdentityValue);
-      BuildMI(BB, I, DL, TII->get(TargetOpcode::REG_SEQUENCE), IdentityValReg)
-          .addReg(Identitylo)
-          .addImm(AMDGPU::sub0)
-          .addReg(Identityhi)
-          .addImm(AMDGPU::sub1);
     }
     // clang-format off
     BuildMI(BB, I, DL, TII->get(AMDGPU::S_BRANCH))
