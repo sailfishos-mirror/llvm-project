@@ -1831,6 +1831,10 @@ public:
   bool hasScratchBaseForwardingHazard() const {
     return GFX1250Insts && getGeneration() == GFX12;
   }
+
+  /// \returns true if the subtarget requires a wait for xcnt before atomic
+  /// flat/global stores & rmw.
+  bool requiresWaitXCntBeforeAtomicStores() const { return GFX1250Insts; }
 };
 
 class GCNUserSGPRUsageInfo {
