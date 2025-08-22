@@ -706,10 +706,8 @@ bool Type::isInterfaceType() const {
 }
 
 bool Type::isStructureOrClassType() const {
-  if (const auto *RT = getAs<RecordType>()) {
-    RecordDecl *RD = RT->getOriginalDecl();
-    return RD->isStruct() || RD->isClass() || RD->isInterface();
-  }
+  if (const auto *RT = getAsCanonical<RecordType>())
+    return RT->getOriginalDecl()->isStructureOrClass();
   return false;
 }
 
@@ -1936,6 +1934,11 @@ CXXRecordDecl *Type::getAsCXXRecordDecl() const {
   return cast<CXXRecordDecl>(TD)->getDefinitionOrSelf();
 }
 
+CXXRecordDecl *Type::castAsCXXRecordDecl() const {
+  const auto *TT = cast<TagType>(CanonicalType);
+  return cast<CXXRecordDecl>(TT->getOriginalDecl())->getDefinitionOrSelf();
+}
+
 RecordDecl *Type::getAsRecordDecl() const {
   const auto *TT = dyn_cast<TagType>(CanonicalType);
   if (!isa_and_present<RecordType, InjectedClassNameType>(TT))
@@ -1943,10 +1946,31 @@ RecordDecl *Type::getAsRecordDecl() const {
   return cast<RecordDecl>(TT->getOriginalDecl())->getDefinitionOrSelf();
 }
 
+RecordDecl *Type::castAsRecordDecl() const {
+  const auto *TT = cast<TagType>(CanonicalType);
+  return cast<RecordDecl>(TT->getOriginalDecl())->getDefinitionOrSelf();
+}
+
+EnumDecl *Type::getAsEnumDecl() const {
+  if (const auto *TT = dyn_cast<EnumType>(CanonicalType))
+    return TT->getOriginalDecl()->getDefinitionOrSelf();
+  return nullptr;
+}
+
+EnumDecl *Type::castAsEnumDecl() const {
+  return cast<EnumType>(CanonicalType)
+      ->getOriginalDecl()
+      ->getDefinitionOrSelf();
+}
+
 TagDecl *Type::getAsTagDecl() const {
   if (const auto *TT = dyn_cast<TagType>(CanonicalType))
     return TT->getOriginalDecl()->getDefinitionOrSelf();
   return nullptr;
+}
+
+TagDecl *Type::castAsTagDecl() const {
+  return cast<TagType>(CanonicalType)->getOriginalDecl()->getDefinitionOrSelf();
 }
 
 const TemplateSpecializationType *
