@@ -12,7 +12,7 @@
 //
 // Limitation: This assumes that all terminators in the CFG are direct branches
 //             (the "br" instruction). The presence of any other control flow
-//             such as indirectbr ot switch will cause an assert.
+//             such as indirectbr or switch will cause an assert.
 //             The callbr terminator is supported by creating intermediate
 //             target blocks that unconditionally branch to the original target
 //             blocks. These intermediate target blocks can then be redirected
@@ -170,9 +170,10 @@ static bool unifyLoopExits(DominatorTree &DT, LoopInfo &LI, Loop *L) {
       Succ1 = L->contains(Succ1) ? nullptr : Succ1;
       CHub.addBranch(BB, Succ0, Succ1);
 
-      LLVM_DEBUG(dbgs() << "Added extiting branch: " << printBBPtr(BB) << " -> "
-                        << printBBPtr(Succ0) << (Succ0 && Succ1 ? " " : "")
-                        << printBBPtr(Succ1) << "\n");
+      LLVM_DEBUG(dbgs() << "Added extiting branch: " << printBasicBlock(BB)
+                        << " -> " << printBasicBlock(Succ0)
+                        << (Succ0 && Succ1 ? " " : "") << printBasicBlock(Succ1)
+                        << "\n");
     } else if (CallBrInst *CallBr = dyn_cast<CallBrInst>(BB->getTerminator())) {
       for (unsigned J = 0; J < CallBr->getNumSuccessors(); ++J) {
         BasicBlock *Succ = CallBr->getSuccessor(J);
@@ -187,8 +188,9 @@ static bool unifyLoopExits(DominatorTree &DT, LoopInfo &LI, Loop *L) {
         // themselves.
         ExitingBlocks[I] = NewSucc;
         CHub.addBranch(NewSucc, Succ);
-        LLVM_DEBUG(dbgs() << "Added exiting branch: " << printBBPtr(NewSucc)
-                          << " -> " << printBBPtr(Succ) << "\n");
+        LLVM_DEBUG(dbgs() << "Added exiting branch: "
+                          << printBasicBlock(NewSucc) << " -> "
+                          << printBasicBlock(Succ) << "\n");
         // Also add the new target block to the list of exiting blocks that
         // should later be added to the parent loops.
         CallBrTargetBlocks.push_back(NewSucc);

@@ -612,7 +612,7 @@ LLVM_ABI void InvertBranch(BranchInst *PBI, IRBuilderBase &Builder);
 // br/brcond/unreachable/ret
 LLVM_ABI bool hasOnlySimpleTerminator(const Function &F);
 
-LLVM_ABI Printable printBBPtr(const BasicBlock *BB);
+LLVM_ABI Printable printBasicBlock(const BasicBlock *BB);
 
 } // end namespace llvm
 

@@ -1776,7 +1776,7 @@ bool llvm::hasOnlySimpleTerminator(const Function &F) {
   return true;
 }
 
-Printable llvm::printBBPtr(const BasicBlock *BB) {
+Printable llvm::printBasicBlock(const BasicBlock *BB) {
   return Printable([BB](raw_ostream &OS) {
     if (BB)
       return BB->printAsOperand(OS);
