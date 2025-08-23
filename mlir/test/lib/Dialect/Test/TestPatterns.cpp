@@ -951,7 +951,7 @@ struct TestCreateIllegalBlock : public RewritePattern {
   }
 };
 
-/// A simple pattern that tests the "replaceUsesOfBlockArgument" API.
+/// A simple pattern that tests the "replaceAllUsesWith" API.
 struct TestBlockArgReplace : public ConversionPattern {
   TestBlockArgReplace(MLIRContext *ctx, const TypeConverter &converter)
       : ConversionPattern(converter, "test.block_arg_replace", /*benefit=*/1,
@@ -962,8 +962,7 @@ struct TestBlockArgReplace : public ConversionPattern {
                   ConversionPatternRewriter &rewriter) const final {
     // Replace the first block argument with 2x the second block argument.
     Value repl = op->getRegion(0).getArgument(1);
-    rewriter.replaceUsesOfBlockArgument(op->getRegion(0).getArgument(0),
-                                        {repl, repl});
+    rewriter.replaceAllUsesWith(op->getRegion(0).getArgument(0), {repl, repl});
     rewriter.modifyOpInPlace(op, [&] {
       // If the "trigger_rollback" attribute is set, keep the op illegal, so
       // that a rollback is triggered.
