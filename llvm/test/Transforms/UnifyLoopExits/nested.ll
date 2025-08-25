@@ -168,3 +168,55 @@ exit:
   %exit.phi = phi i32 [%A4.phi, %A5], [%Z, %C]
   ret void
 }
+
+; Here, the newly created target loop that connects b to r1 needs to be part of
+; the parent loop (the outer loop b participates in). Otherwise, it will be
+; regarded as an additional loop entry point to this outer loop.
+define void @nested_callbr_multiple_exits() {
+; CHECK-LABEL: @nested_callbr_multiple_exits(
+; CHECK-NEXT:    br label [[A:%.*]]
+; CHECK:       a:
+; CHECK-NEXT:    callbr void asm "", ""()
+; CHECK-NEXT:            to label [[B:%.*]] []
+; CHECK:       b:
+; CHECK-NEXT:    callbr void asm "", "!i"()
+; CHECK-NEXT:            to label [[C:%.*]] [label %b.target.b.target.r1]
+; CHECK:       c:
+; CHECK-NEXT:    callbr void asm "", "!i"()
+; CHECK-NEXT:            to label [[C_TARGET_E:%.*]] [label %b]
+; CHECK:       e:
+; CHECK-NEXT:    callbr void asm "", "!i"()
+; CHECK-NEXT:            to label [[A]] [label %e.target.r2]
+; CHECK:       r1:
+; CHECK-NEXT:    ret void
+; CHECK:       r2:
+; CHECK-NEXT:    ret void
+; CHECK:       b.target.r1:
+; CHECK-NEXT:    br label [[LOOP_EXIT_GUARD:%.*]]
+; CHECK:       e.target.r2:
+; CHECK-NEXT:    br label [[LOOP_EXIT_GUARD]]
+; CHECK:       loop.exit.guard:
+; CHECK-NEXT:    [[GUARD_R1:%.*]] = phi i1 [ true, [[B_TARGET_R1:%.*]] ], [ false, [[E_TARGET_R2:%.*]] ]
+; CHECK-NEXT:    br i1 [[GUARD_R1]], label [[R1:%.*]], label [[R2:%.*]]
+; CHECK:       b.target.b.target.r1:
+; CHECK-NEXT:    br label [[LOOP_EXIT_GUARD1:%.*]]
+; CHECK:       c.target.e:
+; CHECK-NEXT:    br label [[LOOP_EXIT_GUARD1]]
+; CHECK:       loop.exit.guard1:
+; CHECK-NEXT:    [[GUARD_B_TARGET_R1:%.*]] = phi i1 [ true, [[B_TARGET_B_TARGET_R1:%.*]] ], [ false, [[C_TARGET_E]] ]
+; CHECK-NEXT:    br i1 [[GUARD_B_TARGET_R1]], label [[B_TARGET_R1]], label [[E:%.*]]
+;
+  br label %a
+a:
+  callbr void asm "", ""() to label %b []
+b:
+  callbr void asm "", "!i"() to label %c [label %r1]
+c:
+  callbr void asm "", "!i"() to label %e [label %b]
+e:
+  callbr void asm "", "!i"() to label %a [label %r2]
+r1:
+  ret void
+r2:
+  ret void
+}

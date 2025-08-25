@@ -155,7 +155,7 @@ static bool unifyLoopExits(DominatorTree &DT, LoopInfo &LI, Loop *L) {
   L->getExitingBlocks(ExitingBlocks);
 
   DomTreeUpdater DTU(DT, DomTreeUpdater::UpdateStrategy::Eager);
-  SmallVector<BasicBlock *, 8> CallBrTargetBlocks;
+  SmallVector<BasicBlock *, 8> CallBrTargetBlocksToFix;
   // Redirect exiting edges through a control flow hub.
   ControlFlowHub CHub;
 
@@ -179,8 +179,13 @@ static bool unifyLoopExits(DominatorTree &DT, LoopInfo &LI, Loop *L) {
         BasicBlock *Succ = CallBr->getSuccessor(J);
         if (L->contains(Succ))
           continue;
+        bool UpdatedLI = false;
         BasicBlock *NewSucc = ControlFlowHub::createCallBrTarget(
-            CallBr, Succ, J, /* AttachToCallBr = */ false, nullptr, &DTU, &LI);
+            CallBr, Succ, J, nullptr, &DTU, &LI, &UpdatedLI);
+        // Even if CallBr and Succ do not have a common parent loop, we need to
+        // add the new target block to the parent loop of the current loop.
+        if (!UpdatedLI)
+          CallBrTargetBlocksToFix.push_back(NewSucc);
         // ExitingBlocks is later used to restore SSA, so we need to make sure
         // that the blocks used for phi nodes in the guard blocks match the
         // predecessors of the guard blocks, which, in the case of callbr, are
@@ -191,9 +196,6 @@ static bool unifyLoopExits(DominatorTree &DT, LoopInfo &LI, Loop *L) {
         LLVM_DEBUG(dbgs() << "Added exiting branch: "
                           << printBasicBlock(NewSucc) << " -> "
                           << printBasicBlock(Succ) << "\n");
-        // Also add the new target block to the list of exiting blocks that
-        // should later be added to the parent loops.
-        CallBrTargetBlocks.push_back(NewSucc);
       }
     } else {
       llvm_unreachable("unsupported block terminator");
@@ -218,16 +220,19 @@ static bool unifyLoopExits(DominatorTree &DT, LoopInfo &LI, Loop *L) {
   L->verifyLoop();
 
   // The guard blocks were created outside the loop, so they need to become
-  // members of the parent loop. Same goes for the callbr target blocks if they
-  // have not already been added to the respective parent loop by adding them to
-  // the original callbr target's loop.
+  // members of the parent loop.
+  // Same goes for the callbr target blocks.  Although we try to add them to the
+  // smallest common parent loop of the callbr block and the corresponding
+  // original target block, there might not have been such a loop, in which case
+  // the newly created callbr target blocks are not part of any loop. For nested
+  // loops, this might result in them leading to a loop with multiple entry
+  // points.
   if (auto *ParentLoop = L->getParentLoop()) {
     for (auto *G : GuardBlocks) {
       ParentLoop->addBasicBlockToLoop(G, LI);
     }
-    for (auto *C : CallBrTargetBlocks) {
-      if (!ParentLoop->contains(C))
-        ParentLoop->addBasicBlockToLoop(C, LI);
+    for (auto *C : CallBrTargetBlocksToFix) {
+      ParentLoop->addBasicBlockToLoop(C, LI);
     }
     ParentLoop->verifyLoop();
   }

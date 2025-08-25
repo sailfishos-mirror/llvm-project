@@ -645,6 +645,36 @@ LoopInfoBase<BlockT, LoopT>::getLoopsInReverseSiblingPreorder() const {
   return PreOrderLoops;
 }
 
+template <class BlockT, class LoopT>
+LoopT *LoopInfoBase<BlockT, LoopT>::getSmallestCommonLoop(LoopT *A,
+                                                          LoopT *B) const {
+  if (!A || !B)
+    return nullptr;
+
+  // If lops A and B have different depth replace them with parent loop
+  // until they have the same depth.
+  while (A->getLoopDepth() > B->getLoopDepth())
+    A = A->getParentLoop();
+  while (B->getLoopDepth() > A->getLoopDepth())
+    B = B->getParentLoop();
+
+  // Loops A and B are at same depth but may be disjoint, replace them with
+  // parent loops until we find loop that contains both or we run out of
+  // parent loops.
+  while (A != B) {
+    A = A->getParentLoop();
+    B = B->getParentLoop();
+  }
+
+  return A;
+}
+
+template <class BlockT, class LoopT>
+LoopT *LoopInfoBase<BlockT, LoopT>::getSmallestCommonLoop(BlockT *A,
+                                                          BlockT *B) const {
+  return getSmallestCommonLoop(getLoopFor(A), getLoopFor(B));
+}
+
 // Debugging
 template <class BlockT, class LoopT>
 void LoopInfoBase<BlockT, LoopT>::print(raw_ostream &OS) const {

@@ -135,14 +135,12 @@ struct ControlFlowHub {
   /// \param Succ           The original successor basic block to be reached.
   /// \param SuccIdx        The index of the successor in the callbr
   ///                       instruction.
-  /// \param AttachToCallBr If true, the new block is associated with the
-  ///                       callbr's parent for loop/cycle info.
-  ///                       If false, the new block is associated with the
-  ///                       callbr's successor for loop/cycle info.
   /// \param CI             Optional CycleInfo for updating cycle membership.
   /// \param DTU            Optional DomTreeUpdater for updating the dominator
   ///                       tree.
   /// \param LI             Optional LoopInfo for updating loop membership.
+  /// \param UpdatedLI      Optional output flag indicating if LoopInfo has been
+  ///                       updated.
   ///
   /// \returns The newly created intermediate target block.
   ///
@@ -150,8 +148,8 @@ struct ControlFlowHub {
   /// cycle info as needed.
   static BasicBlock *
   createCallBrTarget(CallBrInst *CallBr, BasicBlock *Succ, unsigned SuccIdx,
-                     bool AttachToCallBr = true, CycleInfo *CI = nullptr,
-                     DomTreeUpdater *DTU = nullptr, LoopInfo *LI = nullptr);
+                     CycleInfo *CI = nullptr, DomTreeUpdater *DTU = nullptr,
+                     LoopInfo *LI = nullptr, bool *UpdatedLI = nullptr);
 };
 
 } // end namespace llvm

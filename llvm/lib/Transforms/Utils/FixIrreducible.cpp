@@ -308,8 +308,8 @@ static bool fixIrreducible(Cycle &C, CycleInfo &CI, DominatorTree &DT,
         BasicBlock *Succ = CallBr->getSuccessor(I);
         if (Succ != Header)
           continue;
-        BasicBlock *NewSucc = ControlFlowHub::createCallBrTarget(
-            CallBr, Succ, I, /* AttachToCallBr = */ false, &CI, &DTU, LI);
+        BasicBlock *NewSucc =
+            ControlFlowHub::createCallBrTarget(CallBr, Succ, I, &CI, &DTU, LI);
         CHub.addBranch(NewSucc, Succ);
         LLVM_DEBUG(dbgs() << "Added internal branch: "
                           << printBasicBlock(NewSucc) << " -> "
@@ -347,8 +347,8 @@ static bool fixIrreducible(Cycle &C, CycleInfo &CI, DominatorTree &DT,
         BasicBlock *Succ = CallBr->getSuccessor(I);
         if (!C.contains(Succ))
           continue;
-        BasicBlock *NewSucc = ControlFlowHub::createCallBrTarget(
-            CallBr, Succ, I, /* AttachToCallBr = */ true, &CI, &DTU, LI);
+        BasicBlock *NewSucc =
+            ControlFlowHub::createCallBrTarget(CallBr, Succ, I, &CI, &DTU, LI);
         CHub.addBranch(NewSucc, Succ);
         LLVM_DEBUG(dbgs() << "Added external branch: "
                           << printBasicBlock(NewSucc) << " -> "
