@@ -6,6 +6,17 @@
 #include "llvm/ProfileData/InstrProf.h"
 
 using namespace llvm;
+
+StringRef
+StaticDataProfileInfo::getExistingSectionPrefix(const Constant *C) const {
+  if (const GlobalVariable *GV = dyn_cast<GlobalVariable>(C)) {
+    if (auto maybeSectionPrefix = GV->getSectionPrefix();
+        maybeSectionPrefix && !maybeSectionPrefix->empty())
+      return *maybeSectionPrefix;
+  }
+  return "";
+}
+
 void StaticDataProfileInfo::addConstantProfileCount(
     const Constant *C, std::optional<uint64_t> Count) {
   if (!Count) {
@@ -30,9 +41,10 @@ StaticDataProfileInfo::getConstantProfileCount(const Constant *C) const {
 
 StringRef StaticDataProfileInfo::getConstantSectionPrefix(
     const Constant *C, const ProfileSummaryInfo *PSI) const {
+  StringRef ExistingSectionPrefix = getExistingSectionPrefix(C);
   auto Count = getConstantProfileCount(C);
   if (!Count)
-    return "";
+    return ExistingSectionPrefix;
   // The accummulated counter shows the constant is hot. Return 'hot' whether
   // this variable is seen by unprofiled functions or not.
   if (PSI->isHotCount(*Count))
@@ -43,10 +55,12 @@ StringRef StaticDataProfileInfo::getConstantSectionPrefix(
   if (ConstantWithoutCounts.count(C))
     return "";
   // The accummulated counter shows the constant is cold. Return 'unlikely'.
-  if (PSI->isColdCount(*Count))
+  if (PSI->isColdCount(*Count)) {
+    if (ExistingSectionPrefix == "hot")
+      return "hot";
     return "unlikely";
-  // The counter says lukewarm. Return an empty prefix.
-  return "";
+  }
+  return ExistingSectionPrefix;
 }
 
 bool StaticDataProfileInfoWrapperPass::doInitialization(Module &M) {

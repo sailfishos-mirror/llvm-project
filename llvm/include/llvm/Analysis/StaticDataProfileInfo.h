@@ -26,6 +26,10 @@ public:
   LLVM_ABI std::optional<uint64_t>
   getConstantProfileCount(const Constant *C) const;
 
+  /// If \p C already has a section prefix, return it. Otherwise, return an
+  /// empty string.
+  StringRef getExistingSectionPrefix(const Constant *C) const;
+
 public:
   StaticDataProfileInfo() = default;
 
