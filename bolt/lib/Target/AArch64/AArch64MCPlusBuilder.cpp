@@ -2706,6 +2706,24 @@ public:
     return Insts;
   }
 
+  bool isBTILandingPad(MCInst &Inst, bool CouldCall,
+                       bool CouldJump) const override {
+    unsigned HintNum = getBTIHintNum(CouldCall, CouldJump);
+    bool IsExplicitBTI =
+        Inst.getOpcode() == AArch64::HINT && Inst.getNumOperands() == 1 &&
+        Inst.getOperand(0).isImm() && Inst.getOperand(0).getImm() == HintNum;
+
+    bool IsImplicitBTI = HintNum == 34 && isImplicitBTIC(Inst);
+    return IsExplicitBTI || IsImplicitBTI;
+  }
+
+  bool isImplicitBTIC(MCInst &Inst) const override {
+    // PACI[AB]SP are always implicitly BTI C, independently of
+    // SCTLR_EL1.BT[01].
+    return Inst.getOpcode() == AArch64::PACIASP ||
+           Inst.getOpcode() == AArch64::PACIBSP;
+  }
+
   void createBTI(MCInst &Inst, bool CouldCall, bool CouldJump) const override {
     Inst.setOpcode(AArch64::HINT);
     unsigned HintNum = getBTIHintNum(CouldCall, CouldJump);
