@@ -1884,6 +1884,12 @@ public:
     llvm_unreachable("not implemented");
   }
 
+  /// Update operand of BTI instruction.
+  virtual void updateBTIVariant(MCInst &Inst, bool CouldCall,
+                                bool CouldJump) const {
+    llvm_unreachable("not implemented");
+  }
+
   /// Store \p Target absolute address to \p RegName
   virtual InstructionListType materializeAddress(const MCSymbol *Target,
                                                  MCContext *Ctx,

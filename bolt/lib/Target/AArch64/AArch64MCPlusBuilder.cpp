@@ -2730,6 +2730,14 @@ public:
     Inst.addOperand(MCOperand::createImm(HintNum));
   }
 
+  void updateBTIVariant(MCInst &Inst, bool CouldCall,
+                        bool CouldJump) const override {
+    assert(Inst.getOpcode() == AArch64::HINT && "Not a BTI instruction.");
+    unsigned HintNum = getBTIHintNum(CouldCall, CouldJump);
+    Inst.clear();
+    Inst.addOperand(MCOperand::createImm(HintNum));
+  }
+
   InstructionListType materializeAddress(const MCSymbol *Target, MCContext *Ctx,
                                          MCPhysReg RegName,
                                          int64_t Addend = 0) const override {
