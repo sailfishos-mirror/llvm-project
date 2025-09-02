@@ -1109,7 +1109,8 @@ void DecoderTableBuilder::emitBinaryParser(raw_ostream &OS, indent Indent,
     if (IgnoreNonDecodableOperands)
       return;
     assert(!OpInfo.Decoder.empty());
-    OS << Indent << OpInfo.Decoder << "(MI, Decoder);\n";
+    OS << Indent << "if (!Check(S, " << OpInfo.Decoder << "(MI, Decoder)))\n"
+       << Indent << "  return MCDisassembler::Fail;\n";
     return;
   }
 
