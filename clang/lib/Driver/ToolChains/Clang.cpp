@@ -1406,17 +1406,18 @@ static void CollectARMPACBTIOptions(const ToolChain &TC, const ArgList &Args,
     GuardedControlStack = PBP.GuardedControlStack;
   }
 
-  bool HasPtrauthReturns = llvm::any_of(CmdArgs, [](const char *Arg) {
-    return StringRef(Arg) == "-fptrauth-returns";
-  });
+  Arg *PtrauthReturnsArg = Args.getLastArg(options::OPT_fptrauth_returns,
+                                           options::OPT_fno_ptrauth_returns);
+  bool HasPtrauthReturns =
+      PtrauthReturnsArg &&
+      PtrauthReturnsArg->getOption().matches(options::OPT_fptrauth_returns);
   // GCS is currently untested with ptrauth-returns, but enabling this could be
   // allowed in future after testing with a suitable system.
-  if (HasPtrauthReturns &&
-      (Scope != "none" || BranchProtectionPAuthLR || GuardedControlStack)) {
+  if (Scope != "none" || BranchProtectionPAuthLR || GuardedControlStack) {
     if (Triple.getEnvironment() == llvm::Triple::PAuthTest)
       D.Diag(diag::err_drv_unsupported_opt_for_target)
           << A->getAsString(Args) << Triple.getTriple();
-    else
+    else if (HasPtrauthReturns)
       D.Diag(diag::err_drv_incompatible_options)
           << A->getAsString(Args) << "-fptrauth-returns";
   }
