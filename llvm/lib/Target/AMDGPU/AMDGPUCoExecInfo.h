@@ -334,6 +334,15 @@ struct CoExecInfo {
     return std::nullopt;
   }
 
+  unsigned getCoExecStageCount(uint8_t InstMask) const {
+    unsigned Counter = 0;
+    for (unsigned I = 0; I < TotalWindow; ++I) {
+      if ((Slots[I].Mask & InstMask) != 0)
+        ++Counter;
+    }
+    return Counter;
+  }
+
   /// Get stage type from mask for display.
   static CoExecStageType getStageType(uint8_t Mask) {
     using namespace CoExecMask;

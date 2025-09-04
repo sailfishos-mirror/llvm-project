@@ -32,16 +32,25 @@
 
 #include "GCNPreRAOptimizations.h"
 #include "AMDGPU.h"
+#include "AMDGPUCoExecInfo.h"
 #include "GCNSubtarget.h"
 #include "MCTargetDesc/AMDGPUMCTargetDesc.h"
 #include "SIRegisterInfo.h"
 #include "llvm/CodeGen/LiveIntervals.h"
 #include "llvm/CodeGen/MachineFunctionPass.h"
+#include "llvm/CodeGen/Register.h"
+#include "llvm/CodeGen/TargetSchedule.h"
 #include "llvm/InitializePasses.h"
 
 using namespace llvm;
 
 #define DEBUG_TYPE "amdgpu-pre-ra-optimizations"
+
+static cl::opt<bool>
+    EnableAntiHintsForMFMARegs("amdgpu-anti-hints-for-mfma", cl::Hidden,
+                               cl::desc("Enable Anti-Hints for "
+                                        "MFMA in GCNPreRAOptimizations stage."),
+                               cl::init(true));
 
 namespace {
 
@@ -51,6 +60,7 @@ private:
   const SIRegisterInfo *TRI;
   MachineRegisterInfo *MRI;
   LiveIntervals *LIS;
+  TargetSchedModel SchedModel;
 
   bool processReg(Register Reg);
 
@@ -243,8 +253,116 @@ bool GCNPreRAOptimizationsImpl::run(MachineFunction &MF) {
   TII = ST.getInstrInfo();
   MRI = &MF.getRegInfo();
   TRI = ST.getRegisterInfo();
+  SchedModel.init(&ST);
 
   bool Changed = false;
+  // Add RA anti-hints to reduce WMMA/MFMA hazard NOPs
+  if (EnableAntiHintsForMFMARegs && ST.hasGFX1250Insts()) {
+
+    // Per-MFMA tracking to determine anti-hint eligibility for subsequent
+    // instructions within the max lookback window.
+    struct MFMAInfo {
+      SmallVector<Register, 4> Regs;
+      unsigned HazardSlots;
+      unsigned HazardConsumerSince = 0;
+    };
+
+    for (const MachineBasicBlock &MBB : MF) {
+      std::optional<MFMAInfo> LastMFMAOrWMMA = std::nullopt;
+
+      for (const MachineInstr &MI : MBB) {
+        if (MI.isDebugInstr())
+          continue;
+
+        // Handle MFMA instructions
+        if (SIInstrInfo::isMFMAorWMMA(MI)) {
+          SmallVector<Register, 4> MFMARegisters;
+          // Helper to get named operand
+          auto collectNamedOperand = [&](AMDGPU::OpName OpName,
+                                         const char *OpNameStr) {
+            const MachineOperand *MO = TII->getNamedOperand(MI, OpName);
+            if (!MO) {
+              LLVM_DEBUG(dbgs() << "    Named operand " << OpNameStr
+                                << " not found\n");
+              return;
+            }
+            if (MO->isReg() && MO->getReg().isVirtual()) {
+              Register Reg = MO->getReg();
+              const TargetRegisterClass *RC = MRI->getRegClass(Reg);
+              // Only consider VGPRs
+              if (TRI->hasVGPRs(RC))
+                MFMARegisters.push_back(Reg);
+              LLVM_DEBUG(dbgs() << "    Collected " << OpNameStr << " : "
+                                << printReg(Reg, TRI) << "\n");
+            }
+          };
+
+          // Collect destination and source C (accumulator) registers
+          collectNamedOperand(AMDGPU::OpName::src0, "src0");
+          collectNamedOperand(AMDGPU::OpName::src1, "src1");
+          collectNamedOperand(AMDGPU::OpName::src2, "src2");
+          if (!MFMARegisters.empty()) {
+            AMDGPU::CoExecInfo CEI = AMDGPU::getCoExecInfo(MI, *TII);
+            unsigned VALUSlots =
+                CEI.getCoExecStageCount(AMDGPU::CoExecMask::VALU);
+            LastMFMAOrWMMA = {std::move(MFMARegisters), VALUSlots, 0u};
+          }
+          continue;
+        }
+
+        if (!LastMFMAOrWMMA.has_value())
+          continue;
+
+        if (LastMFMAOrWMMA->HazardConsumerSince >=
+            LastMFMAOrWMMA->HazardSlots) {
+          LastMFMAOrWMMA = std::nullopt;
+          continue;
+        }
+
+        if (!(MI.mayLoad() || MI.mayStore() || MI.isCopy() ||
+              SIInstrInfo::isVALU(MI)))
+          continue;
+
+        // Process operands that might reuse MFMA registers
+        const SlotIndex CurrentSlot = LIS->getInstructionIndex(MI).getRegSlot();
+
+        for (const MachineOperand &MO : MI.operands()) {
+
+          if (!MO.isReg() || !MO.getReg().isVirtual())
+            continue;
+
+          if (!MO.isDef())
+            continue;
+
+          const Register CandidateReg = MO.getReg();
+          const TargetRegisterClass *CandidateRC =
+              MRI->getRegClass(CandidateReg);
+
+          // Only process VGPR registers
+          if (!TRI->isVGPRClass(CandidateRC))
+            continue;
+          LLVM_DEBUG(dbgs() << "\nAdding antihints for instruction: ";
+                     MI.dump(); dbgs() << "\n");
+
+          for (Register HazardReg : LastMFMAOrWMMA->Regs) {
+            // Check if MFMA register is dead at current instruction
+            const LiveInterval &HazardInterval = LIS->getInterval(HazardReg);
+            if (!HazardInterval.liveAt(CurrentSlot)) {
+              MRI->addRegAllocationAntiHints(CandidateReg, HazardReg);
+              LLVM_DEBUG(dbgs()
+                         << "  Anti-hint added: " << printReg(CandidateReg, TRI)
+                         << " <--> " << printReg(HazardReg, TRI)
+                         << (SIInstrInfo::isVALU(MI) ? " (VALU)"
+                                                     : " (non-VALU)")
+                         << "\n");
+            }
+          }
+        }
+        if (SIInstrInfo::isVALU(MI) && !SIInstrInfo::isLDSDMA(MI))
+          ++LastMFMAOrWMMA->HazardConsumerSince;
+      }
+    }
+  }
 
   for (unsigned I = 0, E = MRI->getNumVirtRegs(); I != E; ++I) {
     Register Reg = Register::index2VirtReg(I);
