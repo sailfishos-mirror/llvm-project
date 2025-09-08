@@ -131,7 +131,7 @@ static std::string computeDataLayout(const Triple &TT) {
 
   Ret += DataLayout::getManglingComponent(TT);
   // X86 and x32 have 32 bit pointers.
-  if (!TT.isArch64Bit() || TT.isX32())
+  if (TT.getArch() != Triple::x86_64 || TT.isX32())
     Ret += "-p:32:32";
 
   // Address spaces for 32 bit signed, 32 bit unsigned, and 64 bit pointers.
@@ -140,7 +140,7 @@ static std::string computeDataLayout(const Triple &TT) {
   // Some ABIs align 64 bit integers and doubles to 64 bits, others to 32.
   // 128 bit integers are not specified in the 32-bit ABIs but are used
   // internally for lowering f128, so we match the alignment to that.
-  if (TT.isArch64Bit() || TT.isOSWindows())
+  if (TT.getArch() == Triple::x86_64 || TT.isOSWindows())
     Ret += "-i64:64-i128:128";
   else if (TT.isOSIAMCU())
     Ret += "-i64:32-f64:32";
@@ -150,7 +150,8 @@ static std::string computeDataLayout(const Triple &TT) {
   // Some ABIs align long double to 128 bits, others to 32.
   if (TT.isOSIAMCU())
     ; // No f80
-  else if (TT.isArch64Bit() || TT.isOSDarwin() || TT.isWindowsMSVCEnvironment())
+  else if (TT.getArch() == Triple::x86_64 || TT.isOSDarwin() ||
+           TT.isWindowsMSVCEnvironment())
     Ret += "-f80:128";
   else
     Ret += "-f80:32";
@@ -159,13 +160,13 @@ static std::string computeDataLayout(const Triple &TT) {
     Ret += "-f128:32";
 
   // The registers can hold 8, 16, 32 or, in x86-64, 64 bits.
-  if (TT.isArch64Bit())
+  if (TT.getArch() == Triple::x86_64)
     Ret += "-n8:16:32:64";
   else
     Ret += "-n8:16:32";
 
   // The stack is aligned to 32 bits on some ABIs and 128 bits on others.
-  if ((!TT.isArch64Bit() && TT.isOSWindows()) || TT.isOSIAMCU())
+  if ((TT.getArch() != Triple::x86_64 && TT.isOSWindows()) || TT.isOSIAMCU())
     Ret += "-a:0:32-S32";
   else
     Ret += "-S128";
