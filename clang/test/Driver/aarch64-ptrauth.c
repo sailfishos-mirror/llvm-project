@@ -56,34 +56,23 @@
 
 // RUN: %clang -### -c --target=aarch64-linux -mabi=pauthtest %s 2>&1 | FileCheck %s --check-prefix=PAUTHABI1
 // RUN: %clang -### -c --target=aarch64-linux-pauthtest %s 2>&1 | FileCheck %s --check-prefix=PAUTHABI1
-// RUN: %clang -### -c --target=aarch64-linux -mabi=pauthtest -fptrauth-abi-version=0 %s 2>&1 | FileCheck %s --check-prefix=PAUTHABI1
-// RUN: %clang -### -c --target=aarch64-linux-pauthtest       -fptrauth-abi-version=0 %s 2>&1 | FileCheck %s --check-prefix=PAUTHABI1
 // PAUTHABI1:      "-cc1"{{.*}} "-triple" "aarch64-unknown-linux-pauthtest"
-// PAUTHABI1-SAME: "-fptrauth-abi-version=0"
-// PAUTHABI1-SAME: "-fptrauth-intrinsics" "-fptrauth-calls" "-fptrauth-returns" "-fptrauth-auth-traps" "-fptrauth-vtable-pointer-address-discrimination" "-fptrauth-vtable-pointer-type-discrimination" "-fptrauth-type-info-vtable-pointer-discrimination" "-fptrauth-indirect-gotos" "-fptrauth-init-fini" "-fptrauth-init-fini-address-discrimination" "-fptrauth-elf-got" "-faarch64-jump-table-hardening"
+// PAUTHABI1-SAME: "-fptrauth-intrinsics" "-fptrauth-calls" "-fptrauth-returns" "-fptrauth-auth-traps" "-fptrauth-vtable-pointer-address-discrimination" "-fptrauth-vtable-pointer-type-discrimination" "-fptrauth-type-info-vtable-pointer-discrimination" "-fptrauth-indirect-gotos" "-fptrauth-init-fini" "-fptrauth-init-fini-address-discrimination" "-faarch64-jump-table-hardening"
 // PAUTHABI1-SAME: "-target-abi" "pauthtest"
 // PAUTHABI1-NOT: "-fptrauth-function-pointer-type-discrimination"
-
-// RUN: %clang -### -c --target=aarch64-linux -mabi=pauthtest -fptrauth-abi-version=1 %s 2>&1 | FileCheck %s --check-prefix=PAUTHTESTV1
-// RUN: %clang -### -c --target=aarch64-linux-pauthtest       -fptrauth-abi-version=1 %s 2>&1 | FileCheck %s --check-prefix=PAUTHTESTV1
-// PAUTHTESTV1:      "-cc1"{{.*}} "-triple" "aarch64-unknown-linux-pauthtest"
-// PAUTHTESTV1-SAME: "-fptrauth-abi-version=1"
-// PAUTHTESTV1-SAME: "-fptrauth-intrinsics" "-fptrauth-calls" "-fptrauth-returns" "-fptrauth-auth-traps" "-fptrauth-vtable-pointer-address-discrimination" "-fptrauth-vtable-pointer-type-discrimination" "-fptrauth-type-info-vtable-pointer-discrimination" "-fptrauth-indirect-gotos" "-fptrauth-init-fini" "-fptrauth-init-fini-address-discrimination" "-fptrauth-elf-got" "-faarch64-jump-table-hardening"
-// PAUTHTESTV1-SAME: "-target-abi" "pauthtest"
-// PAUTHTESTV1-NOT:  "-fptrauth-function-pointer-type-discrimination"
 
 // RUN: %clang -### -c --target=aarch64-linux -mabi=pauthtest -fno-ptrauth-intrinsics \
 // RUN:   -fno-ptrauth-calls -fno-ptrauth-returns -fno-ptrauth-auth-traps \
 // RUN:   -fno-ptrauth-vtable-pointer-address-discrimination -fno-ptrauth-vtable-pointer-type-discrimination \
 // RUN:   -fno-ptrauth-type-info-vtable-pointer-discrimination -fno-ptrauth-indirect-gotos \
-// RUN:   -fno-ptrauth-init-fini -fno-ptrauth-init-fini-address-discrimination -fno-ptrauth-elf-got \
-// RUN:   -fno-ptrauth-abi-version -fno-aarch64-jump-table-hardening %s 2>&1 | FileCheck %s --check-prefix=PAUTHABI2
+// RUN:   -fno-ptrauth-init-fini -fno-ptrauth-init-fini-address-discrimination \
+// RUN:   -fno-aarch64-jump-table-hardening %s 2>&1 | FileCheck %s --check-prefix=PAUTHABI2
 // RUN: %clang -### -c --target=aarch64-linux-pauthtest -fno-ptrauth-intrinsics \
 // RUN:   -fno-ptrauth-calls -fno-ptrauth-returns -fno-ptrauth-auth-traps \
 // RUN:   -fno-ptrauth-vtable-pointer-address-discrimination -fno-ptrauth-vtable-pointer-type-discrimination \
 // RUN:   -fno-ptrauth-type-info-vtable-pointer-discrimination -fno-ptrauth-indirect-gotos \
-// RUN:   -fno-ptrauth-init-fini -fno-ptrauth-init-fini-address-discrimination -fno-ptrauth-elf-got \
-// RUN:   -fno-ptrauth-abi-version -fno-aarch64-jump-table-hardening %s 2>&1 | FileCheck %s --check-prefix=PAUTHABI2
+// RUN:   -fno-ptrauth-init-fini -fno-ptrauth-init-fini-address-discrimination \
+// RUN:   -fno-aarch64-jump-table-hardening %s 2>&1 | FileCheck %s --check-prefix=PAUTHABI2
 
 //// Non-linux OS: pauthtest ABI has no effect in terms of passing ptrauth cc1 flags.
 //// An error about unsupported ABI will be emitted later in pipeline (see ERR3 below)
@@ -105,8 +94,7 @@
 // RUN: not %clang -### -c --target=aarch64-linux -fptrauth-intrinsics -fptrauth-calls -fptrauth-returns -fptrauth-auth-traps \
 // RUN:   -fptrauth-vtable-pointer-address-discrimination -fptrauth-vtable-pointer-type-discrimination \
 // RUN:   -fptrauth-type-info-vtable-pointer-discrimination -fptrauth-indirect-gotos -fptrauth-init-fini \
-// RUN:   -fptrauth-init-fini-address-discrimination -fptrauth-elf-got -fptrauth-abi-version=1 -fno-ptrauth-abi-version \
-// RUN:   %s 2>&1 | FileCheck %s --check-prefix=ERR1
+// RUN:   -fptrauth-init-fini-address-discrimination -fptrauth-elf-got %s 2>&1 | FileCheck %s --check-prefix=ERR1
 // ERR1:      error: unsupported option '-fptrauth-intrinsics' for target '{{.*}}'
 // ERR1-NEXT: error: unsupported option '-fptrauth-calls' for target '{{.*}}'
 // ERR1-NEXT: error: unsupported option '-fptrauth-returns' for target '{{.*}}'
@@ -118,27 +106,6 @@
 // ERR1-NEXT: error: unsupported option '-fptrauth-init-fini' for target '{{.*}}'
 // ERR1-NEXT: error: unsupported option '-fptrauth-init-fini-address-discrimination' for target '{{.*}}'
 // ERR1-NEXT: error: unsupported option '-fptrauth-elf-got' for target '{{.*}}'
-// ERR1-NEXT: error: unsupported option '-fptrauth-abi-version=' for target '{{.*}}'
-// ERR1-NEXT: error: unsupported option '-fno-ptrauth-abi-version' for target '{{.*}}'
-
-// RUN: %clang -### -c --target=aarch64-linux -mabi=pauthtest -fptrauth-abi-version=2 %s 2>&1 | FileCheck %s --check-prefix=PAUTHTESTV2
-// RUN: %clang -### -c --target=aarch64-linux-pauthtest       -fptrauth-abi-version=2 %s 2>&1 | FileCheck %s --check-prefix=PAUTHTESTV2
-// PAUTHTESTV2:      "-cc1"{{.*}} "-triple" "aarch64-unknown-linux-pauthtest"
-// PAUTHTESTV2-SAME: "-fptrauth-abi-version=2"
-// PAUTHTESTV2-SAME: "-fptrauth-intrinsics" "-fptrauth-calls" "-fptrauth-returns" "-fptrauth-auth-traps" "-fptrauth-vtable-pointer-address-discrimination" "-fptrauth-vtable-pointer-type-discrimination" "-fptrauth-type-info-vtable-pointer-discrimination" "-fptrauth-indirect-gotos" "-fptrauth-init-fini" "-fptrauth-init-fini-address-discrimination" "-fptrauth-elf-got" "-faarch64-jump-table-hardening" "-fptrauth-function-pointer-type-discrimination"
-// PAUTHTESTV2-SAME: "-target-abi" "pauthtest"
-
-// RUN: %clang -### -c --target=aarch64-linux -mabi=pauthtest -fptrauth-abi-version=1 -fno-ptrauth-abi-version %s 2>&1 | FileCheck %s --check-prefix=PAUTHTESTVNONE
-// RUN: %clang -### -c --target=aarch64-linux-pauthtest       -fptrauth-abi-version=1 -fno-ptrauth-abi-version %s 2>&1 | FileCheck %s --check-prefix=PAUTHTESTVNONE
-// PAUTHTESTVNONE:      "-cc1"{{.*}} "-triple" "aarch64-unknown-linux-pauthtest"
-// PAUTHTESTVNONE-SAME: "-fptrauth-intrinsics" "-fptrauth-calls" "-fptrauth-returns" "-fptrauth-auth-traps" "-fptrauth-vtable-pointer-address-discrimination" "-fptrauth-vtable-pointer-type-discrimination" "-fptrauth-type-info-vtable-pointer-discrimination" "-fptrauth-indirect-gotos" "-fptrauth-init-fini" "-fptrauth-init-fini-address-discrimination" "-fptrauth-elf-got" "-faarch64-jump-table-hardening"
-// PAUTHTESTVNONE-SAME: "-target-abi" "pauthtest"
-// PAUTHTESTVNONE-NOT:  "-fptrauth-abi-version
-
-//// A pauth-aware environment (e.g. pauthtest) must be chosen to manipulate ptrauth ABI versioning.
-// RUN: not %clang -### -c --target=aarch64-linux -fptrauth-abi-version=1 -fno-ptrauth-abi-version %s 2>&1 | FileCheck %s --check-prefix=ERR0
-// ERR0:      error: unsupported option '-fptrauth-abi-version=' for target '{{.*}}'
-// ERR0-NEXT: error: unsupported option '-fno-ptrauth-abi-version' for target '{{.*}}'
 
 //// Non-AArch64.
 // RUN: not %clang -### -c --target=x86_64-linux -faarch64-jump-table-hardening %s 2>&1 | FileCheck %s --check-prefix=ERR2
@@ -196,18 +163,6 @@
 // RUN: not %clang -### -c --target=aarch64-linux-pauthtest       -msign-return-address=non-leaf %s 2>&1 | \
 // RUN:   FileCheck %s --check-prefix=ERR9
 // ERR9: error: unsupported option '-msign-return-address=non-leaf' for target 'aarch64-unknown-linux-pauthtest'
-
-// RUN: not %clang -### -c --target=aarch64-linux -mabi=pauthtest -fptrauth-abi-version=3 %s 2>&1 | FileCheck %s --check-prefix=ERR10
-// RUN: not %clang -### -c --target=aarch64-linux-pauthtest       -fptrauth-abi-version=3 %s 2>&1 | FileCheck %s --check-prefix=ERR10
-// ERR10: error: invalid value '3' in '-fptrauth-abi-version=3'
-
-// RUN: not %clang -### -c --target=aarch64-linux -mabi=pauthtest -fptrauth-abi-version=xxx %s 2>&1 | FileCheck %s --check-prefix=ERR11
-// RUN: not %clang -### -c --target=aarch64-linux-pauthtest       -fptrauth-abi-version=xxx %s 2>&1 | FileCheck %s --check-prefix=ERR11
-// ERR11: error: invalid value 'xxx' in '-fptrauth-abi-version=xxx'
-
-// RUN: not %clang -### -c --target=aarch64-linux -mabi=pauthtest -fptrauth-abi-version=-1 %s 2>&1 | FileCheck %s --check-prefix=ERR12
-// RUN: not %clang -### -c --target=aarch64-linux-pauthtest       -fptrauth-abi-version=-1 %s 2>&1 | FileCheck %s --check-prefix=ERR12
-// ERR12: error: invalid value '-1' in '-fptrauth-abi-version=-1'
 
 // RUN: %clang -### -c --target=aarch64-linux -mabi=pauthtest -msign-return-address=none %s
 // RUN: %clang -### -c --target=aarch64-linux-pauthtest       -msign-return-address=none %s
