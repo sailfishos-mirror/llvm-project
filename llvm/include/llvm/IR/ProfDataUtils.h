@@ -191,9 +191,9 @@ LLVM_ABI bool hasExplicitlyUnknownBranchWeights(const Instruction &I);
 /// Scaling the profile data attached to 'I' using the ratio of S/T.
 LLVM_ABI void scaleProfData(Instruction &I, uint64_t S, uint64_t T);
 
-/// get the branch weights of a branch conditioned on b1 | b2, where b1 and b2
-/// are 2 booleans that are the condition of 2 branches for which we have the
-/// branch weights B1 and B2, respectivelly.
+/// Get the branch weights of a branch conditioned on b1 || b2, where b1 and b2
+/// are 2 booleans that are the conditions of 2 branches for which we have the
+/// branch weights B1 and B2, respectively.
 inline SmallVector<uint64_t, 2>
 getDisjunctionWeights(const SmallVector<uint32_t, 2> &B1,
                       const SmallVector<uint32_t, 2> &B2) {
