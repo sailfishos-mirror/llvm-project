@@ -5438,7 +5438,8 @@ kmp_int32 __kmpc_start_record_task(ident_t *loc_ref, kmp_int32 gtid,
     return 1;
   }
 
-  __kmpc_taskgroup(loc_ref, gtid);
+  if (!flags->nowait)
+    __kmpc_taskgroup(loc_ref, gtid);
   kmp_tdg_info_t *tdg = __kmp_find_tdg(tdg_id);
   if (!flags->re_record && tdg) {
     // TODO: remove old if re_record
@@ -5516,13 +5517,14 @@ void __kmp_end_record(kmp_int32 gtid, kmp_tdg_info_t *tdg) {
 void __kmpc_end_record_task(ident_t *loc_ref, kmp_int32 gtid,
                             kmp_int32 input_flags, kmp_int32 tdg_id) {
   kmp_tdg_info_t *tdg = __kmp_find_tdg(tdg_id);
+  kmp_taskgraph_flags_t *flags = (kmp_taskgraph_flags_t *)&input_flags;
 
   KA_TRACE(10, ("__kmpc_end_record_task(enter): T#%d loc=%p finishes recording"
                 " tdg=%d with flags=%d\n",
                 gtid, loc_ref, tdg_id, input_flags));
-  if (__kmp_max_tdgs) {
-    // TODO: use input_flags->nowait
-    __kmpc_end_taskgroup(loc_ref, gtid);
+  if (__kmp_max_tdgs && tdg) {
+    if (!flags->nowait)
+      __kmpc_end_taskgroup(loc_ref, gtid);
     if (__kmp_tdg_is_recording(tdg->tdg_status))
       __kmp_end_record(gtid, tdg);
   }

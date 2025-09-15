@@ -6137,7 +6137,7 @@ void CGOpenMPRuntime::emitTaskgraphCall(CodeGenFunction &CGF,
 
   unsigned Flags = 0;
 
-  if (D.getSingleClause<OMPNowaitClause>()) {
+  if (D.getSingleClause<OMPNogroupClause>()) {
     Flags |= NowaitFlag;
   }
 
