@@ -96,9 +96,8 @@ struct PowiOpToROCDLLibraryCalls : public OpRewritePattern<complex::PowiOp> {
     Value exponent = rewriter.create<complex::CreateOp>(
         loc, op.getLhs().getType(), exponentReal, zeroImag);
 
-    rewriter
-        .replaceOpWithNewOp<complex::PowOp>(op, op.getType(), op.getLhs(),
-                                            exponent);
+    rewriter.replaceOpWithNewOp<complex::PowOp>(op, op.getType(), op.getLhs(),
+                                                exponent);
     return success();
   }
 };
