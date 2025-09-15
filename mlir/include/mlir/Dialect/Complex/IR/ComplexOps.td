@@ -444,6 +444,32 @@ def PowOp : ComplexArithmeticOp<"pow"> {
 }
 
 //===----------------------------------------------------------------------===//
+// PowiOp
+//===----------------------------------------------------------------------===//
+
+def PowiOp : Complex_Op<"powi",
+    [Pure, Elementwise, SameOperandsAndResultShape,
+     AllTypesMatch<["lhs", "result"]>]> {
+  let summary = "complex number raised to integer power";
+  let description = [{
+    The `powi` operation takes a complex number and an integer exponent.
+
+    Example:
+
+    ```mlir
+    %a = complex.powi %b, %c : complex<f32>, i32
+    ```
+  }];
+
+  let arguments = (ins Complex<AnyFloat>:$lhs,
+                       AnySignlessInteger:$rhs);
+  let results = (outs Complex<AnyFloat>:$result);
+
+  let assemblyFormat =
+      "$lhs `,` $rhs attr-dict `:` type($result) `,` type($rhs)";
+}
+
+//===----------------------------------------------------------------------===//
 // ReOp
 //===----------------------------------------------------------------------===//
 

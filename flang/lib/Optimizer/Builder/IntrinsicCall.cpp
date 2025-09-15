@@ -1331,14 +1331,20 @@ mlir::Value genComplexPow(fir::FirOpBuilder &builder, mlir::Location loc,
     return genLibCall(builder, loc, mathOp, mathLibFuncType, args);
   auto complexTy = mlir::cast<mlir::ComplexType>(mathLibFuncType.getInput(0));
   mlir::Value exp = args[1];
-  if (!mlir::isa<mlir::ComplexType>(exp.getType())) {
-    auto realTy = complexTy.getElementType();
-    mlir::Value realExp = builder.createConvert(loc, realTy, exp);
-    mlir::Value zero = builder.createRealConstant(loc, realTy, 0);
-    exp =
-        builder.create<mlir::complex::CreateOp>(loc, complexTy, realExp, zero);
+  mlir::Value result;
+  if (mlir::isa<mlir::IntegerType>(exp.getType()) ||
+      mlir::isa<mlir::IndexType>(exp.getType())) {
+    result = builder.create<mlir::complex::PowiOp>(loc, args[0], exp);
+  } else {
+    if (!mlir::isa<mlir::ComplexType>(exp.getType())) {
+      auto realTy = complexTy.getElementType();
+      mlir::Value realExp = builder.createConvert(loc, realTy, exp);
+      mlir::Value zero = builder.createRealConstant(loc, realTy, 0);
+      exp = builder.create<mlir::complex::CreateOp>(loc, complexTy, realExp,
+                                                    zero);
+    }
+    result = builder.create<mlir::complex::PowOp>(loc, args[0], exp);
   }
-  mlir::Value result = builder.create<mlir::complex::PowOp>(loc, args[0], exp);
   result = builder.createConvert(loc, mathLibFuncType.getResult(0), result);
   return result;
 }
