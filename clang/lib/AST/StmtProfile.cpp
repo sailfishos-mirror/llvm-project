@@ -911,7 +911,7 @@ void OMPClauseProfiler::VisitOMPGrainsizeClause(const OMPGrainsizeClause *C) {
     Profiler->VisitStmt(C->getGrainsize());
 }
 void OMPClauseProfiler::VisitOMPGraphIdClause(const OMPGraphIdClause *C) {
-  VistOMPClauseWithPreInit(C);
+  VisitOMPClauseWithPreInit(C);
   if (C->getCondition())
     Profiler->VisitStmt(C->getCondition());
 }

@@ -6152,6 +6152,14 @@ void CGOpenMPRuntime::emitTaskgraphCall(CodeGenFunction &CGF,
     }
   }
 
+  llvm::Value *GraphId = CGF.Builder.getInt32(0);
+  const OMPGraphIdClause *GraphIdClause = D.getSingleClause<OMPGraphIdClause>();
+  if (GraphIdClause) {
+    const auto *E = GraphIdClause->getCondition();
+    auto *GraphIdVal = CGF.EmitScalarExpr(E);
+    GraphId = CGF.Builder.CreateIntCast(GraphIdVal, CGM.Int32Ty, true);
+  }
+
   CodeGenFunction OutlinedCGF(CGM, /*suppressNewContext=*/true);
 
   const auto *CS = cast<CapturedStmt>(D.getAssociatedStmt());
@@ -6166,11 +6174,12 @@ void CGOpenMPRuntime::emitTaskgraphCall(CodeGenFunction &CGF,
                                                   &TaskgraphRegion);
   llvm::Function *FnT = OutlinedCGF.GenerateCapturedStmtFunction(*CS);
 
-  std::array<llvm::Value *, 6> Args{
+  std::array<llvm::Value *, 7> Args{
       emitUpdateLocation(CGF, Loc),
       getThreadID(CGF, Loc),
       CGF.Builder.getInt32(Flags),
       CGF.Builder.getInt32(D.getBeginLoc().getHashValue()),
+      GraphId,
       CGF.Builder.CreatePointerBitCastOrAddrSpaceCast(FnT, CGM.VoidPtrTy),
       CGF.Builder.CreatePointerBitCastOrAddrSpaceCast(
           CapStruct.getPointer(OutlinedCGF), CGM.VoidPtrTy)};
