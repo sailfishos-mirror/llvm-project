@@ -5637,7 +5637,16 @@ void CodeGenFunction::EmitOMPTaskwaitDirective(const OMPTaskwaitDirective &S) {
 
 void CodeGenFunction::EmitOMPTaskgraphDirective(
     const OMPTaskgraphDirective &S) {
-  CGM.getOpenMPRuntime().emitTaskgraphCall(*this, S.getBeginLoc(), S);
+  const Expr *IfCond = nullptr;
+  for (const auto *C : S.getClausesOfKind<OMPIfClause>()) {
+    if (C->getNameModifier() == OMPD_unknown ||
+        C->getNameModifier() == OMPD_cancel) {
+      IfCond = C->getCondition();
+      break;
+    }
+  }
+
+  CGM.getOpenMPRuntime().emitTaskgraphCall(*this, S.getBeginLoc(), S, IfCond);
 }
 
 static bool isSupportedByOpenMPIRBuilder(const OMPTaskgroupDirective &T) {

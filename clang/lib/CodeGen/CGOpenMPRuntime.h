@@ -1382,7 +1382,7 @@ public:
 
   /// Emit code for 'taskgraph' directive.
   virtual void emitTaskgraphCall(CodeGenFunction &CGF, SourceLocation Loc,
-                                 const OMPExecutableDirective &D);
+                                 const OMPExecutableDirective &D, const Expr *IfCond);
 
   /// Emit code for 'cancellation point' construct.
   /// \param CancelRegion Region kind for which the cancellation point must be
@@ -2213,8 +2213,12 @@ public:
                         const OMPTaskDataTy &Data) override;
 
   /// Emit code for 'taskgraph' directive.
+  /// \param IfCond Expression evaluated in if clause associated with the target
+  /// \param D Directive to emit.
   void emitTaskgraphCall(CodeGenFunction &CGF, SourceLocation Loc,
-                         const OMPExecutableDirective &D) override;
+                         const OMPExecutableDirective &D,
+                         const Expr *IfCond
+                        ) override;
 
   /// Emit code for 'cancellation point' construct.
   /// \param CancelRegion Region kind for which the cancellation point must be
