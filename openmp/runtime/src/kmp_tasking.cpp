@@ -5244,7 +5244,8 @@ bool __kmpc_omp_has_task_team(kmp_int32 gtid) {
 // entry:       Pointer to the entry function
 // args:        Pointer to the function arguments
 void __kmpc_taskgraph(ident_t *loc_ref, kmp_int32 gtid, kmp_int32 input_flags,
-                      kmp_uint32 tdg_id, void (*entry)(void *), void *args) {
+                      kmp_uint32 tdg_id, kmp_uint32 graph_id,
+                      void (*entry)(void *), void *args) {
   kmp_int32 res = __kmpc_start_record_task(loc_ref, gtid, input_flags, tdg_id);
   // When res = 1, we either start recording or only execute tasks
   // without recording. Need to execute entry function in both cases.
