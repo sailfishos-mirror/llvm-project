@@ -47,13 +47,6 @@ static func::FuncOp getOrDeclare(fir::FirOpBuilder &builder, Location loc,
   return func;
 }
 
-static bool isZero(Value v) {
-  if (auto cst = v.getDefiningOp<arith::ConstantOp>())
-    if (auto attr = dyn_cast<FloatAttr>(cst.getValue()))
-      return attr.getValue().isZero();
-  return false;
-}
-
 void ConvertComplexPowPass::runOnOperation() {
   ModuleOp mod = getOperation();
   if (fir::getTargetTriple(mod).isAMDGCN())
