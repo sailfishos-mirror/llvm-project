@@ -916,7 +916,7 @@ void OMPClauseProfiler::VisitOMPGraphIdClause(const OMPGraphIdClause *C) {
     Profiler->VisitStmt(C->getCondition());
 }
 void OMPClauseProfiler::VisitOMPGraphResetClause(const OMPGraphResetClause *C) {
-  VistOMPClauseWithPreInit(C);
+  VisitOMPClauseWithPreInit(C);
   if (C->getCondition())
     Profiler->VisitStmt(C->getCondition());
 }
