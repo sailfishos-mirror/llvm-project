@@ -5439,8 +5439,9 @@ kmp_int32 __kmpc_start_record_task(ident_t *loc_ref, kmp_int32 gtid,
   }
 
   __kmpc_taskgroup(loc_ref, gtid);
-  if (kmp_tdg_info_t *tdg = __kmp_find_tdg(tdg_id)) {
-    // TODO: use re_record flag
+  kmp_tdg_info_t *tdg = __kmp_find_tdg(tdg_id);
+  if (!flags->re_record && tdg) {
+    // TODO: remove old if re_record
     __kmp_exec_tdg(gtid, tdg);
     res = 0;
   } else {
