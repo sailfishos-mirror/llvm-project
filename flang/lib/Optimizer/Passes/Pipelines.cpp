@@ -365,8 +365,10 @@ void createOpenMPFIRPassPipeline(mlir::PassManager &pm,
   // extracts them.
   pm.addPass(flangomp::createDeleteUnreachableTargetsPass());
   pm.addPass(flangomp::createGenericLoopConversionPass());
-  if (opts.isTargetDevice)
+  if (opts.isTargetDevice) {
+    pm.addPass(flangomp::createStackToSharedPass());
     pm.addPass(flangomp::createFunctionFilteringPass());
+  }
 }
 
 void createDebugPasses(mlir::PassManager &pm,
