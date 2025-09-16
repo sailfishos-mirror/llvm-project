@@ -6450,7 +6450,8 @@ TEST_F(OpenMPIRBuilderTest, TargetRegion) {
   auto SimpleArgAccessorCB =
       [&](llvm::Argument &Arg, llvm::Value *Input, llvm::Value *&RetVal,
           llvm::OpenMPIRBuilder::InsertPointTy AllocaIP,
-          llvm::OpenMPIRBuilder::InsertPointTy CodeGenIP) {
+          llvm::OpenMPIRBuilder::InsertPointTy CodeGenIP,
+          llvm::ArrayRef<llvm::OpenMPIRBuilder::InsertPointTy> DeallocIPs) {
         IRBuilderBase::InsertPointGuard guard(Builder);
         Builder.SetCurrentDebugLocation(llvm::DebugLoc());
         if (!OMPBuilder.Config.isTargetDevice()) {
@@ -6616,7 +6617,8 @@ TEST_F(OpenMPIRBuilderTest, TargetRegionDevice) {
   auto SimpleArgAccessorCB =
       [&](llvm::Argument &Arg, llvm::Value *Input, llvm::Value *&RetVal,
           llvm::OpenMPIRBuilder::InsertPointTy AllocaIP,
-          llvm::OpenMPIRBuilder::InsertPointTy CodeGenIP) {
+          llvm::OpenMPIRBuilder::InsertPointTy CodeGenIP,
+          llvm::ArrayRef<llvm::OpenMPIRBuilder::InsertPointTy> DeallocIPs) {
         IRBuilderBase::InsertPointGuard guard(Builder);
         Builder.SetCurrentDebugLocation(llvm::DebugLoc());
         if (!OMPBuilder.Config.isTargetDevice()) {
@@ -6818,12 +6820,13 @@ TEST_F(OpenMPIRBuilderTest, TargetRegionSPMD) {
     return Builder.saveIP();
   };
 
-  auto SimpleArgAccessorCB = [&](Argument &, Value *, Value *&,
-                                 OpenMPIRBuilder::InsertPointTy,
-                                 OpenMPIRBuilder::InsertPointTy CodeGenIP) {
-    Builder.restoreIP(CodeGenIP);
-    return Builder.saveIP();
-  };
+  auto SimpleArgAccessorCB =
+      [&](Argument &, Value *, Value *&, OpenMPIRBuilder::InsertPointTy,
+          OpenMPIRBuilder::InsertPointTy CodeGenIP,
+          llvm::ArrayRef<llvm::OpenMPIRBuilder::InsertPointTy>) {
+        Builder.restoreIP(CodeGenIP);
+        return Builder.saveIP();
+      };
 
   SmallVector<Value *> Inputs;
   OpenMPIRBuilder::MapInfosTy CombinedInfos;
@@ -6918,12 +6921,13 @@ TEST_F(OpenMPIRBuilderTest, TargetRegionDeviceSPMD) {
   Function *OutlinedFn = nullptr;
   SmallVector<Value *> CapturedArgs;
 
-  auto SimpleArgAccessorCB = [&](Argument &, Value *, Value *&,
-                                 OpenMPIRBuilder::InsertPointTy,
-                                 OpenMPIRBuilder::InsertPointTy CodeGenIP) {
-    Builder.restoreIP(CodeGenIP);
-    return Builder.saveIP();
-  };
+  auto SimpleArgAccessorCB =
+      [&](Argument &, Value *, Value *&, OpenMPIRBuilder::InsertPointTy,
+          OpenMPIRBuilder::InsertPointTy CodeGenIP,
+          llvm::ArrayRef<llvm::OpenMPIRBuilder::InsertPointTy>) {
+        Builder.restoreIP(CodeGenIP);
+        return Builder.saveIP();
+      };
 
   OpenMPIRBuilder::MapInfosTy CombinedInfos;
   auto GenMapInfoCB =
@@ -7017,7 +7021,8 @@ TEST_F(OpenMPIRBuilderTest, ConstantAllocaRaise) {
   auto SimpleArgAccessorCB =
       [&](llvm::Argument &Arg, llvm::Value *Input, llvm::Value *&RetVal,
           llvm::OpenMPIRBuilder::InsertPointTy AllocaIP,
-          llvm::OpenMPIRBuilder::InsertPointTy CodeGenIP) {
+          llvm::OpenMPIRBuilder::InsertPointTy CodeGenIP,
+          llvm::ArrayRef<llvm::OpenMPIRBuilder::InsertPointTy> DeallocIPs) {
         IRBuilderBase::InsertPointGuard guard(Builder);
         Builder.SetCurrentDebugLocation(llvm::DebugLoc());
         if (!OMPBuilder.Config.isTargetDevice()) {
