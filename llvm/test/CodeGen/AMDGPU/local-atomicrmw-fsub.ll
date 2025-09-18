@@ -50,17 +50,17 @@ define float @local_atomic_fsub_ret_f32(ptr addrspace(3) %ptr) nounwind {
 ; GFX942-LABEL: local_atomic_fsub_ret_f32:
 ; GFX942:       ; %bb.0:
 ; GFX942-NEXT:    s_waitcnt vmcnt(0) expcnt(0) lgkmcnt(0)
-; GFX942-NEXT:    ds_read_b32 v1, v0
+; GFX942-NEXT:    ds_read_b32 v2, v0
 ; GFX942-NEXT:    s_mov_b64 s[0:1], 0
 ; GFX942-NEXT:  .LBB0_1: ; %atomicrmw.start
 ; GFX942-NEXT:    ; =>This Inner Loop Header: Depth=1
 ; GFX942-NEXT:    s_waitcnt lgkmcnt(0)
-; GFX942-NEXT:    v_mov_b32_e32 v2, v1
 ; GFX942-NEXT:    v_add_f32_e32 v1, -4.0, v2
 ; GFX942-NEXT:    ds_cmpst_rtn_b32 v1, v0, v2, v1
 ; GFX942-NEXT:    s_waitcnt lgkmcnt(0)
 ; GFX942-NEXT:    v_cmp_eq_u32_e32 vcc, v1, v2
 ; GFX942-NEXT:    s_or_b64 s[0:1], vcc, s[0:1]
+; GFX942-NEXT:    v_mov_b32_e32 v2, v1
 ; GFX942-NEXT:    s_andn2_b64 exec, exec, s[0:1]
 ; GFX942-NEXT:    s_cbranch_execnz .LBB0_1
 ; GFX942-NEXT:  ; %bb.2: ; %atomicrmw.end
@@ -119,17 +119,17 @@ define float @local_atomic_fsub_ret_f32(ptr addrspace(3) %ptr) nounwind {
 ; GFX90A-LABEL: local_atomic_fsub_ret_f32:
 ; GFX90A:       ; %bb.0:
 ; GFX90A-NEXT:    s_waitcnt vmcnt(0) expcnt(0) lgkmcnt(0)
-; GFX90A-NEXT:    ds_read_b32 v1, v0
+; GFX90A-NEXT:    ds_read_b32 v2, v0
 ; GFX90A-NEXT:    s_mov_b64 s[4:5], 0
 ; GFX90A-NEXT:  .LBB0_1: ; %atomicrmw.start
 ; GFX90A-NEXT:    ; =>This Inner Loop Header: Depth=1
 ; GFX90A-NEXT:    s_waitcnt lgkmcnt(0)
-; GFX90A-NEXT:    v_mov_b32_e32 v2, v1
 ; GFX90A-NEXT:    v_add_f32_e32 v1, -4.0, v2
 ; GFX90A-NEXT:    ds_cmpst_rtn_b32 v1, v0, v2, v1
 ; GFX90A-NEXT:    s_waitcnt lgkmcnt(0)
 ; GFX90A-NEXT:    v_cmp_eq_u32_e32 vcc, v1, v2
 ; GFX90A-NEXT:    s_or_b64 s[4:5], vcc, s[4:5]
+; GFX90A-NEXT:    v_mov_b32_e32 v2, v1
 ; GFX90A-NEXT:    s_andn2_b64 exec, exec, s[4:5]
 ; GFX90A-NEXT:    s_cbranch_execnz .LBB0_1
 ; GFX90A-NEXT:  ; %bb.2: ; %atomicrmw.end
@@ -262,17 +262,17 @@ define float @local_atomic_fsub_ret_f32__offset(ptr addrspace(3) %ptr) nounwind 
 ; GFX942-LABEL: local_atomic_fsub_ret_f32__offset:
 ; GFX942:       ; %bb.0:
 ; GFX942-NEXT:    s_waitcnt vmcnt(0) expcnt(0) lgkmcnt(0)
-; GFX942-NEXT:    ds_read_b32 v1, v0 offset:65532
+; GFX942-NEXT:    ds_read_b32 v2, v0 offset:65532
 ; GFX942-NEXT:    s_mov_b64 s[0:1], 0
 ; GFX942-NEXT:  .LBB1_1: ; %atomicrmw.start
 ; GFX942-NEXT:    ; =>This Inner Loop Header: Depth=1
 ; GFX942-NEXT:    s_waitcnt lgkmcnt(0)
-; GFX942-NEXT:    v_mov_b32_e32 v2, v1
 ; GFX942-NEXT:    v_add_f32_e32 v1, -4.0, v2
 ; GFX942-NEXT:    ds_cmpst_rtn_b32 v1, v0, v2, v1 offset:65532
 ; GFX942-NEXT:    s_waitcnt lgkmcnt(0)
 ; GFX942-NEXT:    v_cmp_eq_u32_e32 vcc, v1, v2
 ; GFX942-NEXT:    s_or_b64 s[0:1], vcc, s[0:1]
+; GFX942-NEXT:    v_mov_b32_e32 v2, v1
 ; GFX942-NEXT:    s_andn2_b64 exec, exec, s[0:1]
 ; GFX942-NEXT:    s_cbranch_execnz .LBB1_1
 ; GFX942-NEXT:  ; %bb.2: ; %atomicrmw.end
@@ -331,17 +331,17 @@ define float @local_atomic_fsub_ret_f32__offset(ptr addrspace(3) %ptr) nounwind 
 ; GFX90A-LABEL: local_atomic_fsub_ret_f32__offset:
 ; GFX90A:       ; %bb.0:
 ; GFX90A-NEXT:    s_waitcnt vmcnt(0) expcnt(0) lgkmcnt(0)
-; GFX90A-NEXT:    ds_read_b32 v1, v0 offset:65532
+; GFX90A-NEXT:    ds_read_b32 v2, v0 offset:65532
 ; GFX90A-NEXT:    s_mov_b64 s[4:5], 0
 ; GFX90A-NEXT:  .LBB1_1: ; %atomicrmw.start
 ; GFX90A-NEXT:    ; =>This Inner Loop Header: Depth=1
 ; GFX90A-NEXT:    s_waitcnt lgkmcnt(0)
-; GFX90A-NEXT:    v_mov_b32_e32 v2, v1
 ; GFX90A-NEXT:    v_add_f32_e32 v1, -4.0, v2
 ; GFX90A-NEXT:    ds_cmpst_rtn_b32 v1, v0, v2, v1 offset:65532
 ; GFX90A-NEXT:    s_waitcnt lgkmcnt(0)
 ; GFX90A-NEXT:    v_cmp_eq_u32_e32 vcc, v1, v2
 ; GFX90A-NEXT:    s_or_b64 s[4:5], vcc, s[4:5]
+; GFX90A-NEXT:    v_mov_b32_e32 v2, v1
 ; GFX90A-NEXT:    s_andn2_b64 exec, exec, s[4:5]
 ; GFX90A-NEXT:    s_cbranch_execnz .LBB1_1
 ; GFX90A-NEXT:  ; %bb.2: ; %atomicrmw.end
@@ -9339,17 +9339,17 @@ define float @local_atomic_fsub_ret_f32__amdgpu_ignore_denormal_mode(ptr addrspa
 ; GFX942-LABEL: local_atomic_fsub_ret_f32__amdgpu_ignore_denormal_mode:
 ; GFX942:       ; %bb.0:
 ; GFX942-NEXT:    s_waitcnt vmcnt(0) expcnt(0) lgkmcnt(0)
-; GFX942-NEXT:    ds_read_b32 v1, v0
+; GFX942-NEXT:    ds_read_b32 v2, v0
 ; GFX942-NEXT:    s_mov_b64 s[0:1], 0
 ; GFX942-NEXT:  .LBB28_1: ; %atomicrmw.start
 ; GFX942-NEXT:    ; =>This Inner Loop Header: Depth=1
 ; GFX942-NEXT:    s_waitcnt lgkmcnt(0)
-; GFX942-NEXT:    v_mov_b32_e32 v2, v1
 ; GFX942-NEXT:    v_add_f32_e32 v1, -4.0, v2
 ; GFX942-NEXT:    ds_cmpst_rtn_b32 v1, v0, v2, v1
 ; GFX942-NEXT:    s_waitcnt lgkmcnt(0)
 ; GFX942-NEXT:    v_cmp_eq_u32_e32 vcc, v1, v2
 ; GFX942-NEXT:    s_or_b64 s[0:1], vcc, s[0:1]
+; GFX942-NEXT:    v_mov_b32_e32 v2, v1
 ; GFX942-NEXT:    s_andn2_b64 exec, exec, s[0:1]
 ; GFX942-NEXT:    s_cbranch_execnz .LBB28_1
 ; GFX942-NEXT:  ; %bb.2: ; %atomicrmw.end
@@ -9408,17 +9408,17 @@ define float @local_atomic_fsub_ret_f32__amdgpu_ignore_denormal_mode(ptr addrspa
 ; GFX90A-LABEL: local_atomic_fsub_ret_f32__amdgpu_ignore_denormal_mode:
 ; GFX90A:       ; %bb.0:
 ; GFX90A-NEXT:    s_waitcnt vmcnt(0) expcnt(0) lgkmcnt(0)
-; GFX90A-NEXT:    ds_read_b32 v1, v0
+; GFX90A-NEXT:    ds_read_b32 v2, v0
 ; GFX90A-NEXT:    s_mov_b64 s[4:5], 0
 ; GFX90A-NEXT:  .LBB28_1: ; %atomicrmw.start
 ; GFX90A-NEXT:    ; =>This Inner Loop Header: Depth=1
 ; GFX90A-NEXT:    s_waitcnt lgkmcnt(0)
-; GFX90A-NEXT:    v_mov_b32_e32 v2, v1
 ; GFX90A-NEXT:    v_add_f32_e32 v1, -4.0, v2
 ; GFX90A-NEXT:    ds_cmpst_rtn_b32 v1, v0, v2, v1
 ; GFX90A-NEXT:    s_waitcnt lgkmcnt(0)
 ; GFX90A-NEXT:    v_cmp_eq_u32_e32 vcc, v1, v2
 ; GFX90A-NEXT:    s_or_b64 s[4:5], vcc, s[4:5]
+; GFX90A-NEXT:    v_mov_b32_e32 v2, v1
 ; GFX90A-NEXT:    s_andn2_b64 exec, exec, s[4:5]
 ; GFX90A-NEXT:    s_cbranch_execnz .LBB28_1
 ; GFX90A-NEXT:  ; %bb.2: ; %atomicrmw.end
