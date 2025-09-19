@@ -217,6 +217,9 @@ void mlir::python::populatePassManagerSubmodule(nb::module_ &m) {
                               errors.take());
           },
           "operation"_a,
+          // clang-format off
+          nb::sig("def run(self, operation: " MAKE_MLIR_PYTHON_QUALNAME("ir._OperationBase") ") -> None"),
+          // clang-format on
           "Run the pass manager on the provided operation, raising an "
           "MLIRError on failure.")
       .def(
