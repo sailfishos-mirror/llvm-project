@@ -11,6 +11,8 @@
 #include <chrono>
 #include <ratio>
 
+#include "test_macros.h"
+
 struct EmptyStruct {};
 
 // Test structs missing required members
@@ -168,75 +170,75 @@ struct ValidClockWithDurationMatch {
   static time_point now();
 };
 
-int main(int, char**) {
-  // Test both is_clock and is_clock_v
-  static_assert(std::chrono::is_clock<std::chrono::system_clock>::value);
-  static_assert(std::chrono::is_clock_v<std::chrono::system_clock>);
+// Test both is_clock and is_clock_v
+static_assert(std::chrono::is_clock<std::chrono::system_clock>::value);
+static_assert(std::chrono::is_clock_v<std::chrono::system_clock>);
 
-  // Test standard clock types
-  static_assert(std::chrono::is_clock_v<std::chrono::system_clock>);
+// Test standard clock types
+static_assert(std::chrono::is_clock_v<std::chrono::system_clock>);
 #ifdef _LIBCPP_HAS_MONOTONIC_CLOCK
-  static_assert(std::chrono::is_clock_v<std::chrono::steady_clock>);
+static_assert(std::chrono::is_clock_v<std::chrono::steady_clock>);
 #endif
-  static_assert(std::chrono::is_clock_v<std::chrono::high_resolution_clock>);
+static_assert(std::chrono::is_clock_v<std::chrono::high_resolution_clock>);
 
-  // Test non-clock types
-  static_assert(!std::chrono::is_clock_v<EmptyStruct>);
-  static_assert(!std::chrono::is_clock_v<int>);
-  static_assert(!std::chrono::is_clock_v<void>);
-  static_assert(!std::chrono::is_clock_v<std::chrono::system_clock::time_point>);
+// Test non-clock types
+static_assert(!std::chrono::is_clock_v<EmptyStruct>);
+static_assert(!std::chrono::is_clock_v<int>);
+static_assert(!std::chrono::is_clock_v<void>);
+static_assert(!std::chrono::is_clock_v<std::chrono::system_clock::time_point>);
 #ifdef _LIBCPP_HAS_MONOTONIC_CLOCK
-  static_assert(!std::chrono::is_clock_v<std::chrono::steady_clock::time_point>);
+static_assert(!std::chrono::is_clock_v<std::chrono::steady_clock::time_point>);
 #endif
-  static_assert(!std::chrono::is_clock_v<std::chrono::seconds>);
-  static_assert(!std::chrono::is_clock_v<std::chrono::milliseconds>);
+static_assert(!std::chrono::is_clock_v<std::chrono::seconds>);
+static_assert(!std::chrono::is_clock_v<std::chrono::milliseconds>);
 
-  // Test structs missing required members
-  static_assert(!std::chrono::is_clock_v<MissingRep>);
-  static_assert(!std::chrono::is_clock_v<MissingPeriod>);
-  static_assert(!std::chrono::is_clock_v<MissingDuration>);
-  static_assert(!std::chrono::is_clock_v<MissingTimePoint>);
-  static_assert(!std::chrono::is_clock_v<MissingIsSteady>);
-  static_assert(!std::chrono::is_clock_v<MissingNow>);
+// Test structs missing required members
+static_assert(!std::chrono::is_clock_v<MissingRep>);
+static_assert(!std::chrono::is_clock_v<MissingPeriod>);
+static_assert(!std::chrono::is_clock_v<MissingDuration>);
+static_assert(!std::chrono::is_clock_v<MissingTimePoint>);
+static_assert(!std::chrono::is_clock_v<MissingIsSteady>);
+static_assert(!std::chrono::is_clock_v<MissingNow>);
 
-  // Test valid custom clocks
-  static_assert(std::chrono::is_clock_v<ValidSteadyClock>);
-  static_assert(std::chrono::is_clock_v<ValidSystemClock>);
-  static_assert(std::chrono::is_clock_v<ValidClockWithDurationMatch>);
+// Test valid custom clocks
+static_assert(std::chrono::is_clock_v<ValidSteadyClock>);
+static_assert(std::chrono::is_clock_v<ValidSystemClock>);
+static_assert(std::chrono::is_clock_v<ValidClockWithDurationMatch>);
 
-  // Test clocks with invalid is_steady type
-  static_assert(!std::chrono::is_clock_v<WrongIsSteadyType>);    // is_steady not const bool
-  static_assert(!std::chrono::is_clock_v<WrongIsSteadyNonBool>); // is_steady not bool type
+// cv-qualified and reference types
+static_assert(std::chrono::is_clock_v<const std::chrono::system_clock>);
+static_assert(std::chrono::is_clock_v<volatile std::chrono::system_clock>);
+static_assert(std::chrono::is_clock_v<const volatile std::chrono::system_clock>);
+static_assert(!std::chrono::is_clock_v<std::chrono::system_clock&>);
+static_assert(!std::chrono::is_clock_v<std::chrono::system_clock&&>);
+static_assert(!std::chrono::is_clock_v<const std::chrono::system_clock&>);
 
-  // Test clocks with invalid now() return type
-  static_assert(!std::chrono::is_clock_v<WrongNowReturnType>); // now() doesn't return time_point
+// array and pointer types
+static_assert(!std::chrono::is_clock_v<std::chrono::system_clock[]>);
+static_assert(!std::chrono::is_clock_v<std::chrono::system_clock[10]>);
+static_assert(!std::chrono::is_clock_v<std::chrono::system_clock*>);
+static_assert(!std::chrono::is_clock_v<std::chrono::system_clock* const>);
 
-  // Test clocks with invalid period type
-  static_assert(!std::chrono::is_clock_v<WrongPeriodType>); // period is not a ratio
+// The Standard defined a minimum set of checks and allowed implementation to perform stricter checks. The following
+// static asserts are implementation specific and a conforming standard library implementation doesn't have to produce
+// the same outcome.
 
-  // Test clocks with invalid rep type
-  static_assert(!std::chrono::is_clock_v<InvalidRepType>); // rep is not arithmetic and no numeric_limits
+// Test clocks with invalid is_steady type
+LIBCPP_STATIC_ASSERT(!std::chrono::is_clock_v<WrongIsSteadyType>);    // is_steady not const bool
+LIBCPP_STATIC_ASSERT(!std::chrono::is_clock_v<WrongIsSteadyNonBool>); // is_steady not bool type
 
-  // Test clocks with wrong duration type
-  static_assert(!std::chrono::is_clock_v<WrongDurationType>); // duration doesn't match duration<rep, period>
+// Test clocks with invalid now() return type
+LIBCPP_STATIC_ASSERT(!std::chrono::is_clock_v<WrongNowReturnType>); // now() doesn't return time_point
 
-  // Test clocks with wrong time_point type
-  static_assert(!std::chrono::is_clock_v<WrongTimePointType>);  // time_point is not a time_point
-  static_assert(!std::chrono::is_clock_v<WrongTimePointClock>); // time_point has wrong clock and wrong duration
+// Test clocks with invalid period type
+LIBCPP_STATIC_ASSERT(!std::chrono::is_clock_v<WrongPeriodType>); // period is not a ratio
 
-  // cv-qualified and reference types
-  static_assert(std::chrono::is_clock_v<const std::chrono::system_clock>);
-  static_assert(std::chrono::is_clock_v<volatile std::chrono::system_clock>);
-  static_assert(std::chrono::is_clock_v<const volatile std::chrono::system_clock>);
-  static_assert(!std::chrono::is_clock_v<std::chrono::system_clock&>);
-  static_assert(!std::chrono::is_clock_v<std::chrono::system_clock&&>);
-  static_assert(!std::chrono::is_clock_v<const std::chrono::system_clock&>);
+// Test clocks with invalid rep type
+LIBCPP_STATIC_ASSERT(!std::chrono::is_clock_v<InvalidRepType>); // rep is not arithmetic and no numeric_limits
 
-  // array and pointer types
-  static_assert(!std::chrono::is_clock_v<std::chrono::system_clock[]>);
-  static_assert(!std::chrono::is_clock_v<std::chrono::system_clock[10]>);
-  static_assert(!std::chrono::is_clock_v<std::chrono::system_clock*>);
-  static_assert(!std::chrono::is_clock_v<std::chrono::system_clock* const>);
+// Test clocks with wrong duration type
+LIBCPP_STATIC_ASSERT(!std::chrono::is_clock_v<WrongDurationType>); // duration doesn't match duration<rep, period>
 
-  return 0;
-}
+// Test clocks with wrong time_point type
+LIBCPP_STATIC_ASSERT(!std::chrono::is_clock_v<WrongTimePointType>);  // time_point is not a time_point
+LIBCPP_STATIC_ASSERT(!std::chrono::is_clock_v<WrongTimePointClock>); // time_point has wrong clock and wrong duration
