@@ -11,6 +11,10 @@
 #include <chrono>
 #include <ratio>
 
+#if !__has_warning("-Winvalid-specializations")
+// expected-no-diagnostics
+#else
+
 namespace std::chrono {
 // try adding specializations to is_clock
 template <>
@@ -20,3 +24,5 @@ template <>
 constexpr bool is_clock_v<float> = false; // expected-error@*:* {{'is_clock_v' cannot be specialized}}
 
 } // namespace std::chrono
+
+#endif
