@@ -31,14 +31,6 @@ class duration;
 template <class _Clock, class _Duration>
 class time_point;
 
-template <class _TimePoint, class _Clock>
-constexpr bool __is_valid_clock_time_point_v = false;
-
-template <class _Clock, class _Duration, class _ClockType>
-constexpr bool __is_valid_clock_time_point_v<time_point<_Clock, _Duration>, _ClockType> =
-    _IsSame<time_point<_Clock, _Duration>, time_point<_ClockType>>::value ||
-    _IsSame<_Duration, typename _ClockType::duration>::value;
-
 // Check if a clock satisfies the Cpp17Clock requirements as defined in [time.clock.req]
 template <class _Tp>
 _LIBCPP_NO_SPECIALIZATIONS inline constexpr bool is_clock_v = requires {
@@ -52,7 +44,7 @@ _LIBCPP_NO_SPECIALIZATIONS inline constexpr bool is_clock_v = requires {
   requires _IsSame<typename _Tp::duration, duration<typename _Tp::rep, typename _Tp::period>>::value;
 
   typename _Tp::time_point;
-  requires __is_valid_clock_time_point_v<typename _Tp::time_point, _Tp>;
+  requires _IsSame<typename _Tp::time_point::duration, typename _Tp::duration>::value;
 
   _Tp::is_steady;
   requires _IsSame<decltype(_Tp::is_steady), const bool>::value;
