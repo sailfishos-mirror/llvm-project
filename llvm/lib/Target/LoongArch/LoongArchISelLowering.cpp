@@ -4939,20 +4939,6 @@ void LoongArchTargetLowering::ReplaceNodeResults(
   }
 }
 
-// Check if all elements in build_vector are the same or undef, and if so,
-// return true and set the splat element in SplatValue.
-static bool isSplatOrUndef(SDNode *N, SDValue &SplatValue) {
-  if (N->getOpcode() != ISD::BUILD_VECTOR)
-    return false;
-  for (SDValue Op : N->ops()) {
-    if (!Op.isUndef() && SplatValue && Op != SplatValue)
-      return false;
-    if (!Op.isUndef())
-      SplatValue = Op;
-  }
-  return true;
-}
-
 // Helper to attempt to return a cheaper, bit-inverted version of \p V.
 static SDValue isNOT(SDValue V, SelectionDAG &DAG) {
   // TODO: don't always ignore oneuse constraints.
@@ -4976,12 +4962,16 @@ static SDValue isNOT(SDValue V, SelectionDAG &DAG) {
   }
 
   // Match not(SplatVector(not(X)) -> SplatVector(X).
-  SDValue SplatValue;
-  if (isSplatOrUndef(V.getNode(), SplatValue) &&
-      V->isOnlyUserOf(SplatValue.getNode())) {
-    if (SDValue Not = isNOT(SplatValue, DAG)) {
-      Not = DAG.getBitcast(V.getOperand(0).getValueType(), Not);
-      return DAG.getSplat(VT, SDLoc(Not), Not);
+  if (V.getOpcode() == ISD::BUILD_VECTOR) {
+    if (SDValue SplatValue =
+            cast<BuildVectorSDNode>(V.getNode())->getSplatValue()) {
+      if (!V->isOnlyUserOf(SplatValue.getNode()))
+        return SDValue();
+
+      if (SDValue Not = isNOT(SplatValue, DAG)) {
+        Not = DAG.getBitcast(V.getOperand(0).getValueType(), Not);
+        return DAG.getSplat(VT, SDLoc(Not), Not);
+      }
     }
   }
 
@@ -6762,10 +6752,13 @@ static SDValue performVANDNCombine(SDNode *N, SelectionDAG &DAG,
     // -> NOT(OR(x, SplatVector(-Imm))
     // Combination is performed only when VT is v16i8/v32i8, using `vnori.b` to
     // gain benefits.
-    if (!DCI.isBeforeLegalizeOps() && (VT == MVT::v16i8 || VT == MVT::v32i8)) {
-      SDValue SplatValue;
-      if (isSplatOrUndef(N1.getNode(), SplatValue) &&
-          N1->isOnlyUserOf(SplatValue.getNode()))
+    if (!DCI.isBeforeLegalizeOps() && (VT == MVT::v16i8 || VT == MVT::v32i8) &&
+        N1.getOpcode() == ISD::BUILD_VECTOR) {
+      if (SDValue SplatValue =
+              cast<BuildVectorSDNode>(N1.getNode())->getSplatValue()) {
+        if (!N1->isOnlyUserOf(SplatValue.getNode()))
+          return SDValue();
+
         if (auto *C = dyn_cast<ConstantSDNode>(SplatValue)) {
           uint8_t NCVal = static_cast<uint8_t>(~(C->getSExtValue()));
           SDValue Not =
@@ -6774,6 +6767,7 @@ static SDValue performVANDNCombine(SDNode *N, SelectionDAG &DAG,
               DL, DAG.getNode(ISD::OR, DL, VT, N0, DAG.getBitcast(VT, Not)),
               VT);
         }
+      }
     }
   }
 
