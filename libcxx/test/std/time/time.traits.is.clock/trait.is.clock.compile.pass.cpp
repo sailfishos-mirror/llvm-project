@@ -176,7 +176,7 @@ static_assert(std::chrono::is_clock_v<std::chrono::system_clock>);
 
 // Test standard clock types
 static_assert(std::chrono::is_clock_v<std::chrono::system_clock>);
-#ifdef _LIBCPP_HAS_MONOTONIC_CLOCK
+#if _LIBCPP_HAS_MONOTONIC_CLOCK
 static_assert(std::chrono::is_clock_v<std::chrono::steady_clock>);
 #endif
 static_assert(std::chrono::is_clock_v<std::chrono::high_resolution_clock>);
