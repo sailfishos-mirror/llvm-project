@@ -6208,10 +6208,9 @@ define amdgpu_kernel void @sub_i64_uniform(ptr addrspace(1) %out, ptr addrspace(
 ; GFX9-NEXT:    s_or_b64 exec, exec, s[10:11]
 ; GFX9-NEXT:    s_waitcnt lgkmcnt(0)
 ; GFX9-NEXT:    v_mad_u64_u32 v[2:3], s[4:5], s8, v4, 0
-; GFX9-NEXT:    v_readfirstlane_b32 s7, v0
 ; GFX9-NEXT:    v_readfirstlane_b32 s6, v1
-; GFX9-NEXT:    v_mov_b32_e32 v0, v3
-; GFX9-NEXT:    v_mad_u64_u32 v[0:1], s[4:5], s9, v4, v[0:1]
+; GFX9-NEXT:    v_readfirstlane_b32 s7, v0
+; GFX9-NEXT:    v_mad_u64_u32 v[0:1], s[4:5], s9, v4, v[3:4]
 ; GFX9-NEXT:    v_mov_b32_e32 v3, s6
 ; GFX9-NEXT:    v_sub_co_u32_e32 v1, vcc, s7, v2
 ; GFX9-NEXT:    s_mov_b32 s3, 0xf000
