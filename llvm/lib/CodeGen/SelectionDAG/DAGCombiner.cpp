@@ -16693,21 +16693,31 @@ SDValue DAGCombiner::visitBITCAST(SDNode *N) {
   }
 
   // fold (conv (load x)) -> (load (conv*)x)
+  // fold (conv (freeze (load x))) -> (freeze (load (conv*)x))
   // If the resultant load doesn't need a higher alignment than the original!
-  if (ISD::isNormalLoad(N0.getNode()) && N0.hasOneUse() &&
+  // Peek through freeze to find the load.
+  SDValue N0Load = N0;
+  bool HasFreeze = false;
+  if (N0.getOpcode() == ISD::FREEZE && N0.hasOneUse()) {
+    N0Load = N0.getOperand(0);
+    HasFreeze = true;
+  }
+
+  if (ISD::isNormalLoad(N0Load.getNode()) && N0Load.hasOneUse() &&
       // Do not remove the cast if the types differ in endian layout.
-      TLI.hasBigEndianPartOrdering(N0.getValueType(), DAG.getDataLayout()) ==
+      TLI.hasBigEndianPartOrdering(N0Load.getValueType(),
+                                   DAG.getDataLayout()) ==
           TLI.hasBigEndianPartOrdering(VT, DAG.getDataLayout()) &&
       // If the load is volatile, we only want to change the load type if the
       // resulting load is legal. Otherwise we might increase the number of
       // memory accesses. We don't care if the original type was legal or not
       // as we assume software couldn't rely on the number of accesses of an
       // illegal type.
-      ((!LegalOperations && cast<LoadSDNode>(N0)->isSimple()) ||
+      ((!LegalOperations && cast<LoadSDNode>(N0Load)->isSimple()) ||
        TLI.isOperationLegal(ISD::LOAD, VT))) {
-    LoadSDNode *LN0 = cast<LoadSDNode>(N0);
+    LoadSDNode *LN0 = cast<LoadSDNode>(N0Load);
 
-    if (TLI.isLoadBitCastBeneficial(N0.getValueType(), VT, DAG,
+    if (TLI.isLoadBitCastBeneficial(N0Load.getValueType(), VT, DAG,
                                     *LN0->getMemOperand())) {
       // If the range metadata type does not match the new memory
       // operation type, remove the range metadata.
@@ -16721,7 +16731,12 @@ SDValue DAGCombiner::visitBITCAST(SDNode *N) {
       SDValue Load =
           DAG.getLoad(VT, SDLoc(N), LN0->getChain(), LN0->getBasePtr(),
                       LN0->getMemOperand());
-      DAG.ReplaceAllUsesOfValueWith(N0.getValue(1), Load.getValue(1));
+      DAG.ReplaceAllUsesOfValueWith(N0Load.getValue(1), Load.getValue(1));
+
+      // If there was a freeze, wrap the load with freeze again.
+      if (HasFreeze)
+        Load = DAG.getFreeze(Load);
+
       return Load;
     }
   }
