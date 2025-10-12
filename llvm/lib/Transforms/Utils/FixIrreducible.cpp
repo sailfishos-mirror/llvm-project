@@ -294,15 +294,14 @@ static bool fixIrreducible(Cycle &C, CycleInfo &CI, DominatorTree &DT,
       // Exactly one of the two successors is the header.
       BasicBlock *Succ0 = Branch->getSuccessor(0) == Header ? Header : nullptr;
       BasicBlock *Succ1 = Succ0 ? nullptr : Header;
-      if (!Succ0)
-        assert(Branch->getSuccessor(1) == Header);
+      assert(Succ0 || Branch->getSuccessor(1) == Header);
       assert(Succ0 || Succ1);
       CHub.addBranch(P, Succ0, Succ1);
 
       LLVM_DEBUG(dbgs() << "Added internal branch: " << printBasicBlock(P)
                         << " -> " << printBasicBlock(Succ0)
                         << (Succ0 && Succ1 ? " " : "") << printBasicBlock(Succ1)
-                        << "\n");
+                        << '\n');
     } else if (CallBrInst *CallBr = dyn_cast<CallBrInst>(P->getTerminator())) {
       for (unsigned I = 0; I < CallBr->getNumSuccessors(); ++I) {
         BasicBlock *Succ = CallBr->getSuccessor(I);
@@ -313,7 +312,7 @@ static bool fixIrreducible(Cycle &C, CycleInfo &CI, DominatorTree &DT,
         CHub.addBranch(NewSucc, Succ);
         LLVM_DEBUG(dbgs() << "Added internal branch: "
                           << printBasicBlock(NewSucc) << " -> "
-                          << printBasicBlock(Succ) << "\n");
+                          << printBasicBlock(Succ) << '\n');
       }
     } else {
       llvm_unreachable("unsupported block terminator");
@@ -341,7 +340,7 @@ static bool fixIrreducible(Cycle &C, CycleInfo &CI, DominatorTree &DT,
       LLVM_DEBUG(dbgs() << "Added external branch: " << printBasicBlock(P)
                         << " -> " << printBasicBlock(Succ0)
                         << (Succ0 && Succ1 ? " " : "") << printBasicBlock(Succ1)
-                        << "\n");
+                        << '\n');
     } else if (CallBrInst *CallBr = dyn_cast<CallBrInst>(P->getTerminator())) {
       for (unsigned I = 0; I < CallBr->getNumSuccessors(); ++I) {
         BasicBlock *Succ = CallBr->getSuccessor(I);
@@ -352,7 +351,7 @@ static bool fixIrreducible(Cycle &C, CycleInfo &CI, DominatorTree &DT,
         CHub.addBranch(NewSucc, Succ);
         LLVM_DEBUG(dbgs() << "Added external branch: "
                           << printBasicBlock(NewSucc) << " -> "
-                          << printBasicBlock(Succ) << "\n");
+                          << printBasicBlock(Succ) << '\n');
       }
     } else {
       llvm_unreachable("unsupported block terminator");

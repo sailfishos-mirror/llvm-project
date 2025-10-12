@@ -173,7 +173,7 @@ static bool unifyLoopExits(DominatorTree &DT, LoopInfo &LI, Loop *L) {
       LLVM_DEBUG(dbgs() << "Added extiting branch: " << printBasicBlock(BB)
                         << " -> " << printBasicBlock(Succ0)
                         << (Succ0 && Succ1 ? " " : "") << printBasicBlock(Succ1)
-                        << "\n");
+                        << '\n');
     } else if (CallBrInst *CallBr = dyn_cast<CallBrInst>(BB->getTerminator())) {
       for (unsigned J = 0; J < CallBr->getNumSuccessors(); ++J) {
         BasicBlock *Succ = CallBr->getSuccessor(J);
@@ -195,7 +195,7 @@ static bool unifyLoopExits(DominatorTree &DT, LoopInfo &LI, Loop *L) {
         CHub.addBranch(NewSucc, Succ);
         LLVM_DEBUG(dbgs() << "Added exiting branch: "
                           << printBasicBlock(NewSucc) << " -> "
-                          << printBasicBlock(Succ) << "\n");
+                          << printBasicBlock(Succ) << '\n');
       }
     } else {
       llvm_unreachable("unsupported block terminator");
