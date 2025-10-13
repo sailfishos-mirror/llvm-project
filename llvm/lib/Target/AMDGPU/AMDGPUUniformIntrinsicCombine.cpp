@@ -141,6 +141,8 @@ static bool runUniformIntrinsicCombine(Module &M, ModuleAnalysisManager &AM) {
     for (User *U : make_early_inc_range(F.users())) {
       auto *II = cast<IntrinsicInst>(U);
       Function *ParentF = II->getFunction();
+      if (ParentF->hasFnAttribute(Attribute::OptimizeNone))
+        continue;
       const auto &UI = FAM.getResult<UniformityInfoAnalysis>(*ParentF);
       IsChanged |= optimizeUniformIntrinsic(*II, UI, Tracker);
     }
@@ -167,6 +169,8 @@ static bool runUniformIntrinsicCombine(Module &M, ModulePass &P) {
     for (User *U : make_early_inc_range(F.users())) {
       auto *II = cast<IntrinsicInst>(U);
       Function *ParentF = II->getFunction();
+      if (ParentF->hasFnAttribute(Attribute::OptimizeNone))
+        continue;
       auto &UI = P.getAnalysis<UniformityInfoWrapperPass>(*ParentF)
                      .getUniformityInfo();
       IsChanged |= optimizeUniformIntrinsic(*II, UI, Tracker);
