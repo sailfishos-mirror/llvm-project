@@ -24,12 +24,25 @@ ERROR_CHECK_RE = re.compile(r"# COM: .*")
 OUTPUT_SKIPPED_RE = re.compile(r"(.text)")
 COMMENT = {"asm": "//", "dasm": "#"}
 
+SUBSTITUTIONS = {
+    "%extract-encodings": "sed -n 's/.*encoding://p'",
+}
+
 
 def invoke_tool(exe, check_rc, cmd_args, testline, verbose=False):
-    if isinstance(cmd_args, list):
-        args = [applySubstitutions(a, substitutions) for a in cmd_args]
-    else:
-        args = cmd_args
+    def apply_substitutions(cmd, exe):
+        cmd = cmd.strip()
+        s = SUBSTITUTIONS.get(cmd)
+        if s is not None:
+            cmd = s
+        else:
+            args = cmd.split()
+            if args[0] in mc_LIKE_TOOLS:
+                args[0] = exe
+            cmd = " ".join(args)
+        return cmd
+
+    args = " | ".join(apply_substitutions(cmd, exe) for cmd in cmd_args.split("|"))
 
     cmd = 'echo "' + testline + '" | ' + exe + " " + args
     if verbose:
