@@ -21,6 +21,8 @@ template <typename T> using Constant = __gpu_constant T;
 template <typename T> using Local = __gpu_local T;
 template <typename T> using Global = __gpu_local T;
 
+#define omp_invalid_device -2
+
 enum omp_proc_bind_t {
   omp_proc_bind_false = 0,
   omp_proc_bind_true = 1,

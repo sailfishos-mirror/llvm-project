@@ -40,6 +40,8 @@ EXTERN void ompx_dump_mapping_tables() {
 using namespace llvm::omp::target::ompt;
 #endif
 
+using GenericDeviceTy = llvm::omp::target::plugin::GenericDeviceTy;
+
 void *targetAllocExplicit(size_t Size, int DeviceNum, int Kind,
                           const char *Name);
 void targetFreeExplicit(void *DevicePtr, int DeviceNum, int Kind,
@@ -89,6 +91,59 @@ EXTERN int omp_get_device_num(void) {
   DP("Call to omp_get_device_num returning %d\n", HostDevice);
 
   return HostDevice;
+}
+
+EXTERN int omp_get_device_from_uid(const char *DeviceUid) {
+  TIMESCOPE();
+  OMPT_IF_BUILT(ReturnAddressSetterRAII RA(__builtin_return_address(0)));
+
+  if (!DeviceUid) {
+    DP("Call to omp_get_device_from_uid returning omp_invalid_device\n");
+    return omp_invalid_device;
+  }
+  if (strcmp(DeviceUid, GenericDeviceTy::getHostDeviceUid()) == 0) {
+    DP("Call to omp_get_device_from_uid returning host device number %d\n",
+       omp_get_initial_device());
+    return omp_get_initial_device();
+  }
+
+  int DeviceNum = omp_invalid_device;
+
+  auto ExclusiveDevicesAccessor = PM->getExclusiveDevicesAccessor();
+  for (const DeviceTy &Device : PM->devices(ExclusiveDevicesAccessor)) {
+    const char *Uid = Device.RTL->getDevice(Device.RTLDeviceID).getDeviceUid();
+    if (Uid && strcmp(DeviceUid, Uid) == 0) {
+      DeviceNum = Device.DeviceID;
+      break;
+    }
+  }
+
+  DP("Call to omp_get_device_from_uid returning %d\n", DeviceNum);
+  return DeviceNum;
+}
+
+EXTERN const char *omp_get_uid_from_device(int DeviceNum) {
+  TIMESCOPE();
+  OMPT_IF_BUILT(ReturnAddressSetterRAII RA(__builtin_return_address(0)));
+
+  if (DeviceNum == omp_invalid_device) {
+    DP("Call to omp_get_uid_from_device returning nullptr\n");
+    return nullptr;
+  }
+  if (DeviceNum == omp_get_initial_device()) {
+    DP("Call to omp_get_uid_from_device returning host device UID\n");
+    return GenericDeviceTy::getHostDeviceUid();
+  }
+
+  llvm::Expected<DeviceTy &> Device = PM->getDevice(DeviceNum);
+  if (!Device) {
+    FATAL_MESSAGE(DeviceNum, "%s", toString(Device.takeError()).c_str());
+    return nullptr;
+  }
+
+  const char *Uid = Device->RTL->getDevice(Device->RTLDeviceID).getDeviceUid();
+  DP("Call to omp_get_uid_from_device returning %s\n", Uid);
+  return Uid;
 }
 
 EXTERN int omp_get_initial_device(void) {

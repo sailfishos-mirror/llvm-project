@@ -1543,11 +1543,23 @@ int FTN_STDCALL KMP_EXPAND_NAME(FTN_GET_MAX_TASK_PRIORITY)(void) {
 #endif
 }
 
-// This function will be defined in libomptarget. When libomptarget is not
-// loaded, we assume we are on the host and return KMP_HOST_DEVICE.
+// These functions will be defined in libomptarget. When libomptarget is not
+// loaded, we assume we are on the host.
 // Compiler/libomptarget will handle this if called inside target.
 int FTN_STDCALL FTN_GET_DEVICE_NUM(void) KMP_WEAK_ATTRIBUTE_EXTERNAL;
 int FTN_STDCALL FTN_GET_DEVICE_NUM(void) {
+  return KMP_EXPAND_NAME(FTN_GET_INITIAL_DEVICE)();
+}
+
+const char *FTN_STDCALL FTN_GET_UID_FROM_DEVICE(int device_num)
+    KMP_WEAK_ATTRIBUTE_EXTERNAL;
+const char *FTN_STDCALL FTN_GET_UID_FROM_DEVICE(int device_num) {
+  // Returns the same string as used by libomptarget
+  return "HOST";
+}
+int FTN_STDCALL FTN_GET_DEVICE_FROM_UID(const char *device_uid)
+    KMP_WEAK_ATTRIBUTE_EXTERNAL;
+int FTN_STDCALL FTN_GET_DEVICE_FROM_UID(const char *device_uid) {
   return KMP_EXPAND_NAME(FTN_GET_INITIAL_DEVICE)();
 }
 
