@@ -93,6 +93,10 @@ EXTERN int omp_get_device_num(void) {
   return HostDevice;
 }
 
+static inline bool is_host_device_uid(const char *DeviceUid) {
+  return strcmp(DeviceUid, GenericDeviceTy::getHostDeviceUid()) == 0;
+}
+
 EXTERN int omp_get_device_from_uid(const char *DeviceUid) {
   TIMESCOPE();
   OMPT_IF_BUILT(ReturnAddressSetterRAII RA(__builtin_return_address(0)));
@@ -101,7 +105,7 @@ EXTERN int omp_get_device_from_uid(const char *DeviceUid) {
     DP("Call to omp_get_device_from_uid returning omp_invalid_device\n");
     return omp_invalid_device;
   }
-  if (strcmp(DeviceUid, GenericDeviceTy::getHostDeviceUid()) == 0) {
+  if (is_host_device_uid(DeviceUid)) {
     DP("Call to omp_get_device_from_uid returning host device number %d\n",
        omp_get_initial_device());
     return omp_get_initial_device();
