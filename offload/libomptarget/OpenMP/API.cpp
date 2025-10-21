@@ -94,7 +94,7 @@ EXTERN int omp_get_device_num(void) {
 }
 
 static inline bool is_host_device_uid(const char *DeviceUid) {
-  return strcmp(DeviceUid, GenericDeviceTy::getHostDeviceUid()) == 0;
+  return strcmp(DeviceUid, GenericPluginTy::getHostDeviceUid()) == 0;
 }
 
 EXTERN int omp_get_device_from_uid(const char *DeviceUid) {
@@ -115,7 +115,7 @@ EXTERN int omp_get_device_from_uid(const char *DeviceUid) {
 
   auto ExclusiveDevicesAccessor = PM->getExclusiveDevicesAccessor();
   for (const DeviceTy &Device : PM->devices(ExclusiveDevicesAccessor)) {
-    const char *Uid = Device.RTL->getDevice(Device.RTLDeviceID).getDeviceUid();
+    const char *Uid = Device.RTL->getDeviceUid(Device.RTLDeviceID);
     if (Uid && strcmp(DeviceUid, Uid) == 0) {
       DeviceNum = Device.DeviceID;
       break;
@@ -136,7 +136,7 @@ EXTERN const char *omp_get_uid_from_device(int DeviceNum) {
   }
   if (DeviceNum == omp_get_initial_device()) {
     DP("Call to omp_get_uid_from_device returning host device UID\n");
-    return GenericDeviceTy::getHostDeviceUid();
+    return GenericPluginTy::getHostDeviceUid();
   }
 
   llvm::Expected<DeviceTy &> Device = PM->getDevice(DeviceNum);
@@ -145,7 +145,7 @@ EXTERN const char *omp_get_uid_from_device(int DeviceNum) {
     return nullptr;
   }
 
-  const char *Uid = Device->RTL->getDevice(Device->RTLDeviceID).getDeviceUid();
+  const char *Uid = Device->RTL->getDeviceUid(Device->RTLDeviceID);
   DP("Call to omp_get_uid_from_device returning %s\n", Uid);
   return Uid;
 }
