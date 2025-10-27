@@ -174,7 +174,8 @@ public:
   /// Forces a function to be marked as available and provide an alternate name
   /// that must be used.
   void setAvailableWithName(LibFunc F, StringRef Name) {
-    if (StandardNamesStrTable.getCString(StandardNamesOffsets[F]) != Name) {
+    if (StringRef(StandardNamesStrTable.getCString(StandardNamesOffsets[F]),
+                  StandardNamesSizeTable[F]) != Name) {
       setState(F, CustomName);
       CustomNames[F] = std::string(Name);
       assert(CustomNames.contains(F));
@@ -452,8 +453,9 @@ public:
   /// Return the canonical name for a LibFunc. This should not be used for
   /// semantic purposes, use getName instead.
   static StringRef getStandardName(LibFunc F) {
-    return TargetLibraryInfoImpl::StandardNamesStrTable.getCString(
-        TargetLibraryInfoImpl::StandardNamesOffsets[F]);
+    return StringRef(TargetLibraryInfoImpl::StandardNamesStrTable.getCString(
+                         TargetLibraryInfoImpl::StandardNamesOffsets[F]),
+                     TargetLibraryInfoImpl::StandardNamesSizeTable[F]);
   }
 
   StringRef getName(LibFunc F) const {
@@ -461,8 +463,8 @@ public:
     if (State == TargetLibraryInfoImpl::Unavailable)
       return StringRef();
     if (State == TargetLibraryInfoImpl::StandardName)
-      return Impl->StandardNamesStrTable.getCString(
-          Impl->StandardNamesOffsets[F]);
+      return StringRef(Impl->StandardNamesStrTable.getCString(
+          Impl->StandardNamesOffsets[F]), Impl->StandardNamesSizeTable[F]);
     assert(State == TargetLibraryInfoImpl::CustomName);
     return Impl->CustomNames.find(F)->second;
   }

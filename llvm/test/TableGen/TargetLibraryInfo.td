@@ -52,12 +52,19 @@ def printf : TargetLibCall< "printf", [Int, Ptr, Ellip]>;
 // CHECK-NEXT:   11, // fmaxf
 // CHECK-NEXT:   17, // printf
 // CHECK-NEXT: };
+// CHECK-NEXT: const uint8_t TargetLibraryInfoImpl::StandardNamesSizeTable[] = {  0,
+// CHECK-NEXT:   4,
+// CHECK-NEXT:   4,
+// CHECK-NEXT:   5,
+// CHECK-NEXT:   6,
+// CHECK-NEXT: };
 // CHECK-NEXT: #endif
 
 // CHECK:      #ifdef GET_TARGET_LIBRARY_INFO_IMPL_DECL
 // CHECK-NEXT: #undef GET_TARGET_LIBRARY_INFO_IMPL_DECL
 // CHECK-NEXT: LLVM_ABI static const llvm::StringTable StandardNamesStrTable;
 // CHECK-NEXT: LLVM_ABI static const llvm::StringTable::Offset StandardNamesOffsets[5];
+// CHECK-NEXT: LLVM_ABI static const uint8_t StandardNamesSizeTable[5];
 // CHECK-NEXT: #endif
 
 // CHECK:      #ifdef GET_TARGET_LIBRARY_INFO_SIGNATURE_TABLE
@@ -91,7 +98,7 @@ def printf : TargetLibCall< "printf", [Int, Ptr, Ellip]>;
 // CHECK-NEXT:   /* 7 */ Floating, Same, Same, NoFuncArgType,
 // CHECK-NEXT:   /* 11 */ Void, NoFuncArgType,
 // CHECK-NEXT: };
-// CHECK-NEXT: static const unsigned short SignatureOffset[] = {
+// CHECK-NEXT: static const uint16_t SignatureOffset[] = {
 // CHECK-NEXT:   11, //
 // CHECK-NEXT:   4, // cosf
 // CHECK-NEXT:   4, // sinf

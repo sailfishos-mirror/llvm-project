@@ -97,12 +97,19 @@ void TargetLibraryInfoEmitter::emitTargetLibraryInfoStringTable(
     OS.indent(2) << Table.GetStringOffset(Str) << ", // " << Str << "\n";
   }
   OS << "};\n";
+  OS << "const uint8_t TargetLibraryInfoImpl::StandardNamesSizeTable[] = {";
+  OS << "  0,\n";
+  for (const auto *R : AllTargetLibcalls)
+    OS.indent(2) << R->getValueAsString("String").size() << ",\n";
+  OS << "};\n";
   OS << "#endif\n\n";
   OS << "#ifdef GET_TARGET_LIBRARY_INFO_IMPL_DECL\n";
   OS << "#undef GET_TARGET_LIBRARY_INFO_IMPL_DECL\n";
   OS << "LLVM_ABI static const llvm::StringTable StandardNamesStrTable;\n";
   OS << "LLVM_ABI static const llvm::StringTable::Offset StandardNamesOffsets["
      << NumEl << "];\n";
+  OS << "LLVM_ABI static const uint8_t StandardNamesSizeTable[" << NumEl
+     << "];\n";
   OS << "#endif\n\n";
 }
 
@@ -144,7 +151,7 @@ void TargetLibraryInfoEmitter::emitTargetLibraryInfoSignatureTable(
   OS << "static const FuncArgTypeID SignatureTable[] = {\n";
   SignatureTable.emit(OS, [](raw_ostream &OS, StringRef E) { OS << E; });
   OS << "};\n";
-  OS << "static const unsigned short SignatureOffset[] = {\n";
+  OS << "static const uint16_t SignatureOffset[] = {\n";
   OS.indent(2) << SignatureTable.get(NoFuncSig) << ", //\n";
   for (const auto *R : AllTargetLibcalls) {
     OS.indent(2) << SignatureTable.get(GetSignature(R)) << ", // "
