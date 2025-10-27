@@ -2,13 +2,14 @@
 
 include "llvm/Analysis/TargetLibraryInfoImpl.td"
 
-def cosf : TargetLibCall< "cosf", [Flt, Flt]>;
-def sinf : TargetLibCall< "sinf", [Flt, Flt]>;
+def cosf : TargetLibCall< "cosf", Flt, [Flt]>;
+def sinf : TargetLibCall< "sinf", Flt, [Flt]>;
 
-def fmaxf : TargetLibCall< "fmaxf", [Floating, Same, Same]>;
+def fmaxf : TargetLibCall< "fmaxf", Floating, [Same, Same]>;
 
-def printf : TargetLibCall< "printf", [Int, Ptr, Ellip]>;
+def printf : TargetLibCall< "printf", Int, [Ptr, Ellip]>;
 
+def cabs : TargetLibCall< "cabs", ? /* Checked manually. */>;
 
 // CHECK:      #ifdef GET_TARGET_LIBRARY_INFO_ENUM
 // CHECK-NEXT: #undef GET_TARGET_LIBRARY_INFO_ENUM
@@ -18,6 +19,7 @@ def printf : TargetLibCall< "printf", [Int, Ptr, Ellip]>;
 // CHECK-NEXT:   LibFunc_sinf,
 // CHECK-NEXT:   LibFunc_fmaxf,
 // CHECK-NEXT:   LibFunc_printf,
+// CHECK-NEXT:   LibFunc_cabs,
 // CHECK-NEXT:   NumLibFuncs,
 // CHECK-NEXT:   End_LibFunc = NumLibFuncs,
 // CHECK-NEXT:   Begin_LibFunc = LibFunc_cosf,
@@ -37,6 +39,7 @@ def printf : TargetLibCall< "printf", [Int, Ptr, Ellip]>;
 // CHECK-NEXT:   "sinf\0"
 // CHECK-NEXT:   "fmaxf\0"
 // CHECK-NEXT:   "printf\0"
+// CHECK-NEXT:   "cabs\0"
 // CHECK-NEXT:   ;
 // CHECK-NEXT: #ifdef __GNUC__
 // CHECK-NEXT: #pragma GCC diagnostic pop
@@ -45,26 +48,28 @@ def printf : TargetLibCall< "printf", [Int, Ptr, Ellip]>;
 // CHECK:      const llvm::StringTable
 // CHECK-NEXT: TargetLibraryInfoImpl::StandardNamesStrTable = StandardNamesStrTableStorage;
 
-// CHECK:      const llvm::StringTable::Offset TargetLibraryInfoImpl::StandardNamesOffsets[5] = {
+// CHECK:      const llvm::StringTable::Offset TargetLibraryInfoImpl::StandardNamesOffsets[6] = {
 // CHECK-NEXT:   0, //
 // CHECK-NEXT:   1, // cosf
 // CHECK-NEXT:   6, // sinf
 // CHECK-NEXT:   11, // fmaxf
 // CHECK-NEXT:   17, // printf
+// CHECK-NEXT:   24, // cabs
 // CHECK-NEXT: };
-// CHECK-NEXT: const uint8_t TargetLibraryInfoImpl::StandardNamesSizeTable[] = {  0,
+// CHECK-NEXT: const uint8_t TargetLibraryInfoImpl::StandardNamesSizeTable[6] = {  0,
 // CHECK-NEXT:   4,
 // CHECK-NEXT:   4,
 // CHECK-NEXT:   5,
 // CHECK-NEXT:   6,
+// CHECK-NEXT:   4,
 // CHECK-NEXT: };
 // CHECK-NEXT: #endif
 
 // CHECK:      #ifdef GET_TARGET_LIBRARY_INFO_IMPL_DECL
 // CHECK-NEXT: #undef GET_TARGET_LIBRARY_INFO_IMPL_DECL
 // CHECK-NEXT: LLVM_ABI static const llvm::StringTable StandardNamesStrTable;
-// CHECK-NEXT: LLVM_ABI static const llvm::StringTable::Offset StandardNamesOffsets[5];
-// CHECK-NEXT: LLVM_ABI static const uint8_t StandardNamesSizeTable[5];
+// CHECK-NEXT: LLVM_ABI static const llvm::StringTable::Offset StandardNamesOffsets[6];
+// CHECK-NEXT: LLVM_ABI static const uint8_t StandardNamesSizeTable[6];
 // CHECK-NEXT: #endif
 
 // CHECK:      #ifdef GET_TARGET_LIBRARY_INFO_SIGNATURE_TABLE
@@ -104,5 +109,6 @@ def printf : TargetLibCall< "printf", [Int, Ptr, Ellip]>;
 // CHECK-NEXT:   4, // sinf
 // CHECK-NEXT:   7, // fmaxf
 // CHECK-NEXT:   0, // printf
+// CHECK-NEXT:   3, // cabs
 // CHECK-NEXT: };
 // CHECK-NEXT: #endif

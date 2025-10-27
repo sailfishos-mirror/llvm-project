@@ -97,7 +97,8 @@ void TargetLibraryInfoEmitter::emitTargetLibraryInfoStringTable(
     OS.indent(2) << Table.GetStringOffset(Str) << ", // " << Str << "\n";
   }
   OS << "};\n";
-  OS << "const uint8_t TargetLibraryInfoImpl::StandardNamesSizeTable[] = {";
+  OS << "const uint8_t TargetLibraryInfoImpl::StandardNamesSizeTable[" << NumEl
+     << "] = {";
   OS << "  0,\n";
   for (const auto *R : AllTargetLibcalls)
     OS.indent(2) << R->getValueAsString("String").size() << ",\n";
@@ -126,8 +127,12 @@ void TargetLibraryInfoEmitter::emitTargetLibraryInfoSignatureTable(
   using Signature = std::vector<StringRef>;
   SequenceToOffsetTable<Signature> SignatureTable("NoFuncArgType");
   auto GetSignature = [](const Record *R) -> Signature {
-    const auto *Tys = R->getValueAsListInit("Signature");
+    const auto *Tys = R->getValueAsListInit("ArgumentTypes");
     Signature Sig;
+    Sig.reserve(Tys->size() + 1);
+    const Record *RetType = R->getValueAsOptionalDef("ReturnType");
+    if (RetType)
+      Sig.push_back(RetType->getName());
     for (unsigned I = 0, E = Tys->size(); I < E; ++I) {
       Sig.push_back(Tys->getElementAsRecord(I)->getName());
     }

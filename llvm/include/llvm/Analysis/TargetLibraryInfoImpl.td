@@ -35,8 +35,10 @@ def Same : FuncArgType;     // Same argument type as the previous one.
 
 
 // Definition of library function.
-class TargetLibCall<string Str, list<FuncArgType> Sig> {
+class TargetLibCall<string Str, FuncArgType RetType,
+                    list<FuncArgType> ArgTypes = []> {
   string Name = NAME;
   string String = Str;
-  list<FuncArgType> Signature = Sig;
+  FuncArgType ReturnType = RetType;
+  list<FuncArgType> ArgumentTypes = ArgTypes;
 }
