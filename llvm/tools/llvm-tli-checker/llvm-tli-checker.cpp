@@ -317,7 +317,8 @@ int main(int argc, char *argv[]) {
     unsigned TLIandSDKboth = 0;
     unsigned TLIandSDKneither = 0;
 
-    for (unsigned FI = LibFunc::Begin_LibFunc; FI != LibFunc::End_LibFunc; ++FI) {
+    for (unsigned FI = LibFunc::Begin_LibFunc; FI != LibFunc::End_LibFunc;
+         ++FI) {
       LibFunc LF = static_cast<LibFunc>(FI);
 
       StringRef TLIName = TLI.getStandardName(LF);
