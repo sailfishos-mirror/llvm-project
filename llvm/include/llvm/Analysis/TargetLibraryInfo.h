@@ -463,8 +463,9 @@ public:
     if (State == TargetLibraryInfoImpl::Unavailable)
       return StringRef();
     if (State == TargetLibraryInfoImpl::StandardName)
-      return StringRef(Impl->StandardNamesStrTable.getCString(
-          Impl->StandardNamesOffsets[F]), Impl->StandardNamesSizeTable[F]);
+      return StringRef(
+          Impl->StandardNamesStrTable.getCString(Impl->StandardNamesOffsets[F]),
+          Impl->StandardNamesSizeTable[F]);
     assert(State == TargetLibraryInfoImpl::CustomName);
     return Impl->CustomNames.find(F)->second;
   }
