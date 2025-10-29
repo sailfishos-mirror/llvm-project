@@ -393,7 +393,7 @@ define <8 x half> @baz() nounwind {
 ; CHECK-NEXT:    global_load_b128 v[18:21], v[8:9], off offset:80
 ; CHECK-NEXT:    global_load_b128 v[22:25], v[8:9], off offset:96
 ; CHECK-NEXT:    global_load_b128 v[26:29], v[8:9], off offset:112
-; CHECK-NEXT:    v_writelane_b32 v93, s30, 0
+; CHECK-NEXT:    v_writelane_b32 v93, s34, 0
 ; CHECK-NEXT:    s_load_b64 s[0:1], s[0:1], 0x0
 ; CHECK-NEXT:    s_wait_loadcnt 0x4
 ; CHECK-NEXT:    scratch_store_b128 off, v[10:13], s33 offset:276 ; 16-byte Folded Spill
@@ -409,27 +409,27 @@ define <8 x half> @baz() nounwind {
 ; CHECK-NEXT:    scratch_store_b128 off, v[30:33], s33 offset:356
 ; CHECK-NEXT:    scratch_store_b128 off, v[34:37], s33 offset:372
 ; CHECK-NEXT:    scratch_store_b128 off, v[38:41], s33 offset:388
-; CHECK-NEXT:    v_writelane_b32 v93, s31, 1
-; CHECK-NEXT:    v_writelane_b32 v93, s34, 2
-; CHECK-NEXT:    v_writelane_b32 v93, s35, 3
+; CHECK-NEXT:    v_writelane_b32 v93, s35, 1
 ; CHECK-NEXT:    s_mov_b64 s[34:35], s[10:11]
-; CHECK-NEXT:    v_writelane_b32 v93, s36, 4
-; CHECK-NEXT:    v_writelane_b32 v93, s37, 5
+; CHECK-NEXT:    v_writelane_b32 v93, s36, 2
+; CHECK-NEXT:    v_writelane_b32 v93, s37, 3
 ; CHECK-NEXT:    s_mov_b64 s[36:37], s[8:9]
-; CHECK-NEXT:    v_writelane_b32 v93, s38, 6
-; CHECK-NEXT:    v_writelane_b32 v93, s39, 7
+; CHECK-NEXT:    v_writelane_b32 v93, s38, 4
+; CHECK-NEXT:    v_writelane_b32 v93, s39, 5
 ; CHECK-NEXT:    s_mov_b64 s[38:39], s[6:7]
-; CHECK-NEXT:    v_writelane_b32 v93, s48, 8
-; CHECK-NEXT:    v_writelane_b32 v93, s49, 9
+; CHECK-NEXT:    v_writelane_b32 v93, s48, 6
+; CHECK-NEXT:    v_writelane_b32 v93, s49, 7
 ; CHECK-NEXT:    s_mov_b64 s[48:49], s[4:5]
-; CHECK-NEXT:    v_writelane_b32 v93, s50, 10
+; CHECK-NEXT:    v_writelane_b32 v93, s50, 8
 ; CHECK-NEXT:    s_mov_b32 s50, s15
-; CHECK-NEXT:    v_writelane_b32 v93, s51, 11
+; CHECK-NEXT:    v_writelane_b32 v93, s51, 9
 ; CHECK-NEXT:    s_mov_b32 s51, s14
-; CHECK-NEXT:    v_writelane_b32 v93, s52, 12
+; CHECK-NEXT:    v_writelane_b32 v93, s52, 10
 ; CHECK-NEXT:    s_mov_b32 s52, s13
-; CHECK-NEXT:    v_writelane_b32 v93, s53, 13
+; CHECK-NEXT:    v_writelane_b32 v93, s53, 11
 ; CHECK-NEXT:    s_mov_b32 s53, s12
+; CHECK-NEXT:    v_writelane_b32 v93, s30, 12
+; CHECK-NEXT:    v_writelane_b32 v93, s31, 13
 ; CHECK-NEXT:    s_wait_kmcnt 0x0
 ; CHECK-NEXT:    s_wait_alu depctr_sa_sdst(0)
 ; CHECK-NEXT:    s_swappc_b64 s[30:31], s[0:1]
@@ -554,20 +554,20 @@ define <8 x half> @baz() nounwind {
 ; CHECK-NEXT:    scratch_load_b32 v42, off, s33 offset:136
 ; CHECK-NEXT:    scratch_load_b32 v41, off, s33 offset:140
 ; CHECK-NEXT:    scratch_load_b32 v40, off, s33 offset:144
-; CHECK-NEXT:    v_readlane_b32 s53, v93, 13
-; CHECK-NEXT:    v_readlane_b32 s52, v93, 12
-; CHECK-NEXT:    v_readlane_b32 s51, v93, 11
-; CHECK-NEXT:    v_readlane_b32 s50, v93, 10
-; CHECK-NEXT:    v_readlane_b32 s49, v93, 9
-; CHECK-NEXT:    v_readlane_b32 s48, v93, 8
-; CHECK-NEXT:    v_readlane_b32 s39, v93, 7
-; CHECK-NEXT:    v_readlane_b32 s38, v93, 6
-; CHECK-NEXT:    v_readlane_b32 s37, v93, 5
-; CHECK-NEXT:    v_readlane_b32 s36, v93, 4
-; CHECK-NEXT:    v_readlane_b32 s35, v93, 3
-; CHECK-NEXT:    v_readlane_b32 s34, v93, 2
-; CHECK-NEXT:    v_readlane_b32 s31, v93, 1
-; CHECK-NEXT:    v_readlane_b32 s30, v93, 0
+; CHECK-NEXT:    v_readlane_b32 s30, v93, 12
+; CHECK-NEXT:    v_readlane_b32 s31, v93, 13
+; CHECK-NEXT:    v_readlane_b32 s53, v93, 11
+; CHECK-NEXT:    v_readlane_b32 s52, v93, 10
+; CHECK-NEXT:    v_readlane_b32 s51, v93, 9
+; CHECK-NEXT:    v_readlane_b32 s50, v93, 8
+; CHECK-NEXT:    v_readlane_b32 s49, v93, 7
+; CHECK-NEXT:    v_readlane_b32 s48, v93, 6
+; CHECK-NEXT:    v_readlane_b32 s39, v93, 5
+; CHECK-NEXT:    v_readlane_b32 s38, v93, 4
+; CHECK-NEXT:    v_readlane_b32 s37, v93, 3
+; CHECK-NEXT:    v_readlane_b32 s36, v93, 2
+; CHECK-NEXT:    v_readlane_b32 s35, v93, 1
+; CHECK-NEXT:    v_readlane_b32 s34, v93, 0
 ; CHECK-NEXT:    s_mov_b32 s32, s33
 ; CHECK-NEXT:    v_readlane_b32 s0, v93, 14
 ; CHECK-NEXT:    s_or_saveexec_b32 s1, -1
