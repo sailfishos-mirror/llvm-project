@@ -209,6 +209,9 @@ public:
   void emitPendingAssignments(MCSymbol *Symbol);
 };
 
+std::optional<uint64_t> absoluteSymbolDiff(const MCSymbol *Hi,
+                                           const MCSymbol *Lo);
+
 } // end namespace llvm
 
 #endif

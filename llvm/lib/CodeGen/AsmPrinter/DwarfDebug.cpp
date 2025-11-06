@@ -40,6 +40,7 @@
 #include "llvm/IR/Module.h"
 #include "llvm/MC/MCAsmInfo.h"
 #include "llvm/MC/MCContext.h"
+#include "llvm/MC/MCObjectStreamer.h"
 #include "llvm/MC/MCSection.h"
 #include "llvm/MC/MCStreamer.h"
 #include "llvm/MC/MCSymbol.h"
@@ -3372,7 +3373,8 @@ emitRangeList(DwarfDebug &DD, AsmPrinter *Asm, MCSymbol *Sym, const Ranges &R,
           Asm->emitLabelDifference(End, Base, Size);
         }
       } else if (UseDwarf5) {
-        if (DD.useSplitDwarf() && llvm::isRangeRelaxable(Begin, End)) {
+        if (DD.useSplitDwarf() &&
+            !llvm::absoluteSymbolDiff(Begin, End).has_value()) {
           Asm->OutStreamer->AddComment(StringifyEnum(StartxEndx));
           Asm->emitInt8(StartxEndx);
           Asm->OutStreamer->AddComment("  start index");

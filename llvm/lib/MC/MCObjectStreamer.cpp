@@ -129,8 +129,8 @@ void MCObjectStreamer::addFixup(const MCExpr *Value, MCFixupKind Kind) {
 // As a compile-time optimization, avoid allocating and evaluating an MCExpr
 // tree for (Hi - Lo) when Hi and Lo are offsets into the same fragment's fixed
 // part.
-static std::optional<uint64_t> absoluteSymbolDiff(const MCSymbol *Hi,
-                                                  const MCSymbol *Lo) {
+std::optional<uint64_t> llvm::absoluteSymbolDiff(const MCSymbol *Hi,
+                                                 const MCSymbol *Lo) {
   assert(Hi && Lo);
   if (Lo == Hi)
     return 0;
