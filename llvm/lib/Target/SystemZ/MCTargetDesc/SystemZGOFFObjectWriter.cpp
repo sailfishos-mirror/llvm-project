@@ -7,6 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "MCTargetDesc/SystemZMCTargetDesc.h"
+#include "SystemZMCAsmInfo.h"
 #include "llvm/MC/MCGOFFObjectWriter.h"
 #include <memory>
 
@@ -16,11 +17,34 @@ namespace {
 class SystemZGOFFObjectWriter : public MCGOFFObjectTargetWriter {
 public:
   SystemZGOFFObjectWriter();
+
+  unsigned getRelocType(const MCValue &Target, const MCFixup &Fixup,
+                        bool IsPCRel) const override;
 };
 } // end anonymous namespace
 
 SystemZGOFFObjectWriter::SystemZGOFFObjectWriter()
     : MCGOFFObjectTargetWriter() {}
+
+unsigned SystemZGOFFObjectWriter::getRelocType(const MCValue &Target,
+                                               const MCFixup &Fixup,
+                                               bool IsPCRel) const {
+  switch (Target.getSpecifier()) {
+  case SystemZ::S_PLT:  // TODO This doen't make sense.
+    return Reloc_Type_RelImm;
+  case SystemZ::S_RCon:
+    return Reloc_Type_RCon;
+  case SystemZ::S_VCon:
+    return Reloc_Type_VCon;
+  case SystemZ::S_QCon:
+    return Reloc_Type_QCon;
+  case SystemZ::S_None:
+    if (IsPCRel)
+      return Reloc_Type_RelImm;
+    return Reloc_Type_ACon;
+  }
+  llvm_unreachable("Modifier not supported");
+}
 
 std::unique_ptr<MCObjectTargetWriter> llvm::createSystemZGOFFObjectWriter() {
   return std::make_unique<SystemZGOFFObjectWriter>();

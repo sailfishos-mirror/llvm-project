@@ -11,10 +11,13 @@
 
 #include "llvm/MC/MCObjectWriter.h"
 #include "llvm/MC/MCValue.h"
+#include <memory>
+#include <vector>
 
 namespace llvm {
 class MCObjectWriter;
 class MCSectionGOFF;
+class MCSymbolGOFF;
 class raw_pwrite_stream;
 
 class MCGOFFObjectTargetWriter : public MCObjectTargetWriter {
@@ -22,13 +25,41 @@ protected:
   MCGOFFObjectTargetWriter() = default;
 
 public:
+  enum RLDRelocationType {
+    Reloc_Type_ACon = 0x1,   // General address.
+    Reloc_Type_RelImm = 0x2, // Relative-immediate address.
+    Reloc_Type_QCon = 0x3,   // Offset of symbol in class.
+    Reloc_Type_VCon = 0x4,   // Address of external symbol.
+    Reloc_Type_RCon = 0x5,   // PSECT of symbol.
+  };
+
   ~MCGOFFObjectTargetWriter() override = default;
+
+  virtual unsigned getRelocType(const MCValue &Target, const MCFixup &Fixup,
+                                bool IsPCRel) const = 0;
 
   Triple::ObjectFormatType getFormat() const override { return Triple::GOFF; }
 
   static bool classof(const MCObjectTargetWriter *W) {
     return W->getFormat() == Triple::GOFF;
   }
+};
+
+struct GOFFSavedRelocationEntry {
+  const MCSectionGOFF *Section;
+  const MCSymbolGOFF *SymA;
+  const MCSymbolGOFF *SymB;
+  unsigned RelocType;
+  uint64_t FixupOffset;
+  uint32_t Length;
+  uint64_t FixedValue; // Info only.
+
+  GOFFSavedRelocationEntry(const MCSectionGOFF *Section,
+                           const MCSymbolGOFF *SymA, const MCSymbolGOFF *SymB,
+                           unsigned RelocType, uint64_t FixupOffset,
+                           uint32_t Length, uint64_t FixedValue)
+      : Section(Section), SymA(SymA), SymB(SymB), RelocType(RelocType),
+        FixupOffset(FixupOffset), Length(Length), FixedValue(FixedValue) {}
 };
 
 class GOFFObjectWriter : public MCObjectWriter {
@@ -41,6 +72,9 @@ class GOFFObjectWriter : public MCObjectWriter {
   // The RootSD section.
   MCSectionGOFF *RootSD = nullptr;
 
+  // Saved relocation data.
+  std::vector<GOFFSavedRelocationEntry> SavedRelocs;
+
 public:
   GOFFObjectWriter(std::unique_ptr<MCGOFFObjectTargetWriter> MOTW,
                    raw_pwrite_stream &OS);
@@ -50,7 +84,7 @@ public:
 
   // Implementation of the MCObjectWriter interface.
   void recordRelocation(const MCFragment &F, const MCFixup &Fixup,
-                        MCValue Target, uint64_t &FixedValue) override {}
+                        MCValue Target, uint64_t &FixedValue) override;
 
   uint64_t writeObject() override;
 };

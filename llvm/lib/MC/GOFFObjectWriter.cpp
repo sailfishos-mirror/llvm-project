@@ -10,7 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/BinaryFormat/GOFF.h"
+#include "llvm/MC/MCAsmBackend.h"
 #include "llvm/MC/MCAssembler.h"
 #include "llvm/MC/MCGOFFAttributes.h"
 #include "llvm/MC/MCGOFFObjectWriter.h"
@@ -280,14 +282,43 @@ public:
   }
 };
 
+// A GOFFRelocationEntry describes a single relocation.
+struct GOFFRelocationEntry {
+  uint32_t REsdId;  // The R pointer.
+  uint32_t PEsdId;  // The P pointer.
+  uint64_t POffset; // The offset within the element described by the P pointer.
+
+  uint32_t TargetLength; // The byte length of the target field.
+
+  // Details of the relocation.
+  GOFF::RLDReferenceType ReferenceType : 4;
+  GOFF::RLDReferentType ReferentType : 2;
+  GOFF::RLDAction Action : 1;
+  GOFF::RLDFetchStore FetchStore : 1;
+
+  GOFFRelocationEntry() = default;
+  GOFFRelocationEntry(uint32_t REsdId, uint32_t PEsdId, uint64_t POffset,
+                      GOFF::RLDReferenceType ReferenceType,
+                      GOFF::RLDReferentType ReferentType,
+                      GOFF::RLDAction Action, GOFF::RLDFetchStore FetchStore,
+                      uint32_t TargetLength)
+      : REsdId(REsdId), PEsdId(PEsdId), POffset(POffset),
+        TargetLength(TargetLength), ReferenceType(ReferenceType),
+        ReferentType(ReferentType), Action(Action), FetchStore(FetchStore) {}
+};
+
 class GOFFWriter {
   GOFFOstream OS;
   MCAssembler &Asm;
   MCSectionGOFF *RootSD;
 
+  /// Saved relocation data collected in recordRelocations().
+  const std::vector<GOFFSavedRelocationEntry> &SavedRelocs;
+
   void writeHeader();
   void writeSymbol(const GOFFSymbol &Symbol);
   void writeText(const MCSectionGOFF *MC);
+  void writeRelocations();
   void writeEnd();
 
   void defineSectionSymbols(const MCSectionGOFF &Section);
@@ -296,14 +327,16 @@ class GOFFWriter {
   void defineSymbols();
 
 public:
-  GOFFWriter(raw_pwrite_stream &OS, MCAssembler &Asm, MCSectionGOFF *RootSD);
+  GOFFWriter(raw_pwrite_stream &OS, MCAssembler &Asm, MCSectionGOFF *RootSD,
+             const std::vector<GOFFSavedRelocationEntry> &SavedRelocs);
   uint64_t writeObject();
 };
 } // namespace
 
 GOFFWriter::GOFFWriter(raw_pwrite_stream &OS, MCAssembler &Asm,
-                       MCSectionGOFF *RootSD)
-    : OS(OS), Asm(Asm), RootSD(RootSD) {}
+                       MCSectionGOFF *RootSD,
+                       const std::vector<GOFFSavedRelocationEntry> &SavedRelocs)
+    : OS(OS), Asm(Asm), RootSD(RootSD), SavedRelocs(SavedRelocs) {}
 
 void GOFFWriter::defineSectionSymbols(const MCSectionGOFF &Section) {
   if (Section.isSD()) {
@@ -515,6 +548,169 @@ void GOFFWriter::writeText(const MCSectionGOFF *Section) {
   Asm.writeSectionData(S, Section);
 }
 
+namespace {
+// RelocDataItemBuffer provides a static buffer for relocation data items.
+class RelocDataItemBuffer {
+  char Buffer[GOFF::MaxDataLength];
+  char *Ptr;
+
+public:
+  RelocDataItemBuffer() : Ptr(Buffer) {}
+  const char *data() { return Buffer; }
+  size_t size() { return Ptr - Buffer; }
+  void reset() { Ptr = Buffer; }
+  bool fits(size_t S) { return size() + S < GOFF::MaxDataLength; }
+  template <typename T> void writebe(T Val) {
+    assert(fits(sizeof(T)) && "Out-of-bounds write");
+    support::endian::write<T, llvm::endianness::big>(Ptr, Val);
+    Ptr += sizeof(T);
+  }
+};
+} // namespace
+
+void GOFFWriter::writeRelocations() {
+  // Transform a GOFFSavedRelocationEntry to 1 or 2 GOFFRelocationEntry
+  // instances. An expression like SymA - SymB + Const is implemented by storing
+  // Const in the memory (aka the FixedValue), and then having a relocation to
+  // add SymA, and another relocation to subtract SymB.
+  std::vector<GOFFRelocationEntry> Relocations;
+  for (auto &RelocEntry : SavedRelocs) {
+    auto *PSection = RelocEntry.Section;
+    auto RelocType = RelocEntry.RelocType;
+    auto *A = RelocEntry.SymA;
+    auto *B = RelocEntry.SymB;
+    auto FixupOffset = RelocEntry.FixupOffset;
+    auto Length = RelocEntry.Length;
+
+    auto GetRptr = [](const MCSymbolGOFF *Sym) -> uint32_t {
+      if (Sym->isTemporary())
+        return static_cast<MCSectionGOFF &>(Sym->getSection())
+            .getBeginSymbol()
+            ->getIndex();
+      return Sym->getIndex();
+    };
+
+    const uint32_t Pptr = PSection->getOrdinal();
+    uint32_t RptrA = GetRptr(A);
+    uint32_t RptrB = B ? GetRptr(B) : 0;
+
+    // UseQCon causes class offsets versus absolute addresses to be used. This
+    // is analogous to using QCONs in older OBJ object file format.
+    bool UseQCon = RelocType == MCGOFFObjectTargetWriter::Reloc_Type_QCon;
+
+    GOFF::RLDFetchStore FetchStore =
+        (RelocType == MCGOFFObjectTargetWriter::Reloc_Type_RCon ||
+         RelocType == MCGOFFObjectTargetWriter::Reloc_Type_VCon)
+            ? GOFF::RLDFetchStore::RLD_FS_Store
+            : GOFF::RLDFetchStore::RLD_FS_Fetch;
+    assert(FetchStore == GOFF::RLDFetchStore::RLD_FS_Fetch ||
+           RptrB == 0 && "No dependent relocations expected");
+
+    enum GOFF::RLDReferenceType ReferenceType = GOFF::RLD_RT_RAddress;
+    enum GOFF::RLDReferentType ReferentType = GOFF::RLD_RO_Label;
+    if (UseQCon) {
+      ReferenceType = GOFF::RLD_RT_ROffset;
+      ReferentType = GOFF::RLD_RO_Class;
+    }
+    if (RelocType == MCGOFFObjectTargetWriter::Reloc_Type_RCon)
+      ReferenceType = GOFF::RLD_RT_RTypeConstant;
+
+    if (RptrA) {
+      LLVM_DEBUG(dbgs() << "Reloc A: " << (UseQCon ? "QCon" : "ACon")
+                        << " Rptr: " << RptrA << " Pptr: " << Pptr
+                        << " Offset: " << FixupOffset
+                        << " Fixed Imm: " << RelocEntry.FixedValue << "\n");
+      Relocations.emplace_back(RptrA, Pptr, FixupOffset, ReferenceType,
+                               ReferentType, GOFF::RLD_ACT_Add, FetchStore,
+                               Length);
+    }
+    if (RptrB) {
+      LLVM_DEBUG(dbgs() << "Reloc B: " << (UseQCon ? "QCon" : "ACon")
+                        << " Rptr: " << RptrA << " Pptr: " << Pptr
+                        << " Offset: " << FixupOffset
+                        << " Fixed Imm: " << RelocEntry.FixedValue << "\n");
+      Relocations.emplace_back(RptrB, Pptr, FixupOffset, ReferenceType,
+                               ReferentType, GOFF::RLD_ACT_Subtract,
+                               GOFF::RLDFetchStore::RLD_FS_Fetch, Length);
+    }
+  }
+
+  // Sort relocation data items by the P pointer to save space.
+  std::sort(
+      Relocations.begin(), Relocations.end(),
+      [](const GOFFRelocationEntry &Left, const GOFFRelocationEntry &Right) {
+        return std::tie(Left.PEsdId, Left.REsdId, Left.POffset) <
+               std::tie(Right.PEsdId, Right.REsdId, Right.POffset);
+      });
+
+  // Construct the compressed relocation data items, and write them out.
+  RelocDataItemBuffer Buffer;
+  for (auto I = Relocations.begin(), E = Relocations.end(); I != E;) {
+    Buffer.reset();
+
+    uint32_t PrevResdId = -1;
+    uint32_t PrevPesdId = -1;
+    uint64_t PrevPOffset = -1;
+    for (; I != E; ++I) {
+      const GOFFRelocationEntry &Rel = *I;
+
+      bool SameREsdId = (Rel.REsdId == PrevResdId);
+      bool SamePEsdId = (Rel.PEsdId == PrevPesdId);
+      bool SamePOffset = (Rel.POffset == PrevPOffset);
+      bool EightByteOffset = ((Rel.POffset >> 32) & 0xffffffff);
+
+      // Calculate size of relocation data item, and check if it still fits into
+      // the record.
+      size_t ItemSize = 8; // Smallest size of a relocation data item.
+      if (!SameREsdId)
+        ItemSize += 4;
+      if (!SamePEsdId)
+        ItemSize += 4;
+      if (!SamePOffset)
+        ItemSize += (EightByteOffset ? 8 : 4);
+      if (!Buffer.fits(ItemSize))
+        break;
+
+      GOFF::Flags RelocFlags[6];
+      RelocFlags[0].set(0, 1, SameREsdId);
+      RelocFlags[0].set(1, 1, SamePEsdId);
+      RelocFlags[0].set(2, 1, SamePOffset);
+      RelocFlags[0].set(6, 1, EightByteOffset);
+
+      RelocFlags[1].set(0, 4, Rel.ReferenceType);
+      RelocFlags[1].set(4, 4, Rel.ReferentType);
+
+      RelocFlags[2].set(0, 7, Rel.Action);
+      RelocFlags[2].set(7, 1, Rel.FetchStore);
+
+      RelocFlags[4].set(0, 8, Rel.TargetLength);
+
+      for (auto F : RelocFlags)
+        Buffer.writebe<uint8_t>(F);
+      Buffer.writebe<uint16_t>(0); // Reserved.
+      if (!SameREsdId)
+        Buffer.writebe<uint32_t>(Rel.REsdId);
+      if (!SamePEsdId)
+        Buffer.writebe<uint32_t>(Rel.PEsdId);
+      if (!SamePOffset) {
+        if (EightByteOffset)
+          Buffer.writebe<uint64_t>(Rel.POffset);
+        else
+          Buffer.writebe<uint32_t>(Rel.POffset);
+      }
+
+      PrevResdId = Rel.REsdId;
+      PrevPesdId = Rel.PEsdId;
+      PrevPOffset = Rel.POffset;
+    }
+
+    OS.newRecord(GOFF::RT_RLD);
+    OS.writebe<uint8_t>(0);                 // Reserved.
+    OS.writebe<uint16_t>(Buffer.size());    // Length (of the relocation data).
+    OS.write(Buffer.data(), Buffer.size()); // Relocation Directory Data Items.
+  }
+}
+
 void GOFFWriter::writeEnd() {
   uint8_t F = GOFF::END_EPR_None;
   uint8_t AMODE = 0;
@@ -541,6 +737,8 @@ uint64_t GOFFWriter::writeObject() {
   for (const MCSection &Section : Asm)
     writeText(static_cast<const MCSectionGOFF *>(&Section));
 
+  writeRelocations();
+
   writeEnd();
 
   // Make sure all records are written.
@@ -558,8 +756,68 @@ GOFFObjectWriter::GOFFObjectWriter(
 
 GOFFObjectWriter::~GOFFObjectWriter() = default;
 
+void GOFFObjectWriter::recordRelocation(const MCFragment &F,
+                                        const MCFixup &Fixup, MCValue Target,
+                                        uint64_t &FixedValue) {
+  const MCFixupKindInfo &FKI =
+      Asm->getBackend().getFixupKindInfo(Fixup.getKind());
+  const uint32_t Length = FKI.TargetSize / 8;
+  assert(FKI.TargetSize % 8 == 0 && "Target Size not multiple of 8");
+  const uint64_t FixupOffset = Asm->getFragmentOffset(F) + Fixup.getOffset();
+  bool IsPCRel = Fixup.isPCRel();
+
+  unsigned RelocType = TargetObjectWriter->getRelocType(Target, Fixup, IsPCRel);
+
+  const MCSectionGOFF *PSection = static_cast<MCSectionGOFF *>(F.getParent());
+  const auto &A = *static_cast<const MCSymbolGOFF *>(Target.getAddSym());
+  const MCSymbolGOFF *B = static_cast<const MCSymbolGOFF *>(Target.getSubSym());
+  if (RelocType == MCGOFFObjectTargetWriter::Reloc_Type_RelImm) {
+    if (A.isUndefined()) {
+      Asm->reportError(
+          Fixup.getLoc(),
+          Twine("symbol ")
+              .concat(A.getName())
+              .concat(" must be defined for a relative immediate relocation"));
+      return;
+    }
+    if (&A.getSection() != PSection) {
+      Asm->reportError(Fixup.getLoc(),
+                       Twine("relative immediate relocation section mismatch: ")
+                           .concat(A.getSection().getName())
+                           .concat(" of symbol ")
+                           .concat(A.getName())
+                           .concat(" <-> ")
+                           .concat(PSection->getName()));
+      return;
+    }
+    if (B) {
+      Asm->reportError(
+          Fixup.getLoc(),
+          Twine("subtractive symbol ")
+              .concat(B->getName())
+              .concat(" not supported for a relative immediate relocation"));
+      return;
+    }
+    FixedValue = Asm->getSymbolOffset(A) - FixupOffset + Target.getConstant();
+    return;
+  }
+  FixedValue = Target.getConstant();
+
+  // The symbol only has a section-relative offset if it is a temporary symbol.
+  FixedValue += A.isTemporary() ? Asm->getSymbolOffset(A) : 0;
+  A.setUsedInReloc();
+  if (B) {
+    FixedValue -= B->isTemporary() ? Asm->getSymbolOffset(*B) : 0;
+    B->setUsedInReloc();
+  }
+
+  // Save relocation data for later writing.
+  SavedRelocs.emplace_back(PSection, &A, B, RelocType, FixupOffset, Length,
+                           FixedValue);
+}
+
 uint64_t GOFFObjectWriter::writeObject() {
-  uint64_t Size = GOFFWriter(OS, *Asm, RootSD).writeObject();
+  uint64_t Size = GOFFWriter(OS, *Asm, RootSD, SavedRelocs).writeObject();
   return Size;
 }
 
