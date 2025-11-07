@@ -633,7 +633,10 @@ void SPIRVAsmPrinter::outputExecutionMode(const Module &M) {
             // Check if the constant is int32, if not skip it.
             const MachineRegisterInfo &MRI = MI->getMF()->getRegInfo();
             MachineInstr *TypeMI = MRI.getVRegDef(MI->getOperand(1).getReg());
-            if (!TypeMI || TypeMI->getOperand(1).getImm() != 32)
+            bool IsInt32Ty = TypeMI &&
+                             TypeMI->getOpcode() == SPIRV::OpTypeInt &&
+                             TypeMI->getOperand(1).getImm() == 32;
+            if (!IsInt32Ty)
               continue;
 
             ConstZero = MI;
