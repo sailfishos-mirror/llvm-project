@@ -50,8 +50,9 @@
 #include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/IR/Dominators.h"
 #include "llvm/IR/Function.h"
-#include "llvm/IR/Instruction.h"
 #include "llvm/IR/IRBuilder.h"
+#include "llvm/IR/Instruction.h"
+#include "llvm/IR/ProfDataUtils.h"
 #include "llvm/InitializePasses.h"
 #include "llvm/Pass.h"
 #include "llvm/Transforms/Scalar.h"
@@ -66,6 +67,9 @@ using namespace llvm;
 
 #define DEBUG_TYPE "mergeicmps"
 
+namespace llvm {
+extern cl::opt<bool> ProfcheckDisableMetadataFixes;
+} // namespace llvm
 namespace {
 
 // A BCE atom "Binary Compare Expression Atom" represents an integer load
@@ -647,6 +651,8 @@ static BasicBlock *mergeComparisons(ArrayRef<BCECmpBlock> Comparisons,
     ToSplit->split(BB, AA);
   }
 
+  SmallVector<uint32_t, 2> BranchWeights;
+  bool HasBranchWeights = false;
   if (Comparisons.size() == 1) {
     LLVM_DEBUG(dbgs() << "Only one comparison, updating branches\n");
     // Use clone to keep the metadata
@@ -655,7 +661,10 @@ static BasicBlock *mergeComparisons(ArrayRef<BCECmpBlock> Comparisons,
     LhsLoad->replaceUsesOfWith(LhsLoad->getOperand(0), Lhs);
     RhsLoad->replaceUsesOfWith(RhsLoad->getOperand(0), Rhs);
     // There are no blocks to merge, just do the comparison.
+    // If we condition on this IsEqual, we already have its probabilities.
     IsEqual = Builder.CreateICmpEQ(LhsLoad, RhsLoad);
+    HasBranchWeights =
+        extractBranchWeights(*FirstCmp.BB->getTerminator(), BranchWeights);
   } else {
     const unsigned TotalSizeBits = std::accumulate(
         Comparisons.begin(), Comparisons.end(), 0u,
@@ -673,6 +682,25 @@ static BasicBlock *mergeComparisons(ArrayRef<BCECmpBlock> Comparisons,
         Builder, DL, &TLI);
     IsEqual = Builder.CreateICmpEQ(
         MemCmpCall, ConstantInt::get(Builder.getIntNTy(IntBits), 0));
+    // If we condition on this IsEqual, the probability to go to "exit" is the
+    // disjunction of the probability to go to "exit" from the individual
+    // Comparisons. We'll swap the weights because `getDisjunctionWeights`
+    // computes the disjunction for the "true" branch, then swap back.
+    SmallVector<uint64_t, 2> Weights(2);
+    Weights[1] = 1;
+    // At this point, Weights encodes "0-probability" for the "true" side.
+    for (const auto &C : Comparisons) {
+      SmallVector<uint32_t, 2> W;
+      if (!extractBranchWeights(*C.BB->getTerminator(), W)) {
+        HasBranchWeights = false;
+        break;
+      }
+      std::swap(W[0], W[1]);
+      Weights = getDisjunctionWeights(Weights, W);
+    }
+    std::swap(Weights[0], Weights[1]);
+    BranchWeights = fitWeights(Weights);
+    HasBranchWeights = true;
   }
 
   BasicBlock *const PhiBB = Phi.getParent();
@@ -684,7 +712,9 @@ static BasicBlock *mergeComparisons(ArrayRef<BCECmpBlock> Comparisons,
     DTU.applyUpdates({{DominatorTree::Insert, BB, PhiBB}});
   } else {
     // Continue to next block if equal, exit to phi else.
-    Builder.CreateCondBr(IsEqual, NextCmpBlock, PhiBB);
+    auto *BI = Builder.CreateCondBr(IsEqual, NextCmpBlock, PhiBB);
+    if (!ProfcheckDisableMetadataFixes && HasBranchWeights)
+      setBranchWeights(*BI, BranchWeights, /*IsExpected=*/false);
     Phi.addIncoming(ConstantInt::getFalse(Context), BB);
     DTU.applyUpdates({{DominatorTree::Insert, BB, NextCmpBlock},
                       {DominatorTree::Insert, BB, PhiBB}});
