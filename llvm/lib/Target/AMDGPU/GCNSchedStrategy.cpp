@@ -2046,14 +2046,16 @@ bool PreRARematStage::setObjective() {
   // Set up "spilling targets" for all regions.
   unsigned MaxSGPRs = ST.getMaxNumSGPRs(F);
   unsigned MaxVGPRs = ST.getMaxNumVGPRs(F);
+  bool SpillsToMemory = false;
   for (unsigned I = 0, E = DAG.Regions.size(); I != E; ++I) {
     const GCNRegPressure &RP = DAG.Pressure[I];
     GCNRPTarget &Target = RPTargets.emplace_back(MaxSGPRs, MaxVGPRs, MF, RP);
     if (!Target.satisfied())
       TargetRegions.set(I);
+    SpillsToMemory |= Target.spillsToMemory();
   }
 
-  if (TargetRegions.any() || DAG.MinOccupancy >= MFI.getMaxWavesPerEU()) {
+  if (SpillsToMemory || DAG.MinOccupancy >= MFI.getMaxWavesPerEU()) {
     // In addition to register usage being above addressable limits, occupancy
     // below the minimum is considered like "spilling" as well.
     TargetOcc = std::nullopt;
