@@ -104,6 +104,7 @@ struct RegExcess {
   unsigned AGPR = 0;
 
   bool anyExcess() const { return SGPR || VGPR || ArchVGPR || AGPR; }
+  bool spillsToMemory() const { return VGPR || ArchVGPR || AGPR; }
 
   RegExcess(const MachineFunction &MF, const GCNRegPressure &RP,
             unsigned MaxSGPRs, unsigned MaxVGPRs) {
@@ -414,23 +415,20 @@ bool GCNRPTarget::isSaveBeneficial(Register Reg) const {
   const TargetRegisterInfo *TRI = MRI.getTargetRegisterInfo();
   const SIRegisterInfo *SRI = static_cast<const SIRegisterInfo *>(TRI);
 
+  RegExcess Excess(MF, RP, MaxSGPRs, MaxVGPRs);
+
   if (SRI->isSGPRClass(RC))
-    return RP.getSGPRNum() > MaxSGPRs;
-  unsigned NumVGPRs =
-      SRI->isAGPRClass(RC) ? RP.getAGPRNum() : RP.getArchVGPRNum();
-  // The addressable limit must always be respected.
-  if (NumVGPRs > MaxVGPRs)
-    return true;
-  // For unified RFs, combined VGPR usage limit must be respected as well.
-  return UnifiedRF && RP.getVGPRNum(true) > MaxUnifiedVGPRs;
+    return Excess.SGPR;
+
+  if (SRI->isAGPRClass(RC))
+    return Excess.AGPR;
+
+  return Excess.VGPR || Excess.ArchVGPR;
 }
 
 bool GCNRPTarget::satisfied() const {
-  if (RP.getSGPRNum() > MaxSGPRs || RP.getVGPRNum(false) > MaxVGPRs)
-    return false;
-  if (UnifiedRF && RP.getVGPRNum(true) > MaxUnifiedVGPRs)
-    return false;
-  return true;
+  RegExcess Excess(MF, RP, MaxSGPRs, MaxVGPRs);
+  return Excess.spillsToMemory();
 }
 
 ///////////////////////////////////////////////////////////////////////////////
