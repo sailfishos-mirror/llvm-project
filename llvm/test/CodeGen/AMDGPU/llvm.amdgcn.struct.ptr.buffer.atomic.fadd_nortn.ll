@@ -46,6 +46,7 @@ define void @struct_ptr_buffer_atomic_add_f32_noret__vgpr_val__sgpr_rsrc__vgpr_v
 ; GFX1250-NEXT:    s_wait_loadcnt_dscnt 0x0
 ; GFX1250-NEXT:    s_wait_kmcnt 0x0
 ; GFX1250-NEXT:    v_dual_mov_b32 v3, v2 :: v_dual_mov_b32 v2, v1
+; GFX1250-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-NEXT:    buffer_atomic_add_f32 v0, v[2:3], s[0:3], s16 idxen offen
 ; GFX1250-NEXT:    s_set_pc_i64 s[30:31]
   %ret = call float @llvm.amdgcn.struct.ptr.buffer.atomic.fadd.f32(float %val, ptr addrspace(8) %rsrc, i32 %vindex, i32 %voffset, i32 %soffset, i32 0)
@@ -89,6 +90,7 @@ define void @struct_ptr_buffer_atomic_add_f32_noret__vgpr_val__sgpr_rsrc__0_voff
 ; GFX1250:       ; %bb.0:
 ; GFX1250-NEXT:    s_wait_loadcnt_dscnt 0x0
 ; GFX1250-NEXT:    s_wait_kmcnt 0x0
+; GFX1250-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-NEXT:    buffer_atomic_add_f32 v0, v1, s[0:3], s16 idxen
 ; GFX1250-NEXT:    s_set_pc_i64 s[30:31]
   %ret = call float @llvm.amdgcn.struct.ptr.buffer.atomic.fadd.f32(float %val, ptr addrspace(8) %rsrc, i32 %vindex, i32 0, i32 %soffset, i32 0)
@@ -136,6 +138,7 @@ define void @struct_ptr_buffer_atomic_add_f32_noret__vgpr_val__sgpr_rsrc__vgpr_v
 ; GFX1250-NEXT:    s_wait_loadcnt_dscnt 0x0
 ; GFX1250-NEXT:    s_wait_kmcnt 0x0
 ; GFX1250-NEXT:    v_dual_mov_b32 v3, v2 :: v_dual_mov_b32 v2, v1
+; GFX1250-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-NEXT:    buffer_atomic_add_f32 v0, v[2:3], s[0:3], s16 idxen offen th:TH_ATOMIC_NT
 ; GFX1250-NEXT:    s_set_pc_i64 s[30:31]
   %ret = call float @llvm.amdgcn.struct.ptr.buffer.atomic.fadd.f32(float %val, ptr addrspace(8) %rsrc, i32 %vindex, i32 %voffset, i32 %soffset, i32 2)
@@ -183,6 +186,7 @@ define void @struct_ptr_buffer_atomic_add_v2f16_noret__vgpr_val__sgpr_rsrc__vgpr
 ; GFX1250-NEXT:    s_wait_loadcnt_dscnt 0x0
 ; GFX1250-NEXT:    s_wait_kmcnt 0x0
 ; GFX1250-NEXT:    v_dual_mov_b32 v3, v2 :: v_dual_mov_b32 v2, v1
+; GFX1250-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-NEXT:    buffer_atomic_pk_add_f16 v0, v[2:3], s[0:3], s16 idxen offen
 ; GFX1250-NEXT:    s_set_pc_i64 s[30:31]
   %ret = call <2 x half> @llvm.amdgcn.struct.ptr.buffer.atomic.fadd.v2f16(<2 x half> %val, ptr addrspace(8) %rsrc, i32 %vindex, i32 %voffset, i32 %soffset, i32 0)
@@ -348,6 +352,7 @@ define void @struct_ptr_buffer_atomic_add_f32_noret__vgpr_val__vgpr_rsrc__vgpr_v
 ; GFX1250-NEXT:    s_and_b32 s0, s0, s1
 ; GFX1250-NEXT:    s_delay_alu instid0(SALU_CYCLE_1)
 ; GFX1250-NEXT:    s_and_saveexec_b32 s0, s0
+; GFX1250-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-NEXT:    buffer_atomic_add_f32 v0, v[8:9], s[4:7], s3 idxen offen
 ; GFX1250-NEXT:    ; implicit-def: $vgpr2_vgpr3_vgpr4_vgpr5
 ; GFX1250-NEXT:    ; implicit-def: $vgpr7
@@ -522,6 +527,7 @@ define void @struct_ptr_buffer_atomic_add_v2f16_noret__vgpr_val__vgpr_rsrc__vgpr
 ; GFX1250-NEXT:    s_and_b32 s0, s0, s1
 ; GFX1250-NEXT:    s_delay_alu instid0(SALU_CYCLE_1)
 ; GFX1250-NEXT:    s_and_saveexec_b32 s0, s0
+; GFX1250-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-NEXT:    buffer_atomic_pk_add_f16 v0, v[8:9], s[4:7], s3 idxen offen
 ; GFX1250-NEXT:    ; implicit-def: $vgpr2_vgpr3_vgpr4_vgpr5
 ; GFX1250-NEXT:    ; implicit-def: $vgpr7

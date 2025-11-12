@@ -11,6 +11,7 @@ body: |
     ; GCN: liveins: $vgpr0, $vgpr1
     ; GCN-NEXT: {{  $}}
     ; GCN-NEXT: S_WAITCNT_DEPCTR 65507
+    ; GCN-NEXT: S_WAIT_XCNT_soft 0
     ; GCN-NEXT: DS_ATOMIC_ASYNC_BARRIER_ARRIVE_B64 $vgpr1, 0, 0, implicit-def $asynccnt, implicit $asynccnt, implicit $exec
     ; GCN-NEXT: S_WAITCNT_DEPCTR 65507
     DS_ATOMIC_ASYNC_BARRIER_ARRIVE_B64 $vgpr1, 0, 0, implicit-def $asynccnt, implicit $asynccnt, implicit $exec

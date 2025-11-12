@@ -45,6 +45,7 @@ define float @test_barrier_workgroup_local_mmra(ptr addrspace(3) noundef %x, ptr
 ; GFX1250:       ; %bb.0:
 ; GFX1250-NEXT:    s_wait_loadcnt_dscnt 0x0
 ; GFX1250-NEXT:    s_wait_kmcnt 0x0
+; GFX1250-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-NEXT:    ds_store_b32 v0, v2
 ; GFX1250-NEXT:    s_wait_dscnt 0x0
 ; GFX1250-NEXT:    s_barrier_signal -1

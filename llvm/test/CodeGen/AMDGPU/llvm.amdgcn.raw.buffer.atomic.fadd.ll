@@ -15,6 +15,7 @@ define void @raw_buffer_atomic_add_f32_noret__vgpr_val__sgpr_rsrc__vgpr_voffset_
 ; GFX12-NEXT:    s_wait_loadcnt_dscnt 0x0
 ; GFX12-NEXT:    s_wait_kmcnt 0x0
 ; GFX12-NEXT:    v_add_nc_u32_e32 v1, 24, v1
+; GFX12-NEXT:    s_wait_xcnt 0x0
 ; GFX12-NEXT:    buffer_atomic_add_f32 v0, v1, s[0:3], s16 offen
 ; GFX12-NEXT:    s_set_pc_i64 s[30:31]
   %voffset.add = add i32 %voffset, 24
@@ -34,6 +35,7 @@ define void @raw_buffer_atomic_add_f32_noret__vgpr_val__sgpr_rsrc__0_voffset__sg
 ; GFX12:       ; %bb.0:
 ; GFX12-NEXT:    s_wait_loadcnt_dscnt 0x0
 ; GFX12-NEXT:    s_wait_kmcnt 0x0
+; GFX12-NEXT:    s_wait_xcnt 0x0
 ; GFX12-NEXT:    buffer_atomic_add_f32 v0, off, s[0:3], s16
 ; GFX12-NEXT:    s_set_pc_i64 s[30:31]
   %ret = call float @llvm.amdgcn.raw.buffer.atomic.fadd.f32(float %val, <4 x i32> %rsrc, i32 0, i32 %soffset, i32 0)
@@ -52,6 +54,7 @@ define void @raw_buffer_atomic_add_v2f16_noret__vgpr_val__sgpr_rsrc__vgpr_voffse
 ; GFX12:       ; %bb.0:
 ; GFX12-NEXT:    s_wait_loadcnt_dscnt 0x0
 ; GFX12-NEXT:    s_wait_kmcnt 0x0
+; GFX12-NEXT:    s_wait_xcnt 0x0
 ; GFX12-NEXT:    buffer_atomic_pk_add_f16 v0, v1, s[0:3], s16 offen
 ; GFX12-NEXT:    s_set_pc_i64 s[30:31]
   %ret = call <2 x half> @llvm.amdgcn.raw.buffer.atomic.fadd.v2f16(<2 x half> %val, <4 x i32> %rsrc, i32 %voffset, i32 %soffset, i32 0)
@@ -70,6 +73,7 @@ define void @raw_buffer_atomic_add_v2f16_noret__vgpr_val__sgpr_rsrc__0_voffset__
 ; GFX12:       ; %bb.0:
 ; GFX12-NEXT:    s_wait_loadcnt_dscnt 0x0
 ; GFX12-NEXT:    s_wait_kmcnt 0x0
+; GFX12-NEXT:    s_wait_xcnt 0x0
 ; GFX12-NEXT:    buffer_atomic_pk_add_f16 v0, off, s[0:3], s16 offset:92
 ; GFX12-NEXT:    s_set_pc_i64 s[30:31]
   %ret = call <2 x half> @llvm.amdgcn.raw.buffer.atomic.fadd.v2f16(<2 x half> %val, <4 x i32> %rsrc, i32 92, i32 %soffset, i32 0)
@@ -88,6 +92,7 @@ define void @raw_buffer_atomic_add_f32_noret__vgpr_val__sgpr_rsrc__vgpr_voffset_
 ; GFX12:       ; %bb.0:
 ; GFX12-NEXT:    s_wait_loadcnt_dscnt 0x0
 ; GFX12-NEXT:    s_wait_kmcnt 0x0
+; GFX12-NEXT:    s_wait_xcnt 0x0
 ; GFX12-NEXT:    buffer_atomic_add_f32 v0, v1, s[0:3], s16 offen th:TH_ATOMIC_NT
 ; GFX12-NEXT:    s_set_pc_i64 s[30:31]
   %ret = call float @llvm.amdgcn.raw.buffer.atomic.fadd.f32(float %val, <4 x i32> %rsrc, i32 %voffset, i32 %soffset, i32 2)

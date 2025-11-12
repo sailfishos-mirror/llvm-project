@@ -2071,6 +2071,7 @@ define amdgpu_kernel void @private_cluster_release_atomicrmw(
 ; GFX1250-NEXT:    s_wait_storecnt 0x0
 ; GFX1250-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-NEXT:    s_wait_loadcnt_dscnt 0x0
+; GFX1250-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-NEXT:    flat_atomic_swap_b32 v[0:1], v2 scope:SCOPE_SE
 ; GFX1250-NEXT:    s_endpgm
     ptr addrspace(5) %out, i32 %in) {
@@ -2252,6 +2253,7 @@ define amdgpu_kernel void @private_cluster_acq_rel_atomicrmw(
 ; GFX1250-NEXT:    s_wait_storecnt 0x0
 ; GFX1250-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-NEXT:    s_wait_loadcnt_dscnt 0x0
+; GFX1250-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-NEXT:    flat_atomic_swap_b32 v[0:1], v2 scope:SCOPE_SE
 ; GFX1250-NEXT:    s_wait_storecnt_dscnt 0x0
 ; GFX1250-NEXT:    global_inv scope:SCOPE_SE
@@ -2435,6 +2437,7 @@ define amdgpu_kernel void @private_cluster_seq_cst_atomicrmw(
 ; GFX1250-NEXT:    s_wait_storecnt 0x0
 ; GFX1250-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-NEXT:    s_wait_loadcnt_dscnt 0x0
+; GFX1250-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-NEXT:    flat_atomic_swap_b32 v[0:1], v2 scope:SCOPE_SE
 ; GFX1250-NEXT:    s_wait_storecnt_dscnt 0x0
 ; GFX1250-NEXT:    global_inv scope:SCOPE_SE
@@ -2909,6 +2912,7 @@ define amdgpu_kernel void @private_cluster_acq_rel_ret_atomicrmw(
 ; GFX1250-NEXT:    s_wait_storecnt 0x0
 ; GFX1250-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-NEXT:    s_wait_loadcnt_dscnt 0x0
+; GFX1250-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-NEXT:    flat_atomic_swap_b32 v0, v[0:1], v2 th:TH_ATOMIC_RETURN scope:SCOPE_SE
 ; GFX1250-NEXT:    s_wait_loadcnt_dscnt 0x0
 ; GFX1250-NEXT:    global_inv scope:SCOPE_SE
@@ -3148,6 +3152,7 @@ define amdgpu_kernel void @private_cluster_seq_cst_ret_atomicrmw(
 ; GFX1250-NEXT:    s_wait_storecnt 0x0
 ; GFX1250-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-NEXT:    s_wait_loadcnt_dscnt 0x0
+; GFX1250-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-NEXT:    flat_atomic_swap_b32 v0, v[0:1], v2 th:TH_ATOMIC_RETURN scope:SCOPE_SE
 ; GFX1250-NEXT:    s_wait_loadcnt_dscnt 0x0
 ; GFX1250-NEXT:    global_inv scope:SCOPE_SE
@@ -3965,6 +3970,7 @@ define amdgpu_kernel void @private_cluster_release_monotonic_cmpxchg(
 ; GFX1250-NEXT:    s_wait_storecnt 0x0
 ; GFX1250-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-NEXT:    s_wait_loadcnt_dscnt 0x0
+; GFX1250-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-NEXT:    flat_atomic_cmpswap_b32 v[0:1], v[2:3] scope:SCOPE_SE
 ; GFX1250-NEXT:    s_endpgm
     ptr addrspace(5) %out, i32 %in, i32 %old) {
@@ -4237,6 +4243,7 @@ define amdgpu_kernel void @private_cluster_acq_rel_monotonic_cmpxchg(
 ; GFX1250-NEXT:    s_wait_storecnt 0x0
 ; GFX1250-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-NEXT:    s_wait_loadcnt_dscnt 0x0
+; GFX1250-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-NEXT:    flat_atomic_cmpswap_b32 v[0:1], v[2:3] scope:SCOPE_SE
 ; GFX1250-NEXT:    s_wait_storecnt_dscnt 0x0
 ; GFX1250-NEXT:    global_inv scope:SCOPE_SE
@@ -4511,6 +4518,7 @@ define amdgpu_kernel void @private_cluster_seq_cst_monotonic_cmpxchg(
 ; GFX1250-NEXT:    s_wait_storecnt 0x0
 ; GFX1250-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-NEXT:    s_wait_loadcnt_dscnt 0x0
+; GFX1250-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-NEXT:    flat_atomic_cmpswap_b32 v[0:1], v[2:3] scope:SCOPE_SE
 ; GFX1250-NEXT:    s_wait_storecnt_dscnt 0x0
 ; GFX1250-NEXT:    global_inv scope:SCOPE_SE
@@ -5329,6 +5337,7 @@ define amdgpu_kernel void @private_cluster_release_acquire_cmpxchg(
 ; GFX1250-NEXT:    s_wait_storecnt 0x0
 ; GFX1250-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-NEXT:    s_wait_loadcnt_dscnt 0x0
+; GFX1250-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-NEXT:    flat_atomic_cmpswap_b32 v[0:1], v[2:3] scope:SCOPE_SE
 ; GFX1250-NEXT:    s_wait_storecnt_dscnt 0x0
 ; GFX1250-NEXT:    global_inv scope:SCOPE_SE
@@ -5603,6 +5612,7 @@ define amdgpu_kernel void @private_cluster_acq_rel_acquire_cmpxchg(
 ; GFX1250-NEXT:    s_wait_storecnt 0x0
 ; GFX1250-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-NEXT:    s_wait_loadcnt_dscnt 0x0
+; GFX1250-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-NEXT:    flat_atomic_cmpswap_b32 v[0:1], v[2:3] scope:SCOPE_SE
 ; GFX1250-NEXT:    s_wait_storecnt_dscnt 0x0
 ; GFX1250-NEXT:    global_inv scope:SCOPE_SE
@@ -5877,6 +5887,7 @@ define amdgpu_kernel void @private_cluster_seq_cst_acquire_cmpxchg(
 ; GFX1250-NEXT:    s_wait_storecnt 0x0
 ; GFX1250-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-NEXT:    s_wait_loadcnt_dscnt 0x0
+; GFX1250-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-NEXT:    flat_atomic_cmpswap_b32 v[0:1], v[2:3] scope:SCOPE_SE
 ; GFX1250-NEXT:    s_wait_storecnt_dscnt 0x0
 ; GFX1250-NEXT:    global_inv scope:SCOPE_SE
@@ -6151,6 +6162,7 @@ define amdgpu_kernel void @private_cluster_monotonic_seq_cst_cmpxchg(
 ; GFX1250-NEXT:    s_wait_storecnt 0x0
 ; GFX1250-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-NEXT:    s_wait_loadcnt_dscnt 0x0
+; GFX1250-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-NEXT:    flat_atomic_cmpswap_b32 v[0:1], v[2:3] scope:SCOPE_SE
 ; GFX1250-NEXT:    s_wait_storecnt_dscnt 0x0
 ; GFX1250-NEXT:    global_inv scope:SCOPE_SE
@@ -6425,6 +6437,7 @@ define amdgpu_kernel void @private_cluster_acquire_seq_cst_cmpxchg(
 ; GFX1250-NEXT:    s_wait_storecnt 0x0
 ; GFX1250-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-NEXT:    s_wait_loadcnt_dscnt 0x0
+; GFX1250-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-NEXT:    flat_atomic_cmpswap_b32 v[0:1], v[2:3] scope:SCOPE_SE
 ; GFX1250-NEXT:    s_wait_storecnt_dscnt 0x0
 ; GFX1250-NEXT:    global_inv scope:SCOPE_SE
@@ -6699,6 +6712,7 @@ define amdgpu_kernel void @private_cluster_release_seq_cst_cmpxchg(
 ; GFX1250-NEXT:    s_wait_storecnt 0x0
 ; GFX1250-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-NEXT:    s_wait_loadcnt_dscnt 0x0
+; GFX1250-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-NEXT:    flat_atomic_cmpswap_b32 v[0:1], v[2:3] scope:SCOPE_SE
 ; GFX1250-NEXT:    s_wait_storecnt_dscnt 0x0
 ; GFX1250-NEXT:    global_inv scope:SCOPE_SE
@@ -6973,6 +6987,7 @@ define amdgpu_kernel void @private_cluster_acq_rel_seq_cst_cmpxchg(
 ; GFX1250-NEXT:    s_wait_storecnt 0x0
 ; GFX1250-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-NEXT:    s_wait_loadcnt_dscnt 0x0
+; GFX1250-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-NEXT:    flat_atomic_cmpswap_b32 v[0:1], v[2:3] scope:SCOPE_SE
 ; GFX1250-NEXT:    s_wait_storecnt_dscnt 0x0
 ; GFX1250-NEXT:    global_inv scope:SCOPE_SE
@@ -7247,6 +7262,7 @@ define amdgpu_kernel void @private_cluster_seq_cst_seq_cst_cmpxchg(
 ; GFX1250-NEXT:    s_wait_storecnt 0x0
 ; GFX1250-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-NEXT:    s_wait_loadcnt_dscnt 0x0
+; GFX1250-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-NEXT:    flat_atomic_cmpswap_b32 v[0:1], v[2:3] scope:SCOPE_SE
 ; GFX1250-NEXT:    s_wait_storecnt_dscnt 0x0
 ; GFX1250-NEXT:    global_inv scope:SCOPE_SE
@@ -8154,6 +8170,7 @@ define amdgpu_kernel void @private_cluster_release_monotonic_ret_cmpxchg(
 ; GFX1250-NEXT:    s_wait_storecnt 0x0
 ; GFX1250-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-NEXT:    s_wait_loadcnt_dscnt 0x0
+; GFX1250-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-NEXT:    flat_atomic_cmpswap_b32 v0, v[0:1], v[2:3] th:TH_ATOMIC_RETURN scope:SCOPE_SE
 ; GFX1250-NEXT:    s_wait_loadcnt_dscnt 0x0
 ; GFX1250-NEXT:    scratch_store_b32 off, v0, s0
@@ -8458,6 +8475,7 @@ define amdgpu_kernel void @private_cluster_acq_rel_monotonic_ret_cmpxchg(
 ; GFX1250-NEXT:    s_wait_storecnt 0x0
 ; GFX1250-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-NEXT:    s_wait_loadcnt_dscnt 0x0
+; GFX1250-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-NEXT:    flat_atomic_cmpswap_b32 v0, v[0:1], v[2:3] th:TH_ATOMIC_RETURN scope:SCOPE_SE
 ; GFX1250-NEXT:    s_wait_loadcnt_dscnt 0x0
 ; GFX1250-NEXT:    global_inv scope:SCOPE_SE
@@ -8763,6 +8781,7 @@ define amdgpu_kernel void @private_cluster_seq_cst_monotonic_ret_cmpxchg(
 ; GFX1250-NEXT:    s_wait_storecnt 0x0
 ; GFX1250-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-NEXT:    s_wait_loadcnt_dscnt 0x0
+; GFX1250-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-NEXT:    flat_atomic_cmpswap_b32 v0, v[0:1], v[2:3] th:TH_ATOMIC_RETURN scope:SCOPE_SE
 ; GFX1250-NEXT:    s_wait_loadcnt_dscnt 0x0
 ; GFX1250-NEXT:    global_inv scope:SCOPE_SE
@@ -9674,6 +9693,7 @@ define amdgpu_kernel void @private_cluster_release_acquire_ret_cmpxchg(
 ; GFX1250-NEXT:    s_wait_storecnt 0x0
 ; GFX1250-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-NEXT:    s_wait_loadcnt_dscnt 0x0
+; GFX1250-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-NEXT:    flat_atomic_cmpswap_b32 v0, v[0:1], v[2:3] th:TH_ATOMIC_RETURN scope:SCOPE_SE
 ; GFX1250-NEXT:    s_wait_loadcnt_dscnt 0x0
 ; GFX1250-NEXT:    global_inv scope:SCOPE_SE
@@ -9979,6 +9999,7 @@ define amdgpu_kernel void @private_cluster_acq_rel_acquire_ret_cmpxchg(
 ; GFX1250-NEXT:    s_wait_storecnt 0x0
 ; GFX1250-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-NEXT:    s_wait_loadcnt_dscnt 0x0
+; GFX1250-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-NEXT:    flat_atomic_cmpswap_b32 v0, v[0:1], v[2:3] th:TH_ATOMIC_RETURN scope:SCOPE_SE
 ; GFX1250-NEXT:    s_wait_loadcnt_dscnt 0x0
 ; GFX1250-NEXT:    global_inv scope:SCOPE_SE
@@ -10284,6 +10305,7 @@ define amdgpu_kernel void @private_cluster_seq_cst_acquire_ret_cmpxchg(
 ; GFX1250-NEXT:    s_wait_storecnt 0x0
 ; GFX1250-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-NEXT:    s_wait_loadcnt_dscnt 0x0
+; GFX1250-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-NEXT:    flat_atomic_cmpswap_b32 v0, v[0:1], v[2:3] th:TH_ATOMIC_RETURN scope:SCOPE_SE
 ; GFX1250-NEXT:    s_wait_loadcnt_dscnt 0x0
 ; GFX1250-NEXT:    global_inv scope:SCOPE_SE
@@ -10589,6 +10611,7 @@ define amdgpu_kernel void @private_cluster_monotonic_seq_cst_ret_cmpxchg(
 ; GFX1250-NEXT:    s_wait_storecnt 0x0
 ; GFX1250-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-NEXT:    s_wait_loadcnt_dscnt 0x0
+; GFX1250-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-NEXT:    flat_atomic_cmpswap_b32 v0, v[0:1], v[2:3] th:TH_ATOMIC_RETURN scope:SCOPE_SE
 ; GFX1250-NEXT:    s_wait_loadcnt_dscnt 0x0
 ; GFX1250-NEXT:    global_inv scope:SCOPE_SE
@@ -10894,6 +10917,7 @@ define amdgpu_kernel void @private_cluster_acquire_seq_cst_ret_cmpxchg(
 ; GFX1250-NEXT:    s_wait_storecnt 0x0
 ; GFX1250-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-NEXT:    s_wait_loadcnt_dscnt 0x0
+; GFX1250-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-NEXT:    flat_atomic_cmpswap_b32 v0, v[0:1], v[2:3] th:TH_ATOMIC_RETURN scope:SCOPE_SE
 ; GFX1250-NEXT:    s_wait_loadcnt_dscnt 0x0
 ; GFX1250-NEXT:    global_inv scope:SCOPE_SE
@@ -11199,6 +11223,7 @@ define amdgpu_kernel void @private_cluster_release_seq_cst_ret_cmpxchg(
 ; GFX1250-NEXT:    s_wait_storecnt 0x0
 ; GFX1250-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-NEXT:    s_wait_loadcnt_dscnt 0x0
+; GFX1250-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-NEXT:    flat_atomic_cmpswap_b32 v0, v[0:1], v[2:3] th:TH_ATOMIC_RETURN scope:SCOPE_SE
 ; GFX1250-NEXT:    s_wait_loadcnt_dscnt 0x0
 ; GFX1250-NEXT:    global_inv scope:SCOPE_SE
@@ -11504,6 +11529,7 @@ define amdgpu_kernel void @private_cluster_acq_rel_seq_cst_ret_cmpxchg(
 ; GFX1250-NEXT:    s_wait_storecnt 0x0
 ; GFX1250-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-NEXT:    s_wait_loadcnt_dscnt 0x0
+; GFX1250-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-NEXT:    flat_atomic_cmpswap_b32 v0, v[0:1], v[2:3] th:TH_ATOMIC_RETURN scope:SCOPE_SE
 ; GFX1250-NEXT:    s_wait_loadcnt_dscnt 0x0
 ; GFX1250-NEXT:    global_inv scope:SCOPE_SE
@@ -11809,6 +11835,7 @@ define amdgpu_kernel void @private_cluster_seq_cst_seq_cst_ret_cmpxchg(
 ; GFX1250-NEXT:    s_wait_storecnt 0x0
 ; GFX1250-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-NEXT:    s_wait_loadcnt_dscnt 0x0
+; GFX1250-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-NEXT:    flat_atomic_cmpswap_b32 v0, v[0:1], v[2:3] th:TH_ATOMIC_RETURN scope:SCOPE_SE
 ; GFX1250-NEXT:    s_wait_loadcnt_dscnt 0x0
 ; GFX1250-NEXT:    global_inv scope:SCOPE_SE

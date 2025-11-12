@@ -10577,6 +10577,7 @@ define i32 @other_use_mul_mad_i32_var(i32 %x, i32 %y, i32 %z, ptr addrspace(3) %
 ; GFX1250-NEXT:    v_mul_lo_u32 v1, v0, v1
 ; GFX1250-NEXT:    s_delay_alu instid0(VALU_DEP_1)
 ; GFX1250-NEXT:    v_add_nc_u32_e32 v0, v1, v2
+; GFX1250-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-NEXT:    ds_store_b32 v3, v1
 ; GFX1250-NEXT:    s_wait_dscnt 0x0
 ; GFX1250-NEXT:    s_set_pc_i64 s[30:31]
@@ -10722,6 +10723,7 @@ define i16 @other_use_mul_mad_i16_var(i16 %x, i16 %y, i16 %z, ptr addrspace(3) %
 ; GFX1250-NEXT:    s_wait_kmcnt 0x0
 ; GFX1250-NEXT:    v_mul_lo_u16 v4, v0, v1
 ; GFX1250-NEXT:    v_mad_u16 v0, v0, v1, v2
+; GFX1250-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-NEXT:    ds_store_b16 v3, v4
 ; GFX1250-NEXT:    s_wait_dscnt 0x0
 ; GFX1250-NEXT:    s_set_pc_i64 s[30:31]
@@ -10984,6 +10986,7 @@ define <2 x i16> @other_use_mul_mad_v2i16_var(<2 x i16> %x, <2 x i16> %y, <2 x i
 ; GFX1250-NEXT:    s_wait_kmcnt 0x0
 ; GFX1250-NEXT:    v_pk_mul_lo_u16 v4, v0, v1
 ; GFX1250-NEXT:    v_pk_mad_u16 v0, v0, v1, v2
+; GFX1250-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-NEXT:    ds_store_b32 v3, v4
 ; GFX1250-NEXT:    s_wait_dscnt 0x0
 ; GFX1250-NEXT:    s_set_pc_i64 s[30:31]

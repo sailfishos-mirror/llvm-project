@@ -1269,6 +1269,8 @@ void GCNHazardRecognizer::fixHazards(MachineInstr *MI) {
     fixScratchBaseForwardingHazard(MI);
   if (ST.setRegModeNeedsVNOPs())
     fixSetRegMode(MI);
+  if (ST.hasWriteCombiningMissesHazards())
+    fixWriteCombiningMissesHazards(MI);
 }
 
 static bool isVCmpXWritesExec(const SIInstrInfo &TII, const SIRegisterInfo &TRI,
@@ -2174,6 +2176,29 @@ bool GCNHazardRecognizer::fixWMMACoexecutionHazards(MachineInstr *MI) {
     BuildMI(*MI->getParent(), MI, MI->getDebugLoc(),
             TII->get(AMDGPU::V_NOP_e32));
 
+  return true;
+}
+
+/// This function inserts an s_wait_cnt(0) before every atomic store/RMW
+/// operation to work around the write combining hazard.
+bool GCNHazardRecognizer::fixWriteCombiningMissesHazards(MachineInstr *MI) {
+  if (!SIInstrInfo::isAtomic(*MI) || !MI->mayStore())
+    return false;
+
+  // If the previous instruction is an s_wait_xcnt, and the count is 0, we don't
+  // need to do anything.
+  MachineBasicBlock &MBB = *MI->getParent();
+  auto Itr = MachineBasicBlock::iterator(MI);
+  auto PrevItr = std::prev(Itr);
+  if (Itr != MBB.begin() && (PrevItr->getOpcode() == AMDGPU::S_WAIT_XCNT_soft ||
+                             PrevItr->getOpcode() == AMDGPU::S_WAIT_XCNT)) {
+    int64_t Cnt = PrevItr->getOperand(0).getImm();
+    if (Cnt == 0)
+      return false;
+  }
+
+  BuildMI(MBB, MI, MI->getDebugLoc(), TII.get(AMDGPU::S_WAIT_XCNT_soft))
+      .addImm(0);
   return true;
 }
 

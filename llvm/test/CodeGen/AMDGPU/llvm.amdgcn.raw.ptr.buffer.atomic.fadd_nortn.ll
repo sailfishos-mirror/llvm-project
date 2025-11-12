@@ -41,6 +41,7 @@ define void @raw_ptr_buffer_atomic_add_f32_noret__vgpr_val__sgpr_rsrc__vgpr_voff
 ; GFX1250:       ; %bb.0:
 ; GFX1250-NEXT:    s_wait_loadcnt_dscnt 0x0
 ; GFX1250-NEXT:    s_wait_kmcnt 0x0
+; GFX1250-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-NEXT:    buffer_atomic_add_f32 v0, v1, s[0:3], s16 offen scope:SCOPE_SYS
 ; GFX1250-NEXT:    s_set_pc_i64 s[30:31]
   %ret = call float @llvm.amdgcn.raw.ptr.buffer.atomic.fadd.f32(float %val, ptr addrspace(8) %rsrc, i32 %voffset, i32 %soffset, i32 24)
@@ -83,6 +84,7 @@ define void @raw_ptr_buffer_atomic_add_f32_noret__vgpr_val__sgpr_rsrc__0_voffset
 ; GFX1250:       ; %bb.0:
 ; GFX1250-NEXT:    s_wait_loadcnt_dscnt 0x0
 ; GFX1250-NEXT:    s_wait_kmcnt 0x0
+; GFX1250-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-NEXT:    buffer_atomic_add_f32 v0, off, s[0:3], s16
 ; GFX1250-NEXT:    s_set_pc_i64 s[30:31]
   %ret = call float @llvm.amdgcn.raw.ptr.buffer.atomic.fadd.f32(float %val, ptr addrspace(8) %rsrc, i32 0, i32 %soffset, i32 0)
@@ -125,6 +127,7 @@ define void @raw_ptr_buffer_atomic_add_v2f16_noret__vgpr_val__sgpr_rsrc__vgpr_vo
 ; GFX1250:       ; %bb.0:
 ; GFX1250-NEXT:    s_wait_loadcnt_dscnt 0x0
 ; GFX1250-NEXT:    s_wait_kmcnt 0x0
+; GFX1250-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-NEXT:    buffer_atomic_pk_add_f16 v0, v1, s[0:3], s16 offen
 ; GFX1250-NEXT:    s_set_pc_i64 s[30:31]
   %ret = call <2 x half> @llvm.amdgcn.raw.ptr.buffer.atomic.fadd.v2f16(<2 x half> %val, ptr addrspace(8) %rsrc, i32 %voffset, i32 %soffset, i32 0)
@@ -167,6 +170,7 @@ define void @raw_ptr_buffer_atomic_add_v2f16_noret__vgpr_val__sgpr_rsrc__0_voffs
 ; GFX1250:       ; %bb.0:
 ; GFX1250-NEXT:    s_wait_loadcnt_dscnt 0x0
 ; GFX1250-NEXT:    s_wait_kmcnt 0x0
+; GFX1250-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-NEXT:    buffer_atomic_pk_add_f16 v0, off, s[0:3], s16 offset:92
 ; GFX1250-NEXT:    s_set_pc_i64 s[30:31]
   %ret = call <2 x half> @llvm.amdgcn.raw.ptr.buffer.atomic.fadd.v2f16(<2 x half> %val, ptr addrspace(8) %rsrc, i32 92, i32 %soffset, i32 0)
@@ -209,6 +213,7 @@ define void @raw_ptr_buffer_atomic_add_f32_noret__vgpr_val__sgpr_rsrc__vgpr_voff
 ; GFX1250:       ; %bb.0:
 ; GFX1250-NEXT:    s_wait_loadcnt_dscnt 0x0
 ; GFX1250-NEXT:    s_wait_kmcnt 0x0
+; GFX1250-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-NEXT:    buffer_atomic_add_f32 v0, v1, s[0:3], s16 offen th:TH_ATOMIC_NT
 ; GFX1250-NEXT:    s_set_pc_i64 s[30:31]
   %ret = call float @llvm.amdgcn.raw.ptr.buffer.atomic.fadd.f32(float %val, ptr addrspace(8) %rsrc, i32 %voffset, i32 %soffset, i32 2)

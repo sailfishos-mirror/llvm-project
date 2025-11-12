@@ -39,6 +39,7 @@ define float @struct_ptr_buffer_atomic_add_f32_rtn__vgpr_val__sgpr_rsrc__vgpr_vo
 ; GFX1250-NEXT:    s_wait_loadcnt_dscnt 0x0
 ; GFX1250-NEXT:    s_wait_kmcnt 0x0
 ; GFX1250-NEXT:    v_dual_mov_b32 v3, v2 :: v_dual_mov_b32 v2, v1
+; GFX1250-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-NEXT:    buffer_atomic_add_f32 v0, v[2:3], s[0:3], s16 idxen offen th:TH_ATOMIC_RETURN
 ; GFX1250-NEXT:    s_wait_loadcnt 0x0
 ; GFX1250-NEXT:    s_set_pc_i64 s[30:31]
@@ -77,6 +78,7 @@ define float @struct_ptr_buffer_atomic_add_f32_rtn__vgpr_val__sgpr_rsrc__0_voffs
 ; GFX1250:       ; %bb.0:
 ; GFX1250-NEXT:    s_wait_loadcnt_dscnt 0x0
 ; GFX1250-NEXT:    s_wait_kmcnt 0x0
+; GFX1250-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-NEXT:    buffer_atomic_add_f32 v0, v1, s[0:3], s16 idxen th:TH_ATOMIC_RETURN
 ; GFX1250-NEXT:    s_wait_loadcnt 0x0
 ; GFX1250-NEXT:    s_set_pc_i64 s[30:31]
@@ -119,6 +121,7 @@ define float @struct_ptr_buffer_atomic_add_f32_rtn__vgpr_val__sgpr_rsrc__vgpr_vo
 ; GFX1250-NEXT:    s_wait_loadcnt_dscnt 0x0
 ; GFX1250-NEXT:    s_wait_kmcnt 0x0
 ; GFX1250-NEXT:    v_dual_mov_b32 v3, v2 :: v_dual_mov_b32 v2, v1
+; GFX1250-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-NEXT:    buffer_atomic_add_f32 v0, v[2:3], s[0:3], s16 idxen offen th:TH_ATOMIC_NT_RETURN
 ; GFX1250-NEXT:    s_wait_loadcnt 0x0
 ; GFX1250-NEXT:    s_set_pc_i64 s[30:31]
@@ -161,6 +164,7 @@ define <2 x half> @struct_ptr_buffer_atomic_add_v2f16_rtn__vgpr_val__sgpr_rsrc__
 ; GFX1250-NEXT:    s_wait_loadcnt_dscnt 0x0
 ; GFX1250-NEXT:    s_wait_kmcnt 0x0
 ; GFX1250-NEXT:    v_dual_mov_b32 v3, v2 :: v_dual_mov_b32 v2, v1
+; GFX1250-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-NEXT:    buffer_atomic_pk_add_f16 v0, v[2:3], s[0:3], s16 idxen offen th:TH_ATOMIC_RETURN
 ; GFX1250-NEXT:    s_wait_loadcnt 0x0
 ; GFX1250-NEXT:    s_set_pc_i64 s[30:31]
@@ -299,6 +303,7 @@ define float @struct_ptr_buffer_atomic_add_f32_rtn__vgpr_val__vgpr_rsrc__vgpr_vo
 ; GFX1250-NEXT:    s_delay_alu instid0(SALU_CYCLE_1)
 ; GFX1250-NEXT:    s_and_saveexec_b32 s0, s0
 ; GFX1250-NEXT:    s_wait_loadcnt 0x0
+; GFX1250-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-NEXT:    buffer_atomic_add_f32 v0, v[8:9], s[4:7], s3 idxen offen th:TH_ATOMIC_RETURN
 ; GFX1250-NEXT:    ; implicit-def: $vgpr2_vgpr3_vgpr4_vgpr5
 ; GFX1250-NEXT:    ; implicit-def: $vgpr7
@@ -445,6 +450,7 @@ define <2 x half> @struct_ptr_buffer_atomic_add_v2f16_rtn__vgpr_val__vgpr_rsrc__
 ; GFX1250-NEXT:    s_delay_alu instid0(SALU_CYCLE_1)
 ; GFX1250-NEXT:    s_and_saveexec_b32 s0, s0
 ; GFX1250-NEXT:    s_wait_loadcnt 0x0
+; GFX1250-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-NEXT:    buffer_atomic_pk_add_f16 v0, v[8:9], s[4:7], s3 idxen offen th:TH_ATOMIC_RETURN
 ; GFX1250-NEXT:    ; implicit-def: $vgpr2_vgpr3_vgpr4_vgpr5
 ; GFX1250-NEXT:    ; implicit-def: $vgpr7

@@ -154,7 +154,9 @@ define amdgpu_kernel void @simple_write2_two_val_f32_volatile_0(ptr addrspace(1)
 ; GFX1250-NEXT:    s_wait_loadcnt 0x0
 ; GFX1250-NEXT:    global_load_b32 v2, v0, s[2:3] scope:SCOPE_SYS
 ; GFX1250-NEXT:    s_wait_loadcnt 0x0
+; GFX1250-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-NEXT:    ds_store_b32 v0, v1
+; GFX1250-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-NEXT:    ds_store_b32 v0, v2 offset:32
 ; GFX1250-NEXT:    s_endpgm
   %x.i = tail call i32 @llvm.amdgcn.workitem.id.x() #1
@@ -215,7 +217,9 @@ define amdgpu_kernel void @simple_write2_two_val_f32_volatile_1(ptr addrspace(1)
 ; GFX1250-NEXT:    s_wait_loadcnt 0x0
 ; GFX1250-NEXT:    global_load_b32 v2, v0, s[2:3] scope:SCOPE_SYS
 ; GFX1250-NEXT:    s_wait_loadcnt 0x0
+; GFX1250-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-NEXT:    ds_store_b32 v0, v1
+; GFX1250-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-NEXT:    ds_store_b32 v0, v2 offset:32
 ; GFX1250-NEXT:    s_endpgm
   %x.i = tail call i32 @llvm.amdgcn.workitem.id.x() #1
@@ -497,8 +501,10 @@ define amdgpu_kernel void @simple_write2_two_val_too_far_f32(ptr addrspace(1) %C
 ; GFX1250-NEXT:    global_load_b32 v1, v0, s[0:1]
 ; GFX1250-NEXT:    global_load_b32 v2, v0, s[2:3]
 ; GFX1250-NEXT:    s_wait_loadcnt 0x1
+; GFX1250-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-NEXT:    ds_store_b32 v0, v1
 ; GFX1250-NEXT:    s_wait_loadcnt 0x0
+; GFX1250-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-NEXT:    ds_store_b32 v0, v2 offset:1028
 ; GFX1250-NEXT:    s_endpgm
   %x.i = tail call i32 @llvm.amdgcn.workitem.id.x() #1
@@ -709,8 +715,10 @@ define amdgpu_kernel void @write2_ptr_subreg_arg_two_val_f32(ptr addrspace(1) %C
 ; GFX1250-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-NEXT:    v_dual_mov_b32 v0, s4 :: v_dual_mov_b32 v3, s5
 ; GFX1250-NEXT:    s_wait_loadcnt 0x1
+; GFX1250-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-NEXT:    ds_store_b32 v0, v1 offset:32
 ; GFX1250-NEXT:    s_wait_loadcnt 0x0
+; GFX1250-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-NEXT:    ds_store_b32 v3, v2 offset:32
 ; GFX1250-NEXT:    s_endpgm
   %x.i = tail call i32 @llvm.amdgcn.workitem.id.x() #1
@@ -922,7 +930,9 @@ define amdgpu_kernel void @unaligned_offset_simple_write2_one_val_f64(ptr addrsp
 ; GFX1250-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-NEXT:    v_add_nc_u32_e32 v2, s2, v2
 ; GFX1250-NEXT:    s_wait_loadcnt 0x0
+; GFX1250-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-NEXT:    ds_store_b64 v2, v[0:1] offset:5
+; GFX1250-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-NEXT:    ds_store_b64 v2, v[0:1] offset:9
 ; GFX1250-NEXT:    s_endpgm
   %x.i = tail call i32 @llvm.amdgcn.workitem.id.x() #1
@@ -1015,6 +1025,7 @@ define amdgpu_kernel void @store_constant_adjacent_offsets() {
 ; GFX1250:       ; %bb.0:
 ; GFX1250-NEXT:    v_mov_b64_e32 v[0:1], 0x7b0000007b
 ; GFX1250-NEXT:    v_mov_b32_e32 v2, 0
+; GFX1250-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-NEXT:    ds_store_b64 v2, v[0:1]
 ; GFX1250-NEXT:    s_endpgm
   store i32 123, ptr addrspace(3) @foo, align 4
@@ -1075,6 +1086,7 @@ define amdgpu_kernel void @store_misaligned64_constant_offsets() {
 ; GFX1250-NEXT:    v_dual_mov_b32 v0, 0x7b :: v_dual_mov_b32 v1, 0
 ; GFX1250-NEXT:    s_delay_alu instid0(VALU_DEP_1)
 ; GFX1250-NEXT:    v_dual_mov_b32 v2, v0 :: v_dual_mov_b32 v3, v1
+; GFX1250-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-NEXT:    ds_store_b128 v1, v[0:3]
 ; GFX1250-NEXT:    s_endpgm
   store i64 123, ptr addrspace(3) @bar, align 4
@@ -1110,7 +1122,9 @@ define amdgpu_kernel void @store_misaligned64_constant_large_offsets() {
 ; GFX1250:       ; %bb.0:
 ; GFX1250-NEXT:    v_mov_b64_e32 v[0:1], 0x7b
 ; GFX1250-NEXT:    v_mov_b32_e32 v2, 0
+; GFX1250-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-NEXT:    ds_store_b64 v2, v[0:1] offset:16384
+; GFX1250-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-NEXT:    ds_store_b64 v2, v[0:1] offset:32760
 ; GFX1250-NEXT:    s_endpgm
   store i64 123, ptr addrspace(3) getelementptr inbounds ([4096 x i64], ptr addrspace(3) @bar.large, i32 0, i32 2048), align 4
@@ -1353,6 +1367,7 @@ define amdgpu_kernel void @write2_v2i32_align1_odd_offset() {
 ; GFX1250:       ; %bb.0: ; %entry
 ; GFX1250-NEXT:    v_mov_b64_e32 v[0:1], 0x1c80000007b
 ; GFX1250-NEXT:    v_mov_b32_e32 v2, 0
+; GFX1250-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-NEXT:    ds_store_b64 v2, v[0:1] offset:65
 ; GFX1250-NEXT:    s_endpgm
 entry:
