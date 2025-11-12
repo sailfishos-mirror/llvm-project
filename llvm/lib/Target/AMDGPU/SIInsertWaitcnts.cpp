@@ -995,8 +995,7 @@ void WaitcntBrackets::updateByEvent(WaitEventType E, MachineInstr &Inst) {
     // but none with memory instructions.
     for (const MachineOperand &Op : Inst.defs()) {
       if (T == LOAD_CNT || T == SAMPLE_CNT || T == BVH_CNT) {
-        if (!Context->TRI->isVectorRegister(*Context->MRI,
-                                            Op.getReg())) // TODO: add wrapper
+        if (!TRI->isVectorRegister(*MRI, Op.getReg())) // TODO: add wrapper
           continue;
         if (updateVMCntOnly(Inst)) {
           // updateVMCntOnly should only leave us with VGPRs
@@ -1113,7 +1112,9 @@ void WaitcntBrackets::print(raw_ostream &OS) const {
         unsigned RelScore = RegScore - LB - 1;
         if (ID < REGUNITS_END) {
           OS << RelScore << ":vRU" << ID << " ";
-        } else if (ID >= LDSDMA_BEGIN && ID < LDSDMA_END) {
+        } else {
+          assert(ID >= LDSDMA_BEGIN && ID < LDSDMA_END &&
+                 "Unhandled/unexpected ID value!");
           OS << RelScore << ":LDSDMA" << ID << " ";
         }
       }
