@@ -318,7 +318,8 @@ serializeCommonAttributes(const Info &I, json::Object &Obj,
 }
 
 static void serializeReference(const Reference &Ref, Object &ReferenceObj) {
-  ReferenceObj["Path"] = Ref.Path;
+  if (!Ref.Path.empty())
+    ReferenceObj["Path"] = Ref.Path;
   ReferenceObj["Name"] = Ref.Name;
   ReferenceObj["QualName"] = Ref.QualName;
   ReferenceObj["USR"] = toHex(toStringRef(Ref.USR));
@@ -647,6 +648,54 @@ static SmallString<16> determineFileName(Info *I, SmallString<128> &Path) {
   return FileName;
 }
 
+// Creates a JSON file above the global namespace directory.
+// An index can be used to create the top-level HTML index page or the Markdown
+// index file.
+static Error serializeIndex(const ClangDocContext &CDCtx, StringRef RootDir) {
+  if (CDCtx.Idx.Children.empty())
+    return Error::success();
+
+  json::Value ObjVal = Object();
+  Object &Obj = *ObjVal.getAsObject();
+  if (!CDCtx.ProjectName.empty())
+    Obj["ProjectName"] = CDCtx.ProjectName;
+
+  auto IndexCopy = CDCtx.Idx;
+  IndexCopy.sort();
+  json::Value IndexArray = json::Array();
+  auto &IndexArrayRef = *IndexArray.getAsArray();
+
+  if (IndexCopy.Children.empty()) {
+    // If the index is empty, default to displaying the global namespace.
+    IndexCopy.Children.emplace_back(GlobalNamespaceID, "",
+                                    InfoType::IT_namespace, "GlobalNamespace");
+  } else {
+    IndexArrayRef.reserve(CDCtx.Idx.Children.size());
+  }
+
+  for (auto &Idx : IndexCopy.Children) {
+    if (!Idx.Children.empty()) {
+      std::string TypeStr = infoTypeToString(Idx.RefType);
+      // MD output expects a capitalized type string
+      TypeStr[0] = toUppercase(TypeStr[0]);
+      json::Value IdxVal = Object();
+      auto &IdxObj = *IdxVal.getAsObject();
+      serializeReference(Idx, IdxObj);
+      IndexArrayRef.push_back(IdxVal);
+    }
+  }
+  Obj["Index"] = IndexArray;
+
+  SmallString<128> IndexFilePath(RootDir);
+  sys::path::append(IndexFilePath, "/json/index.json");
+  std::error_code FileErr;
+  raw_fd_ostream RootOS(IndexFilePath, FileErr, sys::fs::OF_Text);
+  if (FileErr)
+    return createFileError("cannot open file " + IndexFilePath, FileErr);
+  RootOS << llvm::formatv("{0:2}", ObjVal);
+  return Error::success();
+}
+
 Error JSONGenerator::generateDocumentation(
     StringRef RootDir, llvm::StringMap<std::unique_ptr<doc::Info>> Infos,
     const ClangDocContext &CDCtx, std::string DirName) {
@@ -684,6 +733,9 @@ Error JSONGenerator::generateDocumentation(
       if (Error Err = generateDocForInfo(Info, InfoOS, CDCtx))
         return Err;
   }
+
+  if (auto Err = serializeIndex(CDCtx, RootDir))
+    return Err;
 
   return Error::success();
 }

@@ -1,7 +1,7 @@
 // RUN: rm -rf %t && mkdir -p %t
 // RUN: clang-doc --format=html --output=%t --executor=standalone %s
 // RUN: clang-doc --format=md --output=%t --executor=standalone %s
-// RUN: FileCheck %s < %t/@nonymous_namespace/AnonClass.md -check-prefix=MD-ANON-CLASS-LINE
+// run: filecheck %s < %t/@nonymous_namespace/anonclass.md -check-prefix=md-anon-class-line
 // RUN: FileCheck %s < %t/@nonymous_namespace/AnonClass.md -check-prefix=MD-ANON-CLASS
 // RUN: FileCheck %s < %t/@nonymous_namespace/index.md -check-prefix=MD-ANON-INDEX-LINE
 // RUN: FileCheck %s < %t/@nonymous_namespace/index.md -check-prefix=MD-ANON-INDEX
