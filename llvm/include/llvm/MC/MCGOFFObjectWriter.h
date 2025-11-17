@@ -35,8 +35,8 @@ public:
 
   ~MCGOFFObjectTargetWriter() override = default;
 
-  virtual unsigned getRelocType(const MCValue &Target, const MCFixup &Fixup,
-                                bool IsPCRel) const = 0;
+  virtual unsigned getRelocType(const MCValue &Target,
+                                const MCFixup &Fixup) const = 0;
 
   Triple::ObjectFormatType getFormat() const override { return Triple::GOFF; }
 

@@ -764,9 +764,8 @@ void GOFFObjectWriter::recordRelocation(const MCFragment &F,
   const uint32_t Length = FKI.TargetSize / 8;
   assert(FKI.TargetSize % 8 == 0 && "Target Size not multiple of 8");
   const uint64_t FixupOffset = Asm->getFragmentOffset(F) + Fixup.getOffset();
-  bool IsPCRel = Fixup.isPCRel();
 
-  unsigned RelocType = TargetObjectWriter->getRelocType(Target, Fixup, IsPCRel);
+  unsigned RelocType = TargetObjectWriter->getRelocType(Target, Fixup);
 
   const MCSectionGOFF *PSection = static_cast<MCSectionGOFF *>(F.getParent());
   const auto &A = *static_cast<const MCSymbolGOFF *>(Target.getAddSym());

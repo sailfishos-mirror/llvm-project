@@ -18,8 +18,8 @@ class SystemZGOFFObjectWriter : public MCGOFFObjectTargetWriter {
 public:
   SystemZGOFFObjectWriter();
 
-  unsigned getRelocType(const MCValue &Target, const MCFixup &Fixup,
-                        bool IsPCRel) const override;
+  unsigned getRelocType(const MCValue &Target,
+                        const MCFixup &Fixup) const override;
 };
 } // end anonymous namespace
 
@@ -27,10 +27,9 @@ SystemZGOFFObjectWriter::SystemZGOFFObjectWriter()
     : MCGOFFObjectTargetWriter() {}
 
 unsigned SystemZGOFFObjectWriter::getRelocType(const MCValue &Target,
-                                               const MCFixup &Fixup,
-                                               bool IsPCRel) const {
+                                               const MCFixup &Fixup) const {
   switch (Target.getSpecifier()) {
-  case SystemZ::S_PLT:  // TODO This doen't make sense.
+  case SystemZ::S_PLT: // TODO This doen't make sense.
     return Reloc_Type_RelImm;
   case SystemZ::S_RCon:
     return Reloc_Type_RCon;
@@ -39,7 +38,7 @@ unsigned SystemZGOFFObjectWriter::getRelocType(const MCValue &Target,
   case SystemZ::S_QCon:
     return Reloc_Type_QCon;
   case SystemZ::S_None:
-    if (IsPCRel)
+    if (Fixup.isPCRel())
       return Reloc_Type_RelImm;
     return Reloc_Type_ACon;
   }
