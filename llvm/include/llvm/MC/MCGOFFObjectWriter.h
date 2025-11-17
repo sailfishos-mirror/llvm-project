@@ -9,6 +9,7 @@
 #ifndef LLVM_MC_MCGOFFOBJECTWRITER_H
 #define LLVM_MC_MCGOFFOBJECTWRITER_H
 
+#include "llvm/BinaryFormat/GOFF.h"
 #include "llvm/MC/MCObjectWriter.h"
 #include "llvm/MC/MCValue.h"
 #include <memory>
@@ -45,21 +46,31 @@ public:
   }
 };
 
-struct GOFFSavedRelocationEntry {
-  const MCSectionGOFF *Section;
-  const MCSymbolGOFF *SymA;
-  const MCSymbolGOFF *SymB;
-  unsigned RelocType;
-  uint64_t FixupOffset;
-  uint32_t Length;
-  uint64_t FixedValue; // Info only.
+// A GOFFRelocationEntry describes a single relocation.
+// For the naming, see
+// https://www.ibm.com/docs/en/zos/3.1.0?topic=record-relocation-directory-data-item.
+struct GOFFRelocationEntry {
+  const MCSymbolGOFF *Rptr;  // The R pointer.
+  const MCSectionGOFF *Pptr; // The P pointer.
+  uint32_t REsdId = 0;       // The R pointer id.
+  uint32_t PEsdId = 0;       // The P pointer id.
+  uint64_t POffset; // The offset within the element described by the P pointer.
+  uint32_t TargetLength; // The byte length of the target field.
 
-  GOFFSavedRelocationEntry(const MCSectionGOFF *Section,
-                           const MCSymbolGOFF *SymA, const MCSymbolGOFF *SymB,
-                           unsigned RelocType, uint64_t FixupOffset,
-                           uint32_t Length, uint64_t FixedValue)
-      : Section(Section), SymA(SymA), SymB(SymB), RelocType(RelocType),
-        FixupOffset(FixupOffset), Length(Length), FixedValue(FixedValue) {}
+  // Details of the relocation.
+  GOFF::RLDReferenceType ReferenceType : 4;
+  GOFF::RLDReferentType ReferentType : 2;
+  GOFF::RLDAction Action : 1;
+  GOFF::RLDFetchStore FetchStore : 1;
+
+  GOFFRelocationEntry(const MCSectionGOFF *Pptr, const MCSymbolGOFF *Rptr,
+                      GOFF::RLDReferenceType ReferenceType,
+                      GOFF::RLDReferentType ReferentType,
+                      GOFF::RLDAction Action, GOFF::RLDFetchStore FetchStore,
+                      uint64_t POffset, uint32_t TargetLength)
+      : Rptr(Rptr), Pptr(Pptr), POffset(POffset), TargetLength(TargetLength),
+        ReferenceType(ReferenceType), ReferentType(ReferentType),
+        Action(Action), FetchStore(FetchStore) {}
 };
 
 class GOFFObjectWriter : public MCObjectWriter {
@@ -73,7 +84,7 @@ class GOFFObjectWriter : public MCObjectWriter {
   MCSectionGOFF *RootSD = nullptr;
 
   // Saved relocation data.
-  std::vector<GOFFSavedRelocationEntry> SavedRelocs;
+  std::vector<GOFFRelocationEntry> Relocations;
 
 public:
   GOFFObjectWriter(std::unique_ptr<MCGOFFObjectTargetWriter> MOTW,
