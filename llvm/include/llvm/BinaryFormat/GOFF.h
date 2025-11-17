@@ -178,10 +178,7 @@ enum RLDAction : uint8_t {
   RLD_ACT_Subtract = 1,
 };
 
-enum RLDFetchStore : uint8_t {
-  RLD_FS_Fetch = 0,
-  RLD_FS_Store = 1
-};
+enum RLDFetchStore : uint8_t { RLD_FS_Fetch = 0, RLD_FS_Store = 1 };
 
 enum ENDEntryPointRequest : uint8_t {
   END_EPR_None = 0,
