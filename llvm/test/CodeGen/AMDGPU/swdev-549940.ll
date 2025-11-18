@@ -140,7 +140,7 @@ bb:
 
 bb103:                                            ; preds = %bb364, %bb
   %phi = phi i32 [ -1, %bb ], [ %phi143, %bb364 ]
-  %phi104 = phi nsz float [ undef, %bb ], [ %phi144, %bb364 ]
+  %phi104 = phi nsz float [ 0.0, %bb ], [ %phi144, %bb364 ]
   %phi105 = phi i32 [ -1, %bb ], [ %phi365, %bb364 ]
   %call106 = tail call i32 @llvm.amdgcn.ballot.i32(i1 true)
   %icmp107 = icmp slt i32 %phi105, 0
