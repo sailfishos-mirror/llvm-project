@@ -119,6 +119,11 @@ enum : VMEMID {
   NUM_LDSDMA = TRACKINGID_RANGE_LEN
 };
 
+/// Convert a MCRegUnit to a VMEMID.
+static constexpr VMEMID toVMEMID(MCRegUnit RU) {
+  return static_cast<unsigned>(RU);
+}
+
 struct HardwareLimits {
   unsigned LoadcntMax; // Corresponds to VMcnt prior to gfx12.
   unsigned ExpcntMax;
@@ -685,7 +690,7 @@ public:
   // instructions with types different from V.
   bool hasOtherPendingVmemTypes(MCPhysReg Reg, VmemType V) const {
     for (MCRegUnit RU : regunits(Reg)) {
-      auto It = VMem.find(RU);
+      auto It = VMem.find(toVMEMID(RU));
       if (It != VMem.end() && (It->second.VMEMTypes & ~(1 << V)))
         return true;
     }
@@ -694,7 +699,7 @@ public:
 
   void clearVgprVmemTypes(MCPhysReg Reg) {
     for (MCRegUnit RU : regunits(Reg)) {
-      if (auto It = VMem.find(RU); It != VMem.end())
+      if (auto It = VMem.find(toVMEMID(RU)); It != VMem.end())
         It->second.VMEMTypes = 0;
     }
   }
@@ -763,7 +768,7 @@ private:
       SCCScore = Val;
     } else if (TRI->isVectorRegister(*Context->MRI, Reg)) {
       for (MCRegUnit RU : regunits(Reg))
-        VMem[RU].Scores[T] = Val;
+        VMem[toVMEMID(RU)].Scores[T] = Val;
     } else if (TRI->isSGPRReg(*Context->MRI, Reg)) {
       auto STy = getSgprScoresIdx(T);
       for (MCRegUnit RU : regunits(Reg))
@@ -1009,7 +1014,7 @@ void WaitcntBrackets::updateByEvent(WaitEventType E, MachineInstr &Inst) {
           if (hasPointSampleAccel(Inst))
             TypesMask |= 1 << VMEM_NOSAMPLER;
           for (MCRegUnit RU : regunits(Op.getReg().asMCReg()))
-            VMem[RU].VMEMTypes |= TypesMask;
+            VMem[toVMEMID(RU)].VMEMTypes |= TypesMask;
         }
       }
       setScoreByOperand(Op, T, CurrScore);
@@ -1126,7 +1131,7 @@ void WaitcntBrackets::print(raw_ostream &OS) const {
           if (RegScore <= LB)
             continue;
           unsigned RelScore = RegScore - LB - 1;
-          OS << RelScore << ":sRU" << ID << " ";
+          OS << RelScore << ":sRU" << static_cast<unsigned>(ID) << " ";
         }
       }
 
@@ -1211,7 +1216,8 @@ void WaitcntBrackets::determineWaitForPhysReg(InstCounterType T, MCPhysReg Reg,
     bool IsVGPR = Context->TRI->isVectorRegister(*Context->MRI, Reg);
     for (MCRegUnit RU : regunits(Reg))
       determineWaitForScore(
-          T, IsVGPR ? getVMemScore(RU, T) : getSGPRScore(RU, T), Wait);
+          T, IsVGPR ? getVMemScore(toVMEMID(RU), T) : getSGPRScore(RU, T),
+          Wait);
   }
 }
 
@@ -2633,11 +2639,12 @@ bool SIInsertWaitcnts::shouldFlushVmCnt(MachineLoop *ML,
           VgprUse.insert(RU);
           // If at least one of Op's registers is in the score brackets, the
           // value is likely loaded outside of the loop.
-          if (Brackets.getVMemScore(RU, LOAD_CNT) >
+          unsigned ID = toVMEMID(RU);
+          if (Brackets.getVMemScore(ID, LOAD_CNT) >
                   Brackets.getScoreLB(LOAD_CNT) ||
-              Brackets.getVMemScore(RU, SAMPLE_CNT) >
+              Brackets.getVMemScore(ID, SAMPLE_CNT) >
                   Brackets.getScoreLB(SAMPLE_CNT) ||
-              Brackets.getVMemScore(RU, BVH_CNT) >
+              Brackets.getVMemScore(ID, BVH_CNT) >
                   Brackets.getScoreLB(BVH_CNT)) {
             UsesVgprLoadedOutside = true;
             break;
