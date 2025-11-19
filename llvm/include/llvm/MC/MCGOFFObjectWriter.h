@@ -27,11 +27,11 @@ protected:
 
 public:
   enum RLDRelocationType {
-    Reloc_Type_ACon = 0x1,   // General address.
-    Reloc_Type_RelImm = 0x2, // Relative-immediate address.
-    Reloc_Type_QCon = 0x3,   // Offset of symbol in class.
-    Reloc_Type_VCon = 0x4,   // Address of external symbol.
-    Reloc_Type_RCon = 0x5,   // PSECT of symbol.
+    Reloc_Type_ACon = 0x1,  // General address.
+    Reloc_Type_RICon = 0x2, // Relative-immediate address.
+    Reloc_Type_QCon = 0x3,  // Offset of symbol in class.
+    Reloc_Type_VCon = 0x4,  // Address of external symbol.
+    Reloc_Type_RCon = 0x5,  // PSECT of symbol.
   };
 
   ~MCGOFFObjectTargetWriter() override = default;

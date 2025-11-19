@@ -49,9 +49,9 @@ enum {
 
   // HLASM docs for address constants:
   // https://www.ibm.com/docs/en/hla-and-tf/1.6?topic=value-address-constants
-  S_RCon, // Address of ADA of symbol.
-  S_VCon, // Address of external function symbol.
-  S_QCon, // Class-based offset.
+  S_RCon,  // Address of ADA of symbol.
+  S_VCon,  // Address of external function symbol.
+  S_QCon,  // Class-based offset.
 };
 } // namespace SystemZ
 

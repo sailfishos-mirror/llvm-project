@@ -65,6 +65,9 @@ void SystemZMCAsmInfoGOFF::printSpecifierExpr(
   case SystemZ::S_None:
     OS << "A";
     break;
+  case SystemZ::S_QCon:
+    OS << "Q";
+    break;
   case SystemZ::S_RCon:
     OS << "R";
     break;

@@ -29,8 +29,6 @@ SystemZGOFFObjectWriter::SystemZGOFFObjectWriter()
 unsigned SystemZGOFFObjectWriter::getRelocType(const MCValue &Target,
                                                const MCFixup &Fixup) const {
   switch (Target.getSpecifier()) {
-  case SystemZ::S_PLT: // TODO This doen't make sense.
-    return Reloc_Type_RelImm;
   case SystemZ::S_RCon:
     return Reloc_Type_RCon;
   case SystemZ::S_VCon:
@@ -39,7 +37,7 @@ unsigned SystemZGOFFObjectWriter::getRelocType(const MCValue &Target,
     return Reloc_Type_QCon;
   case SystemZ::S_None:
     if (Fixup.isPCRel())
-      return Reloc_Type_RelImm;
+      return Reloc_Type_RICon;
     return Reloc_Type_ACon;
   }
   llvm_unreachable("Modifier not supported");

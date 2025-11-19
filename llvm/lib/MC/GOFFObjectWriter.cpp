@@ -692,7 +692,7 @@ void GOFFObjectWriter::recordRelocation(const MCFragment &F,
   const MCSectionGOFF *PSection = static_cast<MCSectionGOFF *>(F.getParent());
   const auto &A = *static_cast<const MCSymbolGOFF *>(Target.getAddSym());
   const MCSymbolGOFF *B = static_cast<const MCSymbolGOFF *>(Target.getSubSym());
-  if (RelocType == MCGOFFObjectTargetWriter::Reloc_Type_RelImm) {
+  if (RelocType == MCGOFFObjectTargetWriter::Reloc_Type_RICon) {
     if (A.isUndefined()) {
       Asm->reportError(
           Fixup.getLoc(),
