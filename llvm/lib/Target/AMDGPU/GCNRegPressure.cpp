@@ -409,7 +409,7 @@ bool GCNRPTarget::isSaveBeneficial(Register Reg) const {
   const TargetRegisterInfo *TRI = MRI.getTargetRegisterInfo();
   const SIRegisterInfo *SRI = static_cast<const SIRegisterInfo *>(TRI);
 
-  RegExcess Excess(MF, RP, MaxSGPRs, MaxVGPRs);
+  RegExcess Excess(MF, RP, MaxSGPRs, UnifiedRF ? MaxUnifiedVGPRs : MaxVGPRs);
 
   if (SRI->isSGPRClass(RC))
     return Excess.SGPR;
@@ -429,7 +429,7 @@ bool GCNRPTarget::satisfied() const {
 }
 
 bool GCNRPTarget::spillsToMemory() const {
-  RegExcess Excess(MF, RP, MaxSGPRs, MaxVGPRs);
+  RegExcess Excess(MF, RP, MaxSGPRs, UnifiedRF ? MaxUnifiedVGPRs : MaxVGPRs);
   return Excess.spillsToMemory();
 }
 
