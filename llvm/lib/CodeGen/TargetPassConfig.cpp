@@ -606,6 +606,8 @@ TargetPassConfig::TargetPassConfig(TargetMachine &TM, PassManagerBase &PM)
   // including this pass itself.
   initializeCodeGen(PR);
 
+  initializeLibcallLoweringInfoWrapperPass(PR);
+
   // Also register alias analysis passes required by codegen passes.
   initializeBasicAAWrapperPassPass(PR);
   initializeAAResultsWrapperPassPass(PR);
