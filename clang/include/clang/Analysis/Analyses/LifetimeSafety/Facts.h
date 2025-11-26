@@ -155,7 +155,9 @@ public:
 
 class UseFact : public Fact {
   const Expr *UseExpr;
-  OriginID OID;
+  // The origins of the expression being used.
+  // SmallVector with size 1 since most expressions track a single origin level.
+  llvm::SmallVector<OriginID, 1> OIDs;
   // True if this use is a write operation (e.g., left-hand side of assignment).
   // Write operations are exempted from use-after-free checks.
   bool IsWritten = false;
@@ -163,10 +165,10 @@ class UseFact : public Fact {
 public:
   static bool classof(const Fact *F) { return F->getKind() == Kind::Use; }
 
-  UseFact(const Expr *UseExpr, OriginManager &OM)
-      : Fact(Kind::Use), UseExpr(UseExpr), OID(OM.get(*UseExpr)) {}
+  UseFact(const Expr *UseExpr, llvm::SmallVector<OriginID> OIDs)
+      : Fact(Kind::Use), UseExpr(UseExpr), OIDs(std::move(OIDs)) {}
 
-  OriginID getUsedOrigin() const { return OID; }
+  llvm::ArrayRef<OriginID> getUsedOrigins() const { return OIDs; }
   const Expr *getUseExpr() const { return UseExpr; }
   void markAsWritten() { IsWritten = true; }
   bool isWritten() const { return IsWritten; }
@@ -194,8 +196,8 @@ public:
 
 class FactManager {
 public:
-  void init(const CFG &Cfg) {
-    assert(BlockToFacts.empty() && "FactManager already initialized");
+  FactManager(const AnalysisDeclContext &AC, const CFG &Cfg)
+      : OriginMgr(AC.getASTContext()) {
     BlockToFacts.resize(Cfg.getNumBlockIDs());
   }
 
