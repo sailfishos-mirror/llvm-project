@@ -167,6 +167,10 @@ def note_constexpr_assert_failed : Note<
   "assertion failed during evaluation of constant expression">;
 def err_expansion_size_expr_not_ice : Error<
   "expansion statement size is not a constant expression">;
+def err_expansion_too_big : Error<
+  "expansion statement size %0 exceeds maximum configured size %1">;
+def note_use_fexpansion_limit : Note<
+  "use -fexpansion-limit=N to adjust this limit">;
 
 def note_iterating_expansion_stmt_iterator_requires_minus : Note<
   "while attempting to construct 'begin - begin' with iterator type %0">;
