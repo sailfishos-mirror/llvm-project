@@ -2431,19 +2431,27 @@ void NoteForRangeBeginEndFunction(Sema &SemaRef, Expr *E,
   SemaRef.Diag(Loc, diag::note_for_range_begin_end)
     << BEF << IsTemplate << Description << E->getType();
 }
+}
 
 /// Build a variable declaration for a for-range statement.
-VarDecl *BuildForRangeVarDecl(Sema &SemaRef, SourceLocation Loc, QualType Type,
-                              StringRef Name, bool ForExpansionStmt) {
-  DeclContext *DC = SemaRef.CurContext;
-  IdentifierInfo *II = &SemaRef.PP.getIdentifierTable().get(Name);
-  TypeSourceInfo *TInfo = SemaRef.Context.getTrivialTypeSourceInfo(Type, Loc);
-  VarDecl *Decl = VarDecl::Create(SemaRef.Context, DC, Loc, Loc, II, Type,
-                                  TInfo, SC_None);
+VarDecl *Sema::BuildForRangeVarDecl(SourceLocation Loc, QualType Type,
+                                    StringRef Name, bool Constexpr) {
+  // Making the variable constexpr doesn't automatically add 'const' to the
+  // type, so do that now.
+  if (Constexpr && !Type->isReferenceType())
+    Type = Type.withConst();
+
+  DeclContext *DC = CurContext;
+  IdentifierInfo *II = &PP.getIdentifierTable().get(Name);
+  TypeSourceInfo *TInfo = Context.getTrivialTypeSourceInfo(Type, Loc);
+  VarDecl *Decl =
+      VarDecl::Create(Context, DC, Loc, Loc, II, Type, TInfo, SC_None);
   Decl->setImplicit();
   Decl->setCXXForRangeImplicitVar(true);
+  if (Constexpr)
+    // CWG 3044: Do not make the variable 'static'.
+    Decl->setConstexpr(true);
   return Decl;
-}
 }
 
 static bool ObjCEnumerationCollection(Expr *Collection) {
@@ -2458,7 +2466,7 @@ StmtResult Sema::BuildCXXForRangeRangeVar(Scope *S, Expr *Range, QualType Type,
   const auto DepthStr = std::to_string(S->getDepth() / 2);
   SourceLocation RangeLoc = Range->getBeginLoc();
   VarDecl *RangeVar = BuildForRangeVarDecl(
-      *this, RangeLoc, Type, std::string("__range") + DepthStr, Constexpr);
+      RangeLoc, Type, std::string("__range") + DepthStr, Constexpr);
   if (FinishForRangeVarDecl(*this, RangeVar, Range, RangeLoc,
                             diag::err_for_range_deduction_failure))
 
@@ -2757,12 +2765,10 @@ Sema::ForRangeBeginEndInfo Sema::BuildCXXForRangeBeginEndVars(
   // Build auto __begin = begin-expr, __end = end-expr.
   // Divide by 2, since the variables are in the inner scope (loop body).
   const auto DepthStr = std::to_string(S->getDepth() / 2);
-  VarDecl *BeginVar =
-      BuildForRangeVarDecl(*this, ColonLoc, AutoType,
-                           std::string("__begin") + DepthStr, Constexpr);
-  VarDecl *EndVar =
-      BuildForRangeVarDecl(*this, ColonLoc, AutoType,
-                           std::string("__end") + DepthStr, Constexpr);
+  VarDecl *BeginVar = BuildForRangeVarDecl(
+      ColonLoc, AutoType, std::string("__begin") + DepthStr, Constexpr);
+  VarDecl *EndVar = BuildForRangeVarDecl(
+      ColonLoc, AutoType, std::string("__end") + DepthStr, Constexpr);
 
   // Build begin-expr and end-expr and attach to __begin and __end variables.
   ExprResult BeginExpr, EndExpr;
