@@ -126,6 +126,7 @@ C++ Language Changes
 
 C++2c Feature Support
 ^^^^^^^^^^^^^^^^^^^^^
+- Implemented `P1306R5 <https://wg21.link/P1306R5>`_ Expansion Statements.
 
 C++23 Feature Support
 ^^^^^^^^^^^^^^^^^^^^^
