@@ -82,12 +82,11 @@ llvm::StringRef commentKindToString(CommentKind Kind) {
   llvm_unreachable("Unhandled CommentKind");
 }
 
-namespace {
 
 const SymbolID EmptySID = SymbolID();
 
 template <typename T>
-llvm::Expected<std::unique_ptr<Info>>
+static llvm::Expected<std::unique_ptr<Info>>
 reduce(std::vector<std::unique_ptr<Info>> &Values) {
   if (Values.empty() || !Values[0])
     return llvm::createStringError(llvm::inconvertibleErrorCode(),
@@ -102,7 +101,7 @@ reduce(std::vector<std::unique_ptr<Info>> &Values) {
 // Return the index of the matching child in the vector, or -1 if merge is not
 // necessary.
 template <typename T>
-int getChildIndexIfExists(std::vector<T> &Children, T &ChildToMerge) {
+static int getChildIndexIfExists(std::vector<T> &Children, T &ChildToMerge) {
   for (unsigned long I = 0; I < Children.size(); I++) {
     if (ChildToMerge.USR == Children[I].USR)
       return I;
@@ -111,7 +110,7 @@ int getChildIndexIfExists(std::vector<T> &Children, T &ChildToMerge) {
 }
 
 template <typename T>
-void reduceChildren(std::vector<T> &Children,
+static void reduceChildren(std::vector<T> &Children,
                     std::vector<T> &&ChildrenToMerge) {
   for (auto &ChildToMerge : ChildrenToMerge) {
     int MergeIdx = getChildIndexIfExists(Children, ChildToMerge);
@@ -123,7 +122,6 @@ void reduceChildren(std::vector<T> &Children,
   }
 }
 
-} // namespace
 
 // Dispatch function.
 llvm::Expected<std::unique_ptr<Info>>
