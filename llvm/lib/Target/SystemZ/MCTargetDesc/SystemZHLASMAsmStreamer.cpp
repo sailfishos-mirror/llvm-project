@@ -298,7 +298,7 @@ void SystemZHLASMAsmStreamer::emitHLASMValueImpl(const MCExpr *Value,
     }
 
     if (Parens)
-      OS << "A(";
+      OS << "AD(";
     emitHLASMValueImpl(BE.getLHS(), Size);
 
     switch (BE.getOpcode()) {
@@ -336,7 +336,7 @@ void SystemZHLASMAsmStreamer::emitHLASMValueImpl(const MCExpr *Value,
   default:
     Parens &= isa<MCSymbolRefExpr>(Value);
     if (Parens)
-      OS << "A(";
+      OS << "AD(";
     MAI->printExpr(OS, *Value);
     if (Parens)
       OS << ')';
