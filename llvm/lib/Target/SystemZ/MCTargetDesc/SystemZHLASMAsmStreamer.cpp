@@ -9,6 +9,7 @@
 #include "SystemZHLASMAsmStreamer.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/BinaryFormat/GOFF.h"
+#include "llvm/MC/MCExpr.h"
 #include "llvm/MC/MCGOFFAttributes.h"
 #include "llvm/MC/MCGOFFStreamer.h"
 #include "llvm/MC/MCSymbolGOFF.h"
@@ -80,6 +81,7 @@ void SystemZHLASMAsmStreamer::changeSection(MCSection *Section,
   MAI->printSwitchToSection(*Section, Subsection,
                             getContext().getTargetTriple(), OS);
   MCStreamer::changeSection(Section, Subsection);
+  EmitEOL();
 }
 
 void SystemZHLASMAsmStreamer::emitAlignmentDS(uint64_t ByteAlignment,
@@ -332,6 +334,7 @@ void SystemZHLASMAsmStreamer::emitHLASMValueImpl(const MCExpr *Value,
     MAI->printExpr(OS, *Value);
     return;
   default:
+    Parens &= isa<MCSymbolRefExpr>(Value);
     if (Parens)
       OS << "A(";
     MAI->printExpr(OS, *Value);

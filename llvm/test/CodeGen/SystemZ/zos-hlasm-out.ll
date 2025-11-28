@@ -42,6 +42,14 @@ define void @foo() {
 ; CHECK: DS 0B
 ; CHECK-LABEL: L#.str.1 DS 0H
 ; CHECK: DC XL6'576F726C6400'
+; CHECK: C_WSA64 CATTR ALIGN(4),FILL(0),DEFLOAD,NOTEXECUTABLE,RMODE(64),PART(stdi
+; CHECK:                in#S)
+; CHECK: stdin#S XATTR LINKAGE(XPLINK),REFERENCE(DATA),SCOPE(SECTION)
+; CHECK: * Offset 0 pointer to data symbol Greeting
+; CHECK:  DC A(Greeting)
+; CHECK: * Offset 8 function descriptor of outs
+; CHECK:  DC R(outs)
+; CHECK:  DC V(outs)
 ; CHECK: END
 entry:
   %0 = load ptr, ptr @Greeting, align 8
