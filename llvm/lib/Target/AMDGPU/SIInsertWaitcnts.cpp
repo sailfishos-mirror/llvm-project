@@ -711,8 +711,11 @@ public:
 
   void clearVgprVmemTypes(MCPhysReg Reg) {
     for (MCRegUnit RU : regunits(Reg)) {
-      if (auto It = VMem.find(toVMEMID(RU)); It != VMem.end())
+      if (auto It = VMem.find(toVMEMID(RU)); It != VMem.end()) {
         It->second.VMEMTypes = 0;
+        if (It->second.empty())
+          VMem.erase(It);
+      }
     }
   }
 
@@ -732,6 +735,10 @@ public:
 
   void print(raw_ostream &) const;
   void dump() const { print(dbgs()); }
+
+  // Free up memory by removing empty entries from the DenseMap that track event
+  // scores.
+  void purgeEmptyTrackingData();
 
 private:
   struct MergeInfo {
@@ -820,9 +827,13 @@ private:
 
   struct VGPRInfo {
     // Scores for all instruction counters.
-    unsigned Scores[NUM_INST_CNTS] = {0};
+    std::array<unsigned, NUM_INST_CNTS> Scores = {0};
     // Bitmask of the VmemTypes of VMEM instructions for this VGPR.
     unsigned VMEMTypes = 0;
+
+    bool empty() const {
+      return all_of(Scores, [](unsigned K) { return K == 0; }) && !VMEMTypes;
+    }
   };
 
   struct SGPRInfo {
@@ -830,7 +841,9 @@ private:
     // pre-gfx12) or KM_CNT (gfx12+ only), and X_CNT (gfx1250) are relevant.
     // Row 0 represents the score for either DS_CNT or KM_CNT and row 1 keeps
     // the X_CNT score.
-    unsigned Scores[2] = {0};
+    std::array<unsigned, 2> Scores = {0};
+
+    bool empty() const { return !Scores[0] && !Scores[1]; }
   };
 
   DenseMap<VMEMID, VGPRInfo> VMem; // VGPR + LDS DMA
@@ -1198,6 +1211,17 @@ void WaitcntBrackets::simplifyWaitcnt(InstCounterType T,
   // of outstanding events, then the wait for this counter is redundant.
   if (Count >= getScoreRange(T))
     Count = ~0u;
+}
+
+void WaitcntBrackets::purgeEmptyTrackingData() {
+  for (auto &[K, V] : make_early_inc_range(VMem)) {
+    if (V.empty())
+      VMem.erase(K);
+  }
+  for (auto &[K, V] : make_early_inc_range(SGPRs)) {
+    if (V.empty())
+      SGPRs.erase(K);
+  }
 }
 
 void WaitcntBrackets::determineWaitForScore(InstCounterType T,
@@ -2429,6 +2453,7 @@ bool WaitcntBrackets::merge(const WaitcntBrackets &Other) {
     Value.VMEMTypes = NewVmemTypes;
   }
 
+  purgeEmptyTrackingData();
   return StrictDom;
 }
 
