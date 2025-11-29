@@ -1,9 +1,14 @@
 // RUN: %clang_cc1 -fsyntax-only -fexperimental-lifetime-safety -Wexperimental-lifetime-safety -Wno-dangling -verify %s
 
+#include "Inputs/lifetime-analysis.h"
+
 struct View;
 
 struct [[gsl::Owner]] MyObj {
   int id;
+  MyObj();
+  MyObj(int);
+  MyObj(const MyObj&);
   ~MyObj() {}  // Non-trivial destructor
   MyObj operator+(MyObj);
   
@@ -1297,3 +1302,16 @@ void add(int c, MyObj* node) {
   arr[4] = node;
 }
 } // namespace CppCoverage
+
+namespace do_not_warn_on_std_move {
+void silenced() {
+  MyObj b;
+  View v;
+  {
+    MyObj a;
+    v = a;
+    b = std::move(a); // No warning for 'a' being moved.
+  }
+  (void)v;
+}
+} // namespace do_not_warn_on_std_move

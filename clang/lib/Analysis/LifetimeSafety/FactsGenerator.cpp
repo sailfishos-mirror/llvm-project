@@ -183,9 +183,27 @@ void FactsGenerator::VisitCXXMemberCallExpr(const CXXMemberCallExpr *MCE) {
   }
 }
 
+static bool isStdMove(const FunctionDecl *FD) {
+  return FD && FD->isInStdNamespace() && FD->getIdentifier() &&
+         FD->getName() == "move";
+}
+
 void FactsGenerator::VisitCallExpr(const CallExpr *CE) {
   handleFunctionCall(CE, CE->getDirectCallee(),
                      {CE->getArgs(), CE->getNumArgs()});
+  // Track declarations that are moved via std::move.
+  // This is a flow-insensitive approximation: once a declaration is moved
+  // anywhere in the function, it's treated as moved everywhere. This can lead
+  // to false negatives on control flow paths where the value is not actually
+  // moved, but these are considered lower priority than the false positives
+  // this tracking prevents.
+  // TODO: The ideal solution would be flow-sensitive ownership tracking that
+  // records where values are moved from and to, but this is more complex.
+  if (isStdMove(CE->getDirectCallee()))
+    if (CE->getNumArgs() == 1)
+      if (auto *DRE =
+              dyn_cast<DeclRefExpr>(CE->getArg(0)->IgnoreParenImpCasts()))
+        MovedDecls.insert(DRE->getDecl());
 }
 
 void FactsGenerator::VisitCXXNullPtrLiteralExpr(
@@ -364,6 +382,11 @@ void FactsGenerator::handleLifetimeEnds(const CFGLifetimeEnds &LifetimeEnds) {
   // Iterate through all loans to see if any expire.
   for (const auto *Loan : FactMgr.getLoanMgr().getLoans()) {
     if (const auto *BL = dyn_cast<PathLoan>(Loan)) {
+      // Skip loans for declarations that have been moved. When a value is
+      // moved, the original owner no longer has ownership and its destruction
+      // should not cause the loan to expire, preventing false positives.
+      if (MovedDecls.contains(BL->getAccessPath().D))
+        continue;
       // Check if the loan is for a stack variable and if that variable
       // is the one being destructed.
       if (BL->getAccessPath().D == LifetimeEndsVD)

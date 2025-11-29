@@ -102,6 +102,11 @@ private:
   // corresponding to the left-hand side is updated to be a "write", thereby
   // exempting it from the check.
   llvm::DenseMap<const DeclRefExpr *, UseFact *> UseFacts;
+
+  // Tracks declarations that have been moved via std::move. This is used to
+  // prevent false positives when the original owner is destroyed after the
+  // value has been moved. This tracking is flow-insensitive.
+  llvm::DenseSet<const ValueDecl *> MovedDecls;
 };
 
 } // namespace clang::lifetimes::internal
