@@ -25,7 +25,7 @@ void test() {
   // CHECK: invoke void @func_that_throws(ptr{{.*}} %[[AGG2]])
   // CHECK-NEXT: to label %[[CONT:.*]] unwind label %[[LPAD:.*]]
 
-  // CHECK: [[LPAD]]:
+  // CHECK: [[LPAD1:lpad.*]]:
   // CHECK: landingpad
 
   // CHECK-NOT: llvm.lifetime.start

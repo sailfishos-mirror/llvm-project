@@ -18,11 +18,11 @@ void test() {
   // CHECK: call void @llvm.lifetime.start.p0(ptr %[[AGG1]])
   // CHECK: call void @gen(ptr{{.*}} sret(%struct.Trivial){{.*}} %[[AGG1]])
   // CHECK: call void @func(ptr{{.*}} %[[AGG1]])
+  // CHECK: call void @llvm.lifetime.end.p0(ptr %[[AGG1]])
   // CHECK: call void @llvm.lifetime.start.p0(ptr %[[AGG2]])
   // CHECK: call void @gen(ptr{{.*}} sret(%struct.Trivial){{.*}} %[[AGG2]])
   // CHECK: call void @func(ptr{{.*}} %[[AGG2]])
   // CHECK: call void @llvm.lifetime.end.p0(ptr %[[AGG2]])
-  // CHECK: call void @llvm.lifetime.end.p0(ptr %[[AGG1]])
   // CHECK: call void @cleanup
 
   // EXCEPTIONS: %[[AGG1:.*]] = alloca %struct.Trivial
