@@ -15336,22 +15336,6 @@ SITargetLowering::performExtractVectorEltCombine(SDNode *N,
     }
   }
 
-  // EXTRACT_VECTOR_ELT (<n x e>, var-idx) => n x select (e, const-idx)
-  if (shouldExpandVectorDynExt(N)) {
-    SDLoc SL(N);
-    SDValue Idx = N->getOperand(1);
-    SDValue V;
-    for (unsigned I = 0, E = VecVT.getVectorNumElements(); I < E; ++I) {
-      SDValue IC = DAG.getVectorIdxConstant(I, SL);
-      SDValue Elt = DAG.getNode(ISD::EXTRACT_VECTOR_ELT, SL, ResVT, Vec, IC);
-      if (I == 0)
-        V = Elt;
-      else
-        V = DAG.getSelectCC(SL, Idx, IC, Elt, V, ISD::SETEQ);
-    }
-    return V;
-  }
-
   if (!DCI.isBeforeLegalize())
     return SDValue();
 
@@ -15393,18 +15377,44 @@ SITargetLowering::performExtractVectorEltCombine(SDNode *N,
   return SDValue();
 }
 
+// EXTRACT_VECTOR_ELT (<n x e>, var-idx) => n x select (e, const-idx)
+SDValue SITargetLowering::performExtractVectorDynEltCombine(
+    SDNode *N, DAGCombinerInfo &DCI) const {
+  if (!shouldExpandVectorDynExt(N))
+    return SDValue();
+
+  SDValue Vec = N->getOperand(0);
+  SelectionDAG &DAG = DCI.DAG;
+
+  EVT VecVT = Vec.getValueType();
+  EVT ResVT = N->getValueType(0);
+
+  SDLoc SL(N);
+  SDValue Idx = N->getOperand(1);
+  SDValue V;
+  for (unsigned I = 0, E = VecVT.getVectorNumElements(); I < E; ++I) {
+    SDValue IC = DAG.getVectorIdxConstant(I, SL);
+    SDValue Elt = DAG.getNode(ISD::EXTRACT_VECTOR_ELT, SL, ResVT, Vec, IC);
+    if (I == 0)
+      V = Elt;
+    else
+      V = DAG.getSelectCC(SL, Idx, IC, Elt, V, ISD::SETEQ);
+  }
+  return V;
+}
+
+// INSERT_VECTOR_ELT (<n x e>, var-idx)
+// => BUILD_VECTOR n x select (e, const-idx)
 SDValue
-SITargetLowering::performInsertVectorEltCombine(SDNode *N,
-                                                DAGCombinerInfo &DCI) const {
+SITargetLowering::performInsertVectorDynEltCombine(SDNode *N,
+                                                   DAGCombinerInfo &DCI) const {
+  if (!shouldExpandVectorDynExt(N))
+    return SDValue();
+
   SDValue Vec = N->getOperand(0);
   SDValue Idx = N->getOperand(2);
   EVT VecVT = Vec.getValueType();
   EVT EltVT = VecVT.getVectorElementType();
-
-  // INSERT_VECTOR_ELT (<n x e>, var-idx)
-  // => BUILD_VECTOR n x select (e, const-idx)
-  if (!shouldExpandVectorDynExt(N))
-    return SDValue();
 
   SelectionDAG &DAG = DCI.DAG;
   SDLoc SL(N);
@@ -16943,12 +16953,21 @@ SDValue SITargetLowering::PerformDAGCombine(SDNode *N,
     if (auto Res = promoteUniformOpToI32(SDValue(N, 0), DCI))
       return Res;
     break;
+  case ISD::EXTRACT_VECTOR_ELT:
+    if (SDValue V = performExtractVectorDynEltCombine(N, DCI))
+      return V;
+    break;
+  case ISD::INSERT_VECTOR_ELT:
+    if (SDValue V = performInsertVectorDynEltCombine(N, DCI))
+      return V;
+    break;
   default:
     break;
   }
 
-  if (getTargetMachine().getOptLevel() == CodeGenOptLevel::None)
+  if (getTargetMachine().getOptLevel() == CodeGenOptLevel::None) {
     return SDValue();
+  }
 
   switch (N->getOpcode()) {
   case ISD::ADD:
@@ -17063,8 +17082,6 @@ SDValue SITargetLowering::PerformDAGCombine(SDNode *N,
   }
   case ISD::EXTRACT_VECTOR_ELT:
     return performExtractVectorEltCombine(N, DCI);
-  case ISD::INSERT_VECTOR_ELT:
-    return performInsertVectorEltCombine(N, DCI);
   case ISD::FP_ROUND:
     return performFPRoundCombine(N, DCI);
   case ISD::LOAD: {

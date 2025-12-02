@@ -223,7 +223,10 @@ private:
   SDValue performFMed3Combine(SDNode *N, DAGCombinerInfo &DCI) const;
   SDValue performCvtPkRTZCombine(SDNode *N, DAGCombinerInfo &DCI) const;
   SDValue performExtractVectorEltCombine(SDNode *N, DAGCombinerInfo &DCI) const;
-  SDValue performInsertVectorEltCombine(SDNode *N, DAGCombinerInfo &DCI) const;
+  SDValue performExtractVectorDynEltCombine(SDNode *N,
+                                            DAGCombinerInfo &DCI) const;
+  SDValue performInsertVectorDynEltCombine(SDNode *N,
+                                           DAGCombinerInfo &DCI) const;
   SDValue performFPRoundCombine(SDNode *N, DAGCombinerInfo &DCI) const;
   SDValue performSelectCombine(SDNode *N, DAGCombinerInfo &DCI) const;
 
