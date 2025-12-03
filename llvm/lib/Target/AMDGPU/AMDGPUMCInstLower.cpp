@@ -4,6 +4,31 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
+// Copyright(C) 2026 Advanced Micro Devices, Inc. All rights reserved.
+//
+// This file contains confidential and proprietary information of Advanced Micro
+// Devices, Inc. ("AMD") and is protected under U.S. and international copyright
+// and other intellectual property laws.
+//
+// DISCLAIMER This disclaimer is not a license and does not grant any rights to
+// the materials distributed herewith. Except as otherwise provided in a valid
+// license issued to you by AMD, and to the maximum extent permitted by
+// applicable law: (1) THESE MATERIALS ARE MADE AVAILABLE "AS IS" AND WITH ALL
+// FAULTS, AND AMD HEREBY DISCLAIMS ALL WARRANTIES AND CONDITIONS, EXPRESS,
+// IMPLIED, OR STATUTORY, INCLUDING BUT NOT LIMITED TO WARRANTIES OF
+// MERCHANTABILITY, NON-INFRINGEMENT, OR FITNESS FOR ANY PARTICULAR PURPOSE; and
+// (2) AMD shall not be liable (whether in contract or tort, including
+// negligence, or under any other theory of liability) for any loss or damage of
+// any kind or nature related to, arising under or in connection with these
+// materials, including for any direct, or any indirect, special, incidental, or
+// consequential loss or damage (including loss of data, profits, goodwill, or
+// any type of loss or damage suffered as a result of any action brought by a
+// third party) even if such damage or loss was reasonably foreseeable or AMD
+// had been advised of the possibility of the same.
+//
+// THIS COPYRIGHT NOTICE AND DISCLAIMER MUST BE RETAINED AS PART OF THIS FILE AT
+// ALL TIMES.
+//
 //===----------------------------------------------------------------------===//
 //
 /// \file
@@ -16,6 +41,7 @@
 #include "AMDGPU.h"
 #include "AMDGPUAsmPrinter.h"
 #include "AMDGPUMachineFunction.h"
+#include "AMDGPUStaticSimulator.h"
 #include "MCTargetDesc/AMDGPUInstPrinter.h"
 #include "MCTargetDesc/AMDGPUMCExpr.h"
 #include "MCTargetDesc/AMDGPUMCTargetDesc.h"
@@ -31,12 +57,26 @@
 #include "llvm/MC/MCInst.h"
 #include "llvm/MC/MCObjectStreamer.h"
 #include "llvm/MC/MCStreamer.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Endian.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/Format.h"
 #include <algorithm>
+#include <cstdlib>
 
 using namespace llvm;
+
+static cl::opt<bool> EnableSimAnnotations(
+    "amdgpu-static-sim-inline",
+    cl::desc("Enable inline assembly annotations (per-instruction sim comments)"),
+    cl::init(false), cl::Hidden);
+
+/// Check if inline annotations are enabled via cl::opt or env var.
+static bool isInlineAnnotationEnabled() {
+  if (const char *EnvVal = std::getenv("AMDGPU_STATIC_SIM_INLINE"))
+    return StringRef(EnvVal) == "1";
+  return EnableSimAnnotations;
+}
 
 #include "AMDGPUGenMCPseudoLowering.inc"
 
@@ -327,6 +367,83 @@ void AMDGPUAsmPrinter::emitInstruction(const MachineInstr *MI) {
     EmitToStreamer(*OutStreamer, OutInst);
     return;
   }
+
+  auto emitSimAnnotation = [&]() {
+    if (!isInlineAnnotationEnabled())
+      return;
+
+    const SIMachineFunctionInfo *MFI = MF->getInfo<SIMachineFunctionInfo>();
+    if (!MFI)
+      return;
+
+    auto Report = MFI->getStaticSimReport();
+    if (!Report)
+      return;
+
+    auto It = Report->PerInstr.find(MI);
+    if (It == Report->PerInstr.end())
+      return;
+
+    const AMDGPU::InstrSimInfo &Info = It->second;
+
+    bool HasCacheHit = Info.CachePattern.find('$') != std::string::npos;
+    bool HasBankConflict = Info.Reason == AMDGPU::StallReason::REG_BANK;
+
+    if (Info.StallCycles == 0 && !Info.InWMMAWindow && !Info.WasFused &&
+        !Info.WasExposed && !Info.WasMasked && !Info.IsWMMA && !HasCacheHit)
+      return;
+
+    std::string Comment;
+    raw_string_ostream OS(Comment);
+    bool HasContent = false;
+
+    OS << "Sim:";
+
+    if (Info.IsWMMA && !Info.WMMAPattern.empty()) {
+      OS << " " << Info.WMMAPattern;
+      HasContent = true;
+    }
+
+    if (Info.WasFused) {
+      OS << " Fused";
+      HasContent = true;
+    } else if (Info.WasExposed) {
+      if (Info.WasMasked)
+        OS << " MSB_Exposed(masked)";
+      else
+        OS << " MSB_Exposed";
+      HasContent = true;
+    }
+
+    if (Info.InWMMAWindow && !Info.IsWMMA) {
+      OS << " WMMA[" << (unsigned)Info.WMMAStage << "/"
+         << (unsigned)Info.WMMATotalWindow << "] " << Info.getStageName();
+      if (Info.CoExecuted)
+        OS << " OK";
+      else if (Info.StallCycles > 0 &&
+               Info.Reason == AMDGPU::StallReason::COEXEC_BLOCKED) {
+        OS << " BLOCKED";
+      }
+      HasContent = true;
+    }
+
+    if (Info.StallCycles > 0) {
+      if (HasContent)
+        OS << " |";
+      OS << " Stall:" << Info.StallCycles;
+      if (Info.Reason != AMDGPU::StallReason::NONE &&
+          Info.Reason != AMDGPU::StallReason::COEXEC_BLOCKED)
+        OS << " [" << Info.getReasonString() << "]";
+    }
+
+    if (!Info.CachePattern.empty() && (HasCacheHit || HasBankConflict)) {
+      OS << " Cache" << Info.CachePattern;
+      HasContent = true;
+    }
+
+    OutStreamer->emitRawComment(Comment);
+  };
+  emitSimAnnotation();
 
   const GCNSubtarget &STI = MF->getSubtarget<GCNSubtarget>();
   AMDGPUMCInstLower MCInstLowering(OutContext, STI, *this);
