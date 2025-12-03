@@ -1185,8 +1185,8 @@ static bool builtinMayNeedPromotionToVec(uint32_t BuiltinNumber) {
 //===----------------------------------------------------------------------===//
 
 static SmallVector<Register>
-getOpExtCallArguments(const SPIRV::IncomingCall *Call, uint32_t BuiltinNumber,
-                      MachineIRBuilder &MIRBuilder, SPIRVGlobalRegistry *GR) {
+getBuiltinCallArguments(const SPIRV::IncomingCall *Call, uint32_t BuiltinNumber,
+                        MachineIRBuilder &MIRBuilder, SPIRVGlobalRegistry *GR) {
 
   Register ReturnTypeId = GR->getSPIRVTypeID(Call->ReturnType);
   unsigned ResultElementCount =
@@ -1237,7 +1237,7 @@ static bool generateExtInst(const SPIRV::IncomingCall *Call,
 
   Register ReturnTypeId = GR->getSPIRVTypeID(Call->ReturnType);
   SmallVector<Register> Arguments =
-      getOpExtCallArguments(Call, Number, MIRBuilder, GR);
+      getBuiltinCallArguments(Call, Number, MIRBuilder, GR);
 
   // Build extended instruction.
   auto MIB =
