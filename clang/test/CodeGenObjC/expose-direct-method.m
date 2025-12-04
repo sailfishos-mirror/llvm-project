@@ -271,9 +271,11 @@ int useSRet(Root *r) {
     // CHECK: call void @"-[Root getAggregate]D_thunk"
     [r getAggregate].a +
     // TODO: The compiler is not smart enough to know the class object must be realized yet.
-    // CHECK: call i64 @"+[Root classGetComplex]D_thunk"(ptr noundef
+    // CHECK-NOT: call i64 @"+[Root classGetComplex]"(ptr noundef
+    // CHECK: call i64 @"+[Root classGetComplex]_thunk"(ptr noundef
     [Root classGetComplex].a +
-    // CHECK: call void @"+[Root classGetAggregate]D_thunk"(ptr {{.*}}sret
+    // CHECK-NOT: call void @"+[Root classGetAggregate]"(ptr {{.*}}sret
+    // CHECK: call void @"+[Root classGetAggregate]_thunk"(ptr {{.*}}sret
     [Root classGetAggregate].a
   );
 }
