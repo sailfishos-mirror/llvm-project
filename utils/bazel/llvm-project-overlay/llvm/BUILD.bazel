@@ -1515,6 +1515,7 @@ cc_library(
         ":BinaryFormat",
         ":BitWriter",
         ":Core",
+        ":KCFI",
         ":ProfileData",
         ":Support",
         ":Target",
@@ -1579,13 +1580,24 @@ cc_library(
 )
 
 cc_library(
+    name = "KCFI",
+    hdrs = ["include/llvm/Transforms/Instrumentation/KCFI.h"],
+    deps = [
+        ":Core",
+    ],
+)
+
+cc_library(
     name = "Instrumentation",
     srcs = glob([
         "lib/Transforms/Instrumentation/*.cpp",
         "lib/Transforms/Instrumentation/*.h",
         "lib/Transforms/Instrumentation/*.inc",
     ]),
-    hdrs = glob(["include/llvm/Transforms/Instrumentation/*.h"]) + [
+    hdrs = glob(
+        ["include/llvm/Transforms/Instrumentation/*.h"],
+        exclude = ["include/llvm/Transforms/Instrumentation/KCFI.h"],
+    ) + [
         "include/llvm/Transforms/Utils/Instrumentation.h",
     ],
     copts = llvm_copts,
@@ -1594,6 +1606,7 @@ cc_library(
         ":BinaryFormat",
         ":Core",
         ":Demangle",
+        ":KCFI",
         ":MC",
         ":ProfileData",
         ":Scalar",
@@ -3839,6 +3852,7 @@ cc_library(
         ":IRPrinter",
         ":InstCombine",
         ":Instrumentation",
+        ":KCFI",
         ":MC",
         ":ObjCARC",
         ":Scalar",

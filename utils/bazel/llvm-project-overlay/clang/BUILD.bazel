@@ -1862,6 +1862,7 @@ cc_library(
         "//llvm:IRReader",
         "//llvm:InstCombine",
         "//llvm:Instrumentation",
+        "//llvm:KCFI",
         "//llvm:LTO",
         "//llvm:Linker",
         "//llvm:MC",
