@@ -408,6 +408,10 @@ def __builtin_amdgcn_wave_reduce_fadd_f32 : AMDGPUBuiltin<"float(float, int32_t)
 def __builtin_amdgcn_wave_reduce_fsub_f32 : AMDGPUBuiltin<"float(float, int32_t)", [Const]>;
 def __builtin_amdgcn_wave_reduce_fmin_f32 : AMDGPUBuiltin<"float(float, int32_t)", [Const]>;
 def __builtin_amdgcn_wave_reduce_fmax_f32 : AMDGPUBuiltin<"float(float, int32_t)", [Const]>;
+def __builtin_amdgcn_wave_reduce_fadd_f64 : AMDGPUBuiltin<"double(double, int32_t)", [Const]>;
+def __builtin_amdgcn_wave_reduce_fsub_f64 : AMDGPUBuiltin<"double(double, int32_t)", [Const]>;
+def __builtin_amdgcn_wave_reduce_fmin_f64 : AMDGPUBuiltin<"double(double, int32_t)", [Const]>;
+def __builtin_amdgcn_wave_reduce_fmax_f64 : AMDGPUBuiltin<"double(double, int32_t)", [Const]>;
 
 //===----------------------------------------------------------------------===//
 // R600-NI only builtins.
