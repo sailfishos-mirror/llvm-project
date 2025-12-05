@@ -1568,7 +1568,6 @@ void SystemZAsmPrinter::emitPPA2(Module &M) {
   // Make CELQSTRT symbol.
   const char *StartSymbolName = "CELQSTRT";
   MCSymbol *CELQSTRT = OutContext.getOrCreateSymbol(StartSymbolName);
-  OutStreamer->emitSymbolAttribute(CELQSTRT, MCSA_ELF_TypeFunction);
   OutStreamer->emitSymbolAttribute(CELQSTRT, MCSA_OSLinkage);
   OutStreamer->emitSymbolAttribute(CELQSTRT, MCSA_Global);
 
@@ -1735,9 +1734,6 @@ void SystemZAsmPrinter::emitFunctionEntryLabel() {
         OutStreamer->AddComment("  Bit 2: 0 = Does not use alloca");
     }
     OutStreamer->emitInt32(DSAAndFlags);
-
-    // Functions denote CODE.
-    OutStreamer->emitSymbolAttribute(CurrentFnSym, MCSA_ELF_TypeFunction);
   }
 
   AsmPrinter::emitFunctionEntryLabel();
