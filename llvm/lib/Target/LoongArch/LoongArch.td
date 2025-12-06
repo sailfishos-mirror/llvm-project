@@ -171,6 +171,10 @@ def : ProcessorModel<"generic-la64", NoSchedModel, [Feature64Bit,
                                                     FeatureUAL,
                                                     FeatureExtLSX]>;
 
+// Generic 32-bit processor with double-precision floating-point support.
+def : ProcessorModel<"loongarch32", NoSchedModel, [Feature32Bit,
+                                                   FeatureBasicD]>;
+
 // Generic 64-bit processor with double-precision floating-point support.
 def : ProcessorModel<"loongarch64", NoSchedModel, [Feature64Bit,
                                                    FeatureUAL,
