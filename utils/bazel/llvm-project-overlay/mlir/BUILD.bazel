@@ -4820,6 +4820,7 @@ cc_library(
         ":MemRefDialect",
         ":Pass",
         ":TransformUtils",
+        ":VectorDialect",
     ],
 )
 
@@ -7280,6 +7281,7 @@ cc_library(
         ":FuncDialect",
         ":Pass",
         ":TransformUtils",
+        ":VectorDialect",
     ],
 )
 
@@ -8189,6 +8191,7 @@ cc_library(
         ":IR",
         ":Pass",
         ":TransformUtils",
+        ":VectorDialect",
     ],
 )
 
@@ -8504,6 +8507,7 @@ cc_library(
         ":IR",
         ":Pass",
         ":TransformUtils",
+        ":VectorDialect",
     ],
 )
 
@@ -8522,6 +8526,7 @@ cc_library(
         ":ConversionPassIncGen",
         ":Pass",
         ":TransformUtils",
+        ":VectorDialect",
     ],
 )
 
@@ -8546,6 +8551,7 @@ cc_library(
         ":IR",
         ":Pass",
         ":TransformUtils",
+        ":VectorDialect",
     ],
 )
 
@@ -8620,6 +8626,7 @@ cc_library(
         ":MathDialect",
         ":Pass",
         ":TransformUtils",
+        ":VectorDialect",
     ],
 )
 
@@ -12660,6 +12667,7 @@ cc_library(
         ":IR",
         ":Pass",
         ":TransformUtils",
+        ":VectorDialect",
     ],
 )
 
@@ -12680,6 +12688,7 @@ cc_library(
         ":IR",
         ":Pass",
         ":TransformUtils",
+        ":VectorDialect",
     ],
 )
 
@@ -12721,6 +12730,7 @@ cc_library(
         ":MathDialect",
         ":Pass",
         ":TransformUtils",
+        ":VectorDialect",
     ],
 )
 
@@ -13427,6 +13437,7 @@ cc_library(
         ":MemRefDialect",
         ":Pass",
         ":TransformUtils",
+        ":VectorDialect",
     ],
 )
 
