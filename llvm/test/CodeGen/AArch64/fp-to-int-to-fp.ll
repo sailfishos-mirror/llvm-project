@@ -42,6 +42,27 @@ entry:
   ret float %f
 }
 
+define i1 @test_implicit_nsz(float %x) {
+; CHECK-LABEL: test_implicit_nsz:
+; CHECK:       // %bb.0: // %entry
+; CHECK-NEXT:    frintz s0, s0
+; CHECK-NEXT:    fcmp s0, #0.0
+; CHECK-NEXT:    cset w0, eq
+; CHECK-NEXT:    ret
+;
+; NO-SIGNED-ZEROS-LABEL: test_implicit_nsz:
+; NO-SIGNED-ZEROS:       // %bb.0: // %entry
+; NO-SIGNED-ZEROS-NEXT:    frintz s0, s0
+; NO-SIGNED-ZEROS-NEXT:    fcmp s0, #0.0
+; NO-SIGNED-ZEROS-NEXT:    cset w0, eq
+; NO-SIGNED-ZEROS-NEXT:    ret
+entry:
+  %i = fptoui float %x to i32
+  %f = uitofp i32 %i to float
+  %cmp = fcmp oeq float %f, 0.0
+  ret i1 %cmp
+}
+
 define float @test_signed_min_max(float %x) {
 ; CHECK-LABEL: test_signed_min_max:
 ; CHECK:       // %bb.0: // %entry
