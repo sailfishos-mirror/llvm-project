@@ -19,6 +19,20 @@ namespace mlir {
 
 bool isZeroInteger(OpFoldResult v) { return isConstantIntValue(v, 0); }
 
+bool isZeroFloat(OpFoldResult v) {
+  if (auto attr = dyn_cast<Attribute>(v)) {
+    if (auto floatAttr = dyn_cast<FloatAttr>(attr))
+      return floatAttr.getValue().isZero();
+  } else {
+    return matchPattern(cast<Value>(v), m_AnyZeroFloat());
+  }
+  return false;
+}
+
+bool isZeroIntegerOrFloat(OpFoldResult v) {
+  return isZeroInteger(v) || isZeroFloat(v);
+}
+
 bool isOneInteger(OpFoldResult v) { return isConstantIntValue(v, 1); }
 
 std::tuple<SmallVector<OpFoldResult>, SmallVector<OpFoldResult>,
