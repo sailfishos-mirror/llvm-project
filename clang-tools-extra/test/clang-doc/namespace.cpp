@@ -63,6 +63,9 @@ class AnonClass {};
 // MD-ANON-INDEX: ### anonFunction
 // MD-ANON-INDEX: *void anonFunction()*
 
+// HTML-ANON-INDEX: <div class="navbar-breadcrumb-container">
+// HTML-ANON-INDEX:     <div class="navbar-breadcrumb-item"><a href="../GlobalNamespace/index.html">Global Namespace</a></div>
+// HTML-ANON-INDEX: </div>
 // HTML-ANON-INDEX: <h2>@nonymous_namespace</h2>
 // HTML-ANON-INDEX:     <h2>Inner Classes</h2>
 // HTML-ANON-INDEX:         <ul class="class-container">
@@ -90,6 +93,10 @@ class ClassInPrimaryNamespace {};
 // MD-PRIMARY-CLASS: # class ClassInPrimaryNamespace
 // MD-PRIMARY-CLASS: Class in PrimaryNamespace
 
+// HTML-PRIMARY-CLASS: <div class="navbar-breadcrumb-container">
+// HTML-PRIMARY-CLASS:     <div class="navbar-breadcrumb-item"><a href="../GlobalNamespace/index.html">Global Namespace</a></div>&rarr;
+// HTML-PRIMARY-CLASS:     <div class="navbar-breadcrumb-item"><a href="./index.html">PrimaryNamespace</a></div>
+// HTML-PRIMARY-CLASS: </div>
 // HTML-PRIMARY-CLASS: <h1 class="hero__title-large">class ClassInPrimaryNamespace</h1>
 
 // Nested namespace
@@ -107,6 +114,11 @@ class ClassInNestedNamespace {};
 // MD-NESTED-CLASS: # class ClassInNestedNamespace
 // MD-NESTED-CLASS: Class in NestedNamespace
 
+// HTML-NESTED-CLASS: <div class="navbar-breadcrumb-container">
+// HTML-NESTED-CLASS:     <div class="navbar-breadcrumb-item"><a href="../../GlobalNamespace/index.html">Global Namespace</a></div>&rarr;
+// HTML-NESTED-CLASS:     <div class="navbar-breadcrumb-item"><a href="../index.html">PrimaryNamespace</a></div>&rarr;
+// HTML-NESTED-CLASS:     <div class="navbar-breadcrumb-item"><a href="./index.html">NestedNamespace</a></div>
+// HTML-NESTED-CLASS: </div>
 // HTML-NESTED-CLASS: <h1 class="hero__title-large">class ClassInNestedNamespace</h1>
 } // namespace NestedNamespace
 
@@ -119,6 +131,10 @@ class ClassInNestedNamespace {};
 // MD-NESTED-INDEX: *void functionInNestedNamespace()*
 // MD-NESTED-INDEX: Function in NestedNamespace
 
+// HTML-NESTED-INDEX: <div class="navbar-breadcrumb-container">
+// HTML-NESTED-INDEX:     <div class="navbar-breadcrumb-item"><a href="../../GlobalNamespace/index.html">Global Namespace</a></div>&rarr;
+// HTML-NESTED-INDEX:     <div class="navbar-breadcrumb-item"><a href="../index.html">PrimaryNamespace</a></div>
+// HTML-NESTED-INDEX: </div>
 // HTML-NESTED-INDEX: <h2>NestedNamespace</h2>
 // HTML-NESTED-INDEX:     <h2>Inner Classes</h2>
 // HTML-NESTED-INDEX:     <ul class="class-container">
@@ -136,7 +152,7 @@ class ClassInNestedNamespace {};
 // HTML-NESTED-INDEX:                     <p> Function in NestedNamespace</p>
 // HTML-NESTED-INDEX:                 </div>
 // HTML-NESTED-INDEX:             </div>
-// HTML-NESTED-INDEX:             <p>Defined at line 98 of file {{.*}}namespace.cpp</p>
+// HTML-NESTED-INDEX:             <p>Defined at line 105 of file {{.*}}namespace.cpp</p>
 // HTML-NESTED-INDEX:         </div>
 // HTML-NESTED-INDEX:     </div>
 } // namespace PrimaryNamespace
@@ -152,6 +168,9 @@ class ClassInNestedNamespace {};
 // MD-PRIMARY-INDEX: *void functionInPrimaryNamespace()*
 // MD-PRIMARY-INDEX:  Function in PrimaryNamespace
 
+// HTML-PRIMARY-INDEX: <div class="navbar-breadcrumb-container">
+// HTML-PRIMARY-INDEX:     <div class="navbar-breadcrumb-item"><a href="../GlobalNamespace/index.html">Global Namespace</a></div>
+// HTML-PRIMARY-INDEX: </div>
 // HTML-PRIMARY-INDEX: <h2>PrimaryNamespace</h2>
 // HTML-PRIMARY-INDEX-NOT: <h2 id="Namespaces">Namespaces</h2>
 // HTML-PRIMARY-INDEX-NOT: <a href="NestedNamespace{{[\/]}}index.html">NestedNamespace</a>
@@ -171,7 +190,7 @@ class ClassInNestedNamespace {};
 // HTML-PRIMARY-INDEX:                      <p> Function in PrimaryNamespace</p>
 // HTML-PRIMARY-INDEX:                  </div>
 // HTML-PRIMARY-INDEX:              </div>
-// HTML-PRIMARY-INDEX:              <p>Defined at line 81 of file {{.*}}clang-tools-extra{{[\/]}}test{{[\/]}}clang-doc{{[\/]}}namespace.cpp</p>
+// HTML-PRIMARY-INDEX:              <p>Defined at line 84 of file {{.*}}clang-tools-extra{{[\/]}}test{{[\/]}}clang-doc{{[\/]}}namespace.cpp</p>
 // HTML-PRIMARY-INDEX:          </div>
 // HTML-PRIMARY-INDEX:      </div>
 // AnotherNamespace
@@ -189,6 +208,10 @@ class ClassInAnotherNamespace {};
 // MD-ANOTHER-CLASS: # class ClassInAnotherNamespace
 // MD-ANOTHER-CLASS:  Class in AnotherNamespace
 
+// HTML-ANOTHER-CLASS: <div class="navbar-breadcrumb-container">
+// HTML-ANOTHER-CLASS:     <div class="navbar-breadcrumb-item"><a href="../GlobalNamespace/index.html">Global Namespace</a></div>&rarr;
+// HTML-ANOTHER-CLASS:     <div class="navbar-breadcrumb-item"><a href="./index.html">AnotherNamespace</a></div>
+// HTML-ANOTHER-CLASS: </div>
 // HTML-ANOTHER-CLASS: <h1 class="hero__title-large">class ClassInAnotherNamespace</h1>
 
 } // namespace AnotherNamespace
@@ -202,6 +225,9 @@ class ClassInAnotherNamespace {};
 // MD-ANOTHER-INDEX: *void functionInAnotherNamespace()*
 // MD-ANOTHER-INDEX: Function in AnotherNamespace
 
+// HTML-ANOTHER-INDEX: <div class="navbar-breadcrumb-container">
+// HTML-ANOTHER-INDEX:     <div class="navbar-breadcrumb-item"><a href="../GlobalNamespace/index.html">Global Namespace</a></div>
+// HTML-ANOTHER-INDEX: </div>
 // HTML-ANOTHER-INDEX: <h2>AnotherNamespace</h2>
 // HTML-ANOTHER-INDEX:     <h2>Inner Classes</h2>
 // HTML-ANOTHER-INDEX:     <ul class="class-container">
@@ -219,7 +245,7 @@ class ClassInAnotherNamespace {};
 // HTML-ANOTHER-INDEX:                     <p> Function in AnotherNamespace</p>
 // HTML-ANOTHER-INDEX:                 </div>
 // HTML-ANOTHER-INDEX:             </div>
-// HTML-ANOTHER-INDEX:             <p>Defined at line 180 of file {{.*}}clang-tools-extra{{[\/]}}test{{[\/]}}clang-doc{{[\/]}}namespace.cpp</p>
+// HTML-ANOTHER-INDEX:             <p>Defined at line 199 of file {{.*}}clang-tools-extra{{[\/]}}test{{[\/]}}clang-doc{{[\/]}}namespace.cpp</p>
 // HTML-ANOTHER-INDEX:         </div>
 // HTML-ANOTHER-INDEX:     </div>
 

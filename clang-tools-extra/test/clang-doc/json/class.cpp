@@ -35,6 +35,16 @@ private:
 };
 
 // CHECK:       {
+// CHECK-NEXT:    "Contexts": [
+// CHECK-NEXT:      {
+// CHECK-NEXT:        "DocumentationFileName": "index",
+// CHECK-NEXT:        "End": true,
+// CHECK-NEXT:        "Name": "Global Namespace",
+// CHECK-NEXT:        "QualName": "GlobalNamespace",
+// CHECK-NEXT:        "RelativePath": "./",
+// CHECK-NEXT:        "USR": "0000000000000000000000000000000000000000"
+// CHECK-NEXT:      }
+// CHECK-NEXT:    ],
 // CHECK-NEXT:    "Description": {
 // CHECK-NEXT:      "BriefComments": [
 // CHECK-NEXT:        [
@@ -125,6 +135,7 @@ private:
 // CHECK-NEXT:        }
 // CHECK-NEXT:      }
 // CHECK-NEXT:    ],
+// CHECK-NEXT:    "HasContexts": true,
 // CHECK-NEXT:    "HasEnums": true,
 // CHECK-NEXT:    "HasPrivateMembers": true,
 // CHECK-NEXT:    "HasPublicFunctions": true,

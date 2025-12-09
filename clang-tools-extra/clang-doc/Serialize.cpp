@@ -697,10 +697,39 @@ static TemplateParamInfo convertTemplateArgToInfo(const clang::Decl *D,
   return TemplateParamInfo(Str);
 }
 
+// Check if the DeclKind is one for which we support contextual relationships.
+// There might be other ContextDecls, like blocks, that we currently don't
+// handle at all.
+static bool isSupportedContext(Decl::Kind DeclKind) {
+  if (DeclKind == Decl::Kind::Record || DeclKind == Decl::Kind::CXXRecord ||
+      DeclKind == Decl::Kind::Namespace ||
+      DeclKind == Decl::Kind::ClassTemplateSpecialization ||
+      DeclKind == Decl::Kind::ClassTemplatePartialSpecialization)
+    return true;
+  return false;
+}
+
+template <typename T> static void findParent(Info &I, const T *D) {
+  // Only walk up contexts if D is a record or namespace.
+  if (isSupportedContext(D->getKind())) {
+    const DeclContext *ParentCtx = dyn_cast<DeclContext>(D)->getLexicalParent();
+    while (ParentCtx) {
+      if (isSupportedContext(ParentCtx->getDeclKind())) {
+        // Break when we reach the first record or namespace.
+        I.ParentUSR = getUSRForDecl(dyn_cast<Decl>(ParentCtx));
+        break;
+      }
+      ParentCtx = ParentCtx->getParent();
+    }
+  }
+}
+
 template <typename T>
 static void populateInfo(Info &I, const T *D, const FullComment *C,
                          bool &IsInAnonymousNamespace) {
   I.USR = getUSRForDecl(D);
+  findParent(I, D);
+
   if (auto ConversionDecl = dyn_cast_or_null<CXXConversionDecl>(D);
       ConversionDecl && ConversionDecl->getConversionType()
                             .getTypePtr()

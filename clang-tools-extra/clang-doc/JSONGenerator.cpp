@@ -321,6 +321,67 @@ serializeCommonAttributes(const Info &I, json::Object &Obj,
       Obj["Location"] =
           serializeLocation(Symbol->DefLoc.value(), RepositoryUrl);
   }
+
+  if (!I.Contexts.empty()) {
+    json::Value ContextArray = json::Array();
+    auto &ContextArrayRef = *ContextArray.getAsArray();
+    ContextArrayRef.reserve(I.Contexts.size());
+
+    std::string CurrentRelativePath;
+    bool PreviousRecord = false;
+    for (const auto &Current : I.Contexts) {
+      json::Value ContextVal = Object();
+      Object &Context = *ContextVal.getAsObject();
+      serializeReference(Current, Context);
+
+      if (ContextArrayRef.empty() && I.IT == InfoType::IT_record) {
+        // If the record's immediate context is a namespace, then the
+        // "index.html" is in the same directory.
+        if (Current.DocumentationFileName == "index") {
+          PreviousRecord = false;
+          Context["RelativePath"] = "./";
+        }
+        // If the immediate context is a record, then the file is one level
+        // above
+        else {
+          PreviousRecord = true;
+          CurrentRelativePath += "../";
+          Context["RelativePath"] = CurrentRelativePath;
+        }
+        ContextArrayRef.push_back(ContextVal);
+        continue;
+      }
+
+      // If the previous Context was a record then we already went up a level,
+      // so the current namespace index is in the same directory.
+      if (PreviousRecord && (Current.DocumentationFileName == "index")) {
+        PreviousRecord = false;
+      }
+      // If the current Context is a record but the previous wasn't a record,
+      // then the namespace index is located one level above.
+      else if (Current.DocumentationFileName != "index") {
+        PreviousRecord = true;
+        CurrentRelativePath += "../";
+      }
+      // The current Context is a namespace and so was the previous Context.
+      else {
+        PreviousRecord = false;
+        CurrentRelativePath += "../";
+        // If this namespace is the global namespace, then its documentation
+        // name needs to be changed to link correctly.
+        if (Current.QualName == "GlobalNamespace" &&
+            Current.RelativePath != "./")
+          Context["DocumentationFileName"] =
+              SmallString<16>("GlobalNamespace/index");
+      }
+      Context["RelativePath"] = CurrentRelativePath;
+      ContextArrayRef.insert(ContextArrayRef.begin(), ContextVal);
+    }
+
+    ContextArrayRef.back().getAsObject()->insert({"End", true});
+    Obj["Contexts"] = ContextArray;
+    Obj["HasContexts"] = true;
+  }
 }
 
 static void serializeReference(const Reference &Ref, Object &ReferenceObj) {
@@ -709,6 +770,32 @@ static Error serializeIndex(const ClangDocContext &CDCtx, StringRef RootDir) {
   return Error::success();
 }
 
+static void serializeContexts(Info *I,
+                              StringMap<std::unique_ptr<Info>> &Infos) {
+  if (I->USR == GlobalNamespaceID)
+    return;
+  auto ParentUSR = I->ParentUSR;
+
+  while (true) {
+    Info *ParentInfo =
+        Infos.at(llvm::toStringRef(llvm::toHex(ParentUSR)).str()).get();
+
+    if (ParentInfo->USR == GlobalNamespaceID) {
+      Context GlobalRef(ParentInfo->USR, "Global Namespace",
+                        InfoType::IT_namespace, "GlobalNamespace", "",
+                        SmallString<16>("index"));
+      I->Contexts.push_back(GlobalRef);
+      return;
+    }
+
+    Context ParentRef(ParentInfo->USR, ParentInfo->Name, ParentInfo->IT,
+                      ParentInfo->Name, ParentInfo->Path,
+                      ParentInfo->DocumentationFileName);
+    I->Contexts.push_back(ParentRef);
+    ParentUSR = ParentInfo->ParentUSR;
+  }
+}
+
 Error JSONGenerator::generateDocumentation(
     StringRef RootDir, llvm::StringMap<std::unique_ptr<doc::Info>> Infos,
     const ClangDocContext &CDCtx, std::string DirName) {
@@ -742,9 +829,12 @@ Error JSONGenerator::generateDocumentation(
     if (FileErr)
       return createFileError("cannot open file " + Group.getKey(), FileErr);
 
-    for (const auto &Info : Group.getValue())
+    for (const auto &Info : Group.getValue()) {
+      if (Info->IT == InfoType::IT_record || Info->IT == InfoType::IT_namespace)
+        serializeContexts(Info, Infos);
       if (Error Err = generateDocForInfo(Info, InfoOS, CDCtx))
         return Err;
+    }
   }
 
   return serializeIndex(CDCtx, RootDir);
