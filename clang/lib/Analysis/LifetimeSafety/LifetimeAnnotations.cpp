@@ -99,7 +99,8 @@ bool shouldTrackImplicitObjectArg(const CXXMethodDecl *Callee) {
   if (!isGslPointerType(Callee->getFunctionObjectParameterType()) &&
       !isGslOwnerType(Callee->getFunctionObjectParameterType()))
     return false;
-  if (isPointerLikeType(Callee->getReturnType())) {
+  if (isPointerLikeType(Callee->getReturnType()) &&
+      isGslOwnerType(Callee->getFunctionObjectParameterType())) {
     if (!Callee->getIdentifier())
       return false;
     return llvm::StringSwitch<bool>(Callee->getName())

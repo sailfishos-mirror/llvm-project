@@ -249,8 +249,10 @@ int &doNotFollowReferencesForLocalOwner() {
   return p; // ok
 }
 
+// It is not possible to annotate accessors of view types 
+// (like std::string_view::begin()) to catch bugs like the following:
 const char *trackThroughMultiplePointer() {
-  return std::basic_string_view<char>(std::basic_string<char>()).begin(); // expected-warning {{returning address of local temporary object}}
+  return std::basic_string_view<char>(std::basic_string<char>()).begin();
 }
 
 struct X {
