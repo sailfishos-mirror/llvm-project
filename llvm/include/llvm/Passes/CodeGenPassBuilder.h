@@ -486,6 +486,8 @@ protected:
   /// Add standard basic block placement passes.
   void addBlockPlacement(PassManagerWrapper &PMW) const;
 
+  void addPostBBSections(PassManagerWrapper &PMW) const {}
+
   using CreateMCStreamer =
       std::function<Expected<std::unique_ptr<MCStreamer>>(MCContext &)>;
   void addAsmPrinter(PassManagerWrapper &PMW, CreateMCStreamer) const {
@@ -1062,6 +1064,8 @@ Error CodeGenPassBuilder<Derived, TargetMachineT>::addMachinePasses(
       addModulePass(MachineOutlinerPass(Opt.EnableMachineOutliner), PMW);
     }
   }
+
+  derived().addPostBBSections(PMW);
 
   addMachineFunctionPass(StackFrameLayoutAnalysisPass(), PMW);
 
