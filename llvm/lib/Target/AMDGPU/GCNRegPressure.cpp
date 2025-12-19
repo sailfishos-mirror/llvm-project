@@ -97,6 +97,7 @@ void GCNRegPressure::inc(unsigned Reg,
   Value[RegKind] += Sign;
 }
 
+namespace {
 struct RegExcess {
   unsigned SGPR = 0;
   unsigned VGPR = 0;
@@ -136,6 +137,7 @@ struct RegExcess {
                     0);
   }
 };
+} // namespace
 
 bool GCNRegPressure::less(const MachineFunction &MF, const GCNRegPressure &O,
                           unsigned MaxOccupancy) const {
