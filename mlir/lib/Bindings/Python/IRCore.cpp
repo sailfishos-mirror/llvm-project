@@ -1490,12 +1490,6 @@ public:
                     .str()
                     .c_str()));
     cls.def(nb::init<PyValue &>(), nb::keep_alive<0, 1>(), nb::arg("value"));
-    cls.def_static(
-        "isinstance",
-        [](PyValue &otherValue) -> bool {
-          return DerivedTy::isaFunction(otherValue);
-        },
-        nb::arg("other_value"));
     cls.def(MLIR_PYTHON_MAYBE_DOWNCAST_ATTR,
             [](DerivedTy &self) -> nb::typed<nb::object, DerivedTy> {
               return self.maybeDownCast();
