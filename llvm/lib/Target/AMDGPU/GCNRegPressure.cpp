@@ -105,10 +105,17 @@ struct RegExcess {
   unsigned AGPR = 0;
 
   bool anyExcess() const { return SGPR || VGPR || ArchVGPR || AGPR; }
-  bool spillsToMemory() const { return VGPR || ArchVGPR || AGPR; }
+  bool spillsToMemoryForTargetOccupancy() const {
+    return VGPR || ArchVGPR || AGPR;
+  }
 
+  RegExcess(const MachineFunction &MF, const GCNRegPressure &RP)
+      : RegExcess(MF, RP, GCNRPTarget(MF, RP)) {}
   RegExcess(const MachineFunction &MF, const GCNRegPressure &RP,
-            unsigned MaxSGPRs, unsigned MaxVGPRs) {
+            const GCNRPTarget &Target) {
+    unsigned MaxSGPRs = Target.getMaxSGPRs();
+    unsigned MaxVGPRs = Target.getMaxVGPRs();
+
     const GCNSubtarget &ST = MF.getSubtarget<GCNSubtarget>();
     SGPR = std::max(static_cast<int>(RP.getSGPRNum() - MaxSGPRs), 0);
 
@@ -165,10 +172,9 @@ bool GCNRegPressure::less(const MachineFunction &MF, const GCNRegPressure &O,
     return Occ > OtherOcc;
 
   unsigned MaxVGPRs = ST.getMaxNumVGPRs(MF);
-  unsigned MaxSGPRs = ST.getMaxNumSGPRs(MF);
 
-  RegExcess Excess(MF, *this, MaxSGPRs, MaxVGPRs);
-  RegExcess OtherExcess(MF, O, MaxSGPRs, MaxVGPRs);
+  RegExcess Excess(MF, *this);
+  RegExcess OtherExcess(MF, O);
 
   unsigned MaxArchVGPRs = ST.getAddressableNumArchVGPRs();
 
@@ -411,7 +417,7 @@ bool GCNRPTarget::isSaveBeneficial(Register Reg) const {
   const TargetRegisterInfo *TRI = MRI.getTargetRegisterInfo();
   const SIRegisterInfo *SRI = static_cast<const SIRegisterInfo *>(TRI);
 
-  RegExcess Excess(MF, RP, MaxSGPRs, UnifiedRF ? MaxUnifiedVGPRs : MaxVGPRs);
+  RegExcess Excess(MF, RP, *this);
 
   if (SRI->isSGPRClass(RC))
     return Excess.SGPR;
@@ -431,8 +437,8 @@ bool GCNRPTarget::satisfied() const {
 }
 
 bool GCNRPTarget::spillsToMemory() const {
-  RegExcess Excess(MF, RP, MaxSGPRs, UnifiedRF ? MaxUnifiedVGPRs : MaxVGPRs);
-  return Excess.spillsToMemory();
+  RegExcess Excess(MF, RP, *this);
+  return Excess.spillsToMemoryForTargetOccupancy();
 }
 
 ///////////////////////////////////////////////////////////////////////////////

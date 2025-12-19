@@ -236,6 +236,11 @@ public:
   bool satisfied() const;
   bool spillsToMemory() const;
 
+  unsigned getMaxSGPRs() const { return MaxSGPRs; }
+  unsigned getMaxVGPRs() const {
+    return UnifiedRF ? MaxUnifiedVGPRs : MaxVGPRs;
+  }
+
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
   friend raw_ostream &operator<<(raw_ostream &OS, const GCNRPTarget &Target) {
     OS << "Actual/Target: " << Target.RP.getSGPRNum() << '/' << Target.MaxSGPRs
