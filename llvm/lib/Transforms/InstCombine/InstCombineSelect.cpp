@@ -4347,6 +4347,71 @@ Instruction *InstCombinerImpl::visitSelectInst(SelectInst &SI) {
           matchFMulByZeroIfResultEqZero(*this, Cmp0, Cmp1, MatchCmp1, MatchCmp0,
                                         SI, SIFPOp->hasNoSignedZeros()))
         return replaceInstUsesWith(SI, Cmp0);
+
+      if (Pred == CmpInst::FCMP_ORD || Pred == CmpInst::FCMP_UNO) {
+        // Fold out only-canonicalize-non-nans pattern. This implements a
+        // wrapper around llvm.canonicalize which is not required to quiet
+        // signaling nans or preserve nan payload bits.
+        //
+        //   %hard.canonical = call @llvm.canonicalize(%x)
+        //   %soft.canonical = fdiv 1.0, %x
+        //   %ord = fcmp ord %x, 0.0
+        //   %x.canon = select i1 %ord, %hard.canonical, %soft.canonical
+        //
+        // With known IEEE handling:
+        //   => %x
+        //
+        // With other denormal behaviors:
+        //   => llvm.canonicalize(%x)
+        //
+        // Note the fdiv could be any value preserving, potentially
+        // canonicalizing floating-point operation such as fmul by 1.0. However,
+        // since in the llvm model canonicalization is not mandatory, the fmul
+        // would have been dropped by the time we reached here. The trick here
+        // is to use a reciprocal fdiv. It's not a droppable no-op, as it could
+        // return an infinity if %x were sufficiently small, but in this pattern
+        // we're only using the output for nan values.
+
+        if (Pred == CmpInst::FCMP_ORD) {
+          MatchCmp0 = TrueVal;
+          MatchCmp1 = FalseVal;
+        } else {
+          MatchCmp0 = FalseVal;
+          MatchCmp1 = TrueVal;
+        }
+
+        if (match(MatchCmp0, m_FCanonicalize(m_Specific(Cmp0))) &&
+            match(Cmp1, m_PosZeroFP())) {
+          const fltSemantics &FPSem =
+              SelType->getScalarType()->getFltSemantics();
+          if (APFloat::isIEEELikeFP(FPSem)) {
+            // IEEE handling does not have non-canonical values, so the
+            // canonicalize can be dropped for direct replacement without
+            // looking for the intermediate maybe-canonicalizing operation.
+            if (Cmp0 == MatchCmp1 && SI.getFunction()->getDenormalMode(FPSem) ==
+                                         DenormalMode::getIEEE())
+              return replaceInstUsesWith(SI, Cmp0);
+
+            // If denormals may be flushed, we need to retain the canonicalize
+            // call. This introduces a canonicalization on the nan path, which
+            // we are not free to do as that could change the sign bit or
+            // payload bits. We can only do this if there were a no-op like
+            // floating-point instruction which may have changed the nan bits
+            // anyway.
+            if (match(MatchCmp1, m_FDiv(m_FPOne(), m_Specific(Cmp0)))) {
+              DenormalMode Mode = SI.getFunction()->getDenormalMode(FPSem);
+              if (Mode == DenormalMode::getIEEE())
+                return replaceInstUsesWith(SI, Cmp0);
+
+              if (Mode.inputsAreZero() || Mode.outputsAreZero())
+                return replaceInstUsesWith(SI, MatchCmp0);
+            }
+
+            // Leave the dynamic mode case alone. This would introduce new
+            // constraints if the mode may be refined later.
+          }
+        }
+      }
     }
   }
 

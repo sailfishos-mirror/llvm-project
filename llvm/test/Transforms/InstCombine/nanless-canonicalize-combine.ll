@@ -9,11 +9,7 @@
 define float @canonicalize_ieee_0(float %x) #0 {
 ; CHECK-LABEL: define float @canonicalize_ieee_0(
 ; CHECK-SAME: float [[X:%.*]]) #[[ATTR0:[0-9]+]] {
-; CHECK-NEXT:    [[HARD_CANONICAL:%.*]] = call float @llvm.canonicalize.f32(float [[X]])
-; CHECK-NEXT:    [[SOFT_CANONICAL:%.*]] = fdiv float 1.000000e+00, [[X]]
-; CHECK-NEXT:    [[ORD:%.*]] = fcmp ord float [[X]], 0.000000e+00
-; CHECK-NEXT:    [[X_CANON:%.*]] = select i1 [[ORD]], float [[HARD_CANONICAL]], float [[SOFT_CANONICAL]]
-; CHECK-NEXT:    ret float [[X_CANON]]
+; CHECK-NEXT:    ret float [[X]]
 ;
   %hard.canonical = call float @llvm.canonicalize.f32(float %x)
   %soft.canonical = fdiv float 1.0, %x
@@ -26,11 +22,7 @@ define float @canonicalize_ieee_0(float %x) #0 {
 define float @canonicalize_ieee_1(float %x) #0 {
 ; CHECK-LABEL: define float @canonicalize_ieee_1(
 ; CHECK-SAME: float [[X:%.*]]) #[[ATTR0]] {
-; CHECK-NEXT:    [[HARD_CANONICAL:%.*]] = call float @llvm.canonicalize.f32(float [[X]])
-; CHECK-NEXT:    [[SOFT_CANONICAL:%.*]] = fdiv float 1.000000e+00, [[X]]
-; CHECK-NEXT:    [[UNO:%.*]] = fcmp uno float [[X]], 0.000000e+00
-; CHECK-NEXT:    [[X_CANON:%.*]] = select i1 [[UNO]], float [[SOFT_CANONICAL]], float [[HARD_CANONICAL]]
-; CHECK-NEXT:    ret float [[X_CANON]]
+; CHECK-NEXT:    ret float [[X]]
 ;
   %hard.canonical = call float @llvm.canonicalize.f32(float %x)
   %soft.canonical = fdiv float 1.0, %x
@@ -44,10 +36,7 @@ define float @canonicalize_ieee_1(float %x) #0 {
 define float @canonicalize_ieee_0_fmul(float %x) #0 {
 ; CHECK-LABEL: define float @canonicalize_ieee_0_fmul(
 ; CHECK-SAME: float [[X:%.*]]) #[[ATTR0]] {
-; CHECK-NEXT:    [[HARD_CANONICAL:%.*]] = call float @llvm.canonicalize.f32(float [[X]])
-; CHECK-NEXT:    [[ORD:%.*]] = fcmp ord float [[X]], 0.000000e+00
-; CHECK-NEXT:    [[X_CANON:%.*]] = select i1 [[ORD]], float [[HARD_CANONICAL]], float [[X]]
-; CHECK-NEXT:    ret float [[X_CANON]]
+; CHECK-NEXT:    ret float [[X]]
 ;
   %hard.canonical = call float @llvm.canonicalize.f32(float %x)
   %soft.canonical = fmul float %x, 1.0
@@ -61,10 +50,7 @@ define float @canonicalize_ieee_0_fmul(float %x) #0 {
 define float @canonicalize_ieee_0_fdiv_commute(float %x) #0 {
 ; CHECK-LABEL: define float @canonicalize_ieee_0_fdiv_commute(
 ; CHECK-SAME: float [[X:%.*]]) #[[ATTR0]] {
-; CHECK-NEXT:    [[HARD_CANONICAL:%.*]] = call float @llvm.canonicalize.f32(float [[X]])
-; CHECK-NEXT:    [[ORD:%.*]] = fcmp ord float [[X]], 0.000000e+00
-; CHECK-NEXT:    [[X_CANON:%.*]] = select i1 [[ORD]], float [[HARD_CANONICAL]], float [[X]]
-; CHECK-NEXT:    ret float [[X_CANON]]
+; CHECK-NEXT:    ret float [[X]]
 ;
   %hard.canonical = call float @llvm.canonicalize.f32(float %x)
   %soft.canonical = fdiv float %x, 1.0
@@ -79,10 +65,7 @@ define float @canonicalize_daz_0(float %x) #1 {
 ; CHECK-LABEL: define float @canonicalize_daz_0(
 ; CHECK-SAME: float [[X:%.*]]) #[[ATTR1:[0-9]+]] {
 ; CHECK-NEXT:    [[HARD_CANONICAL:%.*]] = call float @llvm.canonicalize.f32(float [[X]])
-; CHECK-NEXT:    [[SOFT_CANONICAL:%.*]] = fdiv float 1.000000e+00, [[X]]
-; CHECK-NEXT:    [[ORD:%.*]] = fcmp ord float [[X]], 0.000000e+00
-; CHECK-NEXT:    [[X_CANON:%.*]] = select i1 [[ORD]], float [[HARD_CANONICAL]], float [[SOFT_CANONICAL]]
-; CHECK-NEXT:    ret float [[X_CANON]]
+; CHECK-NEXT:    ret float [[HARD_CANONICAL]]
 ;
   %hard.canonical = call float @llvm.canonicalize.f32(float %x)
   %soft.canonical = fdiv float 1.0, %x
@@ -96,11 +79,8 @@ define float @canonicalize_daz_0(float %x) #1 {
 define float @canonicalize_daz_1(float %x) #1 {
 ; CHECK-LABEL: define float @canonicalize_daz_1(
 ; CHECK-SAME: float [[X:%.*]]) #[[ATTR1]] {
-; CHECK-NEXT:    [[HARD_CANONICAL:%.*]] = call float @llvm.canonicalize.f32(float [[X]])
-; CHECK-NEXT:    [[SOFT_CANONICAL:%.*]] = fdiv float 1.000000e+00, [[X]]
-; CHECK-NEXT:    [[UNO:%.*]] = fcmp uno float [[X]], 0.000000e+00
-; CHECK-NEXT:    [[X_CANON:%.*]] = select i1 [[UNO]], float [[SOFT_CANONICAL]], float [[HARD_CANONICAL]]
-; CHECK-NEXT:    ret float [[X_CANON]]
+; CHECK-NEXT:    [[SOFT_CANONICAL:%.*]] = call float @llvm.canonicalize.f32(float [[X]])
+; CHECK-NEXT:    ret float [[SOFT_CANONICAL]]
 ;
   %hard.canonical = call float @llvm.canonicalize.f32(float %x)
   %soft.canonical = fdiv float 1.0, %x
@@ -146,11 +126,7 @@ define float @canonicalize_dynamic_1(float %x) #2 {
 define <2 x float> @canonicalize_ieee_0_vec(<2 x float> %x) #0 {
 ; CHECK-LABEL: define <2 x float> @canonicalize_ieee_0_vec(
 ; CHECK-SAME: <2 x float> [[X:%.*]]) #[[ATTR0]] {
-; CHECK-NEXT:    [[HARD_CANONICAL:%.*]] = call <2 x float> @llvm.canonicalize.v2f32(<2 x float> [[X]])
-; CHECK-NEXT:    [[SOFT_CANONICAL:%.*]] = fdiv <2 x float> splat (float 1.000000e+00), [[X]]
-; CHECK-NEXT:    [[ORD:%.*]] = fcmp ord <2 x float> [[X]], zeroinitializer
-; CHECK-NEXT:    [[X_CANON:%.*]] = select <2 x i1> [[ORD]], <2 x float> [[HARD_CANONICAL]], <2 x float> [[SOFT_CANONICAL]]
-; CHECK-NEXT:    ret <2 x float> [[X_CANON]]
+; CHECK-NEXT:    ret <2 x float> [[X]]
 ;
   %hard.canonical = call <2 x float> @llvm.canonicalize.v2f32(<2 x float> %x)
   %soft.canonical = fdiv <2 x float> splat (float 1.0), %x
@@ -162,11 +138,7 @@ define <2 x float> @canonicalize_ieee_0_vec(<2 x float> %x) #0 {
 define <2 x float> @canonicalize_ieee_1_vec(<2 x float> %x) #0 {
 ; CHECK-LABEL: define <2 x float> @canonicalize_ieee_1_vec(
 ; CHECK-SAME: <2 x float> [[X:%.*]]) #[[ATTR0]] {
-; CHECK-NEXT:    [[HARD_CANONICAL:%.*]] = call <2 x float> @llvm.canonicalize.v2f32(<2 x float> [[X]])
-; CHECK-NEXT:    [[SOFT_CANONICAL:%.*]] = fdiv <2 x float> splat (float 1.000000e+00), [[X]]
-; CHECK-NEXT:    [[UNO:%.*]] = fcmp uno <2 x float> [[X]], zeroinitializer
-; CHECK-NEXT:    [[X_CANON:%.*]] = select <2 x i1> [[UNO]], <2 x float> [[SOFT_CANONICAL]], <2 x float> [[HARD_CANONICAL]]
-; CHECK-NEXT:    ret <2 x float> [[X_CANON]]
+; CHECK-NEXT:    ret <2 x float> [[X]]
 ;
   %hard.canonical = call <2 x float> @llvm.canonicalize.v2f32(<2 x float> %x)
   %soft.canonical = fdiv <2 x float> splat (float 1.0), %x
@@ -195,10 +167,7 @@ define <2 x float> @canonicalize_daz_0_vec(<2 x float> %x) #1 {
 ; CHECK-LABEL: define <2 x float> @canonicalize_daz_0_vec(
 ; CHECK-SAME: <2 x float> [[X:%.*]]) #[[ATTR1]] {
 ; CHECK-NEXT:    [[HARD_CANONICAL:%.*]] = call <2 x float> @llvm.canonicalize.v2f32(<2 x float> [[X]])
-; CHECK-NEXT:    [[SOFT_CANONICAL:%.*]] = fdiv <2 x float> splat (float 1.000000e+00), [[X]]
-; CHECK-NEXT:    [[ORD:%.*]] = fcmp ord <2 x float> [[X]], zeroinitializer
-; CHECK-NEXT:    [[X_CANON:%.*]] = select <2 x i1> [[ORD]], <2 x float> [[HARD_CANONICAL]], <2 x float> [[SOFT_CANONICAL]]
-; CHECK-NEXT:    ret <2 x float> [[X_CANON]]
+; CHECK-NEXT:    ret <2 x float> [[HARD_CANONICAL]]
 ;
   %hard.canonical = call <2 x float> @llvm.canonicalize.v2f32(<2 x float> %x)
   %soft.canonical = fdiv <2 x float> splat (float 1.0), %x
@@ -210,11 +179,8 @@ define <2 x float> @canonicalize_daz_0_vec(<2 x float> %x) #1 {
 define <2 x float> @canonicalize_daz_1_vec(<2 x float> %x) #1 {
 ; CHECK-LABEL: define <2 x float> @canonicalize_daz_1_vec(
 ; CHECK-SAME: <2 x float> [[X:%.*]]) #[[ATTR1]] {
-; CHECK-NEXT:    [[HARD_CANONICAL:%.*]] = call <2 x float> @llvm.canonicalize.v2f32(<2 x float> [[X]])
-; CHECK-NEXT:    [[SOFT_CANONICAL:%.*]] = fdiv <2 x float> splat (float 1.000000e+00), [[X]]
-; CHECK-NEXT:    [[UNO:%.*]] = fcmp uno <2 x float> [[X]], zeroinitializer
-; CHECK-NEXT:    [[X_CANON:%.*]] = select <2 x i1> [[UNO]], <2 x float> [[SOFT_CANONICAL]], <2 x float> [[HARD_CANONICAL]]
-; CHECK-NEXT:    ret <2 x float> [[X_CANON]]
+; CHECK-NEXT:    [[SOFT_CANONICAL:%.*]] = call <2 x float> @llvm.canonicalize.v2f32(<2 x float> [[X]])
+; CHECK-NEXT:    ret <2 x float> [[SOFT_CANONICAL]]
 ;
   %hard.canonical = call <2 x float> @llvm.canonicalize.v2f32(<2 x float> %x)
   %soft.canonical = fdiv <2 x float> splat (float 1.0), %x
@@ -226,11 +192,7 @@ define <2 x float> @canonicalize_daz_1_vec(<2 x float> %x) #1 {
 define bfloat @canonicalize_ieee_bf16(bfloat %x) #0 {
 ; CHECK-LABEL: define bfloat @canonicalize_ieee_bf16(
 ; CHECK-SAME: bfloat [[X:%.*]]) #[[ATTR0]] {
-; CHECK-NEXT:    [[HARD_CANONICAL:%.*]] = call bfloat @llvm.canonicalize.bf16(bfloat [[X]])
-; CHECK-NEXT:    [[SOFT_CANONICAL:%.*]] = fdiv bfloat 0xR3F80, [[X]]
-; CHECK-NEXT:    [[ORD:%.*]] = fcmp ord bfloat [[X]], 0xR0000
-; CHECK-NEXT:    [[X_CANON:%.*]] = select i1 [[ORD]], bfloat [[HARD_CANONICAL]], bfloat [[SOFT_CANONICAL]]
-; CHECK-NEXT:    ret bfloat [[X_CANON]]
+; CHECK-NEXT:    ret bfloat [[X]]
 ;
   %hard.canonical = call bfloat @llvm.canonicalize.bf16(bfloat %x)
   %soft.canonical = fdiv bfloat 1.0, %x
@@ -242,11 +204,7 @@ define bfloat @canonicalize_ieee_bf16(bfloat %x) #0 {
 define half @canonicalize_ieee_f16(half %x) #0 {
 ; CHECK-LABEL: define half @canonicalize_ieee_f16(
 ; CHECK-SAME: half [[X:%.*]]) #[[ATTR0]] {
-; CHECK-NEXT:    [[HARD_CANONICAL:%.*]] = call half @llvm.canonicalize.f16(half [[X]])
-; CHECK-NEXT:    [[SOFT_CANONICAL:%.*]] = fdiv half 0xH3C00, [[X]]
-; CHECK-NEXT:    [[ORD:%.*]] = fcmp ord half [[X]], 0xH0000
-; CHECK-NEXT:    [[X_CANON:%.*]] = select i1 [[ORD]], half [[HARD_CANONICAL]], half [[SOFT_CANONICAL]]
-; CHECK-NEXT:    ret half [[X_CANON]]
+; CHECK-NEXT:    ret half [[X]]
 ;
   %hard.canonical = call half @llvm.canonicalize.f16(half %x)
   %soft.canonical = fdiv half 1.0, %x
@@ -258,11 +216,7 @@ define half @canonicalize_ieee_f16(half %x) #0 {
 define double @canonicalize_ieee_f64(double %x) #0 {
 ; CHECK-LABEL: define double @canonicalize_ieee_f64(
 ; CHECK-SAME: double [[X:%.*]]) #[[ATTR0]] {
-; CHECK-NEXT:    [[HARD_CANONICAL:%.*]] = call double @llvm.canonicalize.f64(double [[X]])
-; CHECK-NEXT:    [[SOFT_CANONICAL:%.*]] = fdiv double 1.000000e+00, [[X]]
-; CHECK-NEXT:    [[ORD:%.*]] = fcmp ord double [[X]], 0.000000e+00
-; CHECK-NEXT:    [[X_CANON:%.*]] = select i1 [[ORD]], double [[HARD_CANONICAL]], double [[SOFT_CANONICAL]]
-; CHECK-NEXT:    ret double [[X_CANON]]
+; CHECK-NEXT:    ret double [[X]]
 ;
   %hard.canonical = call double @llvm.canonicalize.f64(double %x)
   %soft.canonical = fdiv double 1.0, %x
@@ -274,10 +228,7 @@ define double @canonicalize_ieee_f64(double %x) #0 {
 define fp128 @canonicalize_ieee_f128(fp128 %x) #0 {
 ; CHECK-LABEL: define fp128 @canonicalize_ieee_f128(
 ; CHECK-SAME: fp128 [[X:%.*]]) #[[ATTR0]] {
-; CHECK-NEXT:    [[HARD_CANONICAL:%.*]] = call fp128 @llvm.canonicalize.f128(fp128 [[X]])
-; CHECK-NEXT:    [[ORD:%.*]] = fcmp ord fp128 [[X]], 0xL00000000000000000000000000000000
-; CHECK-NEXT:    [[X_CANON:%.*]] = select i1 [[ORD]], fp128 [[HARD_CANONICAL]], fp128 [[X]]
-; CHECK-NEXT:    ret fp128 [[X_CANON]]
+; CHECK-NEXT:    ret fp128 [[X]]
 ;
   %hard.canonical = call fp128 @llvm.canonicalize.f128(fp128 %x)
   %ord = fcmp ord fp128 %x, 0xL00000000000000000000000000000000
@@ -503,10 +454,7 @@ define ppc_fp128 @ignore_ppc_fp128(ppc_fp128 %x) #0 {
 define float @canonicalize_ieee_0_missing_noop(float %x) #0 {
 ; CHECK-LABEL: define float @canonicalize_ieee_0_missing_noop(
 ; CHECK-SAME: float [[X:%.*]]) #[[ATTR0]] {
-; CHECK-NEXT:    [[HARD_CANONICAL:%.*]] = call float @llvm.canonicalize.f32(float [[X]])
-; CHECK-NEXT:    [[ORD:%.*]] = fcmp ord float [[X]], 0.000000e+00
-; CHECK-NEXT:    [[X_CANON:%.*]] = select i1 [[ORD]], float [[HARD_CANONICAL]], float [[X]]
-; CHECK-NEXT:    ret float [[X_CANON]]
+; CHECK-NEXT:    ret float [[X]]
 ;
   %hard.canonical = call float @llvm.canonicalize.f32(float %x)
   %ord = fcmp ord float %x, 0.0
@@ -519,10 +467,7 @@ define float @canonicalize_ieee_0_missing_noop(float %x) #0 {
 define float @canonicalize_ieee_1_missing_noop(float %x) #0 {
 ; CHECK-LABEL: define float @canonicalize_ieee_1_missing_noop(
 ; CHECK-SAME: float [[X:%.*]]) #[[ATTR0]] {
-; CHECK-NEXT:    [[HARD_CANONICAL:%.*]] = call float @llvm.canonicalize.f32(float [[X]])
-; CHECK-NEXT:    [[UNO:%.*]] = fcmp uno float [[X]], 0.000000e+00
-; CHECK-NEXT:    [[X_CANON:%.*]] = select i1 [[UNO]], float [[X]], float [[HARD_CANONICAL]]
-; CHECK-NEXT:    ret float [[X_CANON]]
+; CHECK-NEXT:    ret float [[X]]
 ;
   %hard.canonical = call float @llvm.canonicalize.f32(float %x)
   %uno = fcmp uno float %x, 0.0
@@ -567,10 +512,7 @@ define float @canonicalize_only_ftz(float %x) "denormal-fp-math"="preserve-sign,
 ; CHECK-LABEL: define float @canonicalize_only_ftz(
 ; CHECK-SAME: float [[X:%.*]]) #[[ATTR3:[0-9]+]] {
 ; CHECK-NEXT:    [[HARD_CANONICAL:%.*]] = call float @llvm.canonicalize.f32(float [[X]])
-; CHECK-NEXT:    [[SOFT_CANONICAL:%.*]] = fdiv float 1.000000e+00, [[X]]
-; CHECK-NEXT:    [[ORD:%.*]] = fcmp ord float [[X]], 0.000000e+00
-; CHECK-NEXT:    [[X_CANON:%.*]] = select i1 [[ORD]], float [[HARD_CANONICAL]], float [[SOFT_CANONICAL]]
-; CHECK-NEXT:    ret float [[X_CANON]]
+; CHECK-NEXT:    ret float [[HARD_CANONICAL]]
 ;
   %hard.canonical = call float @llvm.canonicalize.f32(float %x)
   %soft.canonical = fdiv float 1.0, %x
@@ -584,10 +526,7 @@ define float @canonicalize_only_daz(float %x) "denormal-fp-math"="ieee,preserve-
 ; CHECK-LABEL: define float @canonicalize_only_daz(
 ; CHECK-SAME: float [[X:%.*]]) #[[ATTR4:[0-9]+]] {
 ; CHECK-NEXT:    [[HARD_CANONICAL:%.*]] = call float @llvm.canonicalize.f32(float [[X]])
-; CHECK-NEXT:    [[SOFT_CANONICAL:%.*]] = fdiv float 1.000000e+00, [[X]]
-; CHECK-NEXT:    [[ORD:%.*]] = fcmp ord float [[X]], 0.000000e+00
-; CHECK-NEXT:    [[X_CANON:%.*]] = select i1 [[ORD]], float [[HARD_CANONICAL]], float [[SOFT_CANONICAL]]
-; CHECK-NEXT:    ret float [[X_CANON]]
+; CHECK-NEXT:    ret float [[HARD_CANONICAL]]
 ;
   %hard.canonical = call float @llvm.canonicalize.f32(float %x)
   %soft.canonical = fdiv float 1.0, %x
