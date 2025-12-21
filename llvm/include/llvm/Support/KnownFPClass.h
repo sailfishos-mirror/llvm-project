@@ -54,6 +54,9 @@ struct KnownFPClass {
   /// Return true if it's known this can never be an infinity.
   bool isKnownNeverInfinity() const { return isKnownNever(fcInf); }
 
+  /// Return true if it's known this can never be an infinity or nan
+  bool isKnownNeverInfOrNaN() const { return isKnownNever(fcInf | fcNan); }
+
   /// Return true if it's known this can never be +infinity.
   bool isKnownNeverPosInfinity() const { return isKnownNever(fcPosInf); }
 
@@ -119,6 +122,17 @@ struct KnownFPClass {
     return isKnownNever(OrderedGreaterThanZeroMask);
   }
 
+  /// Return true if it's know this can never be a negative value or a logical
+  /// 0.
+  ///
+  ///      NaN --> true
+  ///  x >= -0 --> false
+  ///     nsub --> true if mode is ieee, false otherwise.
+  ///   x < -0 --> true
+  bool cannotBeOrderedGreaterEqZero(DenormalMode Mode) const {
+    return isKnownNever(fcPositive) && isKnownNeverLogicalNegZero(Mode);
+  }
+
   KnownFPClass &operator|=(const KnownFPClass &RHS) {
     KnownFPClasses = KnownFPClasses | RHS.KnownFPClasses;
 
@@ -164,6 +178,21 @@ struct KnownFPClass {
   LLVM_ABI static KnownFPClass
   canonicalize(const KnownFPClass &Src,
                DenormalMode DenormMode = DenormalMode::getDynamic());
+
+  /// Report known values for fmul
+  LLVM_ABI static KnownFPClass
+  fmul(const KnownFPClass &LHS, const KnownFPClass &RHS,
+       DenormalMode Mode = DenormalMode::getDynamic());
+
+  // Special case of fmul x, x.
+  static KnownFPClass square(const KnownFPClass &Src,
+                             DenormalMode Mode = DenormalMode::getDynamic()) {
+    KnownFPClass Known = fmul(Src, Src, Mode);
+
+    // X, * X is always non-negative or a NaN.
+    Known.knownNot(fcNegative);
+    return Known;
+  }
 
   /// Report known values for exp, exp2 and exp10.
   LLVM_ABI static KnownFPClass exp(const KnownFPClass &Src);
