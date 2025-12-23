@@ -283,6 +283,10 @@ struct KnownFPClass {
   static LLVM_ABI KnownFPClass
   log(const KnownFPClass &Src, DenormalMode Mode = DenormalMode::getDynamic());
 
+  /// Propagate known class for sqrt
+  static LLVM_ABI KnownFPClass
+  sqrt(const KnownFPClass &Src, DenormalMode Mode = DenormalMode::getDynamic());
+
   void resetAll() { *this = KnownFPClass(); }
 };
 
