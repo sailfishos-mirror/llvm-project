@@ -1,10 +1,6 @@
 # There's no real issue with windows here, it's just that some CMake generated paths for targets end up being longer
 # than 255 chars when combined with the fact that pip wants to install into a tmp directory buried under
 # C/Users/ContainerAdministrator/AppData/Local/Temp.
-# UNSUPPORTED: target={{.*(windows).*}}
-# REQUIRES: expensive_checks
-# REQUIRES: non-shared-libs-build
-# REQUIRES: bindings-python
 
 # RUN: export CMAKE_BUILD_TYPE=%cmake_build_type
 # RUN: export CMAKE_CXX_COMPILER=%host_cxx
@@ -18,7 +14,8 @@
 # RUN: export MLIR_PYTHON_PACKAGE_PREFIX=mlir_standalone
 # RUN: export MLIR_BINDINGS_PYTHON_NB_DOMAIN=mlir_standalone
 
-# RUN: %python -m pip wheel "%mlir_src_root/examples/standalone" -w "%mlir_obj_root/wheelhouse" -v | tee %t
+# RUN: %python -m pip install scikit-build-core
+# RUN: %python -m pip wheel "%mlir_src_root/examples/standalone" -w "%mlir_obj_root/wheelhouse" -v --no-build-isolation | tee %t
 
 # RUN: rm -rf "%mlir_obj_root/standalone-python-bindings-install"
 # RUN: %python -m pip install standalone_python_bindings -f "%mlir_obj_root/wheelhouse" --target "%mlir_obj_root/standalone-python-bindings-install" -v | tee -a %t
