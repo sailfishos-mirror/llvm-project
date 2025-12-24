@@ -330,8 +330,14 @@ static void serializeReference(const Reference &Ref, Object &ReferenceObj) {
   ReferenceObj["Name"] = Ref.Name;
   ReferenceObj["QualName"] = Ref.QualName;
   ReferenceObj["USR"] = toHex(toStringRef(Ref.USR));
-  if (!Ref.DocumentationFileName.empty())
+  if (!Ref.DocumentationFileName.empty()) {
     ReferenceObj["DocumentationFileName"] = Ref.DocumentationFileName;
+
+    // If the reference is a nested class, the
+    if (Ref.Path != "GlobalNamespace") {
+      ReferenceObj["PathStem"] = sys::path::stem(Ref.Path);
+    }
+  }
 }
 
 // Although namespaces and records both have ScopeChildren, they serialize them
