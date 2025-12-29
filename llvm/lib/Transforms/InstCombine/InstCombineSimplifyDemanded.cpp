@@ -2342,9 +2342,25 @@ Value *InstCombinerImpl::SimplifyDemandedUseFPClass(Value *V,
       auto *FPOp = cast<FPMathOperator>(CI);
 
       bool ChangedFlags = false;
+      if (!FPOp->hasNoSignedZeros()) {
+        // Add NSZ flag if we know the result will not be sensitive on the sign
+        // of 0.
+        FPClassTest ZeroMask = fcZero;
 
-      // TODO: Add NSZ flag if we know the result will not be sensitive on the
-      // sign of 0.
+        if (Mode != DenormalMode::getIEEE())
+          ZeroMask |= fcSubnormal;
+
+        bool ResultNotLogical0 = (ValidResults & ZeroMask) == fcNone;
+        if (ResultNotLogical0 ||
+            ((KnownLHS.isKnownNeverLogicalNegZero(Mode) ||
+              KnownRHS.isKnownNeverLogicalPosZero(Mode)) &&
+             (KnownLHS.isKnownNeverLogicalPosZero(Mode) ||
+              KnownRHS.isKnownNeverLogicalNegZero(Mode)))) {
+          CI->setHasNoSignedZeros(true);
+          ChangedFlags = true;
+        }
+      }
+
       if (!FPOp->hasNoNaNs() && (ValidResults & fcNan) == fcNone) {
         CI->dropUBImplyingAttrsAndMetadata();
         CI->setHasNoNaNs(true);
