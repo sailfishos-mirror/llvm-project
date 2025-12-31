@@ -1718,6 +1718,16 @@ def PseudoJIRL_TAIL : Pseudo<(outs), (ins GPR:$rj, simm16_lsl2:$imm16)>,
                       PseudoInstExpansion<(JIRL R0, GPR:$rj,
                                            simm16_lsl2:$imm16)>;
 
+/// call30/tail30 macro instructions
+let isCall = 1, isBarrier = 1, isCodeGenOnly = 0, isAsmParserOnly = 1,
+    Defs = [R1], hasSideEffects = 0, mayStore = 0, mayLoad = 0 in
+def PseudoCALL30 : Pseudo<(outs), (ins bare_symbol:$dst), [], "call30", "$dst">;
+let isCall = 1, isTerminator = 1, isReturn = 1, isBarrier = 1, Uses = [R3],
+    isCodeGenOnly = 0, isAsmParserOnly = 1, hasSideEffects = 0,
+    mayStore = 0, mayLoad = 0 in
+def PseudoTAIL30 : Pseudo<(outs), (ins GPR:$tmp, bare_symbol:$dst), [],
+                          "tail30", "$tmp, $dst">;
+
 /// call36/taill36 macro instructions
 let isCall = 1, isBarrier = 1, isCodeGenOnly = 0, isAsmParserOnly = 1,
     Defs = [R1], hasSideEffects = 0, mayStore = 0, mayLoad = 0 in
