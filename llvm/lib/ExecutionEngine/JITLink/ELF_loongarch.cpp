@@ -37,9 +37,41 @@ public:
   ELFJITLinker_loongarch(std::unique_ptr<JITLinkContext> Ctx,
                          std::unique_ptr<LinkGraph> G,
                          PassConfiguration PassConfig)
-      : JITLinker(std::move(Ctx), std::move(G), std::move(PassConfig)) {}
+      : JITLinker(std::move(Ctx), std::move(G), std::move(PassConfig)) {
+    JITLinkerBase::getPassConfig().PostAllocationPasses.push_back(
+        [this](LinkGraph &G) { return gatherLoongArchPCAdd20(G); });
+  }
 
 private:
+  DenseMap<std::pair<const Block *, orc::ExecutorAddrDiff>, const Edge *>
+      RelPCAdd20Map;
+
+  Error gatherLoongArchPCAdd20(LinkGraph &G) {
+    for (Block *B : G.blocks())
+      for (Edge &E : B->edges())
+        if (E.getKind() == PCAdd20)
+          RelPCAdd20Map[{B, E.getOffset()}] = &E;
+
+    return Error::success();
+  }
+
+  Expected<const Edge &> getLoongArchPCAdd20(const Edge &E) const {
+    using namespace loongarch;
+    assert((E.getKind() == PCAdd12) &&
+           "Can only have high relocation for PCAdd12");
+
+    const Symbol &Sym = E.getTarget();
+    const Block &B = Sym.getBlock();
+    orc::ExecutorAddrDiff Offset = Sym.getOffset() + E.getAddend();
+
+    auto It = RelPCAdd20Map.find({&B, Offset});
+    if (It != RelPCAdd20Map.end())
+      return *It->second;
+
+    return make_error<JITLinkError>("No PCAdd20 relocation type be found "
+                                    "for PCAdd12 relocation type");
+  }
+
   /// Apply fixup expression for edge to block content.
   Error applyFixup(LinkGraph &G, Block &B, const Edge &E) const {
     using namespace support;
@@ -147,6 +179,48 @@ private:
       uint32_t RawInstr = *(ulittle32_t *)FixupPtr;
       uint32_t Imm11_0 = TargetOffset << 10;
       *(ulittle32_t *)FixupPtr = RawInstr | Imm11_0;
+      break;
+    }
+    case PCAdd20: {
+      uint64_t Target = TargetAddress + Addend;
+      int64_t Delta = Target - FixupAddress + 0x800;
+
+      if (!isInt<32>(Delta))
+        return makeTargetOutOfRangeError(G, B, E);
+
+      uint32_t RawInstr = *(little32_t *)FixupPtr;
+      uint32_t Imm31_12 = extractBits(Delta, /*Hi=*/31, /*Lo=*/12) << 5;
+      *(little32_t *)FixupPtr = RawInstr | Imm31_12;
+      break;
+    }
+    case PCAdd12: {
+      auto RelPCAdd20 = getLoongArchPCAdd20(E);
+      if (!RelPCAdd20)
+        return RelPCAdd20.takeError();
+      int64_t Delta =
+          (RelPCAdd20->getTarget().getAddress() + RelPCAdd20->getAddend()) -
+          (E.getTarget().getAddress() + E.getAddend());
+
+      uint32_t RawInstr = *(ulittle32_t *)FixupPtr;
+      uint32_t Imm11_0 = extractBits(Delta, /*Hi=*/11, /*Lo=*/0) << 10;
+      *(ulittle32_t *)FixupPtr = RawInstr | Imm11_0;
+      break;
+    }
+    case Call30PCRel: {
+      int64_t Value = TargetAddress - FixupAddress + Addend;
+
+      if (Value != llvm::SignExtend64(Value, 32))
+        return makeTargetOutOfRangeError(G, B, E);
+
+      if (!isShiftedInt<30, 2>(Value))
+        return makeAlignmentError(orc::ExecutorAddr(FixupAddress), Value, 4, E);
+
+      uint32_t Pcaddu12i = *(little32_t *)FixupPtr;
+      uint32_t Hi20 = extractBits(Value + (1 << 17), /*Hi=*/31, /*Lo=*/12) << 5;
+      *(little32_t *)FixupPtr = Pcaddu12i | Hi20;
+      uint32_t Jirl = *(little32_t *)(FixupPtr + 4);
+      uint32_t Lo10 = extractBits(Value, /*Hi=*/11, /*Lo=*/2) << 10;
+      *(little32_t *)(FixupPtr + 4) = Jirl | Lo10;
       break;
     }
     case Call36PCRel: {
@@ -534,6 +608,8 @@ private:
       return RequestGOTAndTransformToPage20;
     case ELF::R_LARCH_GOT_PC_LO12:
       return RequestGOTAndTransformToPageOffset12;
+    case ELF::R_LARCH_CALL30:
+      return Call30PCRel;
     case ELF::R_LARCH_CALL36:
       return Call36PCRel;
     case ELF::R_LARCH_ADD6:
@@ -562,6 +638,13 @@ private:
       return SubUleb128;
     case ELF::R_LARCH_ALIGN:
       return AlignRelaxable;
+    case ELF::R_LARCH_PCADD_HI20:
+      return PCAdd20;
+    case ELF::R_LARCH_PCADD_LO12:
+    case ELF::R_LARCH_GOT_PCADD_LO12:
+      return PCAdd12;
+    case ELF::R_LARCH_GOT_PCADD_HI20:
+      return RequestGOTAndTransformToPCAdd20;
     }
 
     return make_error<JITLinkError>(
