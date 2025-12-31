@@ -51,6 +51,16 @@ class PyType;
 class PySymbolTable;
 class PyValue;
 
+/// Wrapper for the global LLVM debugging flag.
+struct MLIR_PYTHON_API_EXPORTED PyGlobalDebugFlag {
+  static void set(nanobind::object &o, bool enable);
+  static bool get(const nanobind::object &);
+  static void bind(nanobind::module_ &m);
+
+private:
+  static nanobind::ft_mutex mutex;
+};
+
 /// Template for a reference to a concrete type which captures a python
 /// reference to its underlying python object.
 template <typename T>
@@ -1454,11 +1464,7 @@ public:
   PyOperationList(PyOperationRef parentOperation, MlirBlock block)
       : parentOperation(std::move(parentOperation)), block(block) {}
 
-  PyOperationIterator dunderIter() {
-    parentOperation->checkValid();
-    return PyOperationIterator(parentOperation,
-                               mlirBlockGetFirstOperation(block));
-  }
+  PyOperationIterator dunderIter();
 
   intptr_t dunderLen();
 
@@ -1569,20 +1575,6 @@ public:
 
   static void bindDerived(ClassTy &c);
 };
-
-/// Returns the list of types of the values held by container.
-template <typename Container>
-std::vector<nanobind::typed<nanobind::object, PyType>>
-getValueTypes(Container &container, PyMlirContextRef &context) {
-  std::vector<nanobind::typed<nanobind::object, PyType>> result;
-  result.reserve(container.size());
-  for (int i = 0, e = container.size(); i < e; ++i) {
-    result.push_back(PyType(context->getRef(),
-                            mlirValueGetType(container.getElement(i).get()))
-                         .maybeDownCast());
-  }
-  return result;
-}
 
 /// A list of operation results. Internally, these are stored as consecutive
 /// elements, random access is cheap. The (returned) result list is associated
@@ -1811,6 +1803,8 @@ private:
 };
 
 MLIR_PYTHON_API_EXPORTED MlirValue getUniqueResult(MlirOperation operation);
+MLIR_PYTHON_API_EXPORTED void populateIRCore(nanobind::module_ &m);
+MLIR_PYTHON_API_EXPORTED void populateRoot(nanobind::module_ &m);
 } // namespace MLIR_BINDINGS_PYTHON_DOMAIN
 } // namespace python
 } // namespace mlir
