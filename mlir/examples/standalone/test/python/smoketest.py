@@ -21,7 +21,7 @@ with mlir_standalone.ir.Context():
 
     custom_type = standalone_d.CustomType.get("foo")
     # CHECK: !standalone.custom<"foo">
-    print(custom_type)
+    print(custom_type, file=sys.stderr)
 
 
 # CHECK: Testing mlir package
