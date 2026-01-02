@@ -1204,5 +1204,5 @@ define nofpclass(snan) half @ret_no_snan__known_negative__fsub__known_positive()
   ret half %result
 }
 
-attributes #0 = { "denormal-fp-math"="preserve-sign,preserve-sign" }
-attributes #1 = { "denormal-fp-math"="dynamic,dynamic" }
+attributes #0 = { denormal_fpenv(preservesign) }
+attributes #1 = { denormal_fpenv(dynamic) }

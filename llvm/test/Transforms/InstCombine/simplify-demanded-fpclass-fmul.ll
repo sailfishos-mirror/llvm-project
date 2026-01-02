@@ -1402,5 +1402,5 @@ define nofpclass(nan inf sub zero) float @norm_result_demands_sub_source_rhs(i1 
   ret float %mul
 }
 
-attributes #0 = { "denormal-fp-math"="preserve-sign,preserve-sign" }
-attributes #1 = { "denormal-fp-math"="dynamic,dynamic" }
+attributes #0 = { denormal_fpenv(preservesign) }
+attributes #1 = { denormal_fpenv(dynamic) }

@@ -2043,9 +2043,9 @@ define nofpclass(snan) half @inf_or_nan__fadd__not_nan(half nofpclass(nan) %not.
   ret half %result
 }
 
-attributes #0 = { "denormal-fp-math"="preserve-sign,preserve-sign" }
-attributes #1 = { "denormal-fp-math"="dynamic,dynamic" }
-attributes #2 = { "denormal-fp-math"="ieee,preserve-sign" }
-attributes #3 = { "denormal-fp-math"="preserve-sign,ieee" }
-attributes #4 = { "denormal-fp-math"="ieee,positive-zero" }
-attributes #5 = { "denormal-fp-math"="positive-zero,ieee" }
+attributes #0 = { denormal_fpenv(preservesign) }
+attributes #1 = { denormal_fpenv(dynamic) }
+attributes #2 = { denormal_fpenv(ieee|preservesign) }
+attributes #3 = { denormal_fpenv(preservesign|ieee) }
+attributes #4 = { denormal_fpenv(ieee|positivezero) }
+attributes #5 = { denormal_fpenv(positivezero|ieee) }

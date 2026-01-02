@@ -2641,6 +2641,23 @@ static void processMemoryEffects(llvm::Function *func, LLVMFuncOp funcOp) {
   funcOp.setMemoryEffectsAttr(memAttr);
 }
 
+static void processDenormalFPEnv(llvm::Function *func, LLVMFuncOp funcOp) {
+  llvm::DenormalFPEnv denormalFpEnv = func->getDenormalFPEnv();
+  // Only set the attr when it does not match the default value.
+  if (denormalFpEnv == llvm::DenormalFPEnv::getDefault())
+    return;
+
+  llvm::DenormalMode defaultMode = denormalFpEnv.DefaultMode;
+  llvm::DenormalMode floatMode = denormalFpEnv.F32Mode;
+
+  auto denormalFpEnvAttr = DenormalFPEnvAttr::get(
+      funcOp.getContext(), convertDenormalModeKindFromLLVM(defaultMode.Output),
+      convertDenormalModeKindFromLLVM(defaultMode.Input),
+      convertDenormalModeKindFromLLVM(floatMode.Output),
+      convertDenormalModeKindFromLLVM(floatMode.Input));
+  funcOp.setDenormalFpenvAttr(denormalFpEnvAttr);
+}
+
 // List of LLVM IR attributes that map to an explicit attribute on the MLIR
 // LLVMFuncOp.
 static constexpr std::array kExplicitLLVMFuncOpAttributes{
@@ -2654,8 +2671,6 @@ static constexpr std::array kExplicitLLVMFuncOpAttributes{
     StringLiteral("aarch64_pstate_sm_enabled"),
     StringLiteral("alwaysinline"),
     StringLiteral("convergent"),
-    StringLiteral("denormal-fp-math"),
-    StringLiteral("denormal-fp-math-f32"),
     StringLiteral("fp-contract"),
     StringLiteral("frame-pointer"),
     StringLiteral("inlinehint"),
@@ -2691,6 +2706,7 @@ static void processPassthroughAttrs(llvm::Function *func, LLVMFuncOp funcOp) {
 void ModuleImport::processFunctionAttributes(llvm::Function *func,
                                              LLVMFuncOp funcOp) {
   processMemoryEffects(func, funcOp);
+  processDenormalFPEnv(func, funcOp);
   processPassthroughAttrs(func, funcOp);
 
   if (func->hasFnAttribute(llvm::Attribute::NoInline))
@@ -2788,16 +2804,6 @@ void ModuleImport::processFunctionAttributes(llvm::Function *func,
   if (llvm::Attribute attr = func->getFnAttribute("no-signed-zeros-fp-math");
       attr.isStringAttribute())
     funcOp.setNoSignedZerosFpMath(attr.getValueAsBool());
-
-  if (llvm::Attribute attr = func->getFnAttribute("denormal-fp-math");
-      attr.isStringAttribute())
-    funcOp.setDenormalFpMathAttr(
-        StringAttr::get(context, attr.getValueAsString()));
-
-  if (llvm::Attribute attr = func->getFnAttribute("denormal-fp-math-f32");
-      attr.isStringAttribute())
-    funcOp.setDenormalFpMathF32Attr(
-        StringAttr::get(context, attr.getValueAsString()));
 
   if (llvm::Attribute attr = func->getFnAttribute("fp-contract");
       attr.isStringAttribute())

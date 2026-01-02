@@ -345,5 +345,5 @@ define nofpclass(nan) float @ret_no_nan__sqrt__no_inf_inputs(float nofpclass(inf
   ret float %result
 }
 
-attributes #0 = { "denormal-fp-math"="preserve-sign,preserve-sign" }
-attributes #1 = { "denormal-fp-math"="dynamic,dynamic" }
+attributes #0 = { denormal_fpenv(preservesign) }
+attributes #1 = { denormal_fpenv(dynamic) }

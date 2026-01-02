@@ -576,6 +576,6 @@ define nofpclass(nan) float @ret_nofpclass_nan__canonicalize_only_sub__dapz(i1 %
   ret float %canon
 }
 
-attributes #0 = { "denormal-fp-math"="preserve-sign,preserve-sign" }
-attributes #1 = { "denormal-fp-math"="dynamic,dynamic" }
-attributes #2 = { "denormal-fp-math"="positive-zero,positive-zero" }
+attributes #0 = { denormal_fpenv(preservesign) }
+attributes #1 = { denormal_fpenv(dynamic) }
+attributes #2 = { denormal_fpenv(positivezero|positivezero) }
