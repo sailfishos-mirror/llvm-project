@@ -2081,13 +2081,15 @@ Value *InstCombinerImpl::SimplifyDemandedUseFPClass(Instruction *I,
     Known.fneg();
     break;
   }
-  case Instruction::FAdd: {
+  case Instruction::FAdd:
+  case Instruction::FSub: {
     KnownFPClass KnownLHS, KnownRHS;
 
     const SimplifyQuery &SQ = getSimplifyQuery();
 
     // fadd x, x can be handled more aggressively.
     if (I->getOperand(0) == I->getOperand(1) &&
+        I->getOpcode() == Instruction::FAdd &&
         isGuaranteedNotToBeUndef(I->getOperand(0), SQ.AC, CxtI, SQ.DT,
                                  Depth + 1)) {
       Type *EltTy = VTy->getScalarType();
@@ -2141,7 +2143,10 @@ Value *InstCombinerImpl::SimplifyDemandedUseFPClass(Instruction *I,
 
       Type *EltTy = VTy->getScalarType();
       DenormalMode Mode = F.getDenormalMode(EltTy->getFltSemantics());
-      Known = KnownFPClass::fadd(KnownLHS, KnownRHS, Mode);
+
+      Known = I->getOpcode() == Instruction::FAdd
+                  ? KnownFPClass::fadd(KnownLHS, KnownRHS, Mode)
+                  : KnownFPClass::fsub(KnownLHS, KnownRHS, Mode);
     }
 
     FPClassTest ValidResults = DemandedMask & Known.KnownFPClasses;
@@ -2157,11 +2162,13 @@ Value *InstCombinerImpl::SimplifyDemandedUseFPClass(Instruction *I,
     }
 
     // With nnan: X + {+/-}Inf --> {+/-}Inf
-    if (KnownRHS.isKnownAlways(fcInf | fcNan) &&
-        KnownLHS.isKnownNever(fcNan))
+    if (I->getOpcode() == Instruction::FAdd &&
+        KnownRHS.isKnownAlways(fcInf | fcNan) && KnownLHS.isKnownNever(fcNan)) {
       return I->getOperand(1);
+    }
 
     // With nnan: {+/-}Inf + X --> {+/-}Inf
+    // With nnan: {+/-}Inf - X --> {+/-}Inf
     if (KnownLHS.isKnownAlways(fcInf | fcNan) &&
         KnownRHS.isKnownNever(fcNan))
       return I->getOperand(0);
