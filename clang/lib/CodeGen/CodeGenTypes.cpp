@@ -471,10 +471,8 @@ llvm::Type *CodeGenTypes::ConvertType(QualType T) {
 
     case BuiltinType::Half:
       // Half FP can either be storage-only (lowered to i16) or native.
-      ResultType = getTypeForFormat(
-          getLLVMContext(), Context.getFloatTypeSemantics(T),
-          Context.getLangOpts().NativeHalfType ||
-              !Context.getTargetInfo().useFP16ConversionIntrinsics());
+      ResultType = getTypeForFormat(getLLVMContext(),
+                                    Context.getFloatTypeSemantics(T), true);
       break;
     case BuiltinType::LongDouble:
       LongDoubleReferenced = true;

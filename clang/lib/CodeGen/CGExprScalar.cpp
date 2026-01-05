@@ -1596,23 +1596,11 @@ Value *ScalarExprEmitter::EmitScalarConversion(Value *Src, QualType SrcType,
   // Cast from half through float if half isn't a native type.
   if (SrcType->isHalfType() && !CGF.getContext().getLangOpts().NativeHalfType) {
     // Cast to FP using the intrinsic if the half type itself isn't supported.
-    if (DstTy->isFloatingPointTy()) {
-      if (CGF.getContext().getTargetInfo().useFP16ConversionIntrinsics())
-        return Builder.CreateCall(
-            CGF.CGM.getIntrinsic(llvm::Intrinsic::convert_from_fp16, DstTy),
-            Src);
-    } else {
+    if (!DstTy->isFloatingPointTy()) {
       // Cast to other types through float, using either the intrinsic or FPExt,
       // depending on whether the half type itself is supported
       // (as opposed to operations on half, available with NativeHalfType).
-      if (CGF.getContext().getTargetInfo().useFP16ConversionIntrinsics()) {
-        Src = Builder.CreateCall(
-            CGF.CGM.getIntrinsic(llvm::Intrinsic::convert_from_fp16,
-                                 CGF.CGM.FloatTy),
-            Src);
-      } else {
-        Src = Builder.CreateFPExt(Src, CGF.CGM.FloatTy, "conv");
-      }
+      Src = Builder.CreateFPExt(Src, CGF.CGM.FloatTy, "conv");
       SrcType = CGF.getContext().FloatTy;
       SrcTy = CGF.FloatTy;
     }
@@ -1723,11 +1711,6 @@ Value *ScalarExprEmitter::EmitScalarConversion(Value *Src, QualType SrcType,
   if (DstType->isHalfType() && !CGF.getContext().getLangOpts().NativeHalfType) {
     // Make sure we cast in a single step if from another FP type.
     if (SrcTy->isFloatingPointTy()) {
-      // Use the intrinsic if the half type itself isn't supported
-      // (as opposed to operations on half, available with NativeHalfType).
-      if (CGF.getContext().getTargetInfo().useFP16ConversionIntrinsics())
-        return Builder.CreateCall(
-            CGF.CGM.getIntrinsic(llvm::Intrinsic::convert_to_fp16, SrcTy), Src);
       // If the half type is supported, just use an fptrunc.
       return Builder.CreateFPTrunc(Src, DstTy);
     }
@@ -1737,14 +1720,7 @@ Value *ScalarExprEmitter::EmitScalarConversion(Value *Src, QualType SrcType,
   Res = EmitScalarCast(Src, SrcType, DstType, SrcTy, DstTy, Opts);
 
   if (DstTy != ResTy) {
-    if (CGF.getContext().getTargetInfo().useFP16ConversionIntrinsics()) {
-      assert(ResTy->isIntegerTy(16) && "Only half FP requires extra conversion");
-      Res = Builder.CreateCall(
-        CGF.CGM.getIntrinsic(llvm::Intrinsic::convert_to_fp16, CGF.CGM.FloatTy),
-        Res);
-    } else {
-      Res = Builder.CreateFPTrunc(Res, ResTy, "conv");
-    }
+    Res = Builder.CreateFPTrunc(Res, ResTy, "conv");
   }
 
   if (Opts.EmitImplicitIntegerTruncationChecks)
@@ -3399,14 +3375,7 @@ ScalarExprEmitter::EmitScalarPrePostIncDec(const UnaryOperator *E, LValue LV,
 
     if (type->isHalfType() && !CGF.getContext().getLangOpts().NativeHalfType) {
       // Another special case: half FP increment should be done via float
-      if (CGF.getContext().getTargetInfo().useFP16ConversionIntrinsics()) {
-        value = Builder.CreateCall(
-            CGF.CGM.getIntrinsic(llvm::Intrinsic::convert_from_fp16,
-                                 CGF.CGM.FloatTy),
-            input, "incdec.conv");
-      } else {
-        value = Builder.CreateFPExt(input, CGF.CGM.FloatTy, "incdec.conv");
-      }
+      value = Builder.CreateFPExt(input, CGF.CGM.FloatTy, "incdec.conv");
     }
 
     if (value->getType()->isFloatTy())
@@ -3439,14 +3408,7 @@ ScalarExprEmitter::EmitScalarPrePostIncDec(const UnaryOperator *E, LValue LV,
     value = Builder.CreateFAdd(value, amt, isInc ? "inc" : "dec");
 
     if (type->isHalfType() && !CGF.getContext().getLangOpts().NativeHalfType) {
-      if (CGF.getContext().getTargetInfo().useFP16ConversionIntrinsics()) {
-        value = Builder.CreateCall(
-            CGF.CGM.getIntrinsic(llvm::Intrinsic::convert_to_fp16,
-                                 CGF.CGM.FloatTy),
-            value, "incdec.conv");
-      } else {
-        value = Builder.CreateFPTrunc(value, input->getType(), "incdec.conv");
-      }
+      value = Builder.CreateFPTrunc(value, input->getType(), "incdec.conv");
     }
 
   // Fixed-point types.

@@ -76,6 +76,10 @@ Changes to the LLVM IR
   keep floating point support out of printf if it can be proven unused.
 * Case values are no longer operands of `SwitchInst`.
 
+* Removed `llvm.convert.to.fp16` and `llvm.convert.from.fp16`
+  intrinsics. These are equivalent to `fptrunc` and `fpext` with half
+  with a bitcast.
+
 Changes to LLVM infrastructure
 ------------------------------
 

@@ -133,307 +133,6 @@ define half @return(ptr %p) nounwind {
   ret half %r
 }
 
-define dso_local double @loadd(ptr nocapture readonly %a) local_unnamed_addr nounwind {
-; PPC32-LABEL: loadd:
-; PPC32:       # %bb.0: # %entry
-; PPC32-NEXT:    mflr r0
-; PPC32-NEXT:    stwu r1, -16(r1)
-; PPC32-NEXT:    stw r0, 20(r1)
-; PPC32-NEXT:    lhz r3, 2(r3)
-; PPC32-NEXT:    bl __extendhfsf2
-; PPC32-NEXT:    lwz r0, 20(r1)
-; PPC32-NEXT:    addi r1, r1, 16
-; PPC32-NEXT:    mtlr r0
-; PPC32-NEXT:    blr
-;
-; P8-LABEL: loadd:
-; P8:       # %bb.0: # %entry
-; P8-NEXT:    mflr r0
-; P8-NEXT:    stdu r1, -32(r1)
-; P8-NEXT:    std r0, 48(r1)
-; P8-NEXT:    lhz r3, 2(r3)
-; P8-NEXT:    bl __extendhfsf2
-; P8-NEXT:    nop
-; P8-NEXT:    addi r1, r1, 32
-; P8-NEXT:    ld r0, 16(r1)
-; P8-NEXT:    mtlr r0
-; P8-NEXT:    blr
-;
-; P9-LABEL: loadd:
-; P9:       # %bb.0: # %entry
-; P9-NEXT:    addi r3, r3, 2
-; P9-NEXT:    lxsihzx f0, 0, r3
-; P9-NEXT:    xscvhpdp f1, f0
-; P9-NEXT:    blr
-;
-; SOFT-LABEL: loadd:
-; SOFT:       # %bb.0: # %entry
-; SOFT-NEXT:    mflr r0
-; SOFT-NEXT:    stdu r1, -32(r1)
-; SOFT-NEXT:    std r0, 48(r1)
-; SOFT-NEXT:    lhz r3, 2(r3)
-; SOFT-NEXT:    bl __extendhfsf2
-; SOFT-NEXT:    nop
-; SOFT-NEXT:    bl __extendsfdf2
-; SOFT-NEXT:    nop
-; SOFT-NEXT:    addi r1, r1, 32
-; SOFT-NEXT:    ld r0, 16(r1)
-; SOFT-NEXT:    mtlr r0
-; SOFT-NEXT:    blr
-;
-; BE-LABEL: loadd:
-; BE:       # %bb.0: # %entry
-; BE-NEXT:    mflr r0
-; BE-NEXT:    stdu r1, -112(r1)
-; BE-NEXT:    std r0, 128(r1)
-; BE-NEXT:    lhz r3, 2(r3)
-; BE-NEXT:    bl __extendhfsf2
-; BE-NEXT:    nop
-; BE-NEXT:    addi r1, r1, 112
-; BE-NEXT:    ld r0, 16(r1)
-; BE-NEXT:    mtlr r0
-; BE-NEXT:    blr
-entry:
-  %arrayidx = getelementptr inbounds i16, ptr %a, i64 1
-  %0 = load i16, ptr %arrayidx, align 2
-  %1 = tail call double @llvm.convert.from.fp16.f64(i16 %0)
-  ret double %1
-}
-
-declare double @llvm.convert.from.fp16.f64(i16)
-
-define dso_local float @loadf(ptr nocapture readonly %a) local_unnamed_addr nounwind {
-; PPC32-LABEL: loadf:
-; PPC32:       # %bb.0: # %entry
-; PPC32-NEXT:    mflr r0
-; PPC32-NEXT:    stwu r1, -16(r1)
-; PPC32-NEXT:    stw r0, 20(r1)
-; PPC32-NEXT:    lhz r3, 2(r3)
-; PPC32-NEXT:    bl __extendhfsf2
-; PPC32-NEXT:    lwz r0, 20(r1)
-; PPC32-NEXT:    addi r1, r1, 16
-; PPC32-NEXT:    mtlr r0
-; PPC32-NEXT:    blr
-;
-; P8-LABEL: loadf:
-; P8:       # %bb.0: # %entry
-; P8-NEXT:    mflr r0
-; P8-NEXT:    stdu r1, -32(r1)
-; P8-NEXT:    std r0, 48(r1)
-; P8-NEXT:    lhz r3, 2(r3)
-; P8-NEXT:    bl __extendhfsf2
-; P8-NEXT:    nop
-; P8-NEXT:    addi r1, r1, 32
-; P8-NEXT:    ld r0, 16(r1)
-; P8-NEXT:    mtlr r0
-; P8-NEXT:    blr
-;
-; P9-LABEL: loadf:
-; P9:       # %bb.0: # %entry
-; P9-NEXT:    addi r3, r3, 2
-; P9-NEXT:    lxsihzx f0, 0, r3
-; P9-NEXT:    xscvhpdp f1, f0
-; P9-NEXT:    blr
-;
-; SOFT-LABEL: loadf:
-; SOFT:       # %bb.0: # %entry
-; SOFT-NEXT:    mflr r0
-; SOFT-NEXT:    stdu r1, -32(r1)
-; SOFT-NEXT:    std r0, 48(r1)
-; SOFT-NEXT:    lhz r3, 2(r3)
-; SOFT-NEXT:    bl __extendhfsf2
-; SOFT-NEXT:    nop
-; SOFT-NEXT:    addi r1, r1, 32
-; SOFT-NEXT:    ld r0, 16(r1)
-; SOFT-NEXT:    mtlr r0
-; SOFT-NEXT:    blr
-;
-; BE-LABEL: loadf:
-; BE:       # %bb.0: # %entry
-; BE-NEXT:    mflr r0
-; BE-NEXT:    stdu r1, -112(r1)
-; BE-NEXT:    std r0, 128(r1)
-; BE-NEXT:    lhz r3, 2(r3)
-; BE-NEXT:    bl __extendhfsf2
-; BE-NEXT:    nop
-; BE-NEXT:    addi r1, r1, 112
-; BE-NEXT:    ld r0, 16(r1)
-; BE-NEXT:    mtlr r0
-; BE-NEXT:    blr
-entry:
-  %arrayidx = getelementptr inbounds i16, ptr %a, i64 1
-  %0 = load i16, ptr %arrayidx, align 2
-  %1 = tail call float @llvm.convert.from.fp16.f32(i16 %0)
-  ret float %1
-}
-
-declare float @llvm.convert.from.fp16.f32(i16)
-
-define dso_local void @stored(ptr nocapture %a, double %b) local_unnamed_addr nounwind {
-; PPC32-LABEL: stored:
-; PPC32:       # %bb.0: # %entry
-; PPC32-NEXT:    mflr r0
-; PPC32-NEXT:    stwu r1, -16(r1)
-; PPC32-NEXT:    stw r0, 20(r1)
-; PPC32-NEXT:    stw r30, 8(r1) # 4-byte Folded Spill
-; PPC32-NEXT:    mr r30, r3
-; PPC32-NEXT:    bl __truncdfhf2
-; PPC32-NEXT:    sth r3, 0(r30)
-; PPC32-NEXT:    lwz r30, 8(r1) # 4-byte Folded Reload
-; PPC32-NEXT:    lwz r0, 20(r1)
-; PPC32-NEXT:    addi r1, r1, 16
-; PPC32-NEXT:    mtlr r0
-; PPC32-NEXT:    blr
-;
-; P8-LABEL: stored:
-; P8:       # %bb.0: # %entry
-; P8-NEXT:    mflr r0
-; P8-NEXT:    std r30, -16(r1) # 8-byte Folded Spill
-; P8-NEXT:    stdu r1, -48(r1)
-; P8-NEXT:    std r0, 64(r1)
-; P8-NEXT:    mr r30, r3
-; P8-NEXT:    bl __truncdfhf2
-; P8-NEXT:    nop
-; P8-NEXT:    sth r3, 0(r30)
-; P8-NEXT:    addi r1, r1, 48
-; P8-NEXT:    ld r0, 16(r1)
-; P8-NEXT:    ld r30, -16(r1) # 8-byte Folded Reload
-; P8-NEXT:    mtlr r0
-; P8-NEXT:    blr
-;
-; P9-LABEL: stored:
-; P9:       # %bb.0: # %entry
-; P9-NEXT:    xscvdphp f0, f1
-; P9-NEXT:    stxsihx f0, 0, r3
-; P9-NEXT:    blr
-;
-; SOFT-LABEL: stored:
-; SOFT:       # %bb.0: # %entry
-; SOFT-NEXT:    mflr r0
-; SOFT-NEXT:    std r30, -16(r1) # 8-byte Folded Spill
-; SOFT-NEXT:    stdu r1, -48(r1)
-; SOFT-NEXT:    mr r30, r3
-; SOFT-NEXT:    mr r3, r4
-; SOFT-NEXT:    std r0, 64(r1)
-; SOFT-NEXT:    bl __truncdfhf2
-; SOFT-NEXT:    nop
-; SOFT-NEXT:    clrldi r3, r3, 48
-; SOFT-NEXT:    bl __extendhfsf2
-; SOFT-NEXT:    nop
-; SOFT-NEXT:    bl __truncsfhf2
-; SOFT-NEXT:    nop
-; SOFT-NEXT:    sth r3, 0(r30)
-; SOFT-NEXT:    addi r1, r1, 48
-; SOFT-NEXT:    ld r0, 16(r1)
-; SOFT-NEXT:    ld r30, -16(r1) # 8-byte Folded Reload
-; SOFT-NEXT:    mtlr r0
-; SOFT-NEXT:    blr
-;
-; BE-LABEL: stored:
-; BE:       # %bb.0: # %entry
-; BE-NEXT:    mflr r0
-; BE-NEXT:    stdu r1, -128(r1)
-; BE-NEXT:    std r0, 144(r1)
-; BE-NEXT:    std r30, 112(r1) # 8-byte Folded Spill
-; BE-NEXT:    mr r30, r3
-; BE-NEXT:    bl __truncdfhf2
-; BE-NEXT:    nop
-; BE-NEXT:    sth r3, 0(r30)
-; BE-NEXT:    ld r30, 112(r1) # 8-byte Folded Reload
-; BE-NEXT:    addi r1, r1, 128
-; BE-NEXT:    ld r0, 16(r1)
-; BE-NEXT:    mtlr r0
-; BE-NEXT:    blr
-entry:
-  %0 = tail call i16 @llvm.convert.to.fp16.f64(double %b)
-  store i16 %0, ptr %a, align 2
-  ret void
-}
-
-declare i16 @llvm.convert.to.fp16.f64(double)
-
-define dso_local void @storef(ptr nocapture %a, float %b) local_unnamed_addr nounwind {
-; PPC32-LABEL: storef:
-; PPC32:       # %bb.0: # %entry
-; PPC32-NEXT:    mflr r0
-; PPC32-NEXT:    stwu r1, -16(r1)
-; PPC32-NEXT:    stw r0, 20(r1)
-; PPC32-NEXT:    stw r30, 8(r1) # 4-byte Folded Spill
-; PPC32-NEXT:    mr r30, r3
-; PPC32-NEXT:    bl __truncsfhf2
-; PPC32-NEXT:    sth r3, 0(r30)
-; PPC32-NEXT:    lwz r30, 8(r1) # 4-byte Folded Reload
-; PPC32-NEXT:    lwz r0, 20(r1)
-; PPC32-NEXT:    addi r1, r1, 16
-; PPC32-NEXT:    mtlr r0
-; PPC32-NEXT:    blr
-;
-; P8-LABEL: storef:
-; P8:       # %bb.0: # %entry
-; P8-NEXT:    mflr r0
-; P8-NEXT:    std r30, -16(r1) # 8-byte Folded Spill
-; P8-NEXT:    stdu r1, -48(r1)
-; P8-NEXT:    std r0, 64(r1)
-; P8-NEXT:    mr r30, r3
-; P8-NEXT:    bl __truncsfhf2
-; P8-NEXT:    nop
-; P8-NEXT:    sth r3, 0(r30)
-; P8-NEXT:    addi r1, r1, 48
-; P8-NEXT:    ld r0, 16(r1)
-; P8-NEXT:    ld r30, -16(r1) # 8-byte Folded Reload
-; P8-NEXT:    mtlr r0
-; P8-NEXT:    blr
-;
-; P9-LABEL: storef:
-; P9:       # %bb.0: # %entry
-; P9-NEXT:    xscvdphp f0, f1
-; P9-NEXT:    stxsihx f0, 0, r3
-; P9-NEXT:    blr
-;
-; SOFT-LABEL: storef:
-; SOFT:       # %bb.0: # %entry
-; SOFT-NEXT:    mflr r0
-; SOFT-NEXT:    std r30, -16(r1) # 8-byte Folded Spill
-; SOFT-NEXT:    stdu r1, -48(r1)
-; SOFT-NEXT:    mr r30, r3
-; SOFT-NEXT:    clrldi r3, r4, 32
-; SOFT-NEXT:    std r0, 64(r1)
-; SOFT-NEXT:    bl __truncsfhf2
-; SOFT-NEXT:    nop
-; SOFT-NEXT:    clrldi r3, r3, 48
-; SOFT-NEXT:    bl __extendhfsf2
-; SOFT-NEXT:    nop
-; SOFT-NEXT:    bl __truncsfhf2
-; SOFT-NEXT:    nop
-; SOFT-NEXT:    sth r3, 0(r30)
-; SOFT-NEXT:    addi r1, r1, 48
-; SOFT-NEXT:    ld r0, 16(r1)
-; SOFT-NEXT:    ld r30, -16(r1) # 8-byte Folded Reload
-; SOFT-NEXT:    mtlr r0
-; SOFT-NEXT:    blr
-;
-; BE-LABEL: storef:
-; BE:       # %bb.0: # %entry
-; BE-NEXT:    mflr r0
-; BE-NEXT:    stdu r1, -128(r1)
-; BE-NEXT:    std r0, 144(r1)
-; BE-NEXT:    std r30, 112(r1) # 8-byte Folded Spill
-; BE-NEXT:    mr r30, r3
-; BE-NEXT:    bl __truncsfhf2
-; BE-NEXT:    nop
-; BE-NEXT:    sth r3, 0(r30)
-; BE-NEXT:    ld r30, 112(r1) # 8-byte Folded Reload
-; BE-NEXT:    addi r1, r1, 128
-; BE-NEXT:    ld r0, 16(r1)
-; BE-NEXT:    mtlr r0
-; BE-NEXT:    blr
-entry:
-  %0 = tail call i16 @llvm.convert.to.fp16.f32(float %b)
-  store i16 %0, ptr %a, align 2
-  ret void
-}
-
-declare i16 @llvm.convert.to.fp16.f32(float)
 define void @test_load_store(ptr %in, ptr %out) nounwind {
 ; PPC32-LABEL: test_load_store:
 ; PPC32:       # %bb.0:
@@ -1063,13 +762,13 @@ define void @test_sitofp_i64(i64 %a, ptr %p) nounwind {
 ; BE-NEXT:    cmpldi r5, 1
 ; BE-NEXT:    std r30, 128(r1) # 8-byte Folded Spill
 ; BE-NEXT:    mr r30, r4
-; BE-NEXT:    ble cr0, .LBB16_2
+; BE-NEXT:    ble cr0, .LBB12_2
 ; BE-NEXT:  # %bb.1:
 ; BE-NEXT:    clrldi r4, r3, 53
 ; BE-NEXT:    addi r4, r4, 2047
 ; BE-NEXT:    or r3, r4, r3
 ; BE-NEXT:    rldicr r3, r3, 0, 52
-; BE-NEXT:  .LBB16_2:
+; BE-NEXT:  .LBB12_2:
 ; BE-NEXT:    std r3, 120(r1)
 ; BE-NEXT:    lfd f0, 120(r1)
 ; BE-NEXT:    fcfid f0, f0
@@ -1147,24 +846,24 @@ define i64 @test_fptoui_i64(ptr %p) nounwind {
 ; BE-NEXT:    lhz r3, 0(r3)
 ; BE-NEXT:    bl __extendhfsf2
 ; BE-NEXT:    nop
-; BE-NEXT:    addis r3, r2, .LCPI17_0@toc@ha
-; BE-NEXT:    lfs f0, .LCPI17_0@toc@l(r3)
+; BE-NEXT:    addis r3, r2, .LCPI13_0@toc@ha
+; BE-NEXT:    lfs f0, .LCPI13_0@toc@l(r3)
 ; BE-NEXT:    fsubs f2, f1, f0
 ; BE-NEXT:    fcmpu cr0, f1, f0
 ; BE-NEXT:    fctidz f2, f2
 ; BE-NEXT:    stfd f2, 120(r1)
 ; BE-NEXT:    fctidz f2, f1
 ; BE-NEXT:    stfd f2, 112(r1)
-; BE-NEXT:    blt cr0, .LBB17_2
+; BE-NEXT:    blt cr0, .LBB13_2
 ; BE-NEXT:  # %bb.1:
 ; BE-NEXT:    ld r3, 120(r1)
 ; BE-NEXT:    li r4, 1
 ; BE-NEXT:    rldic r4, r4, 63, 0
 ; BE-NEXT:    xor r3, r3, r4
-; BE-NEXT:    b .LBB17_3
-; BE-NEXT:  .LBB17_2:
+; BE-NEXT:    b .LBB13_3
+; BE-NEXT:  .LBB13_2:
 ; BE-NEXT:    ld r3, 112(r1)
-; BE-NEXT:  .LBB17_3:
+; BE-NEXT:  .LBB13_3:
 ; BE-NEXT:    addi r1, r1, 128
 ; BE-NEXT:    ld r0, 16(r1)
 ; BE-NEXT:    mtlr r0
@@ -1250,16 +949,16 @@ define void @test_uitofp_i64(i64 %a, ptr %p) nounwind {
 ; BE-NEXT:    cmpldi r5, 1
 ; BE-NEXT:    std r30, 128(r1) # 8-byte Folded Spill
 ; BE-NEXT:    mr r30, r4
-; BE-NEXT:    bgt cr0, .LBB18_2
+; BE-NEXT:    bgt cr0, .LBB14_2
 ; BE-NEXT:  # %bb.1:
 ; BE-NEXT:    mr r4, r3
-; BE-NEXT:    b .LBB18_3
-; BE-NEXT:  .LBB18_2:
+; BE-NEXT:    b .LBB14_3
+; BE-NEXT:  .LBB14_2:
 ; BE-NEXT:    clrldi r4, r3, 53
 ; BE-NEXT:    addi r4, r4, 2047
 ; BE-NEXT:    or r4, r4, r3
 ; BE-NEXT:    rldicr r4, r4, 0, 52
-; BE-NEXT:  .LBB18_3:
+; BE-NEXT:  .LBB14_3:
 ; BE-NEXT:    rldicl r5, r3, 10, 54
 ; BE-NEXT:    clrldi r6, r3, 63
 ; BE-NEXT:    std r4, 112(r1)
@@ -1267,28 +966,28 @@ define void @test_uitofp_i64(i64 %a, ptr %p) nounwind {
 ; BE-NEXT:    cmpldi r5, 1
 ; BE-NEXT:    rldicl r5, r3, 63, 1
 ; BE-NEXT:    or r4, r6, r5
-; BE-NEXT:    ble cr0, .LBB18_5
+; BE-NEXT:    ble cr0, .LBB14_5
 ; BE-NEXT:  # %bb.4:
 ; BE-NEXT:    clrldi r4, r4, 53
 ; BE-NEXT:    addi r4, r4, 2047
 ; BE-NEXT:    or r4, r4, r5
 ; BE-NEXT:    rldicl r4, r4, 53, 11
 ; BE-NEXT:    rldicl r4, r4, 11, 1
-; BE-NEXT:  .LBB18_5:
+; BE-NEXT:  .LBB14_5:
 ; BE-NEXT:    cmpdi r3, 0
 ; BE-NEXT:    std r4, 120(r1)
-; BE-NEXT:    bc 12, lt, .LBB18_7
+; BE-NEXT:    bc 12, lt, .LBB14_7
 ; BE-NEXT:  # %bb.6:
 ; BE-NEXT:    lfd f0, 112(r1)
 ; BE-NEXT:    fcfid f0, f0
 ; BE-NEXT:    frsp f1, f0
-; BE-NEXT:    b .LBB18_8
-; BE-NEXT:  .LBB18_7:
+; BE-NEXT:    b .LBB14_8
+; BE-NEXT:  .LBB14_7:
 ; BE-NEXT:    lfd f0, 120(r1)
 ; BE-NEXT:    fcfid f0, f0
 ; BE-NEXT:    frsp f0, f0
 ; BE-NEXT:    fadds f1, f0, f0
-; BE-NEXT:  .LBB18_8:
+; BE-NEXT:  .LBB14_8:
 ; BE-NEXT:    bl __truncsfhf2
 ; BE-NEXT:    nop
 ; BE-NEXT:    sth r3, 0(r30)
@@ -2130,10 +1829,10 @@ define float @test_sitofp_fadd_i32(i32 %a, ptr %b) nounwind {
 ; PPC32-NEXT:    stw r3, 8(r1)
 ; PPC32-NEXT:    xoris r3, r30, 32768
 ; PPC32-NEXT:    stw r3, 12(r1)
-; PPC32-NEXT:    lis r3, .LCPI23_0@ha
+; PPC32-NEXT:    lis r3, .LCPI19_0@ha
 ; PPC32-NEXT:    fmr f31, f1
 ; PPC32-NEXT:    lfd f0, 8(r1)
-; PPC32-NEXT:    lfs f1, .LCPI23_0@l(r3)
+; PPC32-NEXT:    lfs f1, .LCPI19_0@l(r3)
 ; PPC32-NEXT:    fsub f0, f0, f1
 ; PPC32-NEXT:    frsp f1, f0
 ; PPC32-NEXT:    bl __truncsfhf2
@@ -2265,16 +1964,16 @@ define half @PR40273(half) nounwind {
 ; PPC32-NEXT:    bl __truncsfhf2
 ; PPC32-NEXT:    clrlwi r3, r3, 16
 ; PPC32-NEXT:    bl __extendhfsf2
-; PPC32-NEXT:    lis r3, .LCPI24_0@ha
-; PPC32-NEXT:    lfs f0, .LCPI24_0@l(r3)
+; PPC32-NEXT:    lis r3, .LCPI20_0@ha
+; PPC32-NEXT:    lfs f0, .LCPI20_0@l(r3)
 ; PPC32-NEXT:    li r3, 0
 ; PPC32-NEXT:    fcmpu cr0, f1, f0
-; PPC32-NEXT:    bc 12, eq, .LBB24_2
+; PPC32-NEXT:    bc 12, eq, .LBB20_2
 ; PPC32-NEXT:  # %bb.1:
 ; PPC32-NEXT:    li r3, 4
-; PPC32-NEXT:  .LBB24_2:
-; PPC32-NEXT:    li r4, .LCPI24_1@l
-; PPC32-NEXT:    addis r4, r4, .LCPI24_1@ha
+; PPC32-NEXT:  .LBB20_2:
+; PPC32-NEXT:    li r4, .LCPI20_1@l
+; PPC32-NEXT:    addis r4, r4, .LCPI20_1@ha
 ; PPC32-NEXT:    lfsx f1, r4, r3
 ; PPC32-NEXT:    lwz r0, 20(r1)
 ; PPC32-NEXT:    addi r1, r1, 16
@@ -2294,11 +1993,11 @@ define half @PR40273(half) nounwind {
 ; P8-NEXT:    fmr f0, f1
 ; P8-NEXT:    xxlxor f1, f1, f1
 ; P8-NEXT:    fcmpu cr0, f0, f1
-; P8-NEXT:    beq cr0, .LBB24_2
+; P8-NEXT:    beq cr0, .LBB20_2
 ; P8-NEXT:  # %bb.1:
 ; P8-NEXT:    vspltisw v2, 1
 ; P8-NEXT:    xvcvsxwdp vs1, vs34
-; P8-NEXT:  .LBB24_2:
+; P8-NEXT:  .LBB20_2:
 ; P8-NEXT:    addi r1, r1, 32
 ; P8-NEXT:    ld r0, 16(r1)
 ; P8-NEXT:    mtlr r0
@@ -2350,16 +2049,16 @@ define half @PR40273(half) nounwind {
 ; BE-NEXT:    clrldi r3, r3, 48
 ; BE-NEXT:    bl __extendhfsf2
 ; BE-NEXT:    nop
-; BE-NEXT:    addis r3, r2, .LCPI24_0@toc@ha
-; BE-NEXT:    lfs f0, .LCPI24_0@toc@l(r3)
+; BE-NEXT:    addis r3, r2, .LCPI20_0@toc@ha
+; BE-NEXT:    lfs f0, .LCPI20_0@toc@l(r3)
 ; BE-NEXT:    li r3, 0
 ; BE-NEXT:    fcmpu cr0, f1, f0
-; BE-NEXT:    bc 12, eq, .LBB24_2
+; BE-NEXT:    bc 12, eq, .LBB20_2
 ; BE-NEXT:  # %bb.1:
 ; BE-NEXT:    li r3, 4
-; BE-NEXT:  .LBB24_2:
-; BE-NEXT:    addis r4, r2, .LCPI24_1@toc@ha
-; BE-NEXT:    addi r4, r4, .LCPI24_1@toc@l
+; BE-NEXT:  .LBB20_2:
+; BE-NEXT:    addis r4, r2, .LCPI20_1@toc@ha
+; BE-NEXT:    addi r4, r4, .LCPI20_1@toc@l
 ; BE-NEXT:    lfsx f1, r4, r3
 ; BE-NEXT:    addi r1, r1, 112
 ; BE-NEXT:    ld r0, 16(r1)
@@ -2452,13 +2151,13 @@ define half @fcopysign(half %x, half %y) nounwind {
 ; PPC32-NEXT:    lwz r3, 20(r1)
 ; PPC32-NEXT:    srwi r3, r3, 31
 ; PPC32-NEXT:    andi. r3, r3, 1
-; PPC32-NEXT:    bc 12, gt, .LBB26_2
+; PPC32-NEXT:    bc 12, gt, .LBB22_2
 ; PPC32-NEXT:  # %bb.1:
 ; PPC32-NEXT:    fabs f1, f1
-; PPC32-NEXT:    b .LBB26_3
-; PPC32-NEXT:  .LBB26_2:
+; PPC32-NEXT:    b .LBB22_3
+; PPC32-NEXT:  .LBB22_2:
 ; PPC32-NEXT:    fnabs f1, f1
-; PPC32-NEXT:  .LBB26_3:
+; PPC32-NEXT:  .LBB22_3:
 ; PPC32-NEXT:    lfd f31, 24(r1) # 8-byte Folded Reload
 ; PPC32-NEXT:    lwz r0, 36(r1)
 ; PPC32-NEXT:    addi r1, r1, 32
@@ -2530,13 +2229,13 @@ define half @fcopysign(half %x, half %y) nounwind {
 ; BE-NEXT:    lwz r3, 116(r1)
 ; BE-NEXT:    srwi r3, r3, 31
 ; BE-NEXT:    andi. r3, r3, 1
-; BE-NEXT:    bc 12, gt, .LBB26_2
+; BE-NEXT:    bc 12, gt, .LBB22_2
 ; BE-NEXT:  # %bb.1:
 ; BE-NEXT:    fabs f1, f1
-; BE-NEXT:    b .LBB26_3
-; BE-NEXT:  .LBB26_2:
+; BE-NEXT:    b .LBB22_3
+; BE-NEXT:  .LBB22_2:
 ; BE-NEXT:    fnabs f1, f1
-; BE-NEXT:  .LBB26_3:
+; BE-NEXT:  .LBB22_3:
 ; BE-NEXT:    lfd f31, 120(r1) # 8-byte Folded Reload
 ; BE-NEXT:    addi r1, r1, 128
 ; BE-NEXT:    ld r0, 16(r1)

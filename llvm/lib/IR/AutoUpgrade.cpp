@@ -1245,6 +1245,26 @@ static bool consumeNVVMPtrAddrSpace(StringRef &Name) {
          Name.consume_front("param");
 }
 
+static bool convertIntrinsicValidType(StringRef Name,
+                                      const FunctionType *FuncTy) {
+  Type *HalfTy = Type::getHalfTy(FuncTy->getContext());
+  if (Name.starts_with("to.fp16")) {
+    return CastInst::castIsValid(Instruction::FPTrunc, FuncTy->getParamType(0),
+                                 HalfTy) &&
+           CastInst::castIsValid(Instruction::BitCast, HalfTy,
+                                 FuncTy->getReturnType());
+  }
+
+  if (Name.starts_with("from.fp16")) {
+    return CastInst::castIsValid(Instruction::BitCast, FuncTy->getParamType(0),
+                                 HalfTy) &&
+           CastInst::castIsValid(Instruction::FPExt, HalfTy,
+                                 FuncTy->getReturnType());
+  }
+
+  return false;
+}
+
 static bool upgradeIntrinsicFunction1(Function *F, Function *&NewFn,
                                       bool CanUpgradeDebugIntrinsicsToRecords) {
   assert(F && "Illegal to upgrade a non-existent Function.");
@@ -1311,6 +1331,13 @@ static bool upgradeIntrinsicFunction1(Function *F, Function *&NewFn,
   }
   case 'c': {
     if (F->arg_size() == 1) {
+      if (Name.consume_front("convert.")) {
+        if (convertIntrinsicValidType(Name, F->getFunctionType())) {
+          NewFn = nullptr;
+          return true;
+        }
+      }
+
       Intrinsic::ID ID = StringSwitch<Intrinsic::ID>(Name)
                              .StartsWith("ctlz.", Intrinsic::ctlz)
                              .StartsWith("cttz.", Intrinsic::cttz)
@@ -2682,9 +2709,9 @@ static Value *upgradeNVVMIntrinsicCall(StringRef Name, CallBase *CI,
                                           Arg, /*FMFSource=*/nullptr, "ctpop");
     Rep = Builder.CreateTrunc(Popc, Builder.getInt32Ty(), "ctpop.trunc");
   } else if (Name == "h2f") {
-    Rep = Builder.CreateIntrinsic(Intrinsic::convert_from_fp16,
-                                  {Builder.getFloatTy()}, CI->getArgOperand(0),
-                                  /*FMFSource=*/nullptr, "h2f");
+    Value *Cast =
+        Builder.CreateBitCast(CI->getArgOperand(0), Builder.getHalfTy());
+    Rep = Builder.CreateFPExt(Cast, Builder.getFloatTy());
   } else if (Name.consume_front("bitcast.") &&
              (Name == "f2i" || Name == "i2f" || Name == "ll2d" ||
               Name == "d2ll")) {
@@ -4784,6 +4811,23 @@ static void upgradeDbgIntrinsicToDbgRecord(StringRef Name, CallBase *CI) {
   CI->getParent()->insertDbgRecordBefore(DR, CI->getIterator());
 }
 
+static Value *upgradeConvertIntrinsicCall(StringRef Name, CallBase *CI,
+                                          Function *F, IRBuilder<> &Builder) {
+  if (Name.starts_with("to.fp16")) {
+    Value *Cast =
+        Builder.CreateFPTrunc(CI->getArgOperand(0), Builder.getHalfTy());
+    return Builder.CreateBitCast(Cast, CI->getType());
+  }
+
+  if (Name.starts_with("from.fp16")) {
+    Value *Cast =
+        Builder.CreateBitCast(CI->getArgOperand(0), Builder.getHalfTy());
+    return Builder.CreateFPExt(Cast, CI->getType());
+  }
+
+  return nullptr;
+}
+
 /// Upgrade a call to an old intrinsic. All argument and return casting must be
 /// provided to seamlessly integrate with existing context.
 void llvm::UpgradeIntrinsicCall(CallBase *CI, Function *NewFn) {
@@ -4801,9 +4845,8 @@ void llvm::UpgradeIntrinsicCall(CallBase *CI, Function *NewFn) {
   if (!NewFn) {
     // Get the Function's name.
     StringRef Name = F->getName();
-
-    assert(Name.starts_with("llvm.") && "Intrinsic doesn't start with 'llvm.'");
-    Name = Name.substr(5);
+    if (!Name.consume_front("llvm."))
+      llvm_unreachable("intrinsic doesn't start with 'llvm.'");
 
     bool IsX86 = Name.consume_front("x86.");
     bool IsNVVM = Name.consume_front("nvvm.");
@@ -4827,6 +4870,8 @@ void llvm::UpgradeIntrinsicCall(CallBase *CI, Function *NewFn) {
       Rep = upgradeAMDGCNIntrinsicCall(Name, CI, F, Builder);
     } else if (IsDbg) {
       upgradeDbgIntrinsicToDbgRecord(Name, CI);
+    } else if (Name.consume_front("convert.")) {
+      Rep = upgradeConvertIntrinsicCall(Name, CI, F, Builder);
     } else {
       llvm_unreachable("Unknown function for CallBase upgrade.");
     }
@@ -5037,11 +5082,6 @@ void llvm::UpgradeIntrinsicCall(CallBase *CI, Function *NewFn) {
   case Intrinsic::ctpop:
     NewCall = Builder.CreateCall(NewFn, {CI->getArgOperand(0)});
     break;
-
-  case Intrinsic::convert_from_fp16:
-    NewCall = Builder.CreateCall(NewFn, {CI->getArgOperand(0)});
-    break;
-
   case Intrinsic::dbg_value: {
     StringRef Name = F->getName();
     Name = Name.substr(5); // Strip llvm.
