@@ -2117,7 +2117,6 @@ Value *InstCombinerImpl::SimplifyDemandedUseFPClass(Value *V,
 
     const SimplifyQuery &SQ = getSimplifyQuery();
     if (X == Y && isGuaranteedNotToBeUndef(X, SQ.AC, CxtI, SQ.DT, Depth + 1)) {
-
       if (SimplifyDemandedFPClass(I, 0, SrcDemandedMask, KnownLHS, Depth + 1))
         return I;
       Type *EltTy = VTy->getScalarType();
