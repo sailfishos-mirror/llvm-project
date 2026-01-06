@@ -2334,7 +2334,6 @@ void TaskContextStructManager::generateTaskContextStruct() {
 
 SmallVector<llvm::Value *> TaskContextStructManager::createGEPsToPrivateVars(
     llvm::Value *altStructPtr) const {
-  assert(!privateVarTypes.empty());
   SmallVector<llvm::Value *> ret;
 
   // Create GEPs for each struct member
