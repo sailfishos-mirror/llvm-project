@@ -6628,6 +6628,8 @@ Threads can synchronize execution by performing barrier operations on barrier *o
     * ``X`` does not *barrier-participates-in<BO>* another barrier *wait* ``W'`` in the same thread as ``W``.
     * ``W -> X`` **not** in *thread-barrier-order<BO>*.
 
+  * *Barrier-participates-in<BO>* is consistent with *happens-before*.
+
 * Let ``S`` be the set of barrier operations that *barrier-participates-in<BO>* a barrier *wait* ``W`` for some
   barrier *object* ``BO``, then all of the following is true:
 
@@ -6639,6 +6641,10 @@ Threads can synchronize execution by performing barrier operations on barrier *o
     *expected count* of ``BO`` are equal after ``B`` is performed. ``B`` is the only barrier operation in ``S``
     that causes the *signal count* and *expected count* of ``BO`` to be equal.
 
+* For every barrier *init* ``I`` performed on a barrier *object* ``B0``:
+
+  * There is no barrier operation ``X`` such that ``X -> I`` in *thread-barrier-order<BO>*. :sup:`WIP`
+
 * For every barrier *signal* ``S`` performed on a barrier *object* ``BO``:
 
   * The immediate successor of ``S`` in *thread-barrier-order<BO>* is a barrier *wait*. :sup:`WIP`
@@ -6649,7 +6655,8 @@ Threads can synchronize execution by performing barrier operations on barrier *o
 
 * For every barrier *join* ``J`` performed on a barrier *object* ``BO``:
 
-  * There is no other barrier operation *thread-barrier-ordered<BO>* before ``J``. :sup:`WIP`
+  * There is a barrier *init* ``I`` such that ``I -> J`` in *thread-barrier-ordered<BO>*, **or** is no other
+    barrier operation *thread-barrier-ordered<BO>* before ``J``. :sup:`WIP`
   * ``J`` is not *barrier-joined-before<BO>* another barrier *join*.
 
 * For every barrier *leave* ``L`` performed on a barrier *object* ``BO``:
@@ -6663,6 +6670,9 @@ Threads can synchronize execution by performing barrier operations on barrier *o
   * *Barrier-participates-in<BO>* for every barrier object ``BO``.
 
 * *Barrier-executes-before* is consistent with *program-order*.
+* For every barrier *object* ``BO``:
+
+  * *Barrier-modification-order<BO>* is consistent with *barrier-executes-before*.
 
 *Barrier-executes-before* represents the order in which barrier operations will complete by relating the
 dynamic instances of operations from different threads together.
@@ -6745,6 +6755,9 @@ Informally, we can deduce from the above formal model that execution barrier beh
 
   * Wake-up if they were sleeping because of a barrier *wait*, **or**
   * Skip the next barrier *wait* operation if they have not previously *waited*.
+
+* Barriers cannot complete "out-of-thin-air"; a barrier *wait* ``W`` cannot depend on a barrier operation
+ ``X`` to complete if ``W -> X`` in *barrier-executes-before*.
 
 Execution Barrier GFX6-11
 +++++++++++++++++++++++++
