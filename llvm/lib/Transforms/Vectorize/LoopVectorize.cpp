@@ -7526,6 +7526,8 @@ DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
   unsigned OrigLoopInvocationWeight = 0;
   std::optional<unsigned> OrigAverageTripCount =
       getLoopEstimatedTripCount(OrigLoop, &OrigLoopInvocationWeight);
+  if (!OrigLoopInvocationWeight)
+    OrigLoopInvocationWeight = SE.getSmallConstantTripCount(OrigLoop);
 
   BestVPlan.execute(&State);
 
