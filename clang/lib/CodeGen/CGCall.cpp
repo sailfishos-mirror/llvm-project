@@ -4966,10 +4966,7 @@ void CodeGenFunction::EmitCallArg(CallArgList &args, const Expr *E,
   // will run at the end of the full-expression; emit matching lifetime
   // markers. For types which don't have a destructor, we use a narrower
   // lifetime bound.
-  // FIXME: This should work fine w/ exceptions, but somehow breaks the
-  // dominance relationship in the def-use chain.
-  if (!CGM.getLangOpts().Exceptions &&
-      hasAggregateEvaluationKind(E->getType())) {
+  if (hasAggregateEvaluationKind(E->getType())) {
     RawAddress ArgSlotAlloca = Address::invalid();
     ArgSlot = CreateAggTemp(E->getType(), "agg.tmp", &ArgSlotAlloca);
 

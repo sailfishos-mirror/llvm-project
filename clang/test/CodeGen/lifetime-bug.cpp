@@ -11,28 +11,49 @@ struct e {
 // CHECK-LABEL: define dso_local void @_Z1fv(
 // CHECK-SAME: ) #[[ATTR0:[0-9]+]] personality ptr @__gxx_personality_v0 {
 // CHECK-NEXT:  [[ENTRY:.*:]]
-// CHECK-NEXT:    [[AGG_TEMP:%.*]] = alloca [[STRUCT_B:%.*]], align 1
+// CHECK-NEXT:    [[AGG_TMP:%.*]] = alloca [[STRUCT_B:%.*]], align 1
 // CHECK-NEXT:    [[EXN_SLOT:%.*]] = alloca ptr, align 8
 // CHECK-NEXT:    [[EHSELECTOR_SLOT:%.*]] = alloca i32, align 4
+// CHECK-NEXT:    [[CLEANUP_ISACTIVE:%.*]] = alloca i1, align 1
 // CHECK-NEXT:    [[TMP0:%.*]] = load i32, ptr @d, align 4, !tbaa [[_ZTS1C_TBAA6:![0-9]+]]
 // CHECK-NEXT:    switch i32 [[TMP0]], label %[[SW_DEFAULT:.*]] [
 // CHECK-NEXT:      i32 1, label %[[SW_BB:.*]]
 // CHECK-NEXT:    ]
 // CHECK:       [[SW_BB]]:
-// CHECK-NEXT:    [[CALL:%.*]] = call noalias noundef nonnull ptr @_Znwm(i64 noundef 1) #[[ATTR4:[0-9]+]]
+// CHECK-NEXT:    [[CALL:%.*]] = call noalias noundef nonnull ptr @_Znwm(i64 noundef 1) #[[ATTR5:[0-9]+]]
+// CHECK-NEXT:    store i1 true, ptr [[CLEANUP_ISACTIVE]], align 1
+// CHECK-NEXT:    call void @llvm.lifetime.start.p0(ptr [[AGG_TMP]]) #[[ATTR6:[0-9]+]]
 // CHECK-NEXT:    invoke void @_ZN1eC1E1b(ptr noundef nonnull align 1 dereferenceable(1) [[CALL]])
-// CHECK-NEXT:            to label %[[INVOKE_CONT:.*]] unwind label %[[LPAD:.*]]
+// CHECK-NEXT:            to label %[[INVOKE_CONT:.*]] unwind label %[[LPAD1:.*]]
 // CHECK:       [[INVOKE_CONT]]:
+// CHECK-NEXT:    call void @llvm.lifetime.end.p0(ptr [[AGG_TMP]]) #[[ATTR6]]
+// CHECK-NEXT:    store i1 false, ptr [[CLEANUP_ISACTIVE]], align 1
 // CHECK-NEXT:    call void @_Z1av()
 // CHECK-NEXT:    br label %[[SW_EPILOG:.*]]
-// CHECK:       [[LPAD]]:
+// CHECK:       [[LPAD:.*:]]
 // CHECK-NEXT:    [[TMP1:%.*]] = landingpad { ptr, i32 }
 // CHECK-NEXT:            cleanup
 // CHECK-NEXT:    [[TMP2:%.*]] = extractvalue { ptr, i32 } [[TMP1]], 0
 // CHECK-NEXT:    store ptr [[TMP2]], ptr [[EXN_SLOT]], align 8
 // CHECK-NEXT:    [[TMP3:%.*]] = extractvalue { ptr, i32 } [[TMP1]], 1
 // CHECK-NEXT:    store i32 [[TMP3]], ptr [[EHSELECTOR_SLOT]], align 4
-// CHECK-NEXT:    call void @_ZdlPvm(ptr noundef [[CALL]], i64 noundef 1) #[[ATTR5:[0-9]+]]
+// CHECK-NEXT:    br label %[[EHCLEANUP:.*]]
+// CHECK:       [[LPAD1]]:
+// CHECK-NEXT:    [[TMP4:%.*]] = landingpad { ptr, i32 }
+// CHECK-NEXT:            cleanup
+// CHECK-NEXT:    [[TMP5:%.*]] = extractvalue { ptr, i32 } [[TMP4]], 0
+// CHECK-NEXT:    store ptr [[TMP5]], ptr [[EXN_SLOT]], align 8
+// CHECK-NEXT:    [[TMP6:%.*]] = extractvalue { ptr, i32 } [[TMP4]], 1
+// CHECK-NEXT:    store i32 [[TMP6]], ptr [[EHSELECTOR_SLOT]], align 4
+// CHECK-NEXT:    call void @llvm.lifetime.end.p0(ptr [[AGG_TMP]]) #[[ATTR6]]
+// CHECK-NEXT:    br label %[[EHCLEANUP]]
+// CHECK:       [[EHCLEANUP]]:
+// CHECK-NEXT:    [[CLEANUP_IS_ACTIVE:%.*]] = load i1, ptr [[CLEANUP_ISACTIVE]], align 1
+// CHECK-NEXT:    br i1 [[CLEANUP_IS_ACTIVE]], label %[[CLEANUP_ACTION:.*]], label %[[CLEANUP_DONE:.*]]
+// CHECK:       [[CLEANUP_ACTION]]:
+// CHECK-NEXT:    call void @_ZdlPvm(ptr noundef [[CALL]], i64 noundef 1) #[[ATTR7:[0-9]+]]
+// CHECK-NEXT:    br label %[[CLEANUP_DONE]]
+// CHECK:       [[CLEANUP_DONE]]:
 // CHECK-NEXT:    br label %[[EH_RESUME:.*]]
 // CHECK:       [[SW_DEFAULT]]:
 // CHECK-NEXT:    call void @_Z1av()
@@ -43,8 +64,8 @@ struct e {
 // CHECK-NEXT:    [[EXN:%.*]] = load ptr, ptr [[EXN_SLOT]], align 8
 // CHECK-NEXT:    [[SEL:%.*]] = load i32, ptr [[EHSELECTOR_SLOT]], align 4
 // CHECK-NEXT:    [[LPAD_VAL:%.*]] = insertvalue { ptr, i32 } poison, ptr [[EXN]], 0
-// CHECK-NEXT:    [[LPAD_VAL1:%.*]] = insertvalue { ptr, i32 } [[LPAD_VAL]], i32 [[SEL]], 1
-// CHECK-NEXT:    resume { ptr, i32 } [[LPAD_VAL1]]
+// CHECK-NEXT:    [[LPAD_VAL2:%.*]] = insertvalue { ptr, i32 } [[LPAD_VAL]], i32 [[SEL]], 1
+// CHECK-NEXT:    resume { ptr, i32 } [[LPAD_VAL2]]
 //
 void f() {
   switch (d) {

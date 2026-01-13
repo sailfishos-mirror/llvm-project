@@ -27,10 +27,10 @@ void test() {
 
   // EXCEPTIONS: %[[AGG1:.*]] = alloca %struct.Trivial
   // EXCEPTIONS: %[[AGG2:.*]] = alloca %struct.Trivial
-  // EXCEPTIONS-NOT: call void @llvm.lifetime.start.p0(ptr %[[AGG1]])
-  // EXCEPTIONS-NOT: call void @llvm.lifetime.start.p0(ptr %[[AGG2]])
-  // EXCEPTIONS-NOT: call void @llvm.lifetime.end.p0(ptr %[[AGG2]])
-  // EXCEPTIONS-NOT: call void @llvm.lifetime.end.p0(ptr %[[AGG1]])
+  // EXCEPTIONS: call void @llvm.lifetime.start.p0(ptr %[[AGG1]])
+  // EXCEPTIONS: call void @llvm.lifetime.start.p0(ptr %[[AGG2]])
+  // EXCEPTIONS: call void @llvm.lifetime.end.p0(ptr %[[AGG2]])
+  // EXCEPTIONS: call void @llvm.lifetime.end.p0(ptr %[[AGG1]])
   func(gen());
   func(gen());
 }
