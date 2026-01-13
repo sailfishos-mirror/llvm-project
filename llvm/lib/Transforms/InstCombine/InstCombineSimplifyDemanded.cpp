@@ -2038,16 +2038,16 @@ static Constant *getFPClassConstant(Type *Ty, FPClassTest Mask,
 /// result, and the known operand inputs in \p Known)
 static FastMathFlags
 inferFastMathValueFlags(FastMathFlags FMF, FPClassTest ValidResults,
-                        std::initializer_list<const KnownFPClass> Known) {
+                        ArrayRef<const KnownFPClass> Known) {
   if (!FMF.noNaNs() && (ValidResults & fcNan) == fcNone) {
-    if (all_of(Known, [](const KnownFPClass &KnownSrc) {
+    if (all_of(Known, [](const KnownFPClass KnownSrc) {
           return KnownSrc.isKnownNeverNaN();
         }))
       FMF.setNoNaNs();
   }
 
   if (!FMF.noInfs() && (ValidResults & fcInf) == fcNone) {
-    if (all_of(Known, [](const KnownFPClass &KnownSrc) {
+    if (all_of(Known, [](const KnownFPClass KnownSrc) {
           return KnownSrc.isKnownNeverInfinity();
         }))
       FMF.setNoInfs();
@@ -2564,8 +2564,8 @@ Value *InstCombinerImpl::SimplifyDemandedUseFPClass(Instruction *I,
               getFPClassConstant(VTy, ValidResults, /*IsCanonicalizing=*/true))
         return SingleVal;
 
-      FastMathFlags InferredFMF = inferFastMathValueFlags(
-          FMF, ValidResults, {KnownSrc[0], KnownSrc[1], KnownSrc[2]});
+      FastMathFlags InferredFMF =
+          inferFastMathValueFlags(FMF, ValidResults, KnownSrc);
       if (InferredFMF != FMF) {
         CI->dropUBImplyingAttrsAndMetadata();
         CI->setFastMathFlags(InferredFMF);
