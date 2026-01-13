@@ -12,6 +12,7 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/VersionTuple.h"
+#include "llvm/include/llvm/Support/Compiler.h"
 
 // Some system headers or GCC predefined macros conflict with identifiers in
 // this file.  Undefine them here.
@@ -509,7 +510,7 @@ public:
 
   /// Get the default system encoding of the triple.
   /// For example, "IBM-1047" for z/OS, "UTF-8" for others
-  StringRef getDefaultNarrowTextEncoding() const;
+  LLVM_ABI StringRef getDefaultNarrowTextEncoding() const;
 
   /// @}
   /// @name Convenience Predicates
