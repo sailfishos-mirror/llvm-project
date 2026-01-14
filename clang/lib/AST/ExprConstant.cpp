@@ -21057,6 +21057,7 @@ static ICEDiag CheckICE(const Expr* E, const ASTContext &Ctx) {
   case Expr::CXXInheritedCtorInitExprClass:
   case Expr::CXXStdInitializerListExprClass:
   case Expr::CXXBindTemporaryExprClass:
+  case Expr::ExprWithCleanupsClass:
   case Expr::CXXTemporaryObjectExprClass:
   case Expr::CXXUnresolvedConstructExprClass:
   case Expr::CXXDependentScopeMemberExprClass:
@@ -21096,10 +21097,6 @@ static ICEDiag CheckICE(const Expr* E, const ASTContext &Ctx) {
   case Expr::CXXParenListInitExprClass:
   case Expr::HLSLOutArgExprClass:
     return ICEDiag(IK_NotICE, E->getBeginLoc());
-
-  case Expr::ExprWithCleanupsClass:
-    // ExprWithCleanups is just a wrapper, so check the wrapped expression.
-    return CheckICE(cast<ExprWithCleanups>(E)->getSubExpr(), Ctx);
 
   case Expr::InitListExprClass: {
     // C++03 [dcl.init]p13: If T is a scalar type, then a declaration of the
