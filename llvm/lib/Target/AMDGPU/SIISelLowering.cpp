@@ -655,6 +655,8 @@ SITargetLowering::SITargetLowering(const TargetMachine &TM,
           break;
         case ISD::EXTRACT_SUBVECTOR:
         case ISD::CONCAT_VECTORS:
+        case ISD::FSIN:
+        case ISD::FCOS:
           setOperationAction(Op, VT, Custom);
           break;
         default:
@@ -9876,6 +9878,35 @@ SDValue SITargetLowering::lowerWorkitemID(SelectionDAG &DAG, SDValue Op,
                      DAG.getValueType(SmallVT));
 }
 
+/// Helper function for LowerINTRINSIC_WO_CHAIN.  Replace a \p Op of
+/// scalar type with a new node \p NewISD node with one argument which
+/// is the operand at index \p OperandIndex of Op.  Scalarizes for
+/// vector types.
+///
+// FIXME The manual scalarization seems to be necessary because the
+// Expand fallback is not supported for ISD::INTRINSIC_WO_CHAIN and
+// hence the lowering function should not fail for v2f16; see comment
+// in SelectionDAGLegalize::ExpandNode.
+static SDValue BuildScalarizedUnaryOp(SDValue Op, unsigned NewISD,
+                                      unsigned OperandIndex,
+                                      SelectionDAG &DAG) {
+  EVT VT = Op.getValueType();
+  SDLoc DL(Op);
+  SDValue Operand = Op.getOperand(OperandIndex);
+  if (!VT.isVector())
+    return DAG.getNode(NewISD, DL, VT, Operand);
+
+  EVT ScalarVT = VT.getScalarType();
+  unsigned NElts = VT.getVectorNumElements();
+  SmallVector<SDValue, 8> Args;
+
+  DAG.ExtractVectorElements(Operand, Args, 0, NElts);
+  for (unsigned I = 0; I < NElts; ++I)
+    Args[I] = DAG.getNode(NewISD, DL, ScalarVT, Args[I]);
+
+  return DAG.getBuildVector(VT, DL, Args);
+}
+
 SDValue SITargetLowering::LowerINTRINSIC_WO_CHAIN(SDValue Op,
                                                   SelectionDAG &DAG) const {
   MachineFunction &MF = DAG.getMachineFunction();
@@ -10098,10 +10129,10 @@ SDValue SITargetLowering::LowerINTRINSIC_WO_CHAIN(SDValue Op,
   case Intrinsic::amdgcn_fdiv_fast:
     return lowerFDIV_FAST(Op, DAG);
   case Intrinsic::amdgcn_sin:
-    return DAG.getNode(AMDGPUISD::SIN_HW, DL, VT, Op.getOperand(1));
+    return BuildScalarizedUnaryOp(Op, AMDGPUISD::SIN_HW, 1, DAG);
 
   case Intrinsic::amdgcn_cos:
-    return DAG.getNode(AMDGPUISD::COS_HW, DL, VT, Op.getOperand(1));
+    return BuildScalarizedUnaryOp(Op, AMDGPUISD::COS_HW, 1, DAG);
 
   case Intrinsic::amdgcn_mul_u24:
     return DAG.getNode(AMDGPUISD::MUL_U24, DL, VT, Op.getOperand(1),
@@ -10117,7 +10148,7 @@ SDValue SITargetLowering::LowerINTRINSIC_WO_CHAIN(SDValue Op,
     return emitRemovedIntrinsicError(DAG, DL, VT);
   }
   case Intrinsic::amdgcn_fract:
-    return DAG.getNode(AMDGPUISD::FRACT, DL, VT, Op.getOperand(1));
+    return BuildScalarizedUnaryOp(Op, AMDGPUISD::FRACT, 1, DAG);
 
   case Intrinsic::amdgcn_class:
     return DAG.getNode(AMDGPUISD::FP_CLASS, DL, VT, Op.getOperand(1),
