@@ -5143,6 +5143,16 @@ void computeKnownFPClass(const Value *V, const APInt &DemandedElts,
         DenormalMode Mode =
             F ? F->getDenormalMode(FltSem) : DenormalMode::getDynamic();
 
+        if (KnownNotFromFlags & fcNan) {
+          KnownSrc.knownNot(fcNan);
+          KnownAddend.knownNot(fcNan);
+        }
+
+        if (KnownNotFromFlags & fcInf) {
+          KnownSrc.knownNot(fcInf);
+          KnownAddend.knownNot(fcInf);
+        }
+
         Known = KnownFPClass::fma_square(KnownSrc, KnownAddend, Mode);
         break;
       }
@@ -5153,6 +5163,11 @@ void computeKnownFPClass(const Value *V, const APInt &DemandedElts,
                             InterestedClasses, KnownSrc[I], Q, Depth + 1);
         if (KnownSrc[I].isUnknown())
           return;
+
+        if (KnownNotFromFlags & fcNan)
+          KnownSrc[I].knownNot(fcNan);
+        if (KnownNotFromFlags & fcInf)
+          KnownSrc[I].knownNot(fcInf);
       }
 
       const Function *F = II->getFunction();
