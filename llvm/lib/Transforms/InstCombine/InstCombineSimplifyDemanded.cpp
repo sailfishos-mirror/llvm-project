@@ -2028,6 +2028,8 @@ static Constant *getFPClassConstant(Type *Ty, FPClassTest Mask,
     return ConstantFP::getInfinity(Ty);
   case fcNegInf:
     return ConstantFP::getInfinity(Ty, true);
+  case fcQNan:
+    return ConstantFP::getQNaN(Ty);
   default:
     return nullptr;
   }
