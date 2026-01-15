@@ -2943,7 +2943,7 @@ Value *InstCombinerImpl::SimplifyDemandedUseFPClass(Instruction *I,
   }
   case Instruction::ExtractValue: {
     Value *ExtractSrc;
-    if (match(I, m_ExtractValue<0>(m_Value(ExtractSrc)))) {
+    if (match(I, m_ExtractValue<0>(m_OneUse(m_Value(ExtractSrc))))) {
       if (auto *II = dyn_cast<IntrinsicInst>(ExtractSrc)) {
         const Intrinsic::ID IID = II->getIntrinsicID();
         switch (IID) {
