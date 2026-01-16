@@ -3860,11 +3860,10 @@ define <2 x half> @v_no_fmaximum3_f16__multi_use(half %a, half %b, half %c) {
 ; GFX942-NEXT:    v_cmp_o_f16_e32 vcc, v0, v1
 ; GFX942-NEXT:    s_nop 1
 ; GFX942-NEXT:    v_cndmask_b32_e32 v0, v4, v3, vcc
-; GFX942-NEXT:    v_max_f16_e32 v1, v0, v2
 ; GFX942-NEXT:    v_cmp_o_f16_e32 vcc, v0, v2
-; GFX942-NEXT:    s_nop 1
-; GFX942-NEXT:    v_cndmask_b32_e32 v1, v4, v1, vcc
-; GFX942-NEXT:    v_pack_b32_f16 v0, v0, v1
+; GFX942-NEXT:    v_max_f16_e32 v1, v0, v2
+; GFX942-NEXT:    s_nop 0
+; GFX942-NEXT:    v_cndmask_b32_sdwa v0, v4, v1, vcc dst_sel:WORD_1 dst_unused:UNUSED_PRESERVE src0_sel:DWORD src1_sel:DWORD
 ; GFX942-NEXT:    s_setpc_b64 s[30:31]
 ;
 ; GFX950-LABEL: v_no_fmaximum3_f16__multi_use:

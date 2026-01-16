@@ -455,6 +455,23 @@ bool SDWASrcOperand::convertToSDWA(MachineInstr &MI, const SIInstrInfo *TII) {
         // writing WORD_1. Modifiers don't matter because all the bits that
         // would be impacted are being overwritten by the dst.
         // Any other case will not work.
+        //
+        // FIXME Is this really true for f16 operands? That is, this
+        // change introduced by the v_pack_b32_f16 conversion looks wrong:
+        //@@ -2394,17 +2394,17 @@ define <2 x half> @v_neg_rsq_v2f16(<2 x half>
+        //%a) {
+        //  ; GFX9-LABEL: v_neg_rsq_v2f16:
+        //  ; GFX9:       ; %bb.0:
+        //  ; GFX9-NEXT:    s_waitcnt vmcnt(0) expcnt(0) lgkmcnt(0)
+        // -; GFX9-NEXT:    v_rsq_f16_sdwa v1, v0 dst_sel:DWORD
+        // dst_unused:UNUSED_PAD src0_sel:WORD_1
+        // -; GFX9-NEXT:    v_rsq_f16_e32 v0, v0
+        // -; GFX9-NEXT:    v_pack_b32_f16 v0, -v0, -v1
+        // +; GFX9-NEXT:    v_rsq_f16_e32 v1, v0
+        // +; GFX9-NEXT:    v_rsq_f16_sdwa v1, v0 dst_sel:WORD_1
+        // dst_unused:UNUSED_PRESERVE src0_sel:WORD_1
+        // +; GFX9-NEXT:    v_mov_b32_e32 v0, v1
+        //  ; GFX9-NEXT:    s_setpc_b64 s[30:31]
         SdwaSel DstSel = static_cast<SdwaSel>(
             TII->getNamedImmOperand(MI, AMDGPU::OpName::dst_sel));
         if (DstSel == AMDGPU::SDWA::SdwaSel::WORD_1 &&
@@ -961,7 +978,25 @@ SIPeepholeSDWA::matchSDWAOperand(MachineInstr &MI) {
 
     return std::make_unique<SDWADstPreserveOperand>(
       OrDst, OrSDWADef, OrOtherDef, DstSel);
+  }
+  case AMDGPU::V_PACK_B32_F16_e64: {
+    MachineOperand *Dst = TII->getNamedOperand(MI, AMDGPU::OpName::vdst);
+    MachineOperand *Src1 = TII->getNamedOperand(MI, AMDGPU::OpName::src1);
+    MachineOperand *Src2 = TII->getNamedOperand(MI, AMDGPU::OpName::src0);
 
+    bool InvalidOp = false;
+    for (auto *Op : {Dst, Src1, Src2})
+      if (!Op || !Op->isReg() || Op->getReg().isPhysical())
+        InvalidOp = true;
+
+    if (InvalidOp)
+      break;
+
+    if (isSameReg(*Src1, *Src2))
+      break;
+
+    // FIXME Figure out necessary restrictions on Src1 and Src2
+    return std::make_unique<SDWADstPreserveOperand>(Dst, Src1, Src2, WORD_1);
   }
   }
 
