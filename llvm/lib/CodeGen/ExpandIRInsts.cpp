@@ -1075,11 +1075,11 @@ static bool runImpl(Function &F, const TargetLowering &TLI,
       // The backend has peephole optimizations for powers of two,
       // unless the target explicitly requests expansion.
       // TODO: We don't consider vectors here.
-      if (isConstantPowerOfTwo(I.getOperand(1), isSigned(I.getOpcode())) &&
-          !TLI.shouldExpandPowerOf2DivRem(
-              TLI.getValueType(F.getDataLayout(), IntTy)))
-        return false;
-      return true;
+      if (!isConstantPowerOfTwo(I.getOperand(1), isSigned(I.getOpcode())))
+        return true;
+
+      EVT VT = TLI.getValueType(F.getDataLayout(), IntTy);
+      return TLI.shouldExpandPowerOf2DivRem(VT);
     }
     }
 
