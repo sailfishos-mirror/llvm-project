@@ -99,6 +99,14 @@ bool shouldTrackImplicitObjectArg(const CXXMethodDecl *Callee) {
   if (!isGslPointerType(Callee->getFunctionObjectParameterType()) &&
       !isGslOwnerType(Callee->getFunctionObjectParameterType()))
     return false;
+
+  // Track dereference operator for GSL pointers in STL.
+  if (isGslPointerType(Callee->getFunctionObjectParameterType()))
+    if (const CXXMethodDecl *MD = dyn_cast_or_null<CXXMethodDecl>(Callee))
+      if (MD->getOverloadedOperator() == OverloadedOperatorKind::OO_Star ||
+          MD->getOverloadedOperator() == OverloadedOperatorKind::OO_Arrow)
+        return true;
+
   if (isPointerLikeType(Callee->getReturnType())) {
     if (!Callee->getIdentifier())
       return false;
