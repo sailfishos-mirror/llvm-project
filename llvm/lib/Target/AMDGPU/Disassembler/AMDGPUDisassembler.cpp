@@ -528,11 +528,21 @@ void AMDGPUDisassembler::decodeImmOperands(MCInst &MI,
         break;
       case AMDGPU::OPERAND_REG_IMM_FP16:
       case AMDGPU::OPERAND_REG_IMM_INT16:
-      case AMDGPU::OPERAND_REG_IMM_V2FP16:
       case AMDGPU::OPERAND_REG_INLINE_C_FP16:
       case AMDGPU::OPERAND_REG_INLINE_C_INT16:
-      case AMDGPU::OPERAND_REG_INLINE_C_V2FP16:
         Imm = getInlineImmValF16(Imm);
+        break;
+      case AMDGPU::OPERAND_REG_IMM_V2FP16:
+      case AMDGPU::OPERAND_REG_INLINE_C_V2FP16:
+        // V_PK_FMAC_F16 on GFX11+ duplicates the f16 inline constant to both
+        // halves, so we need to produce the duplicated value for correct
+        // round-trip.
+        if (AMDGPU::isPKFMACF16(MI.getOpcode()) && isGFX11Plus()) {
+          int64_t F16Val = getInlineImmValF16(Imm);
+          Imm = (F16Val << 16) | (F16Val & 0xFFFF);
+        } else {
+          Imm = getInlineImmValF16(Imm);
+        }
         break;
       case AMDGPU::OPERAND_REG_IMM_FP64:
       case AMDGPU::OPERAND_REG_IMM_INT64:

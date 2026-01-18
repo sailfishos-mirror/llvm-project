@@ -1747,6 +1747,10 @@ LLVM_READNONE
 std::optional<unsigned> getInlineEncodingV2F16(uint32_t Literal);
 
 LLVM_READNONE
+std::optional<unsigned> getPKFMACF16InlineEncoding(uint32_t Literal,
+                                                   bool IsPreGFX11);
+
+LLVM_READNONE
 bool isInlinableLiteralV216(uint32_t Literal, uint8_t OpType);
 
 LLVM_READNONE
@@ -1759,6 +1763,9 @@ LLVM_READNONE
 bool isInlinableLiteralV2F16(uint32_t Literal);
 
 LLVM_READNONE
+bool isPKFMACF16InlineConstant(uint32_t Literal, bool IsPreGFX11);
+
+LLVM_READNONE
 bool isValid32BitLiteral(uint64_t Val, bool IsFP64);
 
 LLVM_READNONE
@@ -1769,6 +1776,9 @@ bool isArgPassedInSGPR(const Argument *Arg);
 bool isArgPassedInSGPR(const CallBase *CB, unsigned ArgNo);
 
 LLVM_READONLY bool isPackedFP32Inst(unsigned Opc);
+
+/// Returns true if \p Opc is a V_PK_FMAC_F16 instruction variant.
+LLVM_READONLY bool isPKFMACF16(unsigned Opc);
 
 LLVM_READONLY
 bool isLegalSMRDEncodedUnsignedOffset(const MCSubtargetInfo &ST,
