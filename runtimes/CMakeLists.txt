@@ -26,7 +26,7 @@ set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
 list(INSERT CMAKE_MODULE_PATH 0
   "${CMAKE_CURRENT_SOURCE_DIR}/cmake"
-  "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules"
+  "${CMAKE_CURRENT_SOURCE_DIR}/cmake/Modules"
   "${LLVM_COMMON_CMAKE_UTILS}"
   "${LLVM_COMMON_CMAKE_UTILS}/Modules"
   "${CMAKE_CURRENT_SOURCE_DIR}/../llvm/cmake"
@@ -87,10 +87,11 @@ include(CheckCCompilerFlag)
 include(CheckCXXCompilerFlag)
 include(GetToolchainDirs)
 include(ExtendPath)
-include(HandleFortran)
 
-# Determine wither we can compile Fortran code.
-init_fortran_support()
+# Handle Fortran code. Sets RUNTIMES_FLANG_MODULES_ENABLED when a Fortran
+# toolchain is available and required by one or more of the
+# runtimes.
+include(config-runtimes-Fortran)
 
 # Determine whether we are in the runtimes/runtimes-bins directory of a
 # bootstrap build.
