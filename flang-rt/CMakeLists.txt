@@ -52,6 +52,7 @@ set(LLVM_TOOLS_DIR "${LLVM_BINARY_DIR}/bin")
 # Important: flang-rt user options must be prefixed with "FLANG_RT_". Variables
 # with this prefix will be forwarded in bootstrap builds.
 
+
 # Provide an interface to link against the LLVM libc/libc++ projects directly.
 set(FLANG_RT_SUPPORTED_PROVIDERS system llvm)
 set(FLANG_RT_LIBC_PROVIDER "system" CACHE STRING "Specify C library to use. Supported values are ${FLANG_RT_SUPPORTED_PROVIDERS}.")
@@ -86,13 +87,16 @@ else ()
 endif ()
 
 
-if (FLANG_RT_ENABLE_STATIC OR FLANG_RT_ENABLE_SHARED)
-  option(FLANG_RT_INCLUDE_TESTS "Generate build targets for the flang-rt unit and regression-tests." "${LLVM_INCLUDE_TESTS}")
-else ()
+# TODO: Support tests for the GPU target.
+set(FLANG_RT_INCLUDE_TESTS_default ${LLVM_INCLUDE_TESTS})
+if ("${LLVM_RUNTIMES_TARGET}" MATCHES "^amdgcn|^nvptx")
+  set(FLANG_RT_INCLUDE_TESTS_default OFF)
+endif()
+if (NOT FLANG_RT_ENABLE_STATIC AND NOT FLANG_RT_ENABLE_SHARED)
   # Tests require at least one of the libraries
-  message(STATUS "Flang-RT testing disabled without either FLANG_RT_ENABLE_STATIC OR FLANG_RT_ENABLE_SHARED")
-  set(FLANG_RT_INCLUDE_TESTS OFF)
+  set(FLANG_RT_INCLUDE_TESTS_default OFF)
 endif ()
+option(FLANG_RT_INCLUDE_TESTS "Generate build targets for the flang-rt unit and regression-tests." "${FLANG_RT_INCLUDE_TESTS_default}")
 
 
 set(FLANG_RT_EXPERIMENTAL_OFFLOAD_SUPPORT "" CACHE STRING "Compile Flang-RT with GPU support (CUDA or OpenMP)")
