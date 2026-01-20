@@ -2285,7 +2285,7 @@ define <16 x half> @v_maximum_v16f16(<16 x half> %src0, <16 x half> %src1) {
 ; GFX7-NEXT:    v_cvt_f16_f32_e32 v16, v20
 ; GFX7-NEXT:    v_cvt_f32_f16_e32 v11, v11
 ; GFX7-NEXT:    v_cvt_f16_f32_e32 v12, v12
-; GFX7-NEXT:    v_cvt_f16_f32_e32 v19, v29
+; GFX7-NEXT:    v_cvt_f16_f32_e32 v18, v29
 ; GFX7-NEXT:    v_cvt_f32_f16_e32 v16, v16
 ; GFX7-NEXT:    v_cmp_o_f32_e64 s[24:25], v11, v17
 ; GFX7-NEXT:    v_max_f32_e32 v11, v11, v17
@@ -2293,19 +2293,19 @@ define <16 x half> @v_maximum_v16f16(<16 x half> %src0, <16 x half> %src1) {
 ; GFX7-NEXT:    v_cmp_o_f32_e64 s[10:11], v4, v16
 ; GFX7-NEXT:    v_max_f32_e32 v4, v4, v16
 ; GFX7-NEXT:    v_cvt_f16_f32_e32 v16, v21
-; GFX7-NEXT:    v_cvt_f16_f32_e32 v20, v13
-; GFX7-NEXT:    v_cvt_f32_f16_e32 v13, v17
-; GFX7-NEXT:    v_cvt_f32_f16_e32 v18, v12
+; GFX7-NEXT:    v_cvt_f16_f32_e32 v13, v13
+; GFX7-NEXT:    v_cvt_f32_f16_e32 v17, v17
+; GFX7-NEXT:    v_cvt_f32_f16_e32 v12, v12
 ; GFX7-NEXT:    v_cvt_f32_f16_e32 v16, v16
-; GFX7-NEXT:    v_cvt_f32_f16_e32 v12, v19
-; GFX7-NEXT:    v_cvt_f32_f16_e32 v17, v20
-; GFX7-NEXT:    v_cmp_o_f32_e64 s[26:27], v18, v13
+; GFX7-NEXT:    v_cvt_f32_f16_e32 v18, v18
+; GFX7-NEXT:    v_cvt_f32_f16_e32 v13, v13
+; GFX7-NEXT:    v_cmp_o_f32_e64 s[26:27], v12, v17
 ; GFX7-NEXT:    v_cmp_o_f32_e64 s[12:13], v5, v16
 ; GFX7-NEXT:    v_max_f32_e32 v5, v5, v16
 ; GFX7-NEXT:    v_cvt_f16_f32_e32 v16, v22
-; GFX7-NEXT:    v_max_f32_e32 v13, v18, v13
-; GFX7-NEXT:    v_max_f32_e32 v18, v17, v12
-; GFX7-NEXT:    v_cmp_o_f32_e64 s[28:29], v17, v12
+; GFX7-NEXT:    v_max_f32_e32 v12, v12, v17
+; GFX7-NEXT:    v_max_f32_e32 v17, v13, v18
+; GFX7-NEXT:    v_cmp_o_f32_e64 s[28:29], v13, v18
 ; GFX7-NEXT:    v_cvt_f32_f16_e32 v16, v16
 ; GFX7-NEXT:    v_cvt_f16_f32_e32 v14, v14
 ; GFX7-NEXT:    v_cvt_f16_f32_e32 v15, v15
@@ -2329,6 +2329,7 @@ define <16 x half> @v_maximum_v16f16(<16 x half> %src0, <16 x half> %src1) {
 ; GFX7-NEXT:    v_cvt_f32_f16_e32 v16, v16
 ; GFX7-NEXT:    v_cndmask_b32_e64 v7, v19, v7, s[16:17]
 ; GFX7-NEXT:    v_cndmask_b32_e64 v11, v19, v11, s[24:25]
+; GFX7-NEXT:    v_cndmask_b32_e64 v12, v19, v12, s[26:27]
 ; GFX7-NEXT:    v_cmp_o_f32_e64 s[18:19], v8, v16
 ; GFX7-NEXT:    v_max_f32_e32 v8, v8, v16
 ; GFX7-NEXT:    v_cvt_f16_f32_e32 v16, v25
@@ -2344,17 +2345,16 @@ define <16 x half> @v_maximum_v16f16(<16 x half> %src0, <16 x half> %src1) {
 ; GFX7-NEXT:    buffer_load_dword v16, off, s[0:3], s32
 ; GFX7-NEXT:    v_cndmask_b32_e64 v10, v19, v10, s[22:23]
 ; GFX7-NEXT:    s_waitcnt vmcnt(0)
-; GFX7-NEXT:    v_cvt_f16_f32_e32 v12, v16
+; GFX7-NEXT:    v_cvt_f16_f32_e32 v13, v16
 ; GFX7-NEXT:    v_cvt_f16_f32_e32 v16, v30
-; GFX7-NEXT:    v_cvt_f32_f16_e32 v17, v12
+; GFX7-NEXT:    v_cvt_f32_f16_e32 v18, v13
 ; GFX7-NEXT:    v_cvt_f32_f16_e32 v16, v16
-; GFX7-NEXT:    v_cndmask_b32_e64 v12, v19, v13, s[26:27]
-; GFX7-NEXT:    v_cndmask_b32_e64 v13, v19, v18, s[28:29]
-; GFX7-NEXT:    v_max_f32_e32 v18, v14, v16
+; GFX7-NEXT:    v_cndmask_b32_e64 v13, v19, v17, s[28:29]
+; GFX7-NEXT:    v_max_f32_e32 v17, v14, v16
 ; GFX7-NEXT:    v_cmp_o_f32_e32 vcc, v14, v16
-; GFX7-NEXT:    v_cndmask_b32_e32 v14, v19, v18, vcc
-; GFX7-NEXT:    v_max_f32_e32 v16, v15, v17
-; GFX7-NEXT:    v_cmp_o_f32_e32 vcc, v15, v17
+; GFX7-NEXT:    v_cndmask_b32_e32 v14, v19, v17, vcc
+; GFX7-NEXT:    v_max_f32_e32 v16, v15, v18
+; GFX7-NEXT:    v_cmp_o_f32_e32 vcc, v15, v18
 ; GFX7-NEXT:    v_cndmask_b32_e32 v15, v19, v16, vcc
 ; GFX7-NEXT:    s_setpc_b64 s[30:31]
 ;

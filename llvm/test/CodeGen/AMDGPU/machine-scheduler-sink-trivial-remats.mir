@@ -6270,7 +6270,7 @@ body:             |
   ; GFX908-NEXT:   $exec = S_OR_B64 $exec, [[COPY2]], implicit-def $scc
   ; GFX908-NEXT:   undef [[S_MOV_B32_:%[0-9]+]].sub0:sreg_64 = S_ADD_I32 [[S_MOV_B32_]].sub0, -1, implicit-def dead $scc
   ; GFX908-NEXT:   S_CMP_LG_U32 [[S_MOV_B32_]].sub0, 0, implicit-def $scc
-  ; GFX908-NEXT:   S_CBRANCH_SCC0 %bb.5, implicit killed $scc
+  ; GFX908-NEXT:   S_CBRANCH_SCC0 %bb.5, implicit $scc
   ; GFX908-NEXT: {{  $}}
   ; GFX908-NEXT: bb.4:
   ; GFX908-NEXT:   successors: %bb.1(0x80000000)
@@ -6441,7 +6441,7 @@ body:             |
   ; GFX908-GCNTRACKERS-NEXT:   $exec = S_OR_B64 $exec, [[COPY2]], implicit-def $scc
   ; GFX908-GCNTRACKERS-NEXT:   undef [[S_MOV_B32_:%[0-9]+]].sub0:sreg_64 = S_ADD_I32 [[S_MOV_B32_]].sub0, -1, implicit-def dead $scc
   ; GFX908-GCNTRACKERS-NEXT:   S_CMP_LG_U32 [[S_MOV_B32_]].sub0, 0, implicit-def $scc
-  ; GFX908-GCNTRACKERS-NEXT:   S_CBRANCH_SCC0 %bb.5, implicit killed $scc
+  ; GFX908-GCNTRACKERS-NEXT:   S_CBRANCH_SCC0 %bb.5, implicit $scc
   ; GFX908-GCNTRACKERS-NEXT: {{  $}}
   ; GFX908-GCNTRACKERS-NEXT: bb.4:
   ; GFX908-GCNTRACKERS-NEXT:   successors: %bb.1(0x80000000)
@@ -6827,7 +6827,7 @@ body:             |
   ; GFX908-NEXT:   $exec = S_OR_B64 $exec, [[COPY2]], implicit-def $scc
   ; GFX908-NEXT:   undef [[S_MOV_B32_:%[0-9]+]].sub0:sreg_64 = S_ADD_I32 [[S_MOV_B32_]].sub0, -1, implicit-def dead $scc
   ; GFX908-NEXT:   S_CMP_LG_U32 [[S_MOV_B32_]].sub0, 0, implicit-def $scc
-  ; GFX908-NEXT:   S_CBRANCH_SCC0 %bb.5, implicit killed $scc
+  ; GFX908-NEXT:   S_CBRANCH_SCC0 %bb.5, implicit $scc
   ; GFX908-NEXT: {{  $}}
   ; GFX908-NEXT: bb.4:
   ; GFX908-NEXT:   successors: %bb.1(0x80000000)
@@ -7064,7 +7064,7 @@ body:             |
   ; GFX908-GCNTRACKERS-NEXT:   $exec = S_OR_B64 $exec, [[COPY2]], implicit-def $scc
   ; GFX908-GCNTRACKERS-NEXT:   undef [[S_MOV_B32_:%[0-9]+]].sub0:sreg_64 = S_ADD_I32 [[S_MOV_B32_]].sub0, -1, implicit-def dead $scc
   ; GFX908-GCNTRACKERS-NEXT:   S_CMP_LG_U32 [[S_MOV_B32_]].sub0, 0, implicit-def $scc
-  ; GFX908-GCNTRACKERS-NEXT:   S_CBRANCH_SCC0 %bb.5, implicit killed $scc
+  ; GFX908-GCNTRACKERS-NEXT:   S_CBRANCH_SCC0 %bb.5, implicit $scc
   ; GFX908-GCNTRACKERS-NEXT: {{  $}}
   ; GFX908-GCNTRACKERS-NEXT: bb.4:
   ; GFX908-GCNTRACKERS-NEXT:   successors: %bb.1(0x80000000)
