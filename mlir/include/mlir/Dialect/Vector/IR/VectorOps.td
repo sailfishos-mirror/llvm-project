@@ -1709,6 +1709,8 @@ def Vector_LoadOp : Vector_Op<"load", [
     load operation. It must be a positive power of 2. The operation must access
     memory at an address aligned to this boundary. Violating this requirement
     triggers immediate undefined behavior.
+
+    Implements IndexedAccessOpInterface.
   }];
 
   let arguments = (ins Arg<AnyMemRef, "the reference to load from",
@@ -1825,6 +1827,8 @@ def Vector_StoreOp : Vector_Op<"store", [
     store operation. It must be a positive power of 2. The operation must access
     memory at an address aligned to this boundary. Violating this requirement
     triggers immediate undefined behavior.
+
+    Implements IndexedAccessOpInterface.
   }];
 
   let arguments = (ins
@@ -1899,6 +1903,8 @@ def Vector_MaskedLoadOp :
     hardware ISA support for a masked load. The semantics of the operation
     closely correspond to those of the `llvm.masked.load`
     [intrinsic](https://llvm.org/docs/LangRef.html#llvm-masked-load-intrinsics).
+
+    Implements IndexedAccessOpInterface.
 
     Examples:
 
@@ -1993,6 +1999,8 @@ def Vector_MaskedStoreOp :
     hardware ISA support for a masked store. The semantics of the operation
     closely correspond to those of the `llvm.masked.store`
     [intrinsic](https://llvm.org/docs/LangRef.html#llvm-masked-store-intrinsics).
+
+    Implements IndexedAccessOpInterface.
 
     Examples:
 
@@ -2103,6 +2111,14 @@ def Vector_GatherOp :
     memory at an address aligned to this boundary. Violating this requirement
     triggers immediate undefined behavior.
 
+    Note that if the base argument is not contiguous in memory (for example,
+    it is the result of a `tensor.extract` or a `memref.subview`), the entries
+    of `index_vec` must respect the strieds in the underlying memory and are
+    applied as pure 1-D offsets and are not decomposed in order to apply
+    the strides on the base.
+
+    Implements IndexedAccessOpInterface.
+
     Examples:
 
     ```mlir
@@ -2196,6 +2212,14 @@ def Vector_ScatterOp
     memory at an address aligned to this boundary. Violating this requirement
     triggers immediate undefined behavior.
 
+    Note that if the base argument is not contiguous in memory (for example,
+    it is the result of a `tensor.extract` or a `memref.subview`), the entries
+    of `index_vec` must respect the strieds in the underlying memory and are
+    applied as pure 1-D offsets and are not decomposed in order to apply
+    the strides on the base.
+
+    Implements IndexedAccessOpInterface.
+
     Examples:
 
     ```mlir
@@ -2279,6 +2303,8 @@ def Vector_ExpandLoadOp :
     triggers immediate undefined behavior.
 
     Note, at the moment this Op is only available for fixed-width vectors.
+
+    Implements IndexedAccessOpInterface.
 
     Examples:
 
@@ -2369,6 +2395,8 @@ def Vector_CompressStoreOp :
     triggers immediate undefined behavior.
 
     Note, at the moment this Op is only available for fixed-width vectors.
+
+    Implements IndexedAccessOpInterface.
 
     Examples:
 
@@ -2534,7 +2562,7 @@ def Vector_TypeCastOp :
 }
 
 def Vector_ConstantMaskOp :
-  Vector_Op<"constant_mask", [Pure, 
+  Vector_Op<"constant_mask", [Pure,
    DeclareOpInterfaceMethods<VectorUnrollOpInterface>
    ]>,
     Arguments<(ins DenseI64ArrayAttr:$mask_dim_sizes)>,
@@ -2594,7 +2622,7 @@ def Vector_ConstantMaskOp :
 }
 
 def Vector_CreateMaskOp :
-  Vector_Op<"create_mask", [Pure, 
+  Vector_Op<"create_mask", [Pure,
    DeclareOpInterfaceMethods<VectorUnrollOpInterface>
    ]>,
     Arguments<(ins Variadic<Index>:$operands)>,
