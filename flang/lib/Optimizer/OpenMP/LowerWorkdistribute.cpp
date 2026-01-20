@@ -840,6 +840,7 @@ static TempOmpVar allocateTempOmpVar(Location loc, Type ty,
         rewriter.getAttr<omp::VariableCaptureKindAttr>(
             omp::VariableCaptureKind::ByRef),
         /*varPtrPtr=*/Value{},
+        /*varPtrPtrType=*/mlir::TypeAttr{},
         /*members=*/SmallVector<Value>{},
         /*member_index=*/mlir::ArrayAttr{},
         /*bounds=*/ValueRange(),
