@@ -4466,8 +4466,8 @@ declare half @llvm.maxnum.f16(half, half) #1
 declare half @llvm.amdgcn.sin.f16(half) #1
 declare half @llvm.amdgcn.rcp.f16(half) #1
 
-attributes #0 = { nounwind denormal_fpenv(float: preservesign,preservesign) }
+attributes #0 = { nounwind denormal_fpenv(float: preservesign) }
 attributes #1 = { nounwind readnone }
 attributes #2 = { nounwind }
 attributes #3 = { nounwind "no-signed-zeros-fp-math"="true" }
-attributes #4 = { nounwind "amdgpu-ieee"="false" denormal_fpenv(float: preservesign,preservesign) }
+attributes #4 = { nounwind "amdgpu-ieee"="false" denormal_fpenv(float: preservesign) }

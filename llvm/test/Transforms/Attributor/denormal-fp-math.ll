@@ -38,7 +38,7 @@ define internal void @leaf_f64_ieee_f64_ieee__f32_dynamic_f32_dynamic__dynamic_d
 
 ; Should infer to preserve-sign,preserve-sign
 define internal void @leaf_dynamic_dynamic_from_daz_daz() #0 {
-; CHECK: Function Attrs: denormal_fpenv(preservesign,preservesign)
+; CHECK: Function Attrs: denormal_fpenv(preservesign)
 ; CHECK-LABEL: define internal void @leaf_dynamic_dynamic_from_daz_daz
 ; CHECK-SAME: () #[[ATTR0:[0-9]+]] {
 ; CHECK-NEXT:    call void @call_of_mystery()
@@ -51,7 +51,7 @@ define internal void @leaf_dynamic_dynamic_from_daz_daz() #0 {
 ; This goes to invalid because of the mismatch in the main mode. We
 ; could theoretically refine to denormal-fp-math-f32=preserve-sign,preserve-sign
 define internal void @leaf_f64_ieee_f64_ieee__f32_dynamic_f32_dynamic__dynamic_dynamic_from_daz_daz() #1 {
-; CHECK: Function Attrs: denormal_fpenv(float: dynamic,dynamic)
+; CHECK: Function Attrs: denormal_fpenv(float: dynamic)
 ; CHECK-LABEL: define internal void @leaf_f64_ieee_f64_ieee__f32_dynamic_f32_dynamic__dynamic_dynamic_from_daz_daz
 ; CHECK-SAME: () #[[ATTR1:[0-9]+]] {
 ; CHECK-NEXT:    call void @call_of_mystery()
@@ -63,7 +63,7 @@ define internal void @leaf_f64_ieee_f64_ieee__f32_dynamic_f32_dynamic__dynamic_d
 
 ; Leave this alone, must stay dynamic,dynamic
 define internal void @leaf_dynamic_dynamic_from_daz_daz_and_ieee_ieee() #0 {
-; CHECK: Function Attrs: denormal_fpenv(dynamic,dynamic)
+; CHECK: Function Attrs: denormal_fpenv(dynamic)
 ; CHECK-LABEL: define internal void @leaf_dynamic_dynamic_from_daz_daz_and_ieee_ieee
 ; CHECK-SAME: () #[[ATTR2:[0-9]+]] {
 ; CHECK-NEXT:    call void @call_of_mystery()
@@ -75,7 +75,7 @@ define internal void @leaf_dynamic_dynamic_from_daz_daz_and_ieee_ieee() #0 {
 
 ; Leave this alone, should only have denormal-fp-math-f32=ieee,ieee
 define internal void @leaf_f64_ieee_f64_ieee__f32_dynamic_f32_dynamic__dynamic_dynamic_from_daz_daz_and_ieee_ieee() #1 {
-; CHECK: Function Attrs: denormal_fpenv(float: dynamic,dynamic)
+; CHECK: Function Attrs: denormal_fpenv(float: dynamic)
 ; CHECK-LABEL: define internal void @leaf_f64_ieee_f64_ieee__f32_dynamic_f32_dynamic__dynamic_dynamic_from_daz_daz_and_ieee_ieee
 ; CHECK-SAME: () #[[ATTR1]] {
 ; CHECK-NEXT:    call void @call_of_mystery()
@@ -87,7 +87,7 @@ define internal void @leaf_f64_ieee_f64_ieee__f32_dynamic_f32_dynamic__dynamic_d
 
 ; Leave as dynamic,dynamic
 define void @externally_visible_dynamic_dynamic_from_ieee_ieee() #0 {
-; CHECK: Function Attrs: denormal_fpenv(dynamic,dynamic)
+; CHECK: Function Attrs: denormal_fpenv(dynamic)
 ; CHECK-LABEL: define void @externally_visible_dynamic_dynamic_from_ieee_ieee
 ; CHECK-SAME: () #[[ATTR2]] {
 ; CHECK-NEXT:    call void @call_of_mystery()
@@ -99,7 +99,7 @@ define void @externally_visible_dynamic_dynamic_from_ieee_ieee() #0 {
 
 ; Should infer to positive-zero,positive-zero
 define internal void @leaf_dynamic_dynamic_from_dapz_dapz() #0 {
-; CHECK: Function Attrs: denormal_fpenv(positivezero,positivezero)
+; CHECK: Function Attrs: denormal_fpenv(positivezero)
 ; CHECK-LABEL: define internal void @leaf_dynamic_dynamic_from_dapz_dapz
 ; CHECK-SAME: () #[[ATTR3:[0-9]+]] {
 ; CHECK-NEXT:    call void @call_of_mystery()
@@ -159,7 +159,7 @@ define void @func_default_is_ieee_ieee() {
 
 ; preserve-sign,preserve-sign entry point
 define void @func_daz_daz() #3 {
-; CHECK: Function Attrs: denormal_fpenv(preservesign,preservesign)
+; CHECK: Function Attrs: denormal_fpenv(preservesign)
 ; CHECK-LABEL: define void @func_daz_daz
 ; CHECK-SAME: () #[[ATTR0]] {
 ; CHECK-NEXT:    call void @leaf_dynamic_dynamic_from_daz_daz()
@@ -179,7 +179,7 @@ define void @func_daz_daz() #3 {
 
 ; positive-zero,positive-zero entry point
 define void @func_dapz_dapz() #4 {
-; CHECK: Function Attrs: denormal_fpenv(positivezero,positivezero)
+; CHECK: Function Attrs: denormal_fpenv(positivezero)
 ; CHECK-LABEL: define void @func_dapz_dapz
 ; CHECK-SAME: () #[[ATTR3]] {
 ; CHECK-NEXT:    call void @leaf_dynamic_dynamic_from_dapz_dapz()
@@ -192,7 +192,7 @@ define void @func_dapz_dapz() #4 {
 ; Could be fully preserve-sign,preserve-sign, but this isn't a
 ; realistic case and we don't bother trying to handle it.
 define internal void @leaf_f64_dynamic_f64_dynamic__f32_daz_f32_daz_from__daz_daz() #5 {
-; CHECK: Function Attrs: denormal_fpenv(dynamic,dynamic float: preservesign,preservesign)
+; CHECK: Function Attrs: denormal_fpenv(dynamic float: preservesign)
 ; CHECK-LABEL: define internal void @leaf_f64_dynamic_f64_dynamic__f32_daz_f32_daz_from__daz_daz
 ; CHECK-SAME: () #[[ATTR4:[0-9]+]] {
 ; CHECK-NEXT:    call void @call_of_mystery()
@@ -224,7 +224,7 @@ define internal void @leaf_ieee_dynamic_from_ieee_ieee() #7 {
 
 ; Specialize the f64 mode to ieee,ieee but leave f32 as dynamic,dynamic
 define internal void @leaf_dynamic_dynamic_from_f64_ieee_f32_dynamic() #0 {
-; CHECK: Function Attrs: denormal_fpenv(float: dynamic,dynamic)
+; CHECK: Function Attrs: denormal_fpenv(float: dynamic)
 ; CHECK-LABEL: define internal void @leaf_dynamic_dynamic_from_f64_ieee_f32_dynamic
 ; CHECK-SAME: () #[[ATTR1]] {
 ; CHECK-NEXT:    call void @call_of_mystery()
@@ -235,7 +235,7 @@ define internal void @leaf_dynamic_dynamic_from_f64_ieee_f32_dynamic() #0 {
 }
 
 define void @func_f64_ieee_f64_ieee__f32_dynamic_f32_dynamic() #1 {
-; CHECK: Function Attrs: denormal_fpenv(float: dynamic,dynamic)
+; CHECK: Function Attrs: denormal_fpenv(float: dynamic)
 ; CHECK-LABEL: define void @func_f64_ieee_f64_ieee__f32_dynamic_f32_dynamic
 ; CHECK-SAME: () #[[ATTR1]] {
 ; CHECK-NEXT:    call void @leaf_dynamic_dynamic_from_f64_ieee_f32_dynamic()
@@ -247,7 +247,6 @@ define void @func_f64_ieee_f64_ieee__f32_dynamic_f32_dynamic() #1 {
 
 ; -> preserve-sign,ieee.
 define internal void @leaf_daz_dynamic_from_dynamic_ieee() #8 {
-; CHECK: Function Attrs: denormal_fpenv(preservesign,ieee)
 ; CHECK-LABEL: define internal void @leaf_daz_dynamic_from_dynamic_ieee
 ; CHECK-SAME: () #[[ATTR5:[0-9]+]] {
 ; CHECK-NEXT:    call void @call_of_mystery()
@@ -258,7 +257,6 @@ define internal void @leaf_daz_dynamic_from_dynamic_ieee() #8 {
 }
 
 define void @dynamic_ieee() #6 {
-; CHECK: Function Attrs: denormal_fpenv(dynamic,ieee)
 ; CHECK-LABEL: define void @dynamic_ieee
 ; CHECK-SAME: () #[[ATTR6:[0-9]+]] {
 ; CHECK-NEXT:    call void @leaf_daz_dynamic_from_dynamic_ieee()
@@ -290,7 +288,7 @@ define internal void @leaf_dynamic_from_dynamic() {
 
 ; Leave unchanged as preserve-sign,preserve-sign
 define internal void @leaf_daz_daz_from_dynamic() #3 {
-; CHECK: Function Attrs: denormal_fpenv(preservesign,preservesign)
+; CHECK: Function Attrs: denormal_fpenv(preservesign)
 ; CHECK-LABEL: define internal void @leaf_daz_daz_from_dynamic
 ; CHECK-SAME: () #[[ATTR0]] {
 ; CHECK-NEXT:    call void @call_of_mystery()
@@ -301,7 +299,7 @@ define internal void @leaf_daz_daz_from_dynamic() #3 {
 }
 
 define void @dynamic_dynamic() #0 {
-; CHECK: Function Attrs: denormal_fpenv(dynamic,dynamic)
+; CHECK: Function Attrs: denormal_fpenv(dynamic)
 ; CHECK-LABEL: define void @dynamic_dynamic
 ; CHECK-SAME: () #[[ATTR2]] {
 ; CHECK-NEXT:    call void @leaf_ieee_ieee_from_dynamic()
@@ -316,7 +314,7 @@ define void @dynamic_dynamic() #0 {
 }
 
 define internal void @leaf_ieee_f64_daz_f32() #9 {
-; CHECK: Function Attrs: denormal_fpenv(float: preservesign,preservesign)
+; CHECK: Function Attrs: denormal_fpenv(float: preservesign)
 ; CHECK-LABEL: define internal void @leaf_ieee_f64_daz_f32
 ; CHECK-SAME: () #[[ATTR7:[0-9]+]] {
 ; CHECK-NEXT:    call void @call_of_mystery()
@@ -327,7 +325,7 @@ define internal void @leaf_ieee_f64_daz_f32() #9 {
 }
 
 define internal void @leaf_ieee_f64_daz_f32_from_ieee_f64_dynamic_f32() #10 {
-; CHECK: Function Attrs: denormal_fpenv(preservesign,preservesign float: ieee,ieee)
+; CHECK: Function Attrs: denormal_fpenv(preservesign float: ieee)
 ; CHECK-LABEL: define internal void @leaf_ieee_f64_daz_f32_from_ieee_f64_dynamic_f32
 ; CHECK-SAME: () #[[ATTR8:[0-9]+]] {
 ; CHECK-NEXT:    call void @call_of_mystery()
@@ -338,7 +336,7 @@ define internal void @leaf_ieee_f64_daz_f32_from_ieee_f64_dynamic_f32() #10 {
 }
 
 define void @ieee_f64_dynamic_f32() #1 {
-; CHECK: Function Attrs: denormal_fpenv(float: dynamic,dynamic)
+; CHECK: Function Attrs: denormal_fpenv(float: dynamic)
 ; CHECK-LABEL: define void @ieee_f64_dynamic_f32
 ; CHECK-SAME: () #[[ATTR1]] {
 ; CHECK-NEXT:    call void @leaf_ieee_f64_daz_f32()
@@ -350,9 +348,8 @@ define void @ieee_f64_dynamic_f32() #1 {
   ret void
 }
 
-; => "preserve-sign,positive-zero" + denormal_fpenv(float: ieee,positivezero)
+; => "preserve-sign,positive-zero" + denormal_fpenv(float: ieee|positivezero)
 define internal void @leaf_daz_dynamic_dynamic_dapz_from_daz_dapz_ieee_dapz() #11 {
-; CHECK: Function Attrs: denormal_fpenv(preservesign,positivezero float: ieee,positivezero)
 ; CHECK-LABEL: define internal void @leaf_daz_dynamic_dynamic_dapz_from_daz_dapz_ieee_dapz
 ; CHECK-SAME: () #[[ATTR9:[0-9]+]] {
 ; CHECK-NEXT:    call void @call_of_mystery()
@@ -363,7 +360,6 @@ define internal void @leaf_daz_dynamic_dynamic_dapz_from_daz_dapz_ieee_dapz() #1
 }
 
 define void @daz_dapz_ieee_dapz() #12 {
-; CHECK: Function Attrs: denormal_fpenv(preservesign,positivezero float: ieee,positivezero)
 ; CHECK-LABEL: define void @daz_dapz_ieee_dapz
 ; CHECK-SAME: () #[[ATTR9]] {
 ; CHECK-NEXT:    call void @leaf_daz_dynamic_dynamic_dapz_from_daz_dapz_ieee_dapz()
@@ -373,28 +369,28 @@ define void @daz_dapz_ieee_dapz() #12 {
   ret void
 }
 
-attributes #0 = { denormal_fpenv(dynamic,dynamic) }
-attributes #1 = { denormal_fpenv(float: dynamic,dynamic) }
-attributes #2 = { denormal_fpenv(ieee,ieee) }
-attributes #3 = { denormal_fpenv(preservesign,preservesign) }
-attributes #4 = { denormal_fpenv(positivezero,positivezero) }
-attributes #5 = { denormal_fpenv(dynamic,dynamic float: preservesign,preservesign) }
-attributes #6 = { denormal_fpenv(dynamic,ieee) }
-attributes #7 = { denormal_fpenv(ieee,dynamic) }
-attributes #8 = { denormal_fpenv(preservesign,dynamic) }
-attributes #9 = { denormal_fpenv(float: preservesign,preservesign) }
-attributes #10 = { denormal_fpenv(preservesign,preservesign float: ieee,ieee) }
-attributes #11 = { denormal_fpenv(preservesign,dynamic float: dynamic,positivezero) }
-attributes #12 = { denormal_fpenv(preservesign,positivezero float: ieee,positivezero) }
+attributes #0 = { denormal_fpenv(dynamic) }
+attributes #1 = { denormal_fpenv(float: dynamic) }
+attributes #2 = { denormal_fpenv(ieee|ieee) }
+attributes #3 = { denormal_fpenv(preservesign) }
+attributes #4 = { denormal_fpenv(positivezero|positivezero) }
+attributes #5 = { denormal_fpenv(dynamic float: preservesign) }
+attributes #6 = { denormal_fpenv(dynamic|ieee) }
+attributes #7 = { denormal_fpenv(ieee|dynamic) }
+attributes #8 = { denormal_fpenv(preservesign|dynamic) }
+attributes #9 = { denormal_fpenv(float: preservesign) }
+attributes #10 = { denormal_fpenv(preservesign|preservesign float: ieee) }
+attributes #11 = { denormal_fpenv(preservesign|dynamic float: dynamic|positivezero) }
+attributes #12 = { denormal_fpenv(preservesign|positivezero float: ieee|positivezero) }
 ;.
-; CHECK: attributes #[[ATTR0]] = { denormal_fpenv(preservesign,preservesign) }
-; CHECK: attributes #[[ATTR1]] = { denormal_fpenv(float: dynamic,dynamic) }
-; CHECK: attributes #[[ATTR2]] = { denormal_fpenv(dynamic,dynamic) }
-; CHECK: attributes #[[ATTR3]] = { denormal_fpenv(positivezero,positivezero) }
-; CHECK: attributes #[[ATTR4]] = { denormal_fpenv(dynamic,dynamic float: preservesign,preservesign) }
-; CHECK: attributes #[[ATTR5]] = { denormal_fpenv(preservesign,ieee) }
-; CHECK: attributes #[[ATTR6]] = { denormal_fpenv(dynamic,ieee) }
-; CHECK: attributes #[[ATTR7]] = { denormal_fpenv(float: preservesign,preservesign) }
-; CHECK: attributes #[[ATTR8]] = { denormal_fpenv(preservesign,preservesign float: ieee,ieee) }
-; CHECK: attributes #[[ATTR9]] = { denormal_fpenv(preservesign,positivezero float: ieee,positivezero) }
+; CHECK: attributes #[[ATTR0]] = { denormal_fpenv(preservesign) }
+; CHECK: attributes #[[ATTR1]] = { denormal_fpenv(float: dynamic) }
+; CHECK: attributes #[[ATTR2]] = { denormal_fpenv(dynamic) }
+; CHECK: attributes #[[ATTR3]] = { denormal_fpenv(positivezero) }
+; CHECK: attributes #[[ATTR4]] = { denormal_fpenv(dynamic float: preservesign) }
+; CHECK: attributes #[[ATTR5]] = { denormal_fpenv(preservesign|ieee) }
+; CHECK: attributes #[[ATTR6]] = { denormal_fpenv(dynamic|ieee) }
+; CHECK: attributes #[[ATTR7]] = { denormal_fpenv(float: preservesign) }
+; CHECK: attributes #[[ATTR8]] = { denormal_fpenv(preservesign float: ieee) }
+; CHECK: attributes #[[ATTR9]] = { denormal_fpenv(preservesign|positivezero float: ieee|positivezero) }
 ;.
