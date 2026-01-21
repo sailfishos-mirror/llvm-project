@@ -512,8 +512,7 @@ private:
     /// Maximum pressure recorded in the region.
     GCNRegPressure MaxPressure;
 
-    RegionSchedRevert(unsigned RegionIdx,
-                      const std::vector<MachineInstr *> &OrigMIOrder,
+    RegionSchedRevert(unsigned RegionIdx, ArrayRef<MachineInstr *> OrigMIOrder,
                       const GCNRegPressure &MaxPressure)
         : RegionIdx(RegionIdx), OrigMIOrder(OrigMIOrder),
           MaxPressure(MaxPressure) {}

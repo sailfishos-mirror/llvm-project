@@ -2194,7 +2194,7 @@ void PreRARematStage::finalizeGCNSchedStage() {
     return;
   for (const auto &[RegionIdx, OrigMIOrder, MaxPressure] : RegionReverts) {
     REMAT_DEBUG(dbgs() << "Reverting re-scheduling in region " << RegionIdx
-                        << '\n');
+                       << '\n');
     DAG.Pressure[RegionIdx] = MaxPressure;
     modifyRegionSchedule(RegionIdx, RegionBB[RegionIdx], OrigMIOrder);
   }
