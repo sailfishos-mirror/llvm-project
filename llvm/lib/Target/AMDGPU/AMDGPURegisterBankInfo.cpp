@@ -3500,6 +3500,8 @@ void AMDGPURegisterBankInfo::applyMappingImpl(
     executeInWaterfallLoop(B, make_range(Start, End), SGPROperandRegs);
     break;
   }
+  case AMDGPU::G_AMDGPU_FLAT_ATOMIC_LOAD_MONITOR:
+  case AMDGPU::G_AMDGPU_GLOBAL_ATOMIC_LOAD_MONITOR:
   case AMDGPU::G_LOAD:
   case AMDGPU::G_ZEXTLOAD:
   case AMDGPU::G_SEXTLOAD: {
@@ -5338,12 +5340,12 @@ AMDGPURegisterBankInfo::getInstrMapping(const MachineInstr &MI) const {
     case Intrinsic::amdgcn_ds_load_tr16_b128:
     case Intrinsic::amdgcn_ds_load_tr4_b64:
     case Intrinsic::amdgcn_ds_load_tr6_b96:
-    case Intrinsic::amdgcn_flat_load_monitor_b32:
-    case Intrinsic::amdgcn_flat_load_monitor_b64:
-    case Intrinsic::amdgcn_flat_load_monitor_b128:
-    case Intrinsic::amdgcn_global_load_monitor_b32:
-    case Intrinsic::amdgcn_global_load_monitor_b64:
-    case Intrinsic::amdgcn_global_load_monitor_b128:
+    // case Intrinsic::amdgcn_flat_load_monitor_b32:
+    // case Intrinsic::amdgcn_flat_load_monitor_b64:
+    // case Intrinsic::amdgcn_flat_load_monitor_b128:
+    // case Intrinsic::amdgcn_global_load_monitor_b32:
+    // case Intrinsic::amdgcn_global_load_monitor_b64:
+    // case Intrinsic::amdgcn_global_load_monitor_b128:
     case Intrinsic::amdgcn_ds_read_tr4_b64:
     case Intrinsic::amdgcn_ds_read_tr6_b96:
     case Intrinsic::amdgcn_ds_read_tr8_b64:
@@ -5758,6 +5760,14 @@ AMDGPURegisterBankInfo::getInstrMapping(const MachineInstr &MI) const {
   case AMDGPU::G_AMDGPU_WHOLE_WAVE_FUNC_RETURN:
     OpdsMapping[0] = AMDGPU::getValueMapping(AMDGPU::VCCRegBankID, 1);
     break;
+  case AMDGPU::G_AMDGPU_FLAT_ATOMIC_LOAD_MONITOR:
+  case AMDGPU::G_AMDGPU_GLOBAL_ATOMIC_LOAD_MONITOR: {
+    unsigned Size = getSizeInBits(MI.getOperand(0).getReg(), MRI, *TRI);
+    unsigned PtrSize = getSizeInBits(MI.getOperand(1).getReg(), MRI, *TRI);
+    OpdsMapping[0] = AMDGPU::getValueMapping(AMDGPU::VGPRRegBankID, Size);
+    OpdsMapping[1] = AMDGPU::getValueMapping(AMDGPU::VGPRRegBankID, PtrSize);
+    break;
+  }
   }
 
   return getInstructionMapping(/*ID*/1, /*Cost*/1,
