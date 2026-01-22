@@ -857,7 +857,7 @@ private:
       return {{}, {}};
     const TargetRegisterClass *RC = Context->TRI->getPhysRegBaseClass(Reg);
     unsigned Size = Context->TRI->getRegSizeInBits(*RC);
-    if (Size == 16 && Context->ST->hasD16Writes32BitVgpr())
+    if (Size == 16 && Context->ST->enableD16Writes32BitVgpr())
       Reg = Context->TRI->get32BitRegister(Reg);
     return Context->TRI->regunits(Reg);
   }
