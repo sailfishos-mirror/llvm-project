@@ -1080,7 +1080,8 @@ struct SemiNCAInfo {
       LLVM_DEBUG(dbgs() << "Processing affected node " << BlockNamePrinter(TN)
                         << " with NCD = " << BlockNamePrinter(NCD)
                         << ", MinNode =" << BlockNamePrinter(MinNode) << "\n");
-      if (NCD != TN && NCD->getLevel() < MinNode->getLevel()) MinNode = NCD;
+      if (NCD != TN && NCD->getLevel() < MinNode->getLevel())
+        MinNode = NCD;
     }
 
     // Root reached, rebuild the whole tree from scratch.
@@ -1110,9 +1111,12 @@ struct SemiNCAInfo {
     SNCA.clear();
 
     // Identify nodes that remain in the affected subtree.
-    auto DescendBelow = [MinLevel, &DT](NodePtr, NodePtr To) {
+    auto DescendBelow = [MinLevel, &DT](NodePtr R, NodePtr To) {
       const TreeNodePtr ToTN = DT.getNode(To);
-      return ToTN && ToTN->getLevel() > MinLevel;
+      if (ToTN)
+        return ToTN->getLevel() > MinLevel;
+      DT.createNode(To, DT.getNode(R));
+      return true;
     };
     SNCA.runDFS(MinNode->getBlock(), 0, DescendBelow, 0);
 
