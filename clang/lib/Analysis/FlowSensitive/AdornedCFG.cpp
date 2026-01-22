@@ -159,6 +159,7 @@ llvm::Expected<AdornedCFG> AdornedCFG::build(const Decl &D, Stmt &S,
   Options.PruneTriviallyFalseEdges = true;
   Options.AddImplicitDtors = true;
   Options.AddTemporaryDtors = true;
+  Options.AddParameterDtors = true;
   Options.AddInitializers = true;
   Options.AddCXXDefaultInitExprInCtors = true;
   Options.AddLifetime = true;

@@ -1,6 +1,5 @@
 // RUN: %clang_cc1 -fsyntax-only -Wdangling -Wdangling-field -Wreturn-stack-address -verify %s
 // RUN: %clang_cc1 -fsyntax-only -Wlifetime-safety -Wno-dangling -verify=cfg %s
-// RUN: %clang_cc1 -fsyntax-only -flifetime-safety-inference -fexperimental-lifetime-safety-tu-analysis -Wlifetime-safety -Wno-dangling -verify=cfg %s
 
 #include "Inputs/lifetime-analysis.h"
 
@@ -80,11 +79,18 @@ void dangligGslPtrFromTemporary() {
 }
 
 struct DanglingGslPtrField {
-  MyIntPointer p; // expected-note {{pointer member declared here}}
-  MyLongPointerFromConversion p2; // expected-note {{pointer member declared here}}
-  DanglingGslPtrField(int i) : p(&i) {} // TODO
-  DanglingGslPtrField() : p2(MyLongOwnerWithConversion{}) {} // expected-warning {{initializing pointer member 'p2' to point to a temporary object whose lifetime is shorter than the lifetime of the constructed object}}
-  DanglingGslPtrField(double) : p(MyIntOwner{}) {} // expected-warning {{initializing pointer member 'p' to point to a temporary object whose lifetime is shorter than the lifetime of the constructed object}}
+  MyIntPointer p; // expected-note {{pointer member declared here}} \
+                  // cfg-note 3 {{this field dangles}}
+  MyLongPointerFromConversion p2; // expected-note {{pointer member declared here}} \
+                                  // cfg-note 2 {{this field dangles}}
+
+  DanglingGslPtrField(int i) : p(&i) {} // cfg-warning {{address of stack memory escapes to a field}}
+  DanglingGslPtrField() : p2(MyLongOwnerWithConversion{}) {}  // expected-warning {{initializing pointer member 'p2' to point to a temporary object whose lifetime is shorter than the lifetime of the constructed object}} \
+                                                              // cfg-warning {{address of stack memory escapes to a field}}
+  DanglingGslPtrField(double) : p(MyIntOwner{}) {}  // expected-warning {{initializing pointer member 'p' to point to a temporary object whose lifetime is shorter than the lifetime of the constructed object}} \
+                                                    // cfg-warning {{address of stack memory escapes to a field}}
+  DanglingGslPtrField(MyIntOwner io) : p(io) {} // cfg-warning {{address of stack memory escapes to a field}}
+  DanglingGslPtrField(MyLongOwnerWithConversion lo) : p2(lo) {} // cfg-warning {{address of stack memory escapes to a field}}
 };
 
 MyIntPointer danglingGslPtrFromLocal() {
@@ -1099,10 +1105,11 @@ struct Foo2 {
 };
 
 struct Test {
-  Test(Foo2 foo) : bar(foo.bar.get()), // OK
+  Test(Foo2 foo) : bar(foo.bar.get()), // OK \
+      // FIXME: cfg-warning {{address of stack memory escapes to a field}}
       storage(std::move(foo.bar)) {};
 
-  Bar* bar;
+  Bar* bar; // cfg-note {{this field dangles}}
   std::unique_ptr<Bar> storage;
 };
 

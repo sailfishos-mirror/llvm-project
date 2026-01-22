@@ -52,9 +52,13 @@ public:
                                   Confidence Confidence) {}
 
   virtual void reportUseAfterReturn(const Expr *IssueExpr,
-                                    const Expr *EscapeExpr,
+                                    const Expr *ReturnExpr,
                                     SourceLocation ExpiryLoc,
                                     Confidence Confidence) {}
+
+  virtual void reportDanglingField(const Expr *IssueExpr,
+                                   const FieldDecl *Field,
+                                   SourceLocation ExpiryLoc) {}
 
   // Suggests lifetime bound annotations for function paramters
   virtual void suggestAnnotation(SuggestionScope Scope,

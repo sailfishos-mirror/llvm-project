@@ -91,7 +91,8 @@ public:
         const ParmVarDecl *PVD = PL->getParmVarDecl();
         if (PVD->hasAttr<LifetimeBoundAttr>())
           continue;
-        AnnotationWarningsMap.try_emplace(PVD, OEF->getEscapeExpr());
+        if (auto *ReturnEsc = dyn_cast<ReturnEscapeFact>(OEF))
+          AnnotationWarningsMap.try_emplace(PVD, ReturnEsc->getReturnExpr());
       }
     }
   }
@@ -154,10 +155,16 @@ public:
         Reporter->reportUseAfterFree(IssueExpr, UF->getUseExpr(), ExpiryLoc,
                                      Confidence);
       else if (const auto *OEF =
-                   CausingFact.dyn_cast<const OriginEscapesFact *>())
-        Reporter->reportUseAfterReturn(IssueExpr, OEF->getEscapeExpr(),
-                                       ExpiryLoc, Confidence);
-      else
+                   CausingFact.dyn_cast<const OriginEscapesFact *>()) {
+        if (const auto *RetEscape = dyn_cast<ReturnEscapeFact>(OEF))
+          Reporter->reportUseAfterReturn(IssueExpr, RetEscape->getReturnExpr(),
+                                         ExpiryLoc, Confidence);
+        else if (const auto *FieldEscape = dyn_cast<FieldEscapeFact>(OEF))
+          Reporter->reportDanglingField(IssueExpr, FieldEscape->getFieldDecl(),
+                                        ExpiryLoc);
+        else
+          llvm_unreachable("Unhandled OriginEscapesFact type");
+      } else
         llvm_unreachable("Unhandled CausingFact type");
     }
   }

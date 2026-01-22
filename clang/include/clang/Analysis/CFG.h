@@ -1235,6 +1235,11 @@ public:
     bool AddEHEdges = false;
     bool AddInitializers = false;
     bool AddImplicitDtors = false;
+    // Add dtors for function parameters. In principle, function parameters are
+    // constructed and destructed in the caller context but analyses could still
+    // choose to include these in the callee's CFG to represent the dtors run on
+    // function exit.
+    bool AddParameterDtors = false;
     bool AddLifetime = false;
     bool AddLoopExit = false;
     bool AddTemporaryDtors = false;
