@@ -9897,6 +9897,7 @@ SIInstrInfo::getSerializableMachineMemOperandTargetFlags() const {
           {MONoClobber, "amdgpu-noclobber"},
           {MOLastUse, "amdgpu-last-use"},
           {MOCooperative, "amdgpu-cooperative"},
+          {MONonVolatile, "amdgpu-non-volatile"},
       };
 
   return ArrayRef(TargetFlags);
