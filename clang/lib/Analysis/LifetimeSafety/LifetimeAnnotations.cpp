@@ -13,6 +13,7 @@
 #include "clang/AST/DeclTemplate.h"
 #include "clang/AST/Type.h"
 #include "clang/AST/TypeLoc.h"
+#include "llvm/ADT/StringSet.h"
 
 namespace clang::lifetimes {
 
@@ -108,35 +109,36 @@ bool shouldTrackImplicitObjectArg(const CXXMethodDecl *Callee,
     if (isGslPointerType(Conv->getConversionType()) &&
         Callee->getParent()->hasAttr<OwnerAttr>())
       return true;
-  if (!isInStlNamespace(Callee->getParent()))
-    return false;
   if (!isGslPointerType(Callee->getFunctionObjectParameterType()) &&
       !isGslOwnerType(Callee->getFunctionObjectParameterType()))
     return false;
 
+  static const llvm::StringSet<> TransparentFns = {
+      // Begin and end iterators.
+      "begin", "end", "rbegin", "rend", "cbegin", "cend", "crbegin", "crend",
+      // Inner pointer getters.
+      "c_str", "data", "get",
+      // Map and set types.
+      "find", "equal_range", "lower_bound", "upper_bound"};
   // Track dereference operator for GSL pointers in STL. Only do so for lifetime
   // safety analysis and not for Sema's statement-local analysis as it starts
   // to have false-positives.
   if (RunningUnderLifetimeSafety &&
-      isGslPointerType(Callee->getFunctionObjectParameterType()) &&
-      (Callee->getOverloadedOperator() == OverloadedOperatorKind::OO_Star ||
-       Callee->getOverloadedOperator() == OverloadedOperatorKind::OO_Arrow))
-    return true;
+      isGslPointerType(Callee->getFunctionObjectParameterType())) {
+    if (Callee->getOverloadedOperator() == OverloadedOperatorKind::OO_Star ||
+        Callee->getOverloadedOperator() == OverloadedOperatorKind::OO_Arrow)
+      return true;
+    if (Callee->getIdentifier() && TransparentFns.contains(Callee->getName()))
+      return true;
+  }
+
+  if (!isInStlNamespace(Callee->getParent()))
+    return false;
 
   if (isPointerLikeType(Callee->getReturnType())) {
     if (!Callee->getIdentifier())
       return false;
-    return llvm::StringSwitch<bool>(Callee->getName())
-        .Cases(
-            {// Begin and end iterators.
-             "begin", "end", "rbegin", "rend", "cbegin", "cend", "crbegin",
-             "crend",
-             // Inner pointer getters.
-             "c_str", "data", "get",
-             // Map and set types.
-             "find", "equal_range", "lower_bound", "upper_bound"},
-            true)
-        .Default(false);
+    return TransparentFns.contains(Callee->getName());
   }
   if (Callee->getReturnType()->isReferenceType()) {
     if (!Callee->getIdentifier()) {
