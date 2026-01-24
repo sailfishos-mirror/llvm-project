@@ -1575,3 +1575,26 @@ std::string_view& refViewMemberReturnView2(RefMember a) { return a.view; } // ex
 std::string_view refViewMemberReturnRefView1(RefMember a) { return a.view_ref; }
 std::string_view& refViewMemberReturnRefView2(RefMember a) { return a.view_ref; }
 } // namespace field_access
+
+namespace non_trivial_views {
+struct [[gsl::Pointer]] View {
+    View(const std::string&);
+    ~View(); // Forces a CXXBindTemporaryExpr.
+};
+
+View test1(std::string a) {
+  // Make sure we handle CXXBindTemporaryExpr of view types.
+  return View(a); // expected-warning {{address of stack memory is returned later}} expected-note {{returned here}}
+}
+
+View test2(std::string a) {
+  View b = View(a); // expected-warning {{address of stack memory is returned later}}
+  return b;  // expected-note {{returned here}}
+}
+
+View test3(std::string a) {
+  const View& b = View(a); // expected-warning {{address of stack memory is returned later}}
+  return b;  // expected-note {{returned here}}
+}
+
+} // namespace non_trivial_views

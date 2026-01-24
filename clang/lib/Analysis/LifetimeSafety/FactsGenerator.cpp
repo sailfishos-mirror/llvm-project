@@ -418,12 +418,23 @@ void FactsGenerator::VisitInitListExpr(const InitListExpr *ILE) {
     killAndFlowOrigin(*ILE, *ILE->getInit(0));
 }
 
+void FactsGenerator::VisitCXXBindTemporaryExpr(
+    const CXXBindTemporaryExpr *BTE) {
+  killAndFlowOrigin(*BTE, *BTE->getSubExpr());
+}
+
 void FactsGenerator::VisitMaterializeTemporaryExpr(
     const MaterializeTemporaryExpr *MTE) {
   assert(MTE->isGLValue());
   // We defer from handling lifetime extended materializations.
-  if (MTE->getStorageDuration() != SD_FullExpression)
+  if (MTE->getStorageDuration() != SD_FullExpression) {
+    assert(MTE->getLifetimeExtendedTemporaryDecl());
+    OriginList *MTEList = getOriginsList(*MTE);
+    assert(MTEList && "Lifetime-extended MTE should have an origin list");
+    OriginList *SubExprList = getOriginsList(*MTE->getSubExpr());
+    flow(MTEList->peelOuterOrigin(), SubExprList, /*Kill=*/true);
     return;
+  }
   OriginList *MTEList = getOriginsList(*MTE);
   if (!MTEList)
     return;
