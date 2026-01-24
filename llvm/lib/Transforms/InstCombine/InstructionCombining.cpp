@@ -1916,7 +1916,9 @@ Instruction *InstCombinerImpl::foldBinOpSelectBinOp(BinaryOperator &Op) {
   if (!NewTV || !NewFV)
     return nullptr;
 
-  Value *NewSI = Builder.CreateSelect(SI->getCondition(), NewTV, NewFV);
+  Value *NewSI =
+      Builder.CreateSelect(SI->getCondition(), NewTV, NewFV, "",
+                           ProfcheckDisableMetadataFixes ? nullptr : SI);
   return BinaryOperator::Create(Op.getOpcode(), NewSI, Input);
 }
 
