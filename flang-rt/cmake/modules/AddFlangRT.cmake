@@ -376,8 +376,8 @@ function (add_flangrt_library name)
       #        is /usr/lib/<triple>/lib<name>.so, like e.g. libgcc_s.so.
       #        Flang-RT also would require a library versioning scheme so
       #        executables compiled with different versions of Flang either use
-      #        matching versions of Flang-RT, or use a newer backward-compatble
-      #        versions. Currently, Flang-RT has no ABI backwards-compatibility
+      #        matching versions of Flang-RT, or use a newer backward-compatible
+      #        version. Currently, Flang-RT has no ABI backwards-compatibility
       #        policy.
       #        Currently, we just emit it into RUNTIMES_OUTPUT_RESOURCE_LIB_DIR
       #        like the static library, which is already in the driver's and

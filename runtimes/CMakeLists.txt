@@ -258,7 +258,7 @@ else()
   set(RUNTIMES_INSTALL_RESOURCE_PATH_DEFAULT "lib${LLVM_LIBDIR_SUFFIX}/clang/${LLVM_VERSION_MAJOR}")
 endif()
 
-# Determine build and install paths. The ouptut paths are absolute, but the
+# Determine build and install paths. The output paths are absolute, but the
 # install dirs are relative to CMAKE_INSTALL_PREFIX to be resolved by CMake.
 get_toolchain_library_subdir(toolchain_lib_subdir)
 extend_path(RUNTIMES_OUTPUT_RESOURCE_LIB_DIR "${RUNTIMES_OUTPUT_RESOURCE_DIR}" "${toolchain_lib_subdir}")
