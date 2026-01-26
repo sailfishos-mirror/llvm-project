@@ -31,6 +31,8 @@ module attributes {llvm.target_triple = "x86_64-unknown-linux-gnu", omp.is_gpu =
 // CHECK:  %[[SIZE2_CALC_3:.*]] = ptrtoint ptr %[[ALLOCA]] to i64
 // CHECK:  %[[SIZE2_CALC_4:.*]] = sub i64 %[[SIZE2_CALC_2]], %[[SIZE2_CALC_3]]
 // CHECK:  %[[SIZE2_CALC_5:.*]] = sdiv exact i64 %[[SIZE2_CALC_4]], ptrtoint (ptr getelementptr (i8, ptr null, i32 1) to i64)
+// CHECK: %[[SZCMP:.*]] = icmp ne i64 0, %[[SIZE2_CALC_5]]
+// CHECK: %[[SZ_SEL:.*]] = select i1 %[[SZCMP]], i64 %[[SIZE2_CALC_5]], i64 4
 
 // CHECK:  %[[SIZE3_CALC_1:.*]] = getelementptr i32, ptr %[[ELEMENT_ACC]], i32 1
 // CHECK:  %[[SIZE3_CALC_2:.*]] = ptrtoint ptr %[[SIZE2_CALC_1]] to i64
@@ -50,12 +52,12 @@ module attributes {llvm.target_triple = "x86_64-unknown-linux-gnu", omp.is_gpu =
 // CHECK: %[[PTRS:.*]] = getelementptr inbounds [4 x ptr], ptr %.offload_ptrs, i32 0, i32 1
 // CHECK: store ptr %[[ALLOCA]], ptr %[[PTRS]], align 8
 // CHECK: %[[SIZES:.*]] = getelementptr inbounds [4 x i64], ptr %.offload_sizes, i32 0, i32 1
-// CHECK: store i64 %[[SIZE2_CALC_5]], ptr %[[SIZES]], align 8
+// CHECK: store i64 %[[SZ_SEL]], ptr %[[SIZES]], align 8
 
 // CHECK: %[[BASEPTR:.*]] = getelementptr inbounds [4 x ptr], ptr %.offload_baseptrs, i32 0, i32 2
 // CHECK: store ptr %[[ALLOCA]], ptr %[[BASEPTR]], align 8
 // CHECK: %[[PTRS:.*]] = getelementptr inbounds [4 x ptr], ptr %.offload_ptrs, i32 0, i32 2
-// CHECK: store ptr %13, ptr %[[PTRS]], align 8
+// CHECK: store ptr %15, ptr %[[PTRS]], align 8
 // CHECK: %[[SIZES:.*]] = getelementptr inbounds [4 x i64], ptr %.offload_sizes, i32 0, i32 2
 // CHECK: store i64 %[[SIZE3_CALC_5]], ptr %[[SIZES]], align 8
 
