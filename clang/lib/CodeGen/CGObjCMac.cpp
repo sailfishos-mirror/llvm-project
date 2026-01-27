@@ -3975,9 +3975,20 @@ CGObjCCommonMac::GenerateDirectMethod(const ObjCMethodDecl *OMD,
     auto Name = getSymbolNameForMethod(OMD, /*include category*/ false,
                                        /*includePrefixByte*/ !removePrefixByte);
 
-    // ALWAYS use ExternalLinkage for true implementation
-    Fn = llvm::Function::Create(MethodTy, llvm::GlobalValue::ExternalLinkage,
-                                Name, &CGM.getModule());
+    // It's possible swift's IRGen already generated the function declaration
+    // for us, in that case, using existing ones. Reinforce the linkage since
+    // we are not sure what swift would do. Also double check the function type.
+    Fn = CGM.getModule().getFunction(Name);
+    if (Fn) {
+      Fn->setLinkage(llvm::GlobalValue::ExternalLinkage);
+      assert(Fn->getFunctionType() == MethodTy &&
+             "Existing function type is different");
+    } else {
+      // ALWAYS use ExternalLinkage for true implementation
+      Fn = llvm::Function::Create(MethodTy, llvm::GlobalValue::ExternalLinkage,
+                                  Name, &CGM.getModule());
+    }
+
     auto [It, inserted] = DirectMethodDefinitions.insert(
         std::make_pair(COMD, DirectMethodInfo(Fn)));
     I = It;
