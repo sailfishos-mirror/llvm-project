@@ -1389,7 +1389,10 @@ The AMDGPU backend implements the following LLVM IR intrinsics.
   llvm.amdgcn.wave.reduce.fmin                     Similar to `llvm.amdgcn.wave.reduce.umin`, but performs a floating point min
                                                    reduction on floating point values.
                                                    Intrinsic is implemented for float and double types.
-                                                   NAN values are not canonnicalized.
+                                                   Intrinsic is modelled similar to `llvm.minnum` intrinsic.
+                                                   For a reduction between two NAN values, a NAN is returned.
+                                                   For a reduction between a NAN and a number, the number is returned.
+                                                   -0.0 < +0.0 is true for this reduction.
                                                    The ordering behaviour of SNANs is non-deterministic.
 
   llvm.amdgcn.wave.reduce.umax                     Performs an arithmetic unsigned max reduction on the unsigned values
@@ -1409,7 +1412,10 @@ The AMDGPU backend implements the following LLVM IR intrinsics.
   llvm.amdgcn.wave.reduce.fmax                     Similar to `llvm.amdgcn.wave.reduce.umax`, but performs a floating point max
                                                    reduction on floating point values.
                                                    Intrinsic is implemented for float and double types.
-                                                   NAN values are not canonnicalized.
+                                                   Intrinsic is modelled similar to `llvm.maxnum` intrinsic.
+                                                   For a reduction between two NAN values, a NAN is returned.
+                                                   For a reduction between a NAN and a number, the number is returned.
+                                                   -0.0 < +0.0 is true for this reduction.
                                                    The ordering behaviour of SNANs is non-deterministic.
 
   llvm.amdgcn.wave.reduce.add                      Performs an arithmetic add reduction on the signed/unsigned values
