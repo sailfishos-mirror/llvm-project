@@ -24,16 +24,16 @@
 // RUN: llvm-nm -g %t/libFoo.dylib | FileCheck %s --check-prefix=DYLIB
 
 // Hidden visibility methods should NOT be exported
-// DYLIB-NOT: -[Foo instanceMethod:]
-// DYLIB-NOT: +[Foo classMethod:]
-// DYLIB-NOT: -[Foo privateValue:]
-// DYLIB-NOT: -[Foo setPrivateValue:]
+// DYLIB-NOT: _objc_direct_i_Foo_instanceMethod__
+// DYLIB-NOT: _objc_direct_i_Foo_classMethod__
+// DYLIB-NOT: _objc_direct_i_Foo_privateValue__
+// DYLIB-NOT: _objc_direct_i_Foo_setPrivateValue__
 
 // Default visibility methods SHOULD be exported
-// DYLIB: {{[0-9a-f]+}} T _+[Foo exportedClassMethod:]
-// DYLIB: {{[0-9a-f]+}} T _-[Foo exportedInstanceMethod:]
-// DYLIB: {{[0-9a-f]+}} T _-[Foo exportedValue]
-// DYLIB: {{[0-9a-f]+}} T _-[Foo setExportedValue:]
+// DYLIB: {{[0-9a-f]+}} T __objc_direct_c_Foo_exportedClassMethod__
+// DYLIB: {{[0-9a-f]+}} T __objc_direct_i_Foo_exportedInstanceMethod__
+// DYLIB: {{[0-9a-f]+}} T __objc_direct_i_Foo_exportedValue_
+// DYLIB: {{[0-9a-f]+}} T __objc_direct_i_Foo_setExportedValue__
 
 // Test 5: Compile main.m
 // RUN: %clang -fobjc-direct-precondition-thunk -target arm64-apple-darwin \
@@ -50,16 +50,16 @@
 // RUN: llvm-nm %t/main | FileCheck %s --check-prefix=EXE
 
 // Thunks should be defined locally
-// EXE-DAG: {{[0-9a-f]+}} t _+[Foo exportedClassMethod:]_thunk
-// EXE-DAG: {{[0-9a-f]+}} t _-[Foo exportedInstanceMethod:]_thunk
-// EXE-DAG: {{[0-9a-f]+}} t _-[Foo exportedValue]_thunk
-// EXE-DAG: {{[0-9a-f]+}} t _-[Foo setExportedValue:]_thunk
+// EXE-DAG: {{[0-9a-f]+}} t __objc_direct_c_Foo_exportedClassMethod___thunk
+// EXE-DAG: {{[0-9a-f]+}} t __objc_direct_i_Foo_exportedInstanceMethod___thunk
+// EXE-DAG: {{[0-9a-f]+}} t __objc_direct_i_Foo_exportedValue__thunk
+// EXE-DAG: {{[0-9a-f]+}} t __objc_direct_i_Foo_setExportedValue___thunk
 
 // Actual methods should be undefined
-// EXE-DAG: U _+[Foo exportedClassMethod:]
-// EXE-DAG: U _-[Foo exportedInstanceMethod:]
-// EXE-DAG: U _-[Foo exportedValue]
-// EXE-DAG: U _-[Foo setExportedValue:]
+// EXE-DAG: U __objc_direct_c_Foo_exportedClassMethod__
+// EXE-DAG: U __objc_direct_i_Foo_exportedInstanceMethod__
+// EXE-DAG: U __objc_direct_i_Foo_exportedValue_
+// EXE-DAG: U __objc_direct_i_Foo_setExportedValue__
 
 //--- foo.h
 // Header for libFoo
@@ -100,43 +100,43 @@
   return self;
 }
 
-// FOO_M-LABEL: define hidden i32 @"-[Foo instanceMethod:]"
+// FOO_M-LABEL: define hidden i32 @_objc_direct_i_Foo_instanceMethod__
 - (int)instanceMethod:(int)x {
   // Compiler is smart enough to know that self is non-nil, so we dispatch to
   // true implementation.
-  // FOO_M: call i32 @"-[Foo privateValue]"
-  // FOO_M: call i32 @"-[Foo exportedValue]"
+  // FOO_M: call i32 @_objc_direct_i_Foo_privateValue_
+  // FOO_M: call i32 @_objc_direct_i_Foo_exportedValue_
   return x + [self privateValue] + [self exportedValue];
 }
 
 // Hidden property getter and setter (default visibility)
-// FOO_M-LABEL: define hidden i32 @"-[Foo privateValue]"
+// FOO_M-LABEL: define hidden i32 @_objc_direct_i_Foo_privateValue_
 
 // Exported property getter and setter (explicit default visibility)
-// FOO_M-LABEL: define dso_local i32 @"-[Foo exportedValue]"
+// FOO_M-LABEL: define dso_local i32 @_objc_direct_i_Foo_exportedValue_
 
-// FOO_M-LABEL: define hidden i32 @"+[Foo classMethod:]"
+// FOO_M-LABEL: define hidden i32 @_objc_direct_c_Foo_classMethod__
 + (int)classMethod:(int)x {
   return x * 3;
 }
 
-// FOO_M-LABEL: define dso_local i32 @"-[Foo exportedInstanceMethod:]"
+// FOO_M-LABEL: define dso_local i32 @_objc_direct_i_Foo_exportedInstanceMethod__
 - (int)exportedInstanceMethod:(int)x {
-  // FOO_M: call i32 @"-[Foo privateValue]"
-  // FOO_M: call i32 @"-[Foo exportedValue]"
+  // FOO_M: call i32 @_objc_direct_i_Foo_privateValue_
+  // FOO_M: call i32 @_objc_direct_i_Foo_exportedValue_
   return x + [self privateValue] + [self exportedValue];
 }
 
-// FOO_M-LABEL: define dso_local i32 @"+[Foo exportedClassMethod:]"
+// FOO_M-LABEL: define dso_local i32 @_objc_direct_c_Foo_exportedClassMethod__
 + (int)exportedClassMethod:(int)x {
   return x * 5;
 }
 
 // Hidden property getter and setter (default visibility)
-// FOO_M-LABEL: define hidden void @"-[Foo setPrivateValue:]"
+// FOO_M-LABEL: define hidden void @_objc_direct_i_Foo_setPrivateValue__
 
 // Exported property getter and setter (explicit default visibility)
-// FOO_M-LABEL: define dso_local void @"-[Foo setExportedValue:]"
+// FOO_M-LABEL: define dso_local void @_objc_direct_i_Foo_setExportedValue__
 
 @end
 
@@ -150,23 +150,23 @@ int main() {
     Foo *obj = [[Foo alloc] initWithprivateValue:10 exportedValue:20];
     printf("Allocated Foo\n");
 
-    // MAIN_M: call void @"-[Foo setExportedValue:]_thunk"
+    // MAIN_M: call void @_objc_direct_i_Foo_setExportedValue___thunk
     [obj setExportedValue:30];
 
-    // MAIN_M: call i32 @"-[Foo exportedValue]_thunk"
+    // MAIN_M: call i32 @_objc_direct_i_Foo_exportedValue__thunk
     printf("Reset exportedValue: %d\n", [obj exportedValue]);
 
-    // MAIN_M: call i32 @"-[Foo exportedInstanceMethod:]_thunk"
+    // MAIN_M: call i32 @_objc_direct_i_Foo_exportedInstanceMethod___thunk
     printf("Exported instance: %d\n", [obj exportedInstanceMethod:10]);
 
-    // MAIN_M: call i32 @"+[Foo exportedClassMethod:]_thunk"
+    // MAIN_M: call i32 @_objc_direct_c_Foo_exportedClassMethod___thunk
     printf("Exported class: %d\n", [Foo exportedClassMethod:10]);
 }
     return 0;
 }
 
 // Thunks are generated during compilation
-// MAIN_M-LABEL: define linkonce_odr hidden void @"-[Foo setExportedValue:]_thunk"
-// MAIN_M-LABEL: define linkonce_odr hidden i32 @"-[Foo exportedValue]_thunk"
-// MAIN_M-LABEL: define linkonce_odr hidden i32 @"-[Foo exportedInstanceMethod:]_thunk"
-// MAIN_M-LABEL: define linkonce_odr hidden i32 @"+[Foo exportedClassMethod:]_thunk"
+// MAIN_M-LABEL: define linkonce_odr hidden void @_objc_direct_i_Foo_setExportedValue___thunk
+// MAIN_M-LABEL: define linkonce_odr hidden i32 @_objc_direct_i_Foo_exportedValue__thunk
+// MAIN_M-LABEL: define linkonce_odr hidden i32 @_objc_direct_i_Foo_exportedInstanceMethod___thunk
+// MAIN_M-LABEL: define linkonce_odr hidden i32 @_objc_direct_c_Foo_exportedClassMethod___thunk
