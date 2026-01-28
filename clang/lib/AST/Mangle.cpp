@@ -29,7 +29,6 @@
 
 using namespace clang;
 
-
 // Mangle ObjC method name using C-identifier-compatible direct format:
 //   _objc_direct_i_ClassName_Category_method_arg1_arg2_
 void clang::mangleObjCMethodNameWithDirectABI(
