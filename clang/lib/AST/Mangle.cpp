@@ -29,27 +29,17 @@
 
 using namespace clang;
 
-// Mangle ObjC method name using C-identifier-compatible direct format:
-//   _objc_direct_i_ClassName_Category_method_arg1_arg2_
-void clang::mangleObjCMethodNameWithDirectABI(
-    raw_ostream &OS, bool isInstanceMethod, StringRef ClassName,
-    std::optional<StringRef> CategoryName, StringRef MethodName) {
-  OS << "_objc_direct_" << (isInstanceMethod ? 'i' : 'c') << '_' << ClassName;
-  if (CategoryName)
-    OS << '_' << *CategoryName;
-  OS << '_';
-  // Convert colons to underscores: "foo:bar:" -> "foo_bar_"
-  SmallString<64> SelectorStr(MethodName);
-  std::replace(SelectorStr.begin(), SelectorStr.end(), ':', '_');
-  OS << SelectorStr;
-  OS << '_';
-}
-
 void clang::mangleObjCMethodName(raw_ostream &OS, bool includePrefixByte,
                                  bool isInstanceMethod, StringRef ClassName,
                                  std::optional<StringRef> CategoryName,
-                                 StringRef MethodName) {
+                                 StringRef MethodName,
+                                 bool includePostfixByte) {
+
+  assert(!(includePrefixByte && includePostfixByte) &&
+         "includePrefixByte and includePostfixByte "
+         "shouldn't be set at the same time");
   // \01+[ContainerName(CategoryName) SelectorName]
+  // Or for direct ABI: +[ContainerName(CategoryName) SelectorName]D
   if (includePrefixByte)
     OS << "\01";
   OS << (isInstanceMethod ? '-' : '+');
@@ -60,6 +50,8 @@ void clang::mangleObjCMethodName(raw_ostream &OS, bool includePrefixByte,
   OS << " ";
   OS << MethodName;
   OS << ']';
+  if (includePostfixByte)
+    OS << 'D';
 }
 
 // FIXME: For blocks we currently mimic GCC's mangling scheme, which leaves
@@ -449,13 +441,10 @@ void MangleContext::mangleObjCMethodName(const ObjCMethodDecl *MD,
   std::string MethodName;
   llvm::raw_string_ostream MethodNameOS(MethodName);
   MD->getSelector().print(MethodNameOS);
-  if (useDirectABI) {
-    clang::mangleObjCMethodNameWithDirectABI(
-        OS, MD->isInstanceMethod(), ClassName, CategoryName, MethodName);
-  } else {
-    clang::mangleObjCMethodName(OS, includePrefixByte, MD->isInstanceMethod(),
-                                ClassName, CategoryName, MethodName);
-  }
+  // When using direct ABI, we use postfix 'D' instead of prefix '\01'
+  clang::mangleObjCMethodName(OS, includePrefixByte && !useDirectABI,
+                              MD->isInstanceMethod(), ClassName, CategoryName,
+                              MethodName, useDirectABI);
 }
 
 void MangleContext::mangleObjCMethodNameAsSourceName(const ObjCMethodDecl *MD,

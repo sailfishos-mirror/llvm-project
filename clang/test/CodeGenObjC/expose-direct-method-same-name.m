@@ -27,8 +27,8 @@
 // RUN:   -o %t/libBar.dylib
 //
 // RUN: llvm-nm %t/libBar.dylib | FileCheck %s --check-prefix=CHECK_DYLIB
-// CHECK_DYLIB: __objc_direct_i_Bar_CategoryA_sameName_
-// CHECK_DYLIB: __objc_direct_i_Bar_CategoryB_sameName_
+// CHECK_DYLIB: _-[Bar(CategoryA) sameName]D
+// CHECK_DYLIB: _-[Bar(CategoryB) sameName]D
 //
 // Compile main.m (uses CategoryB)
 // RUN: %clang -fobjc-direct-precondition-thunk -target arm64-apple-darwin \
@@ -43,8 +43,8 @@
 // RUN: %t/main
 //
 // RUN: llvm-nm %t/main | FileCheck %s --check-prefix=CHECK_EXE
-// CHECK_EXE: U __objc_direct_i_Bar_CategoryB_sameName_
-// CHECK_EXE: t __objc_direct_i_Bar_CategoryB_sameName__thunk
+// CHECK_EXE: U _-[Bar(CategoryB) sameName]D
+// CHECK_EXE: t _-[Bar(CategoryB) sameName]D_thunk
 // CHECK_EXE-NOT: CategoryA
 
 //--- bar.h
