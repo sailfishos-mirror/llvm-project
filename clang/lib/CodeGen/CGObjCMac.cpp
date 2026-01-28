@@ -3972,7 +3972,7 @@ CGObjCCommonMac::GenerateDirectMethod(const ObjCMethodDecl *OMD,
   } else {
     bool usePreconditionThunk = CGM.usePreconditionThunk(OMD);
     auto Name =
-        getSymbolNameForMethod(OMD, /*includeCategoryName*/ false,
+        getSymbolNameForMethod(OMD, /*includeCategoryName*/ usePreconditionThunk,
                                /*useDirectABI*/ usePreconditionThunk);
 
     // It's possible swift's IRGen already generated the function declaration

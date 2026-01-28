@@ -102,12 +102,12 @@ __attribute__((objc_direct_members))
 @end
 
 @implementation Foo (Cat)
-// CHECK-LABEL: define hidden i32 @_objc_direct_i_Foo_directMethodInCategory_(ptr noundef %self)
+// CHECK-LABEL: define hidden i32 @_objc_direct_i_Foo_Cat_directMethodInCategory_(ptr noundef %self)
 - (int)directMethodInCategory {
   return 42;
 }
 
-// CHECK-LABEL: define hidden i32 @_objc_direct_i_Foo_directMethodInCategoryNoDecl_(ptr noundef %self)
+// CHECK-LABEL: define hidden i32 @_objc_direct_i_Foo_Cat_directMethodInCategoryNoDecl_(ptr noundef %self)
 - (int)directMethodInCategoryNoDecl __attribute__((objc_direct)) {
   return 42;
 }
@@ -164,8 +164,8 @@ int useFoo(Foo *f) {
   // CHECK: call void @_objc_direct_i_Foo_setGetDynamic_setDirect___thunk(ptr noundef %{{[0-9]+}}, i32 noundef 1)
   // CHECK: call i32 @_objc_direct_i_Foo_getDirect_setDynamic__thunk(ptr noundef %{{[0-9]+}})
   // CHECK: call i32 @_objc_direct_i_Foo_directMethodInExtension__thunk(ptr noundef %{{[0-9]+}})
-  // CHECK: call i32 @_objc_direct_i_Foo_directMethodInCategory__thunk(ptr noundef %{{[0-9]+}})
-  // CHECK: call i32 @_objc_direct_i_Foo_directMethodInCategoryNoDecl__thunk(ptr noundef %{{[0-9]+}})
+  // CHECK: call i32 @_objc_direct_i_Foo_Cat_directMethodInCategory__thunk(ptr noundef %{{[0-9]+}})
+  // CHECK: call i32 @_objc_direct_i_Foo_Cat_directMethodInCategoryNoDecl__thunk(ptr noundef %{{[0-9]+}})
   [f setGetDynamic_setDirect:1];
   return [f getDirect_setDynamic] +
          [f directMethodInExtension] +
@@ -209,7 +209,7 @@ int useFoo(Foo *f) {
 // CHECK:   ret i32 %[[RET]]
 // CHECK: dummy_ret_block:
 
-// CHECK-LABEL: define linkonce_odr hidden i32 @_objc_direct_i_Foo_directMethodInCategory__thunk(ptr noundef %self)
+// CHECK-LABEL: define linkonce_odr hidden i32 @_objc_direct_i_Foo_Cat_directMethodInCategory__thunk(ptr noundef %self)
 // CHECK: entry:
 // CHECK:   %[[IS_NIL:.*]] = icmp eq ptr {{.*}}, null
 // CHECK:   br i1 %[[IS_NIL]], label %objc_direct_method.self_is_nil, label %objc_direct_method.cont
@@ -217,11 +217,11 @@ int useFoo(Foo *f) {
 // CHECK:   call void @llvm.memset
 // CHECK:   br label %dummy_ret_block
 // CHECK: objc_direct_method.cont:
-// CHECK:   %[[RET:.*]] = musttail call i32 @_objc_direct_i_Foo_directMethodInCategory_(ptr noundef %self)
+// CHECK:   %[[RET:.*]] = musttail call i32 @_objc_direct_i_Foo_Cat_directMethodInCategory_(ptr noundef %self)
 // CHECK:   ret i32 %[[RET]]
 // CHECK: dummy_ret_block:
 
-// CHECK-LABEL: define linkonce_odr hidden i32 @_objc_direct_i_Foo_directMethodInCategoryNoDecl__thunk(ptr noundef %self)
+// CHECK-LABEL: define linkonce_odr hidden i32 @_objc_direct_i_Foo_Cat_directMethodInCategoryNoDecl__thunk(ptr noundef %self)
 // CHECK: entry:
 // CHECK:   %[[IS_NIL:.*]] = icmp eq ptr {{.*}}, null
 // CHECK:   br i1 %[[IS_NIL]], label %objc_direct_method.self_is_nil, label %objc_direct_method.cont
@@ -229,7 +229,7 @@ int useFoo(Foo *f) {
 // CHECK:   call void @llvm.memset
 // CHECK:   br label %dummy_ret_block
 // CHECK: objc_direct_method.cont:
-// CHECK:   %[[RET:.*]] = musttail call i32 @_objc_direct_i_Foo_directMethodInCategoryNoDecl_(ptr noundef %self)
+// CHECK:   %[[RET:.*]] = musttail call i32 @_objc_direct_i_Foo_Cat_directMethodInCategoryNoDecl_(ptr noundef %self)
 // CHECK:   ret i32 %[[RET]]
 // CHECK: dummy_ret_block:
 
