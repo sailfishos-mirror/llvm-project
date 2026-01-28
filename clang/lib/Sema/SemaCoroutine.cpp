@@ -841,7 +841,11 @@ static bool isAttributedCoroAwaitElidable(const QualType &QT) {
 }
 
 static void applySafeElideContext(Expr *Operand) {
-  auto *Call = dyn_cast<CallExpr>(Operand->IgnoreImplicit());
+  // Strip both implicit nodes and parentheses to find the underlying CallExpr.
+  // The AST may have these in either order (e.g., ParenExpr -> ImplicitCast
+  // or ImplicitCast -> ParenExpr), so we strip both ways.
+  auto *Call = dyn_cast<CallExpr>(
+      Operand->IgnoreImplicit()->IgnoreParens()->IgnoreImplicit());
   if (!Call || !Call->isPRValue())
     return;
 
