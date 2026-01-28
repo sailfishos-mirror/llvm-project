@@ -170,3 +170,48 @@ int main() {
 // MAIN_M-LABEL: define linkonce_odr hidden i32 @"-[Foo exportedValue]D_thunk"
 // MAIN_M-LABEL: define linkonce_odr hidden i32 @"-[Foo exportedInstanceMethod:]D_thunk"
 // MAIN_M-LABEL: define linkonce_odr hidden i32 @"+[Foo exportedClassMethod:]D_thunk"
+
+// Test 8: Duplicate symbol error when two categories define the same method
+//
+// Compile CategoryA and CategoryB separately
+// RUN: %clang -fobjc-direct-precondition-thunk -target arm64-apple-darwin \
+// RUN:   -fobjc-arc -c %t/foo_catA.m -I %t -o %t/foo_catA.o
+// RUN: %clang -fobjc-direct-precondition-thunk -target arm64-apple-darwin \
+// RUN:   -fobjc-arc -c %t/foo_catB.m -I %t -o %t/foo_catB.o
+
+// Link should FAIL with duplicate symbol error (category names not in symbol)
+// RUN: not %clang -target arm64-apple-darwin -fobjc-arc -dynamiclib \
+// RUN:   %t/foo.m %t/foo_catA.o %t/foo_catB.o -I %t \
+// RUN:   -framework Foundation \
+// RUN:   -o %t/libFooCats.dylib 2>&1 | FileCheck %s --check-prefix=DUP_SYM
+
+// DUP_SYM: duplicate symbol {{.*}}-[Foo sameName]D
+// DUP_SYM:   {{.*}}foo_cat{{A|B}}.o
+// DUP_SYM:   {{.*}}foo_cat{{A|B}}.o
+// DUP_SYM: 1 duplicate symbols
+
+//--- foo_catA.m
+#import "foo.h"
+
+@interface Foo (CategoryA)
+- (int)sameName __attribute__((objc_direct, visibility("default")));
+@end
+
+@implementation Foo (CategoryA)
+- (int)sameName {
+  return 1;
+}
+@end
+
+//--- foo_catB.m
+#import "foo.h"
+
+@interface Foo (CategoryB)
+- (int)sameName __attribute__((objc_direct, visibility("default")));
+@end
+
+@implementation Foo (CategoryB)
+- (int)sameName {
+  return 2;
+}
+@end
