@@ -9,7 +9,7 @@ __attribute__((objc_root_class))
 
 // EXPOSE-DIRECT-LABEL: define ptr @useMethod
 Root* useMethod(Root *root) {
-  // EXPOSE-DIRECT: call ptr @"-[Root method]_thunk"
+  // EXPOSE-DIRECT: call ptr @_objc_direct_i_Root_method__thunk
   return [root method];
 }
 
@@ -22,7 +22,7 @@ Root* useMethod(Root *root) {
 }
 
 // CHECK-LABEL: define hidden ptr @"\01-[Root method]"(
-// EXPOSE-DIRECT-LABEL: define hidden ptr @"-[Root method]"(ptr noundef
+// EXPOSE-DIRECT-LABEL: define hidden ptr @_objc_direct_i_Root_method_(ptr noundef
 - (id)method {
   return self;
 }
@@ -30,7 +30,7 @@ Root* useMethod(Root *root) {
 @end
 
 // New thunk will be emitted after [Root method] instead of useMethod because its been updatd with method.
-// EXPOSE-DIRECT-LABEL: define linkonce_odr hidden ptr @"-[Root method]_thunk"
+// EXPOSE-DIRECT-LABEL: define linkonce_odr hidden ptr @_objc_direct_i_Root_method__thunk
 // EXPOSE-DIRECT-LABEL: entry:
 // EXPOSE-DIRECT:           %[[IS_NIL:.*]] = icmp eq ptr {{.*}}, null
 // EXPOSE-DIRECT:           br i1 %[[IS_NIL]], label %objc_direct_method.self_is_nil, label %objc_direct_method.cont
@@ -38,6 +38,6 @@ Root* useMethod(Root *root) {
 // EXPOSE-DIRECT:           call void @llvm.memset.p0.i64
 // EXPOSE-DIRECT:           br label %dummy_ret_block
 // EXPOSE-DIRECT-LABEL: objc_direct_method.cont:
-// EXPOSE-DIRECT:           %[[RET:.*]] = musttail call ptr @"-[Root method]"
+// EXPOSE-DIRECT:           %[[RET:.*]] = musttail call ptr @_objc_direct_i_Root_method_
 // EXPOSE-DIRECT:           ret ptr %[[RET]]
 // EXPOSE-DIRECT-LABEL: dummy_ret_block:

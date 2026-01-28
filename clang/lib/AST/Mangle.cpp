@@ -43,8 +43,7 @@ void clang::mangleObjCMethodNameWithDirectABI(
   SmallString<64> SelectorStr(MethodName);
   std::replace(SelectorStr.begin(), SelectorStr.end(), ':', '_');
   OS << SelectorStr;
-  if (!MethodName.contains(':'))
-    OS << '_';
+  OS << '_';
 }
 
 void clang::mangleObjCMethodName(raw_ostream &OS, bool includePrefixByte,
