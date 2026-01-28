@@ -42,6 +42,15 @@ class VarDecl;
 
 /// Extract mangling function name from MangleContext such that swift can call
 /// it to prepare for ObjCDirect in swift.
+/// Mangle ObjC method name using C-identifier-compatible direct format:
+///   _objc_direct_i_ClassName_Category_method_arg1_arg2_
+void mangleObjCMethodNameWithDirectABI(raw_ostream &OS, bool isInstanceMethod,
+                                       StringRef ClassName,
+                                       std::optional<StringRef> CategoryName,
+                                       StringRef MethodName);
+
+/// Produces the traditional mangling:
+///   \01-[ClassName(Category) method:arg1:arg2:]
 void mangleObjCMethodName(raw_ostream &OS, bool includePrefixByte,
                           bool isInstanceMethod, StringRef ClassName,
                           std::optional<StringRef> CategoryName,
@@ -160,7 +169,8 @@ public:
 
   void mangleObjCMethodName(const ObjCMethodDecl *MD, raw_ostream &OS,
                             bool includePrefixByte = true,
-                            bool includeCategoryNamespace = true) const;
+                            bool includeCategoryNamespace = true,
+                            bool useDirectABI = false) const;
   void mangleObjCMethodNameAsSourceName(const ObjCMethodDecl *MD,
                                         raw_ostream &) const;
 

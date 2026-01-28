@@ -29,6 +29,24 @@
 
 using namespace clang;
 
+
+// Mangle ObjC method name using C-identifier-compatible direct format:
+//   _objc_direct_i_ClassName_Category_method_arg1_arg2_
+void clang::mangleObjCMethodNameWithDirectABI(
+    raw_ostream &OS, bool isInstanceMethod, StringRef ClassName,
+    std::optional<StringRef> CategoryName, StringRef MethodName) {
+  OS << "_objc_direct_" << (isInstanceMethod ? 'i' : 'c') << '_' << ClassName;
+  if (CategoryName)
+    OS << '_' << *CategoryName;
+  OS << '_';
+  // Convert colons to underscores: "foo:bar:" -> "foo_bar_"
+  SmallString<64> SelectorStr(MethodName);
+  std::replace(SelectorStr.begin(), SelectorStr.end(), ':', '_');
+  OS << SelectorStr;
+  if (!MethodName.contains(':'))
+    OS << '_';
+}
+
 void clang::mangleObjCMethodName(raw_ostream &OS, bool includePrefixByte,
                                  bool isInstanceMethod, StringRef ClassName,
                                  std::optional<StringRef> CategoryName,
@@ -380,7 +398,8 @@ void MangleContext::mangleBlock(const DeclContext *DC, const BlockDecl *BD,
 void MangleContext::mangleObjCMethodName(const ObjCMethodDecl *MD,
                                          raw_ostream &OS,
                                          bool includePrefixByte,
-                                         bool includeCategoryNamespace) const {
+                                         bool includeCategoryNamespace,
+                                         bool useDirectABI) const {
   if (getASTContext().getLangOpts().ObjCRuntime.isGNUFamily()) {
     // This is the mangling we've always used on the GNU runtimes, but it
     // has obvious collisions in the face of underscores within class
@@ -432,8 +451,13 @@ void MangleContext::mangleObjCMethodName(const ObjCMethodDecl *MD,
   std::string MethodName;
   llvm::raw_string_ostream MethodNameOS(MethodName);
   MD->getSelector().print(MethodNameOS);
-  clang::mangleObjCMethodName(OS, includePrefixByte, MD->isInstanceMethod(),
-                              ClassName, CategoryName, MethodName);
+  if (useDirectABI) {
+    clang::mangleObjCMethodNameWithDirectABI(
+        OS, MD->isInstanceMethod(), ClassName, CategoryName, MethodName);
+  } else {
+    clang::mangleObjCMethodName(OS, includePrefixByte, MD->isInstanceMethod(),
+                                ClassName, CategoryName, MethodName);
+  }
 }
 
 void MangleContext::mangleObjCMethodNameAsSourceName(const ObjCMethodDecl *MD,

@@ -3970,10 +3970,10 @@ CGObjCCommonMac::GenerateDirectMethod(const ObjCMethodDecl *OMD,
       I->second.Thunk = NewThunk;
     }
   } else {
-    bool removePrefixByte = CGM.usePreconditionThunk(OMD);
-    // Generate symbol without \01 prefix when optimization enabled
-    auto Name = getSymbolNameForMethod(OMD, /*include category*/ false,
-                                       /*includePrefixByte*/ !removePrefixByte);
+    bool usePreconditionThunk = CGM.usePreconditionThunk(OMD);
+    auto Name =
+        getSymbolNameForMethod(OMD, /*includeCategoryName*/ false,
+                               /*useDirectABI*/ usePreconditionThunk);
 
     // It's possible swift's IRGen already generated the function declaration
     // for us, in that case, using existing ones. Reinforce the linkage since

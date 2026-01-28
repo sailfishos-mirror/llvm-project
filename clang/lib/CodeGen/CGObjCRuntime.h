@@ -118,7 +118,7 @@ public:
 
   std::string getSymbolNameForMethod(const ObjCMethodDecl *method,
                                      bool includeCategoryName = true,
-                                     bool includePrefixByte = true);
+                                     bool useDirectABI = false);
 
   /// Generate the function required to register all Objective-C components in
   /// this compilation unit with the runtime library.
