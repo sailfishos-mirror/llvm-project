@@ -67,6 +67,16 @@ private:
 
   void handleGSLPointerConstruction(const CXXConstructExpr *CCE);
 
+  /// Detects arguments passed to rvalue reference parameters and creates
+  /// MovedOriginFact for them. This is a flow-insensitive approximation: once
+  /// an origin is moved anywhere in the function, all loans from that origin
+  /// are marked as potentially moved everywhere. This can lead to false
+  /// negatives on control flow paths where the value is not actually moved, but
+  /// these are considered lower priority as they are anyway surfaced as strict
+  /// warning.
+  void handleMovedArgsInCall(const FunctionDecl *FD,
+                             ArrayRef<const Expr *> Args);
+
   /// Checks if a call-like expression creates a borrow by passing a value to a
   /// reference parameter, creating an IssueFact if it does.
   /// \param IsGslConstruction True if this is a GSL construction where all
@@ -110,15 +120,6 @@ private:
   // corresponding to the left-hand side is updated to be a "write", thereby
   // exempting it from the check.
   llvm::DenseMap<const DeclRefExpr *, UseFact *> UseFacts;
-
-  // This is a flow-insensitive approximation: once a declaration is moved
-  // anywhere in the function, it's treated as moved everywhere. This can lead
-  // to false negatives on control flow paths where the value is not actually
-  // moved, but these are considered lower priority than the false positives
-  // this tracking prevents.
-  // TODO: The ideal solution would be flow-sensitive ownership tracking that
-  // records where values are moved from and to, but this is more complex.
-  llvm::DenseSet<const ValueDecl *> MovedDecls;
 };
 
 } // namespace clang::lifetimes::internal

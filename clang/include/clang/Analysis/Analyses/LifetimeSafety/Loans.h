@@ -52,6 +52,12 @@ public:
   const clang::MaterializeTemporaryExpr *getAsMaterializeTemporaryExpr() const {
     return P.dyn_cast<const clang::MaterializeTemporaryExpr *>();
   }
+
+  bool operator==(const AccessPath &RHS) const {
+    return getAsValueDecl() == RHS.getAsValueDecl() &&
+           getAsMaterializeTemporaryExpr() ==
+               RHS.getAsMaterializeTemporaryExpr();
+  }
 };
 
 /// An abstract base class for a single "Loan" which represents lending a
@@ -164,6 +170,7 @@ public:
     assert(ID.Value < AllLoans.size());
     return AllLoans[ID.Value];
   }
+
   llvm::ArrayRef<const Loan *> getLoans() const { return AllLoans; }
 
 private:
