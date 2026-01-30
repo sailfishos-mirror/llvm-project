@@ -88,21 +88,23 @@ define <4 x i16> @dont_fold_urem_one(<4 x i16> %x) {
 ; CHECK-LABEL: dont_fold_urem_one:
 ; CHECK:       // %bb.0:
 ; CHECK-NEXT:    adrp x8, .LCPI4_0
-; CHECK-NEXT:    ldr d1, [x8, :lo12:.LCPI4_0]
-; CHECK-NEXT:    mov x8, #140737488355328 // =0x800000000000
-; CHECK-NEXT:    fmov d3, x8
+; CHECK-NEXT:    ushll v1.4s, v0.4h, #0
+; CHECK-NEXT:    ldr q2, [x8, :lo12:.LCPI4_0]
 ; CHECK-NEXT:    adrp x8, .LCPI4_1
-; CHECK-NEXT:    umull v1.4s, v0.4h, v1.4h
+; CHECK-NEXT:    ldr q3, [x8, :lo12:.LCPI4_1]
+; CHECK-NEXT:    adrp x8, .LCPI4_2
+; CHECK-NEXT:    mul v1.4s, v1.4s, v2.4s
 ; CHECK-NEXT:    shrn v1.4h, v1.4s, #16
 ; CHECK-NEXT:    sub v2.4h, v0.4h, v1.4h
-; CHECK-NEXT:    umull v2.4s, v2.4h, v3.4h
+; CHECK-NEXT:    ushll v2.4s, v2.4h, #0
+; CHECK-NEXT:    mul v2.4s, v2.4s, v3.4s
 ; CHECK-NEXT:    movi d3, #0x0000000000ffff
 ; CHECK-NEXT:    shrn v2.4h, v2.4s, #16
 ; CHECK-NEXT:    add v1.4h, v2.4h, v1.4h
-; CHECK-NEXT:    ldr d2, [x8, :lo12:.LCPI4_1]
-; CHECK-NEXT:    adrp x8, .LCPI4_2
-; CHECK-NEXT:    ushl v1.4h, v1.4h, v2.4h
 ; CHECK-NEXT:    ldr d2, [x8, :lo12:.LCPI4_2]
+; CHECK-NEXT:    adrp x8, .LCPI4_3
+; CHECK-NEXT:    ushl v1.4h, v1.4h, v2.4h
+; CHECK-NEXT:    ldr d2, [x8, :lo12:.LCPI4_3]
 ; CHECK-NEXT:    bit v1.8b, v0.8b, v3.8b
 ; CHECK-NEXT:    mls v0.4h, v1.4h, v2.4h
 ; CHECK-NEXT:    ret
