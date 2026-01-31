@@ -10,12 +10,26 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "CIRGenCXXABI.h"
+#include "CIRGenFunction.h"
 #include "CIRGenModule.h"
 #include "clang/AST/Attr.h"
 #include "clang/Basic/LangOptions.h"
 
 using namespace clang;
 using namespace clang::CIRGen;
+
+void CIRGenFunction::emitCXXGuardedInit(const VarDecl &varDecl,
+                                        cir::GlobalOp globalOp,
+                                        bool performInit) {
+  // If we've been asked to forbid guard variables, emit an error now.
+  // This diagnostic is hard-coded for Darwin's use case; we can find
+  // better phrasing if someone else needs it.
+  if (cgm.getCodeGenOpts().ForbidGuardVariables)
+    cgm.errorNYI(varDecl.getLocation(), "guard variables are forbidden");
+
+  cgm.getCXXABI().emitGuardedInit(*this, varDecl, globalOp, performInit);
+}
 
 void CIRGenModule::emitCXXGlobalVarDeclInitFunc(const VarDecl *vd,
                                                 cir::GlobalOp addr,

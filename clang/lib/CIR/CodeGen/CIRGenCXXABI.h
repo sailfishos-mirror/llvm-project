@@ -188,6 +188,13 @@ public:
                                   bool forVirtualBase, bool delegating,
                                   Address thisAddr, QualType thisTy) = 0;
 
+  /// Emit a guarded initializer for a static local variable or a static
+  /// data member. This handles:
+  ///   - a static local variable
+  ///   - a static data member of a class template instantiation
+  virtual void emitGuardedInit(CIRGenFunction &cgf, const VarDecl &varDecl,
+                               cir::GlobalOp globalOp, bool performInit) = 0;
+
   /// Emit code to force the execution of a destructor during global
   /// teardown.  The default implementation of this uses atexit.
   ///

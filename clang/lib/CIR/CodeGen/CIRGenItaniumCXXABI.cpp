@@ -74,6 +74,8 @@ public:
                           QualType thisTy) override;
   void registerGlobalDtor(const VarDecl *vd, cir::FuncOp dtor,
                           mlir::Value addr) override;
+  void emitGuardedInit(CIRGenFunction &cgf, const VarDecl &varDecl,
+                       cir::GlobalOp globalOp, bool performInit) override;
   void emitVirtualObjectDelete(CIRGenFunction &cgf, const CXXDeleteExpr *de,
                                Address ptr, QualType elementType,
                                const CXXDestructorDecl *dtor) override;
@@ -1590,6 +1592,19 @@ void CIRGenItaniumCXXABI::registerGlobalDtor(const VarDecl *vd,
 
   // The default behavior is to use atexit. This is handled in lowering
   // prepare. Nothing to be done for CIR here.
+}
+
+void CIRGenItaniumCXXABI::emitGuardedInit(CIRGenFunction &cgf,
+                                          const VarDecl &varDecl,
+                                          cir::GlobalOp globalOp,
+                                          bool performInit) {
+  // Emit the initializer and add a global destructor if appropriate.
+  cgf.cgm.emitCXXGlobalVarDeclInit(&varDecl, globalOp, performInit);
+
+  // CIR diverges from IRGen here by emitting the init into the ctor region and
+  // marking the global as static local. The emission of the guard/acquire walk
+  // is done during LoweringPrepare.
+  globalOp.setStaticLocal(true);
 }
 
 mlir::Value CIRGenItaniumCXXABI::getCXXDestructorImplicitParam(
