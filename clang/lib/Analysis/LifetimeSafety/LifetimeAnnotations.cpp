@@ -227,4 +227,40 @@ template <typename T> static bool isRecordWithAttr(QualType Type) {
 bool isGslPointerType(QualType QT) { return isRecordWithAttr<PointerAttr>(QT); }
 bool isGslOwnerType(QualType QT) { return isRecordWithAttr<OwnerAttr>(QT); }
 
+bool isContainerInvalidationMethod(const CXXMethodDecl *MD) {
+  if (!MD)
+    return false;
+
+  const CXXRecordDecl *RD = MD->getParent();
+  if (!RD || !isInStlNamespace(RD))
+    return false;
+
+  StringRef ContainerName;
+  if (const auto *CTSD = dyn_cast<ClassTemplateSpecializationDecl>(RD)) {
+    ContainerName = CTSD->getSpecializedTemplate()->getName();
+  } else if (RD->getIdentifier()) {
+    ContainerName = RD->getName();
+  } else {
+    return false;
+  }
+
+  bool IsSequenceContainer = ContainerName == "vector" ||
+                             ContainerName == "basic_string" ||
+                             ContainerName == "deque";
+  bool IsAssociativeContainer =
+      ContainerName == "set" || ContainerName == "multiset" ||
+      ContainerName == "map" || ContainerName == "multimap" ||
+      ContainerName == "unordered_set" || ContainerName == "unordered_multiset" ||
+      ContainerName == "unordered_map" || ContainerName == "unordered_multimap";
+
+  if (!IsSequenceContainer && !IsAssociativeContainer)
+    return false;
+
+  static const llvm::StringSet<> InvalidatingMembers = {
+      "push_back", "emplace_back", "insert",   "erase", "resize",
+      "clear",     "emplace",      "pop_back", "swap"};
+
+  return MD->getIdentifier() && InvalidatingMembers.contains(MD->getName());
+}
+
 } // namespace clang::lifetimes

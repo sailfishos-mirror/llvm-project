@@ -24,6 +24,7 @@
 #include "clang/Basic/SourceLocation.h"
 #include "clang/Basic/SourceManager.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/TimeProfiler.h"
 
@@ -48,6 +49,7 @@ struct PendingWarning {
   SourceLocation ExpiryLoc; // Where the loan expired.
   llvm::PointerUnion<const UseFact *, const OriginEscapesFact *> CausingFact;
   const Expr *MovedExpr;
+  const Expr *InvalidatedByExpr;
   Confidence ConfidenceLevel;
 };
 
@@ -80,6 +82,8 @@ public:
       for (const Fact *F : FactMgr.getFacts(B))
         if (const auto *EF = F->getAs<ExpireFact>())
           checkExpiry(EF);
+        else if (const auto *IOF = F->getAs<InvalidateOriginFact>())
+          checkInvalidation(IOF);
         else if (const auto *OEF = F->getAs<OriginEscapesFact>())
           checkAnnotations(OEF);
     issuePendingWarnings();
@@ -175,7 +179,51 @@ public:
     FinalWarningsMap[ExpiredLoan] = {/*ExpiryLoc=*/EF->getExpiryLoc(),
                                      /*BestCausingFact=*/BestCausingFact,
                                      /*MovedExpr=*/MovedExpr,
+                                     /*InvalidatedByExpr=*/nullptr,
                                      /*ConfidenceLevel=*/CurConfidence};
+  }
+
+  void checkInvalidation(const InvalidateOriginFact *IOF) {
+    OriginID InvalidatedOrigin = IOF->getInvalidatedOrigin();
+    LoanSet DirectlyInvalidatedLoans =
+        LoanPropagation.getLoans(InvalidatedOrigin, IOF);
+    llvm::DenseSet<LoanID> AllInvalidatedLoans;
+
+    FactMgr.forAllPredecessors(IOF, [&](const Fact *PF) {
+      auto *IF = PF->getAs<IssueFact>();
+      if (!IF)
+        return;
+      for (LoanID LID : DirectlyInvalidatedLoans) {
+        const Loan *InvalidatedLoan = FactMgr.getLoanMgr().getLoan(LID);
+        auto *PL = dyn_cast<PathLoan>(InvalidatedLoan);
+        if (!PL)
+          continue;
+        LoanID ReachableLID = IF->getLoanID();
+        const Loan *ReachableLoan = FactMgr.getLoanMgr().getLoan(ReachableLID);
+        if (auto *RL = dyn_cast<PathLoan>(ReachableLoan))
+          if (RL->getAccessPath() == PL->getAccessPath())
+            AllInvalidatedLoans.insert(ReachableLID);
+      }
+    });
+    LivenessMap Origins = LiveOrigins.getLiveOriginsAt(IOF);
+    for (auto &[OID, LiveInfo] : Origins) {
+      LoanSet HeldLoans = LoanPropagation.getLoans(OID, IOF);
+      for (LoanID HeldLID : HeldLoans) {
+        if (AllInvalidatedLoans.count(HeldLID)) {
+          Confidence CurConfidence = livenessKindToConfidence(LiveInfo.Kind);
+          Confidence LastConf =
+              FinalWarningsMap.lookup(HeldLID).ConfidenceLevel;
+          if (LastConf < CurConfidence) {
+            FinalWarningsMap[HeldLID] = {
+                /*ExpiryLoc=*/{},
+                /*CausingFact=*/LiveInfo.CausingFact,
+                /*MovedExpr=*/nullptr,
+                /*InvalidatedByExpr=*/IOF->getInvalidationExpr(),
+                /*ConfidenceLevel=*/CurConfidence};
+          }
+        }
+      }
+    }
   }
 
   void issuePendingWarnings() {
@@ -191,11 +239,15 @@ public:
       const Expr *MovedExpr = Warning.MovedExpr;
       SourceLocation ExpiryLoc = Warning.ExpiryLoc;
 
-      if (const auto *UF = CausingFact.dyn_cast<const UseFact *>())
-        SemaHelper->reportUseAfterFree(IssueExpr, UF->getUseExpr(), MovedExpr,
-                                       ExpiryLoc, Confidence);
-      else if (const auto *OEF =
-                   CausingFact.dyn_cast<const OriginEscapesFact *>()) {
+      if (const auto *UF = CausingFact.dyn_cast<const UseFact *>()) {
+        if (Warning.InvalidatedByExpr)
+          SemaHelper->reportUseAfterInvalidation(IssueExpr, UF->getUseExpr(),
+                                                 Warning.InvalidatedByExpr);
+        else
+          SemaHelper->reportUseAfterFree(IssueExpr, UF->getUseExpr(), MovedExpr,
+                                         ExpiryLoc, Confidence);
+      } else if (const auto *OEF =
+                     CausingFact.dyn_cast<const OriginEscapesFact *>()) {
         if (const auto *RetEscape = dyn_cast<ReturnEscapeFact>(OEF))
           SemaHelper->reportUseAfterReturn(IssueExpr,
                                            RetEscape->getReturnExpr(),

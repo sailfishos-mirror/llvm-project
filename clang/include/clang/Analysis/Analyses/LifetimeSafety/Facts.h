@@ -51,6 +51,8 @@ public:
     TestPoint,
     /// An origin that escapes the function scope (e.g., via return).
     OriginEscapes,
+    /// An origin is invalidated (e.g. vector resized).
+    InvalidateOrigin,
   };
 
 private:
@@ -218,6 +220,25 @@ public:
   void markAsWritten() { IsWritten = true; }
   bool isWritten() const { return IsWritten; }
 
+  void dump(llvm::raw_ostream &OS, const LoanManager &,
+            const OriginManager &OM) const override;
+};
+
+class InvalidateOriginFact : public Fact {
+  OriginID OID;
+  const Expr *InvalidationExpr;
+
+public:
+  static bool classof(const Fact *F) {
+    return F->getKind() == Kind::InvalidateOrigin;
+  }
+
+  InvalidateOriginFact(OriginID OID, const Expr *InvalidationExpr)
+      : Fact(Kind::InvalidateOrigin), OID(OID),
+        InvalidationExpr(InvalidationExpr) {}
+
+  OriginID getInvalidatedOrigin() const { return OID; }
+  const Expr *getInvalidationExpr() const { return InvalidationExpr; }
   void dump(llvm::raw_ostream &OS, const LoanManager &,
             const OriginManager &OM) const override;
 };
