@@ -1,0 +1,16 @@
+// RUN: cir-opt %s -verify-diagnostics -split-input-file
+
+!s32i = !cir.int<s, 32>
+
+module {
+
+// Global is not marked static_local, but get_global is
+cir.global "private" internal @_ZZ1fvE1x : !s32i
+
+cir.func @test_static_local_mismatch() {
+  // expected-error @below {{access to global not marked static local}}
+  %0 = cir.get_global static_local @_ZZ1fvE1x : !cir.ptr<!s32i>
+  cir.return
+}
+
+}

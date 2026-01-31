@@ -1854,6 +1854,10 @@ cir::GetGlobalOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
     // be marked with tls bits.
     if (getTls() && !g.getTlsModel())
       return emitOpError("access to global not marked thread local");
+    // Verify that for static local access, the global needs to be marked
+    // static_local.
+    if (getStaticLocal() && !g.getStaticLocal())
+      return emitOpError("access to global not marked static local");
   } else if (auto f = dyn_cast<FuncOp>(op)) {
     symTy = f.getFunctionType();
   } else {
