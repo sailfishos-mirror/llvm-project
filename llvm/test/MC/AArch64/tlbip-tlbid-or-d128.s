@@ -1,6 +1,6 @@
 // NOTE: These TLBIP forms are valid with either +tlbid or +d128.
-// RUN: llvm-mc -triple=aarch64 -show-encoding -mattr=+tlbid,+tlb-rmi,+xs < %s | FileCheck %s --check-prefix=TLBID
-// RUN: llvm-mc -triple=aarch64 -show-encoding -mattr=+d128,+tlb-rmi,+xs < %s | FileCheck %s --check-prefix=D128
+// RUN: llvm-mc -triple=aarch64 -show-encoding -mattr=+tlbid,+tlb-rmi < %s | FileCheck %s --check-prefix=TLBID
+// RUN: llvm-mc -triple=aarch64 -show-encoding -mattr=+d128,+tlb-rmi < %s | FileCheck %s --check-prefix=D128
 
 tlbip VAE1OS, x0, x1
 // TLBID: tlbip vae1os, x0, x1

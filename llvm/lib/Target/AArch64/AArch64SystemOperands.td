@@ -905,7 +905,6 @@ multiclass TLBI<string name, bit hasTLBIP, bits<3> op1, bits<4> crn, bits<4> crm
   defvar TLBIPRequires = !if(allowTLBID,
                              ["AArch64::FeatureD128", "AArch64::FeatureTLBID"],
                              ["AArch64::FeatureD128"]);
-  defvar TLBIPRequiresNXS = !listconcat(TLBIPRequires, ["AArch64::FeatureXS"]);
   def : TLBIEntry<name, op1, crn, crm, op2, needsreg, optionalreg>;
   def : TLBIEntry<!strconcat(name, "nXS"), op1, crn, crm, op2, needsreg, optionalreg> {
     let Encoding{7} = 1;
@@ -917,7 +916,7 @@ multiclass TLBI<string name, bit hasTLBIP, bits<3> op1, bits<4> crn, bits<4> crm
     }
     def : TLBIPEntry<!strconcat(name, "nXS"), op1, crn, crm, op2, needsreg, optionalreg> {
       let Encoding{7} = 1;
-      let ExtraRequires = TLBIPRequiresNXS;
+      let ExtraRequires = TLBIPRequires;
     }
   }
 }

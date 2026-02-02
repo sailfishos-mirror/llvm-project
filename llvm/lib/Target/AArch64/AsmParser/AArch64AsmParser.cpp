@@ -4262,23 +4262,13 @@ bool AArch64AsmParser::parseSyspAlias(StringRef Name, SMLoc NameLoc,
   SMLoc S = Tok.getLoc();
 
   if (Mnemonic == "tlbip") {
-    bool HasnXSQualifier = Op.ends_with_insensitive("nXS");
-    if (HasnXSQualifier) {
-      Op = Op.drop_back(3);
-    }
-    const AArch64TLBIP::TLBIP *TLBIPorig = AArch64TLBIP::lookupTLBIPByName(Op);
-    if (!TLBIPorig)
+    const AArch64TLBIP::TLBIP *TLBIP = AArch64TLBIP::lookupTLBIPByName(Op);
+    if (!TLBIP)
       return TokError("invalid operand for TLBIP instruction");
-    const AArch64TLBIP::TLBIP TLBIP(
-        TLBIPorig->Name, TLBIPorig->Encoding | (HasnXSQualifier ? (1 << 7) : 0),
-        TLBIPorig->NeedsReg, TLBIPorig->OptionalReg,
-        HasnXSQualifier
-            ? TLBIPorig->FeaturesRequired | FeatureBitset({AArch64::FeatureXS})
-            : TLBIPorig->FeaturesRequired);
-    if (!TLBIP.haveFeatures(getSTI().getFeatureBits())) {
+    if (!TLBIP->haveFeatures(getSTI().getFeatureBits())) {
       FeatureBitset Active = getSTI().getFeatureBits();
-      FeatureBitset Missing = TLBIP.getRequiredFeatures() & ~Active;
-      if (TLBIP.allowTLBID()) {
+      FeatureBitset Missing = TLBIP->getRequiredFeatures() & ~Active;
+      if (TLBIP->allowTLBID()) {
         Missing.reset(AArch64::FeatureD128);
         Missing.reset(AArch64::FeatureTLBID);
         if (!Active[AArch64::FeatureD128] && !Active[AArch64::FeatureTLBID]) {
@@ -4292,7 +4282,7 @@ bool AArch64AsmParser::parseSyspAlias(StringRef Name, SMLoc NameLoc,
       setRequiredFeatureString(Missing, Str);
       return TokError(Str);
     }
-    createSysAlias(TLBIP.Encoding, Operands, S);
+    createSysAlias(TLBIP->Encoding, Operands, S);
   }
 
   Lex(); // Eat operand.
