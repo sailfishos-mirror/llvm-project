@@ -2396,17 +2396,24 @@ static Value *simplifyAndOrWithOpReplaced(Value *V, Value *Op, Value *RepOp,
 /// number of and/or instructions might have to be created.
 Value *InstCombinerImpl::reassociateBooleanAndOr(Value *LHS, Value *X, Value *Y,
                                                  Instruction &I, bool IsAnd,
-                                                 bool RHSIsLogical) {
+                                                 bool RHSIsLogical,
+                                                 Instruction *MDFrom) {
   Instruction::BinaryOps Opcode = IsAnd ? Instruction::And : Instruction::Or;
   // LHS bop (X lop Y) --> (LHS bop X) lop Y
   // LHS bop (X bop Y) --> (LHS bop X) bop Y
   if (Value *Res = foldBooleanAndOr(LHS, X, I, IsAnd, /*IsLogical=*/false))
-    return RHSIsLogical ? Builder.CreateLogicalOp(Opcode, Res, Y)
+    return RHSIsLogical ? Builder.CreateLogicalOp(Opcode, Res, Y, "",
+                                                  ProfcheckDisableMetadataFixes
+                                                      ? nullptr
+                                                      : MDFrom)
                         : Builder.CreateBinOp(Opcode, Res, Y);
   // LHS bop (X bop Y) --> X bop (LHS bop Y)
   // LHS bop (X lop Y) --> X lop (LHS bop Y)
   if (Value *Res = foldBooleanAndOr(LHS, Y, I, IsAnd, /*IsLogical=*/false))
-    return RHSIsLogical ? Builder.CreateLogicalOp(Opcode, X, Res)
+    return RHSIsLogical ? Builder.CreateLogicalOp(Opcode, X, Res, "",
+                                                  ProfcheckDisableMetadataFixes
+                                                      ? nullptr
+                                                      : MDFrom)
                         : Builder.CreateBinOp(Opcode, X, Res);
   return nullptr;
 }
@@ -2798,13 +2805,15 @@ Instruction *InstCombinerImpl::visitAnd(BinaryOperator &I) {
   if (match(Op1, m_OneUse(m_LogicalAnd(m_Value(X), m_Value(Y))))) {
     bool IsLogical = isa<SelectInst>(Op1);
     if (auto *V = reassociateBooleanAndOr(Op0, X, Y, I, /*IsAnd=*/true,
-                                          /*RHSIsLogical=*/IsLogical))
+                                          /*RHSIsLogical=*/IsLogical,
+                                          dyn_cast<Instruction>(Op1)))
       return replaceInstUsesWith(I, V);
   }
   if (match(Op0, m_OneUse(m_LogicalAnd(m_Value(X), m_Value(Y))))) {
     bool IsLogical = isa<SelectInst>(Op0);
     if (auto *V = reassociateBooleanAndOr(Op1, X, Y, I, /*IsAnd=*/true,
-                                          /*RHSIsLogical=*/IsLogical))
+                                          /*RHSIsLogical=*/IsLogical,
+                                          dyn_cast<Instruction>(Op0)))
       return replaceInstUsesWith(I, V);
   }
 
@@ -4305,13 +4314,15 @@ Instruction *InstCombinerImpl::visitOr(BinaryOperator &I) {
   if (match(Op1, m_OneUse(m_LogicalOr(m_Value(X), m_Value(Y))))) {
     bool IsLogical = isa<SelectInst>(Op1);
     if (auto *V = reassociateBooleanAndOr(Op0, X, Y, I, /*IsAnd=*/false,
-                                          /*RHSIsLogical=*/IsLogical))
+                                          /*RHSIsLogical=*/IsLogical,
+                                          dyn_cast<Instruction>(Op1)))
       return replaceInstUsesWith(I, V);
   }
   if (match(Op0, m_OneUse(m_LogicalOr(m_Value(X), m_Value(Y))))) {
     bool IsLogical = isa<SelectInst>(Op0);
     if (auto *V = reassociateBooleanAndOr(Op1, X, Y, I, /*IsAnd=*/false,
-                                          /*RHSIsLogical=*/IsLogical))
+                                          /*RHSIsLogical=*/IsLogical,
+                                          dyn_cast<Instruction>(Op0)))
       return replaceInstUsesWith(I, V);
   }
 
