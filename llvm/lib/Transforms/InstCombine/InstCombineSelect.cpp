@@ -3543,8 +3543,11 @@ Instruction *InstCombinerImpl::foldSelectOfBools(SelectInst &SI) {
   // poison.
   if (match(TrueVal, m_One())) {
     if (impliesPoisonOrCond(FalseVal, CondVal, /*Expected=*/false)) {
-      // Change: A = select B, true, C --> A = or B, C
-      return BinaryOperator::CreateOr(CondVal, FalseVal);
+      if (ProfcheckDisableMetadataFixes ||
+          !SI.hasMetadata(LLVMContext::MD_prof)) {
+        // Change: A = select B, true, C --> A = or B, C
+        return BinaryOperator::CreateOr(CondVal, FalseVal);
+      }
     }
 
     if (match(CondVal, m_OneUse(m_Select(m_Value(A), m_One(), m_Value(B)))) &&
@@ -3588,8 +3591,11 @@ Instruction *InstCombinerImpl::foldSelectOfBools(SelectInst &SI) {
 
   if (match(FalseVal, m_Zero())) {
     if (impliesPoisonOrCond(TrueVal, CondVal, /*Expected=*/true)) {
-      // Change: A = select B, C, false --> A = and B, C
-      return BinaryOperator::CreateAnd(CondVal, TrueVal);
+      if (ProfcheckDisableMetadataFixes ||
+          !SI.hasMetadata(LLVMContext::MD_prof)) {
+        // Change: A = select B, C, false --> A = and B, C
+        return BinaryOperator::CreateAnd(CondVal, TrueVal);
+      }
     }
 
     if (match(CondVal, m_OneUse(m_Select(m_Value(A), m_Value(B), m_Zero()))) &&
