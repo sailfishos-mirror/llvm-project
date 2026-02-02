@@ -4458,6 +4458,21 @@ std::pair<Register, unsigned> AMDGPUInstructionSelector::selectVOP3ModsImpl(
   return std::pair(Src, Mods);
 }
 
+std::pair<Register, unsigned>
+AMDGPUInstructionSelector::selectVOP3PModsF32Impl(Register Src) const {
+  unsigned Mods = SISrcMods::OP_SEL_1;
+  if (Subtarget->isGFX11Plus()) {
+    unsigned ModsImpl;
+    std::tie(Src, ModsImpl) = selectVOP3ModsImpl(Src);
+    Mods |= ModsImpl;
+    if (Mods & SISrcMods::ABS) {
+      Mods ^= SISrcMods::ABS;
+      Mods |= SISrcMods::NEG_HI;
+    }
+  }
+  return std::pair(Src, Mods);
+}
+
 Register AMDGPUInstructionSelector::copyToVGPRIfSrcFolded(
     Register Src, unsigned Mods, MachineOperand Root, MachineInstr *InsertPt,
     bool ForceVGPR) const {
@@ -5165,23 +5180,40 @@ AMDGPUInstructionSelector::selectVOP3PModsDOT(MachineOperand &Root) const {
 }
 
 InstructionSelector::ComplexRendererFns
-AMDGPUInstructionSelector::selectVOP3PModsF32(MachineOperand &Root) const {
-  Register Src = Root.getReg();
-  unsigned Mods = SISrcMods::OP_SEL_1;
-  if (Subtarget->isGFX11Plus()) {
-    unsigned ModsImpl;
-    std::tie(Src, ModsImpl) = selectVOP3ModsImpl(Root.getReg());
-    Mods |= ModsImpl;
-    if (Mods & SISrcMods::ABS) {
-      Mods ^= SISrcMods::ABS;
-      Mods |= SISrcMods::NEG_HI;
-    }
-  }
+AMDGPUInstructionSelector::selectVOP3PNoModsDOT(MachineOperand &Root) const {
+  MachineRegisterInfo &MRI = Root.getParent()->getMF()->getRegInfo();
+  Register Src;
+  unsigned Mods;
+  std::tie(Src, Mods) = selectVOP3PModsImpl(Root.getReg(), MRI, true /*IsDOT*/);
+  if (Mods != SISrcMods::OP_SEL_1)
+    return {};
 
+  return {{[=](MachineInstrBuilder &MIB) { MIB.addReg(Src); }}};
+}
+
+InstructionSelector::ComplexRendererFns
+AMDGPUInstructionSelector::selectVOP3PModsF32(MachineOperand &Root) const {
+  MachineRegisterInfo &MRI = Root.getParent()->getMF()->getRegInfo();
+  Register Reg;
+  unsigned Mods;
+  std::tie(Reg, Mods) = selectVOP3PModsF32Impl(Root.getReg());
+
+  Reg = getLegalRegBank(Reg, Root.getReg(), RBI, MRI, TRI, TII);
   return {{
-      [=](MachineInstrBuilder &MIB) { MIB.addReg(Src); },
+      [=](MachineInstrBuilder &MIB) { MIB.addReg(Reg); },
       [=](MachineInstrBuilder &MIB) { MIB.addImm(Mods); } // src_mods
   }};
+}
+
+InstructionSelector::ComplexRendererFns
+AMDGPUInstructionSelector::selectVOP3PNoModsF32(MachineOperand &Root) const {
+  Register Src;
+  unsigned Mods;
+  std::tie(Src, Mods) = selectVOP3PModsF32Impl(Root.getReg());
+  if (Mods != SISrcMods::OP_SEL_1)
+    return {};
+
+  return {{[=](MachineInstrBuilder &MIB) { MIB.addReg(Src); }}};
 }
 
 InstructionSelector::ComplexRendererFns

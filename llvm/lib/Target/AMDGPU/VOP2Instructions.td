@@ -1302,13 +1302,19 @@ let Constraints = "$vdst = $src2",
 
 let AddedComplexity = 30 in {
   def : GCNPat<
-    (f32 (AMDGPUfdot2 v2f16:$src0, v2f16:$src1, f32:$src2, (i1 DSTCLAMP.NONE))),
+    (f32 (AMDGPUfdot2 (v2f16 (VOP3PNoModsDOT v2f16:$src0)),
+                      (v2f16 (VOP3PNoModsDOT v2f16:$src1)),
+                      (f32 (VOP3PNoModsF32 f32:$src2)),
+                      (i1 DSTCLAMP.NONE))),
     (f32 (V_DOT2C_F32_F16_e32 $src0, $src1, $src2))
   > {
     let SubtargetPredicate = HasDot5Insts;
   }
   def : GCNPat<
-    (f32 (int_amdgcn_fdot2_f32_bf16 v2bf16:$src0, v2bf16:$src1, f32:$src2, (i1 DSTCLAMP.NONE))),
+    (f32 (int_amdgcn_fdot2_f32_bf16 (v2bf16 (VOP3PNoModsDOT v2bf16:$src0)),
+                                    (v2bf16 (VOP3PNoModsDOT v2bf16:$src1)),
+                                    (f32 (VOP3PNoModsF32 f32:$src2)),
+                                    (i1 DSTCLAMP.NONE))),
     (f32 (V_DOT2C_F32_BF16_e32 $src0, $src1, $src2))
   > {
     let SubtargetPredicate = HasDot13Insts;
