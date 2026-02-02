@@ -41,6 +41,10 @@
 using namespace llvm;
 using namespace PatternMatch;
 
+namespace llvm {
+extern cl::opt<bool> ProfcheckDisableMetadataFixes;
+}
+
 /// The specific integer value is used in a context where it is known to be
 /// non-zero.  If this allows us to simplify the computation, do so and return
 /// the new operand, otherwise return null.
@@ -1619,7 +1623,11 @@ Value *InstCombinerImpl::takeLog2(Value *Op, unsigned Depth, bool AssumeNonZero,
       if (Value *LogY =
               takeLog2(SI->getOperand(2), Depth, AssumeNonZero, DoFold))
         return IfFold([&]() {
-          return Builder.CreateSelect(SI->getOperand(0), LogX, LogY);
+          Value *NewSel = Builder.CreateSelect(SI->getOperand(0), LogX, LogY);
+          if (auto *Inst = dyn_cast<Instruction>(NewSel))
+            if (!ProfcheckDisableMetadataFixes)
+              Inst->copyMetadata(*SI);
+          return NewSel;
         });
 
   // log2(umin(X, Y)) -> umin(log2(X), log2(Y))
