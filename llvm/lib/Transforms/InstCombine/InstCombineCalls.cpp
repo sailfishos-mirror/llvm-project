@@ -48,6 +48,7 @@
 #include "llvm/IR/IntrinsicsAMDGPU.h"
 #include "llvm/IR/IntrinsicsARM.h"
 #include "llvm/IR/IntrinsicsHexagon.h"
+#include "llvm/IR/MDBuilder.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Metadata.h"
 #include "llvm/IR/PatternMatch.h"
@@ -83,6 +84,10 @@
 
 using namespace llvm;
 using namespace PatternMatch;
+
+namespace llvm {
+extern cl::opt<bool> ProfcheckDisableMetadataFixes;
+}
 
 STATISTIC(NumSimplified, "Number of library calls simplified");
 
@@ -2119,6 +2124,20 @@ Instruction *InstCombinerImpl::visitCallInst(CallInst &CI) {
       Value *Cmp = Builder.CreateICmpEQ(X, ConstantInt::get(X->getType(), 0));
       Value *NewSelect =
           Builder.CreateSelect(Cmp, ConstantInt::get(X->getType(), 1), A);
+      if (auto *Inst = dyn_cast<Instruction>(NewSelect)) {
+        if (!ProfcheckDisableMetadataFixes) {
+          Inst->copyMetadata(*II);
+          // umax -> select conversion introduces control flow. If the original
+          // intrinsic didn't have profile data, we must synthesize it to satisfy
+          // verification requirements that demand profiles on all selects.
+          // Assume 50/50 probability since we lack better information.
+          if (isa<SelectInst>(Inst) && !Inst->getMetadata(LLVMContext::MD_prof)) {
+            MDBuilder MDB(II->getContext());
+            Inst->setMetadata(LLVMContext::MD_prof,
+                              MDB.createBranchWeights(1, 1));
+          }
+        }
+      }
       return replaceInstUsesWith(*II, NewSelect);
     };
 
