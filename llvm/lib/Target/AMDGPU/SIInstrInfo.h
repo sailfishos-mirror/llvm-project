@@ -559,6 +559,19 @@ public:
 
   static bool isVOP3(const MachineInstr &MI) { return isVOP3(MI.getDesc()); }
 
+  static bool isVOP3WithoutVOPD(const MachineInstr &MI) {
+    if (MI.getOpcode() == AMDGPU::V_DOT2_F32_F16 ||
+        MI.getOpcode() == AMDGPU::V_DOT2_F32_BF16) {
+      // VOPD if no src_mods, no clamp, no inline const and src2 same as dst.
+      return MI.getOperand(1).getImm() != 8 || !MI.getOperand(2).isReg() ||
+             MI.getOperand(3).getImm() != 8 || !MI.getOperand(4).isReg() ||
+             MI.getOperand(5).getImm() != 8 || !MI.getOperand(6).isReg() ||
+             MI.getOperand(6).getReg() != MI.getOperand(0).getReg() ||
+             MI.getOperand(7).getImm() != 0;
+    }
+    return isVOP3(MI.getDesc());
+  }
+
   bool isVOP3(uint16_t Opcode) const { return isVOP3(get(Opcode)); }
 
   static bool isSDWA(const MachineInstr &MI) {

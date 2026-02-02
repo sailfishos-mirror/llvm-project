@@ -752,6 +752,9 @@ defm Dot13Insts : AMDGPUSubtargetFeature<"dot13-insts",
   "Has v_dot2c_f32_bf16 instructions"
 >;
 
+def HasOnlyDualDot2AccF32F16 : Predicate<"Subtarget->hasVOPDInsts() && Subtarget->hasDot10Insts() && !Subtarget->hasDot5Insts()">;
+def HasOnlyDualDot2AccF32BF16 : Predicate<"Subtarget->hasVOPDInsts() && Subtarget->hasDot12Insts() && !Subtarget->hasDot13Insts()">;
+
 defm MAIInsts : AMDGPUSubtargetFeature<"mai-insts",
   "Has mAI instructions"
 >;
