@@ -169,12 +169,20 @@ TargetCodeGenInfo::performAddrSpaceCast(CodeGenModule &CGM, llvm::Constant *Src,
   return llvm::ConstantExpr::getPointerCast(Src, DestTy);
 }
 
+std::string
+TargetCodeGenInfo::getLLVMSyncScopeStr(const LangOptions &LangOpts,
+                                       SyncScope Scope,
+                                       llvm::AtomicOrdering Ordering) const {
+  return ""; /* default sync scope */
+}
+
 llvm::SyncScope::ID
 TargetCodeGenInfo::getLLVMSyncScopeID(const LangOptions &LangOpts,
                                       SyncScope Scope,
                                       llvm::AtomicOrdering Ordering,
                                       llvm::LLVMContext &Ctx) const {
-  return Ctx.getOrInsertSyncScopeID(""); /* default sync scope */
+  return Ctx.getOrInsertSyncScopeID(
+      getLLVMSyncScopeStr(LangOpts, Scope, Ordering));
 }
 
 void TargetCodeGenInfo::addStackProbeTargetAttributes(
