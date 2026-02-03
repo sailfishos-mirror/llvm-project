@@ -3570,10 +3570,17 @@ Instruction *InstCombinerImpl::foldSelectOfBools(SelectInst &SI) {
                                   Value *InnerVal,
                                   bool SelFirst = false) -> Instruction * {
         Value *InnerSel = Builder.CreateSelect(InnerCond, One, InnerVal);
+        if (!ProfcheckDisableMetadataFixes)
+          if (auto *I = dyn_cast<Instruction>(InnerSel))
+            setExplicitlyUnknownBranchWeightsIfProfiled(*I, DEBUG_TYPE, &F);
+
         if (SelFirst)
           std::swap(Common, InnerSel);
         if (FalseLogicAnd || (CondLogicAnd && Common == A))
-          return SelectInst::Create(Common, InnerSel, Zero);
+          return ProfcheckDisableMetadataFixes
+                     ? SelectInst::Create(Common, InnerSel, Zero)
+                     : createSelectInstWithUnknownProfile(Common, InnerSel,
+                                                          Zero);
         else
           return BinaryOperator::CreateAnd(Common, InnerSel);
       };
@@ -3618,10 +3625,17 @@ Instruction *InstCombinerImpl::foldSelectOfBools(SelectInst &SI) {
                                  Value *InnerVal,
                                  bool SelFirst = false) -> Instruction * {
         Value *InnerSel = Builder.CreateSelect(InnerCond, InnerVal, Zero);
+        if (!ProfcheckDisableMetadataFixes)
+          if (auto *I = dyn_cast<Instruction>(InnerSel))
+            setExplicitlyUnknownBranchWeightsIfProfiled(*I, DEBUG_TYPE, &F);
+
         if (SelFirst)
           std::swap(Common, InnerSel);
         if (TrueLogicOr || (CondLogicOr && Common == A))
-          return SelectInst::Create(Common, One, InnerSel);
+          return ProfcheckDisableMetadataFixes
+                     ? SelectInst::Create(Common, One, InnerSel)
+                     : createSelectInstWithUnknownProfile(Common, One,
+                                                          InnerSel);
         else
           return BinaryOperator::CreateOr(Common, InnerSel);
       };
