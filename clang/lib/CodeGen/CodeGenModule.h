@@ -592,6 +592,9 @@ private:
   /// A vector of metadata strings for dependent libraries for ELF.
   SmallVector<llvm::MDNode *, 16> ELFDependentLibraries;
 
+  /// Metadata for copyright pragma comment (if present).
+  llvm::MDNode *LoadTimeComment = nullptr;
+
   /// @name Cache for Objective-C runtime types
   /// @{
 
@@ -1495,6 +1498,9 @@ public:
   /// Appends a dependent lib to the appropriate metadata value.
   void AddDependentLib(StringRef Lib);
 
+  /// Process pragma comment
+  void ProcessPragmaComment(PragmaMSCommentKind Kind, StringRef Comment,
+                            bool isFromASTFile);
 
   llvm::GlobalVariable::LinkageTypes getFunctionLinkage(GlobalDecl GD);
 
@@ -2074,6 +2080,11 @@ private:
   /// Determine whether the definition must be emitted; if this returns \c
   /// false, the definition can be emitted lazily if it's used.
   bool MustBeEmitted(const ValueDecl *D);
+
+  /// Emit load-time comment metadata for #pragma comment(copyright, ...).
+  /// This adds the copyright string to the module's named metadata, which will
+  /// be processed by the backend to include it in the generated executable.
+  void EmitLoadTimeComment();
 
   /// Determine whether the definition can be emitted eagerly, or should be
   /// delayed until the end of the translation unit. This is relevant for

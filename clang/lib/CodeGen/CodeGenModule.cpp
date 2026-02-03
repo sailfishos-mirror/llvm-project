@@ -1632,6 +1632,8 @@ void CodeGenModule::Release() {
 
   EmitBackendOptionsMetadata(getCodeGenOpts());
 
+  EmitLoadTimeComment();
+
   // If there is device offloading code embed it in the host now.
   EmbedObject(&getModule(), CodeGenOpts, *getFileSystem(), getDiags());
 
@@ -3541,6 +3543,39 @@ void CodeGenModule::AddDependentLib(StringRef Lib) {
   LinkerOptionsMetadata.push_back(llvm::MDNode::get(C, MDOpts));
 }
 
+/// Process copyright pragma and create LLVM metadata.
+/// #pragma comment(copyright, "string") embeds copyright information into a
+/// loadable program-data section of the object file for inclusion in the linked
+/// module.
+///
+/// Example: #pragma comment(copyright, "Copyright string")
+///
+/// This should only be called once per translation unit.
+void CodeGenModule::ProcessPragmaComment(PragmaMSCommentKind Kind,
+                                         StringRef Comment,
+                                         bool isFromASTFile) {
+  // Ensure we are only processing Copyright Pragmas
+  assert(Kind == PCK_Copyright &&
+         "Unexpected pragma comment kind, ProcessPragmaComment should only be "
+         "called for PCK_Copyright");
+  // Target Guard: Only AIX supports PCK_Copyright currently.
+  assert(getTriple().isOSAIX() &&
+         "pragma comment copyright is supported only when targeting AIX");
+
+  // Deserialization Guard: Only process if copyright originated in this TU.
+  if (isFromASTFile)
+    return;
+
+  // Only one copyright pragma allowed per translation unit
+  assert(!LoadTimeComment &&
+         "Only one copyright pragma allowed per translation unit");
+
+  // Create llvm metadata with the comment string
+  auto &C = getLLVMContext();
+  llvm::Metadata *Ops[] = {llvm::MDString::get(C, Comment)};
+  LoadTimeComment = llvm::MDNode::get(C, Ops);
+}
+
 /// Add link options implied by the given module, including modules
 /// it depends on, using a postorder walk.
 static void addLinkOptionsPostorder(CodeGenModule &CGM, Module *Mod,
@@ -4059,6 +4094,16 @@ bool CodeGenModule::MustBeEmitted(const ValueDecl *Global) {
     return true;
 
   return getContext().DeclMustBeEmitted(Global);
+}
+
+void CodeGenModule::EmitLoadTimeComment() {
+  // Emit copyright metadata for #pragma comment(copyright, ...).
+  // The LoadTimeComment is set during pragma processing and contains the
+  // copyright string that should be embedded in the executable.
+  if (LoadTimeComment) {
+    auto *NMD = getModule().getOrInsertNamedMetadata("comment_string.loadtime");
+    NMD->addOperand(LoadTimeComment);
+  }
 }
 
 bool CodeGenModule::MayBeEmittedEagerly(const ValueDecl *Global) {
@@ -7793,7 +7838,11 @@ void CodeGenModule::EmitTopLevelDecl(Decl *D) {
       AppendLinkerOptions(PCD->getArg());
       break;
     case PCK_Lib:
-        AddDependentLib(PCD->getArg());
+      AddDependentLib(PCD->getArg());
+      break;
+    case PCK_Copyright:
+      ProcessPragmaComment(PCD->getCommentKind(), PCD->getArg(),
+                           PCD->isFromASTFile());
       break;
     case PCK_Compiler:
     case PCK_ExeStr:
