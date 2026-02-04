@@ -133,6 +133,7 @@ private:
   bool lowerSplitTo32SExtInReg(MachineInstr &MI);
   bool lowerUnpackMinMax(MachineInstr &MI);
   bool lowerUnpackAExt(MachineInstr &MI);
+  bool applyRegisterBanksINTRIN_IMAGE(MachineInstr &MI);
 };
 
 } // end namespace AMDGPU
