@@ -20599,7 +20599,7 @@ tryToReplaceScalarFPConversionWithSVE(SDNode *N, SelectionDAG &DAG,
   if (DCI.isBeforeLegalizeOps())
     return SDValue();
 
-  if (Subtarget->isStreaming() && Subtarget->hasFPRCVT())
+  if (Subtarget->hasFPRCVT())
     return SDValue();
 
   if (!Subtarget->isSVEorStreamingSVEAvailable() ||

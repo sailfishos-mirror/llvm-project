@@ -41,10 +41,7 @@ define float @test_fptosi_f16_i32_simd(half %a)  {
 ;
 ; CHECK-SVE-LABEL: test_fptosi_f16_i32_simd:
 ; CHECK-SVE:       // %bb.0:
-; CHECK-SVE-NEXT:    ptrue p0.s
-; CHECK-SVE-NEXT:    // kill: def $h0 killed $h0 def $z0
-; CHECK-SVE-NEXT:    fcvtzs z0.s, p0/m, z0.h
-; CHECK-SVE-NEXT:    // kill: def $s0 killed $s0 killed $z0
+; CHECK-SVE-NEXT:    fcvtzs s0, h0
 ; CHECK-SVE-NEXT:    ret
   %r = fptosi half %a to i32
   %bc = bitcast i32 %r to float
@@ -70,10 +67,7 @@ define double @test_fptosi_f16_i64_simd(half %a)  {
 ;
 ; CHECK-SVE-LABEL: test_fptosi_f16_i64_simd:
 ; CHECK-SVE:       // %bb.0:
-; CHECK-SVE-NEXT:    ptrue p0.d
-; CHECK-SVE-NEXT:    // kill: def $h0 killed $h0 def $z0
-; CHECK-SVE-NEXT:    fcvtzs z0.d, p0/m, z0.h
-; CHECK-SVE-NEXT:    // kill: def $d0 killed $d0 killed $z0
+; CHECK-SVE-NEXT:    fcvtzs d0, h0
 ; CHECK-SVE-NEXT:    ret
   %r = fptosi half %a to i64
   %bc = bitcast i64 %r to double
@@ -125,10 +119,7 @@ define double @test_fptosi_f32_i64_simd(float %a)  {
 ;
 ; CHECK-SVE-LABEL: test_fptosi_f32_i64_simd:
 ; CHECK-SVE:       // %bb.0:
-; CHECK-SVE-NEXT:    ptrue p0.d
-; CHECK-SVE-NEXT:    // kill: def $s0 killed $s0 def $z0
-; CHECK-SVE-NEXT:    fcvtzs z0.d, p0/m, z0.s
-; CHECK-SVE-NEXT:    // kill: def $d0 killed $d0 killed $z0
+; CHECK-SVE-NEXT:    fcvtzs d0, s0
 ; CHECK-SVE-NEXT:    ret
   %r = fptosi float %a to i64
   %bc = bitcast i64 %r to double
@@ -153,10 +144,7 @@ define double @test_fptosi_f64_i64_simd(double %a)  {
 ;
 ; CHECK-SVE-LABEL: test_fptosi_f64_i64_simd:
 ; CHECK-SVE:       // %bb.0:
-; CHECK-SVE-NEXT:    ptrue p0.d
-; CHECK-SVE-NEXT:    // kill: def $d0 killed $d0 def $z0
-; CHECK-SVE-NEXT:    fcvtzs z0.d, p0/m, z0.d
-; CHECK-SVE-NEXT:    // kill: def $d0 killed $d0 killed $z0
+; CHECK-SVE-NEXT:    fcvtzs d0, d0
 ; CHECK-SVE-NEXT:    ret
   %r = fptosi double %a to i64
   %bc = bitcast i64 %r to double
@@ -182,10 +170,7 @@ define float @test_fptosi_f32_i32_simd(float %a)  {
 ;
 ; CHECK-SVE-LABEL: test_fptosi_f32_i32_simd:
 ; CHECK-SVE:       // %bb.0:
-; CHECK-SVE-NEXT:    ptrue p0.s
-; CHECK-SVE-NEXT:    // kill: def $s0 killed $s0 def $z0
-; CHECK-SVE-NEXT:    fcvtzs z0.s, p0/m, z0.s
-; CHECK-SVE-NEXT:    // kill: def $s0 killed $s0 killed $z0
+; CHECK-SVE-NEXT:    fcvtzs s0, s0
 ; CHECK-SVE-NEXT:    ret
   %r = fptosi float %a to i32
   %bc = bitcast i32 %r to float
@@ -211,10 +196,7 @@ define float @test_fptoui_f16_i32_simd(half %a)  {
 ;
 ; CHECK-SVE-LABEL: test_fptoui_f16_i32_simd:
 ; CHECK-SVE:       // %bb.0:
-; CHECK-SVE-NEXT:    ptrue p0.s
-; CHECK-SVE-NEXT:    // kill: def $h0 killed $h0 def $z0
-; CHECK-SVE-NEXT:    fcvtzu z0.s, p0/m, z0.h
-; CHECK-SVE-NEXT:    // kill: def $s0 killed $s0 killed $z0
+; CHECK-SVE-NEXT:    fcvtzu s0, h0
 ; CHECK-SVE-NEXT:    ret
   %r = fptoui half %a to i32
   %bc = bitcast i32 %r to float
@@ -240,10 +222,7 @@ define double @test_fptoui_f16_i64_simd(half %a)  {
 ;
 ; CHECK-SVE-LABEL: test_fptoui_f16_i64_simd:
 ; CHECK-SVE:       // %bb.0:
-; CHECK-SVE-NEXT:    ptrue p0.d
-; CHECK-SVE-NEXT:    // kill: def $h0 killed $h0 def $z0
-; CHECK-SVE-NEXT:    fcvtzu z0.d, p0/m, z0.h
-; CHECK-SVE-NEXT:    // kill: def $d0 killed $d0 killed $z0
+; CHECK-SVE-NEXT:    fcvtzu d0, h0
 ; CHECK-SVE-NEXT:    ret
   %r = fptoui half %a to i64
   %bc = bitcast i64 %r to double
@@ -295,10 +274,7 @@ define double @test_fptoui_f32_i64_simd(float %a)  {
 ;
 ; CHECK-SVE-LABEL: test_fptoui_f32_i64_simd:
 ; CHECK-SVE:       // %bb.0:
-; CHECK-SVE-NEXT:    ptrue p0.d
-; CHECK-SVE-NEXT:    // kill: def $s0 killed $s0 def $z0
-; CHECK-SVE-NEXT:    fcvtzu z0.d, p0/m, z0.s
-; CHECK-SVE-NEXT:    // kill: def $d0 killed $d0 killed $z0
+; CHECK-SVE-NEXT:    fcvtzu d0, s0
 ; CHECK-SVE-NEXT:    ret
   %r = fptoui float %a to i64
   %bc = bitcast i64 %r to double
@@ -323,10 +299,7 @@ define double @test_fptoui_f64_i64_simd(double %a)  {
 ;
 ; CHECK-SVE-LABEL: test_fptoui_f64_i64_simd:
 ; CHECK-SVE:       // %bb.0:
-; CHECK-SVE-NEXT:    ptrue p0.d
-; CHECK-SVE-NEXT:    // kill: def $d0 killed $d0 def $z0
-; CHECK-SVE-NEXT:    fcvtzu z0.d, p0/m, z0.d
-; CHECK-SVE-NEXT:    // kill: def $d0 killed $d0 killed $z0
+; CHECK-SVE-NEXT:    fcvtzu d0, d0
 ; CHECK-SVE-NEXT:    ret
   %r = fptoui double %a to i64
   %bc = bitcast i64 %r to double
@@ -352,10 +325,7 @@ define float @test_fptoui_f32_i32_simd(float %a)  {
 ;
 ; CHECK-SVE-LABEL: test_fptoui_f32_i32_simd:
 ; CHECK-SVE:       // %bb.0:
-; CHECK-SVE-NEXT:    ptrue p0.s
-; CHECK-SVE-NEXT:    // kill: def $s0 killed $s0 def $z0
-; CHECK-SVE-NEXT:    fcvtzu z0.s, p0/m, z0.s
-; CHECK-SVE-NEXT:    // kill: def $s0 killed $s0 killed $z0
+; CHECK-SVE-NEXT:    fcvtzu s0, s0
 ; CHECK-SVE-NEXT:    ret
   %r = fptoui float %a to i32
   %bc = bitcast i32 %r to float
@@ -701,10 +671,7 @@ define double @fcvtas_ds_round_simd(float %a) {
 ;
 ; CHECK-SVE-LABEL: fcvtas_ds_round_simd:
 ; CHECK-SVE:       // %bb.0:
-; CHECK-SVE-NEXT:    frinta s0, s0
-; CHECK-SVE-NEXT:    ptrue p0.d
-; CHECK-SVE-NEXT:    fcvtzs z0.d, p0/m, z0.s
-; CHECK-SVE-NEXT:    // kill: def $d0 killed $d0 killed $z0
+; CHECK-SVE-NEXT:    fcvtas d0, s0
 ; CHECK-SVE-NEXT:    ret
   %r = call float @llvm.round.f32(float %a)
   %i = fptosi float %r to i64
@@ -757,10 +724,7 @@ define float @fcvtas_ss_round_simd(float %a) {
 ;
 ; CHECK-SVE-LABEL: fcvtas_ss_round_simd:
 ; CHECK-SVE:       // %bb.0:
-; CHECK-SVE-NEXT:    frinta s0, s0
-; CHECK-SVE-NEXT:    ptrue p0.s
-; CHECK-SVE-NEXT:    fcvtzs z0.s, p0/m, z0.s
-; CHECK-SVE-NEXT:    // kill: def $s0 killed $s0 killed $z0
+; CHECK-SVE-NEXT:    fcvtas s0, s0
 ; CHECK-SVE-NEXT:    ret
   %r = call float @llvm.round.f32(float %a)
   %i = fptosi float %r to i32
@@ -786,10 +750,7 @@ define double @fcvtas_dd_round_simd(double %a) {
 ;
 ; CHECK-SVE-LABEL: fcvtas_dd_round_simd:
 ; CHECK-SVE:       // %bb.0:
-; CHECK-SVE-NEXT:    frinta d0, d0
-; CHECK-SVE-NEXT:    ptrue p0.d
-; CHECK-SVE-NEXT:    fcvtzs z0.d, p0/m, z0.d
-; CHECK-SVE-NEXT:    // kill: def $d0 killed $d0 killed $z0
+; CHECK-SVE-NEXT:    fcvtas d0, d0
 ; CHECK-SVE-NEXT:    ret
   %r = call double @llvm.round.f64(double %a)
   %i = fptosi double %r to i64
@@ -817,10 +778,7 @@ define double @fcvtau_ds_round_simd(float %a) {
 ;
 ; CHECK-SVE-LABEL: fcvtau_ds_round_simd:
 ; CHECK-SVE:       // %bb.0:
-; CHECK-SVE-NEXT:    frinta s0, s0
-; CHECK-SVE-NEXT:    ptrue p0.d
-; CHECK-SVE-NEXT:    fcvtzu z0.d, p0/m, z0.s
-; CHECK-SVE-NEXT:    // kill: def $d0 killed $d0 killed $z0
+; CHECK-SVE-NEXT:    fcvtau d0, s0
 ; CHECK-SVE-NEXT:    ret
   %r = call float @llvm.round.f32(float %a)
   %i = fptoui float %r to i64
@@ -873,10 +831,7 @@ define float @fcvtau_ss_round_simd(float %a) {
 ;
 ; CHECK-SVE-LABEL: fcvtau_ss_round_simd:
 ; CHECK-SVE:       // %bb.0:
-; CHECK-SVE-NEXT:    frinta s0, s0
-; CHECK-SVE-NEXT:    ptrue p0.s
-; CHECK-SVE-NEXT:    fcvtzs z0.s, p0/m, z0.s
-; CHECK-SVE-NEXT:    // kill: def $s0 killed $s0 killed $z0
+; CHECK-SVE-NEXT:    fcvtas s0, s0
 ; CHECK-SVE-NEXT:    ret
   %r = call float @llvm.round.f32(float %a)
   %i = fptosi float %r to i32
@@ -902,10 +857,7 @@ define double @fcvtau_dd_round_simd(double %a) {
 ;
 ; CHECK-SVE-LABEL: fcvtau_dd_round_simd:
 ; CHECK-SVE:       // %bb.0:
-; CHECK-SVE-NEXT:    frinta d0, d0
-; CHECK-SVE-NEXT:    ptrue p0.d
-; CHECK-SVE-NEXT:    fcvtzs z0.d, p0/m, z0.d
-; CHECK-SVE-NEXT:    // kill: def $d0 killed $d0 killed $z0
+; CHECK-SVE-NEXT:    fcvtas d0, d0
 ; CHECK-SVE-NEXT:    ret
   %r = call double @llvm.round.f64(double %a)
   %i = fptosi double %r to i64
@@ -927,17 +879,12 @@ define double @fcvtns_ds_roundeven_simd(float %a) {
 ;
 ; CHECK-SME-LABEL: fcvtns_ds_roundeven_simd:
 ; CHECK-SME:       // %bb.0:
-; CHECK-SME-NEXT:    frintn s0, s0
-; CHECK-SME-NEXT:    ptrue p0.d
-; CHECK-SME-NEXT:    fcvtzs z0.d, p0/m, z0.s
+; CHECK-SME-NEXT:    fcvtns d0, s0
 ; CHECK-SME-NEXT:    ret
 ;
 ; CHECK-SVE-LABEL: fcvtns_ds_roundeven_simd:
 ; CHECK-SVE:       // %bb.0:
-; CHECK-SVE-NEXT:    frintn s0, s0
-; CHECK-SVE-NEXT:    ptrue p0.d
-; CHECK-SVE-NEXT:    fcvtzs z0.d, p0/m, z0.s
-; CHECK-SVE-NEXT:    // kill: def $d0 killed $d0 killed $z0
+; CHECK-SVE-NEXT:    fcvtns d0, s0
 ; CHECK-SVE-NEXT:    ret
   %r = call float @llvm.roundeven.f32(float %a)
   %i = fptosi float %r to i64
@@ -985,17 +932,12 @@ define float @fcvtns_ss_roundeven_simd(float %a) {
 ;
 ; CHECK-SME-LABEL: fcvtns_ss_roundeven_simd:
 ; CHECK-SME:       // %bb.0:
-; CHECK-SME-NEXT:    frintn s0, s0
-; CHECK-SME-NEXT:    ptrue p0.s
-; CHECK-SME-NEXT:    fcvtzs z0.s, p0/m, z0.s
+; CHECK-SME-NEXT:    fcvtns s0, s0
 ; CHECK-SME-NEXT:    ret
 ;
 ; CHECK-SVE-LABEL: fcvtns_ss_roundeven_simd:
 ; CHECK-SVE:       // %bb.0:
-; CHECK-SVE-NEXT:    frintn s0, s0
-; CHECK-SVE-NEXT:    ptrue p0.s
-; CHECK-SVE-NEXT:    fcvtzs z0.s, p0/m, z0.s
-; CHECK-SVE-NEXT:    // kill: def $s0 killed $s0 killed $z0
+; CHECK-SVE-NEXT:    fcvtns s0, s0
 ; CHECK-SVE-NEXT:    ret
   %r = call float @llvm.roundeven.f32(float %a)
   %i = fptosi float %r to i32
@@ -1016,17 +958,12 @@ define double @fcvtns_dd_roundeven_simd(double %a) {
 ;
 ; CHECK-SME-LABEL: fcvtns_dd_roundeven_simd:
 ; CHECK-SME:       // %bb.0:
-; CHECK-SME-NEXT:    frintn d0, d0
-; CHECK-SME-NEXT:    ptrue p0.d
-; CHECK-SME-NEXT:    fcvtzs z0.d, p0/m, z0.d
+; CHECK-SME-NEXT:    fcvtns d0, d0
 ; CHECK-SME-NEXT:    ret
 ;
 ; CHECK-SVE-LABEL: fcvtns_dd_roundeven_simd:
 ; CHECK-SVE:       // %bb.0:
-; CHECK-SVE-NEXT:    frintn d0, d0
-; CHECK-SVE-NEXT:    ptrue p0.d
-; CHECK-SVE-NEXT:    fcvtzs z0.d, p0/m, z0.d
-; CHECK-SVE-NEXT:    // kill: def $d0 killed $d0 killed $z0
+; CHECK-SVE-NEXT:    fcvtns d0, d0
 ; CHECK-SVE-NEXT:    ret
   %r = call double @llvm.roundeven.f64(double %a)
   %i = fptosi double %r to i64
@@ -1049,17 +986,12 @@ define double @fcvtnu_ds_roundeven_simd(float %a) {
 ;
 ; CHECK-SME-LABEL: fcvtnu_ds_roundeven_simd:
 ; CHECK-SME:       // %bb.0:
-; CHECK-SME-NEXT:    frintn s0, s0
-; CHECK-SME-NEXT:    ptrue p0.d
-; CHECK-SME-NEXT:    fcvtzu z0.d, p0/m, z0.s
+; CHECK-SME-NEXT:    fcvtnu d0, s0
 ; CHECK-SME-NEXT:    ret
 ;
 ; CHECK-SVE-LABEL: fcvtnu_ds_roundeven_simd:
 ; CHECK-SVE:       // %bb.0:
-; CHECK-SVE-NEXT:    frintn s0, s0
-; CHECK-SVE-NEXT:    ptrue p0.d
-; CHECK-SVE-NEXT:    fcvtzu z0.d, p0/m, z0.s
-; CHECK-SVE-NEXT:    // kill: def $d0 killed $d0 killed $z0
+; CHECK-SVE-NEXT:    fcvtnu d0, s0
 ; CHECK-SVE-NEXT:    ret
   %r = call float @llvm.roundeven.f32(float %a)
   %i = fptoui float %r to i64
@@ -1107,17 +1039,12 @@ define float @fcvtnu_ss_roundeven_simd(float %a) {
 ;
 ; CHECK-SME-LABEL: fcvtnu_ss_roundeven_simd:
 ; CHECK-SME:       // %bb.0:
-; CHECK-SME-NEXT:    frintn s0, s0
-; CHECK-SME-NEXT:    ptrue p0.s
-; CHECK-SME-NEXT:    fcvtzu z0.s, p0/m, z0.s
+; CHECK-SME-NEXT:    fcvtnu s0, s0
 ; CHECK-SME-NEXT:    ret
 ;
 ; CHECK-SVE-LABEL: fcvtnu_ss_roundeven_simd:
 ; CHECK-SVE:       // %bb.0:
-; CHECK-SVE-NEXT:    frintn s0, s0
-; CHECK-SVE-NEXT:    ptrue p0.s
-; CHECK-SVE-NEXT:    fcvtzu z0.s, p0/m, z0.s
-; CHECK-SVE-NEXT:    // kill: def $s0 killed $s0 killed $z0
+; CHECK-SVE-NEXT:    fcvtnu s0, s0
 ; CHECK-SVE-NEXT:    ret
   %r = call float @llvm.roundeven.f32(float %a)
   %i = fptoui float %r to i32
@@ -1138,17 +1065,12 @@ define double @fcvtnu_dd_roundeven_simd(double %a) {
 ;
 ; CHECK-SME-LABEL: fcvtnu_dd_roundeven_simd:
 ; CHECK-SME:       // %bb.0:
-; CHECK-SME-NEXT:    frintn d0, d0
-; CHECK-SME-NEXT:    ptrue p0.d
-; CHECK-SME-NEXT:    fcvtzu z0.d, p0/m, z0.d
+; CHECK-SME-NEXT:    fcvtnu d0, d0
 ; CHECK-SME-NEXT:    ret
 ;
 ; CHECK-SVE-LABEL: fcvtnu_dd_roundeven_simd:
 ; CHECK-SVE:       // %bb.0:
-; CHECK-SVE-NEXT:    frintn d0, d0
-; CHECK-SVE-NEXT:    ptrue p0.d
-; CHECK-SVE-NEXT:    fcvtzu z0.d, p0/m, z0.d
-; CHECK-SVE-NEXT:    // kill: def $d0 killed $d0 killed $z0
+; CHECK-SVE-NEXT:    fcvtnu d0, d0
 ; CHECK-SVE-NEXT:    ret
   %r = call double @llvm.roundeven.f64(double %a)
   %i = fptoui double %r to i64
@@ -1175,10 +1097,7 @@ define double @fcvtms_ds_round_simd(float %a) {
 ;
 ; CHECK-SVE-LABEL: fcvtms_ds_round_simd:
 ; CHECK-SVE:       // %bb.0:
-; CHECK-SVE-NEXT:    frintm s0, s0
-; CHECK-SVE-NEXT:    ptrue p0.d
-; CHECK-SVE-NEXT:    fcvtzs z0.d, p0/m, z0.s
-; CHECK-SVE-NEXT:    // kill: def $d0 killed $d0 killed $z0
+; CHECK-SVE-NEXT:    fcvtms d0, s0
 ; CHECK-SVE-NEXT:    ret
   %r = call float @llvm.floor.f32(float %a)
   %i = fptosi float %r to i64
@@ -1231,10 +1150,7 @@ define float @fcvtms_ss_round_simd(float %a) {
 ;
 ; CHECK-SVE-LABEL: fcvtms_ss_round_simd:
 ; CHECK-SVE:       // %bb.0:
-; CHECK-SVE-NEXT:    frintm s0, s0
-; CHECK-SVE-NEXT:    ptrue p0.s
-; CHECK-SVE-NEXT:    fcvtzs z0.s, p0/m, z0.s
-; CHECK-SVE-NEXT:    // kill: def $s0 killed $s0 killed $z0
+; CHECK-SVE-NEXT:    fcvtms s0, s0
 ; CHECK-SVE-NEXT:    ret
   %r = call float @llvm.floor.f32(float %a)
   %i = fptosi float %r to i32
@@ -1260,10 +1176,7 @@ define double @fcvtms_dd_round_simd(double %a) {
 ;
 ; CHECK-SVE-LABEL: fcvtms_dd_round_simd:
 ; CHECK-SVE:       // %bb.0:
-; CHECK-SVE-NEXT:    frintm d0, d0
-; CHECK-SVE-NEXT:    ptrue p0.d
-; CHECK-SVE-NEXT:    fcvtzs z0.d, p0/m, z0.d
-; CHECK-SVE-NEXT:    // kill: def $d0 killed $d0 killed $z0
+; CHECK-SVE-NEXT:    fcvtms d0, d0
 ; CHECK-SVE-NEXT:    ret
   %r = call double @llvm.floor.f64(double %a)
   %i = fptosi double %r to i64
@@ -1292,10 +1205,7 @@ define double @fcvtmu_ds_round_simd(float %a) {
 ;
 ; CHECK-SVE-LABEL: fcvtmu_ds_round_simd:
 ; CHECK-SVE:       // %bb.0:
-; CHECK-SVE-NEXT:    frintm s0, s0
-; CHECK-SVE-NEXT:    ptrue p0.d
-; CHECK-SVE-NEXT:    fcvtzu z0.d, p0/m, z0.s
-; CHECK-SVE-NEXT:    // kill: def $d0 killed $d0 killed $z0
+; CHECK-SVE-NEXT:    fcvtmu d0, s0
 ; CHECK-SVE-NEXT:    ret
   %r = call float @llvm.floor.f32(float %a)
   %i = fptoui float %r to i64
@@ -1348,10 +1258,7 @@ define float @fcvtmu_ss_round_simd(float %a) {
 ;
 ; CHECK-SVE-LABEL: fcvtmu_ss_round_simd:
 ; CHECK-SVE:       // %bb.0:
-; CHECK-SVE-NEXT:    frintm s0, s0
-; CHECK-SVE-NEXT:    ptrue p0.s
-; CHECK-SVE-NEXT:    fcvtzs z0.s, p0/m, z0.s
-; CHECK-SVE-NEXT:    // kill: def $s0 killed $s0 killed $z0
+; CHECK-SVE-NEXT:    fcvtms s0, s0
 ; CHECK-SVE-NEXT:    ret
   %r = call float @llvm.floor.f32(float %a)
   %i = fptosi float %r to i32
@@ -1377,10 +1284,7 @@ define double @fcvtmu_dd_round_simd(double %a) {
 ;
 ; CHECK-SVE-LABEL: fcvtmu_dd_round_simd:
 ; CHECK-SVE:       // %bb.0:
-; CHECK-SVE-NEXT:    frintm d0, d0
-; CHECK-SVE-NEXT:    ptrue p0.d
-; CHECK-SVE-NEXT:    fcvtzs z0.d, p0/m, z0.d
-; CHECK-SVE-NEXT:    // kill: def $d0 killed $d0 killed $z0
+; CHECK-SVE-NEXT:    fcvtms d0, d0
 ; CHECK-SVE-NEXT:    ret
   %r = call double @llvm.floor.f64(double %a)
   %i = fptosi double %r to i64
@@ -1408,10 +1312,7 @@ define double @fcvtps_ds_round_simd(float %a) {
 ;
 ; CHECK-SVE-LABEL: fcvtps_ds_round_simd:
 ; CHECK-SVE:       // %bb.0:
-; CHECK-SVE-NEXT:    frintp s0, s0
-; CHECK-SVE-NEXT:    ptrue p0.d
-; CHECK-SVE-NEXT:    fcvtzs z0.d, p0/m, z0.s
-; CHECK-SVE-NEXT:    // kill: def $d0 killed $d0 killed $z0
+; CHECK-SVE-NEXT:    fcvtps d0, s0
 ; CHECK-SVE-NEXT:    ret
   %r = call float @llvm.ceil.f32(float %a)
   %i = fptosi float %r to i64
@@ -1464,10 +1365,7 @@ define float @fcvtps_ss_round_simd(float %a) {
 ;
 ; CHECK-SVE-LABEL: fcvtps_ss_round_simd:
 ; CHECK-SVE:       // %bb.0:
-; CHECK-SVE-NEXT:    frintp s0, s0
-; CHECK-SVE-NEXT:    ptrue p0.s
-; CHECK-SVE-NEXT:    fcvtzs z0.s, p0/m, z0.s
-; CHECK-SVE-NEXT:    // kill: def $s0 killed $s0 killed $z0
+; CHECK-SVE-NEXT:    fcvtps s0, s0
 ; CHECK-SVE-NEXT:    ret
   %r = call float @llvm.ceil.f32(float %a)
   %i = fptosi float %r to i32
@@ -1493,10 +1391,7 @@ define double @fcvtps_dd_round_simd(double %a) {
 ;
 ; CHECK-SVE-LABEL: fcvtps_dd_round_simd:
 ; CHECK-SVE:       // %bb.0:
-; CHECK-SVE-NEXT:    frintp d0, d0
-; CHECK-SVE-NEXT:    ptrue p0.d
-; CHECK-SVE-NEXT:    fcvtzs z0.d, p0/m, z0.d
-; CHECK-SVE-NEXT:    // kill: def $d0 killed $d0 killed $z0
+; CHECK-SVE-NEXT:    fcvtps d0, d0
 ; CHECK-SVE-NEXT:    ret
   %r = call double @llvm.ceil.f64(double %a)
   %i = fptosi double %r to i64
@@ -1524,10 +1419,7 @@ define double @fcvtpu_ds_round_simd(float %a) {
 ;
 ; CHECK-SVE-LABEL: fcvtpu_ds_round_simd:
 ; CHECK-SVE:       // %bb.0:
-; CHECK-SVE-NEXT:    frintp s0, s0
-; CHECK-SVE-NEXT:    ptrue p0.d
-; CHECK-SVE-NEXT:    fcvtzu z0.d, p0/m, z0.s
-; CHECK-SVE-NEXT:    // kill: def $d0 killed $d0 killed $z0
+; CHECK-SVE-NEXT:    fcvtpu d0, s0
 ; CHECK-SVE-NEXT:    ret
   %r = call float @llvm.ceil.f32(float %a)
   %i = fptoui float %r to i64
@@ -1580,10 +1472,7 @@ define float @fcvtpu_ss_round_simd(float %a) {
 ;
 ; CHECK-SVE-LABEL: fcvtpu_ss_round_simd:
 ; CHECK-SVE:       // %bb.0:
-; CHECK-SVE-NEXT:    frintp s0, s0
-; CHECK-SVE-NEXT:    ptrue p0.s
-; CHECK-SVE-NEXT:    fcvtzs z0.s, p0/m, z0.s
-; CHECK-SVE-NEXT:    // kill: def $s0 killed $s0 killed $z0
+; CHECK-SVE-NEXT:    fcvtps s0, s0
 ; CHECK-SVE-NEXT:    ret
   %r = call float @llvm.ceil.f32(float %a)
   %i = fptosi float %r to i32
@@ -1609,10 +1498,7 @@ define double @fcvtpu_dd_round_simd(double %a) {
 ;
 ; CHECK-SVE-LABEL: fcvtpu_dd_round_simd:
 ; CHECK-SVE:       // %bb.0:
-; CHECK-SVE-NEXT:    frintp d0, d0
-; CHECK-SVE-NEXT:    ptrue p0.d
-; CHECK-SVE-NEXT:    fcvtzs z0.d, p0/m, z0.d
-; CHECK-SVE-NEXT:    // kill: def $d0 killed $d0 killed $z0
+; CHECK-SVE-NEXT:    fcvtps d0, d0
 ; CHECK-SVE-NEXT:    ret
   %r = call double @llvm.ceil.f64(double %a)
   %i = fptosi double %r to i64
@@ -1640,10 +1526,7 @@ define double @fcvtzs_ds_round_simd(float %a) {
 ;
 ; CHECK-SVE-LABEL: fcvtzs_ds_round_simd:
 ; CHECK-SVE:       // %bb.0:
-; CHECK-SVE-NEXT:    frintz s0, s0
-; CHECK-SVE-NEXT:    ptrue p0.d
-; CHECK-SVE-NEXT:    fcvtzs z0.d, p0/m, z0.s
-; CHECK-SVE-NEXT:    // kill: def $d0 killed $d0 killed $z0
+; CHECK-SVE-NEXT:    fcvtzs d0, s0
 ; CHECK-SVE-NEXT:    ret
   %r = call float @llvm.trunc.f32(float %a)
   %i = fptosi float %r to i64
@@ -1696,10 +1579,7 @@ define float @fcvtzs_ss_round_simd(float %a) {
 ;
 ; CHECK-SVE-LABEL: fcvtzs_ss_round_simd:
 ; CHECK-SVE:       // %bb.0:
-; CHECK-SVE-NEXT:    frintz s0, s0
-; CHECK-SVE-NEXT:    ptrue p0.s
-; CHECK-SVE-NEXT:    fcvtzs z0.s, p0/m, z0.s
-; CHECK-SVE-NEXT:    // kill: def $s0 killed $s0 killed $z0
+; CHECK-SVE-NEXT:    fcvtzs s0, s0
 ; CHECK-SVE-NEXT:    ret
   %r = call float @llvm.trunc.f32(float %a)
   %i = fptosi float %r to i32
@@ -1725,10 +1605,7 @@ define double @fcvtzs_dd_round_simd(double %a) {
 ;
 ; CHECK-SVE-LABEL: fcvtzs_dd_round_simd:
 ; CHECK-SVE:       // %bb.0:
-; CHECK-SVE-NEXT:    frintz d0, d0
-; CHECK-SVE-NEXT:    ptrue p0.d
-; CHECK-SVE-NEXT:    fcvtzs z0.d, p0/m, z0.d
-; CHECK-SVE-NEXT:    // kill: def $d0 killed $d0 killed $z0
+; CHECK-SVE-NEXT:    fcvtzs d0, d0
 ; CHECK-SVE-NEXT:    ret
   %r = call double @llvm.trunc.f64(double %a)
   %i = fptosi double %r to i64
@@ -1755,10 +1632,7 @@ define double @fcvtzu_ds_round_simd(float %a) {
 ;
 ; CHECK-SVE-LABEL: fcvtzu_ds_round_simd:
 ; CHECK-SVE:       // %bb.0:
-; CHECK-SVE-NEXT:    frintz s0, s0
-; CHECK-SVE-NEXT:    ptrue p0.d
-; CHECK-SVE-NEXT:    fcvtzu z0.d, p0/m, z0.s
-; CHECK-SVE-NEXT:    // kill: def $d0 killed $d0 killed $z0
+; CHECK-SVE-NEXT:    fcvtzu d0, s0
 ; CHECK-SVE-NEXT:    ret
   %r = call float @llvm.trunc.f32(float %a)
   %i = fptoui float %r to i64
@@ -1811,10 +1685,7 @@ define float @fcvtzu_ss_round_simd(float %a) {
 ;
 ; CHECK-SVE-LABEL: fcvtzu_ss_round_simd:
 ; CHECK-SVE:       // %bb.0:
-; CHECK-SVE-NEXT:    frintz s0, s0
-; CHECK-SVE-NEXT:    ptrue p0.s
-; CHECK-SVE-NEXT:    fcvtzs z0.s, p0/m, z0.s
-; CHECK-SVE-NEXT:    // kill: def $s0 killed $s0 killed $z0
+; CHECK-SVE-NEXT:    fcvtzs s0, s0
 ; CHECK-SVE-NEXT:    ret
   %r = call float @llvm.trunc.f32(float %a)
   %i = fptosi float %r to i32
@@ -1840,10 +1711,7 @@ define double @fcvtzu_dd_round_simd(double %a) {
 ;
 ; CHECK-SVE-LABEL: fcvtzu_dd_round_simd:
 ; CHECK-SVE:       // %bb.0:
-; CHECK-SVE-NEXT:    frintz d0, d0
-; CHECK-SVE-NEXT:    ptrue p0.d
-; CHECK-SVE-NEXT:    fcvtzs z0.d, p0/m, z0.d
-; CHECK-SVE-NEXT:    // kill: def $d0 killed $d0 killed $z0
+; CHECK-SVE-NEXT:    fcvtzs d0, d0
 ; CHECK-SVE-NEXT:    ret
   %r = call double @llvm.trunc.f64(double %a)
   %i = fptosi double %r to i64
