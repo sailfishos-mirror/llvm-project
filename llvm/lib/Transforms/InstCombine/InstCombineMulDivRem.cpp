@@ -996,9 +996,6 @@ Instruction *InstCombinerImpl::visitFMul(BinaryOperator &I) {
   if (match(Op1, m_SpecificFP(-1.0)))
     return UnaryOperator::CreateFNegFMF(Op0, &I);
 
-  if (SimplifyDemandedInstructionFPClass(I))
-    return &I;
-
   // -X * C --> X * -C
   Value *X, *Y;
   Constant *C;
@@ -1088,6 +1085,9 @@ Instruction *InstCombinerImpl::visitFMul(BinaryOperator &I) {
     }
     return replaceInstUsesWith(I, Sin);
   }
+
+  if (SimplifyDemandedInstructionFPClass(I))
+    return &I;
 
   return nullptr;
 }
