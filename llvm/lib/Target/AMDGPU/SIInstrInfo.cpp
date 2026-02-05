@@ -184,7 +184,7 @@ bool SIInstrInfo::resultDependsOnExec(const MachineInstr &MI) const {
   default:
     break;
   case AMDGPU::V_READFIRSTLANE_B32:
-    return true;
+    return MI.isConvergent();
   }
 
   return false;
