@@ -121,9 +121,6 @@ void CIRGenNVCUDARuntime::emitDeviceStubBodyNew(CIRGenFunction &cgf,
   if (cgm.getLangOpts().OffloadViaLLVM)
     cgm.errorNYI("CIRGenNVCUDARuntime: Offload via LLVM");
 
-  if (cgm.getLangOpts().HIP)
-    cgm.errorNYI("CIRGenNVCUDARuntime: HIP Support");
-
   CIRGenBuilderTy &builder = cgm.getBuilder();
   mlir::Location loc = fn.getLoc();
 
@@ -325,10 +322,9 @@ mlir::Operation *CIRGenNVCUDARuntime::getKernelHandle(cir::FuncOp fn,
   CIRGenBuilderTy &builder = cgm.getBuilder();
   StringRef globalName = cgm.getMangledName(
       gd.getWithKernelReferenceKind(KernelReferenceKind::Kernel));
-  const VarDecl *varDecl = llvm::dyn_cast_or_null<VarDecl>(gd.getDecl());
-  cir::GlobalOp globalOp =
-      cgm.getOrCreateCIRGlobal(globalName, fn.getFunctionType().getReturnType(),
-                               LangAS::Default, varDecl, NotForDefinition);
+  cir::GlobalOp globalOp = CIRGenModule::createGlobalOp(
+      cgm, fn.getLoc(), globalName, fn.getFunctionType().getReturnType(),
+      /*isConstant=*/true);
 
   globalOp->setAttr("alignment", builder.getI64IntegerAttr(
                                      cgm.getPointerAlign().getQuantity()));
