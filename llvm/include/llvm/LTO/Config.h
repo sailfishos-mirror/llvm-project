@@ -48,7 +48,8 @@ struct Config {
   // Note: when adding fields here, consider whether they need to be added to
   // computeLTOCacheKey in LTO.cpp.
   std::string CPU;
-  TargetOptions Options;
+  // Callback to modify the target options once they are instantiated.
+  std::function<void(TargetOptions& Options)> ModifyTargetOptions = [](TargetOptions&){};
   std::vector<std::string> MAttrs;
   std::vector<std::string> MllvmArgs;
   // LTO will register both lists of plugins, but
@@ -292,6 +293,7 @@ struct Config {
   LLVM_ABI Error addSaveTemps(std::string OutputFileName,
                               bool UseInputModulePath = false,
                               const DenseSet<StringRef> &SaveTempsArgs = {});
+
 };
 
 struct LTOLLVMDiagnosticHandler : public DiagnosticHandler {
