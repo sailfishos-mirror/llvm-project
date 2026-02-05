@@ -1286,5 +1286,6 @@ def CIR_SideEffect : CIR_I32EnumAttr<
   }];
 }
 
+include "clang/CIR/Dialect/IR/CIRCUDAAttrs.td"
 
 #endif // CLANG_CIR_DIALECT_IR_CIRATTRS_TD
