@@ -204,9 +204,6 @@ void CIRGenNVCUDARuntime::emitDeviceStubBodyNew(CIRGenFunction &cgf,
 
   // We now either pick the function or the stub global for cuda, hip
   // respectively.
-  mlir::Value* a;
-  
-  
   mlir::Value kernel = [&]() -> mlir::Value {
     if (cir::GlobalOp globalOp = llvm::dyn_cast_or_null<cir::GlobalOp>(
             kernelHandles[fn.getSymName()])) {
