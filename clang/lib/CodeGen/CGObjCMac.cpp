@@ -8071,12 +8071,9 @@ CodeGen::CreateMacObjCRuntime(CodeGen::CodeGenModule &CGM) {
 
 // Public wrapper function for external compilers (e.g., Swift) to access
 // the Mac runtime's GetDirectMethodCallee functionality.
-llvm::Function *
-clang::CodeGen::getObjCDirectMethodCallee(CodeGenModule &CGM,
-                                          const ObjCMethodDecl *OMD,
-                                          const ObjCContainerDecl *CD,
-                                          bool ReceiverCanBeNull,
-                                          bool ClassObjectCanBeUnrealized) {
+llvm::Function *clang::CodeGen::getObjCDirectMethodCallee(
+    CodeGenModule &CGM, const ObjCMethodDecl *OMD, const ObjCContainerDecl *CD,
+    bool ReceiverCanBeNull, bool ClassObjectCanBeUnrealized) {
   // This function should only be called when targeting Darwin platforms,
   // which always use the Mac runtime.
   assert(CGM.getLangOpts().ObjCRuntime.isNeXTFamily() &&
