@@ -210,7 +210,8 @@ void CIRGenNVCUDARuntime::emitDeviceStubBodyNew(CIRGenFunction &cgf,
       cir::PointerType kernelTy = cir::PointerType::get(globalOp.getSymType());
       mlir::Value kernelVal = cir::GetGlobalOp::create(builder, loc, kernelTy,
                                                        globalOp.getSymName());
-      return kernelVal;
+      mlir::Value func = builder.createBitcast(kernelVal, cgm.voidPtrTy);
+      return func;
     }
     if (cir::FuncOp funcOp = llvm::dyn_cast_or_null<cir::FuncOp>(
             kernelHandles[fn.getSymName()])) {
@@ -323,7 +324,7 @@ mlir::Operation *CIRGenNVCUDARuntime::getKernelHandle(cir::FuncOp fn,
   StringRef globalName = cgm.getMangledName(
       gd.getWithKernelReferenceKind(KernelReferenceKind::Kernel));
   cir::GlobalOp globalOp = CIRGenModule::createGlobalOp(
-      cgm, fn.getLoc(), globalName, fn.getFunctionType().getReturnType(),
+      cgm, fn.getLoc(), globalName, fn.getFunctionType(),
       /*isConstant=*/true);
 
   globalOp->setAttr("alignment", builder.getI64IntegerAttr(
