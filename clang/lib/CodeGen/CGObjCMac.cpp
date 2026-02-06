@@ -25,6 +25,7 @@
 #include "clang/AST/StmtObjC.h"
 #include "clang/Basic/CodeGenOptions.h"
 #include "clang/Basic/LangOptions.h"
+#include "clang/CodeGen/CodeGenABITypes.h"
 #include "clang/CodeGen/ConstantInitBuilder.h"
 #include "llvm/ADT/CachedHashString.h"
 #include "llvm/ADT/DenseSet.h"
@@ -8066,4 +8067,22 @@ CodeGen::CreateMacObjCRuntime(CodeGen::CodeGenModule &CGM) {
     llvm_unreachable("these runtimes are not Mac runtimes");
   }
   llvm_unreachable("bad runtime");
+}
+
+// Public wrapper function for external compilers (e.g., Swift) to access
+// the Mac runtime's GetDirectMethodCallee functionality.
+llvm::Function *
+clang::CodeGen::getObjCDirectMethodCallee(CodeGenModule &CGM,
+                                          const ObjCMethodDecl *OMD,
+                                          const ObjCContainerDecl *CD,
+                                          bool ReceiverCanBeNull,
+                                          bool ClassObjectCanBeUnrealized) {
+  // This function should only be called when targeting Darwin platforms,
+  // which always use the Mac runtime.
+  assert(CGM.getLangOpts().ObjCRuntime.isNeXTFamily() &&
+         "getObjCDirectMethodCallee requires Mac ObjC runtime");
+  CGObjCCommonMac *MacRuntime =
+      static_cast<CGObjCCommonMac *>(&CGM.getObjCRuntime());
+  return MacRuntime->GetDirectMethodCallee(OMD, CD, ReceiverCanBeNull,
+                                           ClassObjectCanBeUnrealized);
 }
