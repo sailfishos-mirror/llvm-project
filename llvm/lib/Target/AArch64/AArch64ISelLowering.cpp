@@ -20614,6 +20614,15 @@ tryToReplaceScalarFPConversionWithSVE(SDNode *N, SelectionDAG &DAG,
   if (!isSupportedType(SrcTy) || !isSupportedType(DestTy))
     return SDValue();
 
+  if (N->getOpcode() == ISD::FP_TO_SINT_SAT ||
+      N->getOpcode() == ISD::FP_TO_UINT_SAT) {
+    // Keep scalar/custom lowering when the target already handles the
+    // saturating conversion for this type.
+    const TargetLowering &TLI = DAG.getTargetLoweringInfo();
+    if (TLI.isOperationLegalOrCustom(N->getOpcode(), DestTy))
+      return SDValue();
+  }
+
   EVT SrcVecTy;
   EVT DestVecTy;
   if (DestTy.bitsGT(SrcTy)) {
@@ -20632,7 +20641,13 @@ tryToReplaceScalarFPConversionWithSVE(SDNode *N, SelectionDAG &DAG,
   SDValue ZeroIdx = DAG.getVectorIdxConstant(0, DL);
   SDValue Vec = DAG.getNode(ISD::INSERT_VECTOR_ELT, DL, SrcVecTy,
                             DAG.getPOISON(SrcVecTy), SrcVal, ZeroIdx);
-  SDValue Convert = DAG.getNode(N->getOpcode(), DL, DestVecTy, Vec);
+
+  // FP_TO_*_SAT carries the saturating scalar VT as operand 1, so preserve it.
+  SmallVector<SDValue, 2> ConvertOps = {Vec};
+  if (N->getOpcode() == ISD::FP_TO_SINT_SAT ||
+      N->getOpcode() == ISD::FP_TO_UINT_SAT)
+    ConvertOps.push_back(N->getOperand(1));
+  SDValue Convert = DAG.getNode(N->getOpcode(), DL, DestVecTy, ConvertOps);
   return DAG.getNode(ISD::EXTRACT_VECTOR_ELT, DL, DestTy, Convert, ZeroIdx);
 }
 
