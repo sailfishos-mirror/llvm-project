@@ -260,9 +260,26 @@ void PointerToVectorElement() {
 }
 
 void SelfInvalidatingMap() {
-  std::unordered_map<int, int> mp;
-  mp[1] = 1;
-  mp[2] = mp[1];  // FIXME: Detect this. We are mising a UseFact for the assignment params.
+  std::unordered_map<int, std::string> mp;
+  // TODO: We do not have a way to differentiate between pointer stability and iterator stability!
+  //
+  // std::unordered_map and other containers provide pointer/reference stability. Therefore the
+  // following is safe in practice.
+  // On the other hand, std::flat_hash_map (since C++23) does not provide pointer stability on
+  // insertion and following is unsafe for this container.
+  //
+  // FIXME(https://github.com/llvm/llvm-project/issues/180521): RHS should be evaluated before the LHS.
+  // RHS is the reference which is invaldiated by the LHS (and not the opposite which is the case now).
+  mp[1] = "42";
+  mp[2] // expected-warning {{object whose reference is captured is later invalidated}} expected-note {{later used here}}
+    = 
+    mp[1]; // expected-note {{invalidated here}}
+
+  // None of these containers provide iterator stability. So following is unsafe:
+  auto it = mp.find(3); // expected-warning {{object whose reference is captured is later invalidated}}
+  mp.erase(mp.find(4)); // expected-note {{invalidated here}} 
+  if (it != mp.end())   // expected-note {{later used here}}
+    *it;
 }
 } // namespace ElementReferences
 

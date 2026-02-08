@@ -75,11 +75,6 @@ struct vector {
   void clear();
 };
 
-template<class Key,class T>
-struct unordered_map {
-  T& operator[](const Key& key);
-};
-
 template<class T>
 void swap( T& a, T& b );
 
@@ -88,6 +83,17 @@ struct pair {
   A first;
   B second;
 };
+
+template<class Key,class T>
+struct unordered_map {
+  using iterator = __gnu_cxx::basic_iterator<std::pair<const Key, T>>;
+  T& operator[](const Key& key);
+  iterator begin();
+  iterator end();
+  iterator find(const Key& key);
+  void erase(iterator);
+};
+
 
 template<typename T>
 struct basic_string_view {
