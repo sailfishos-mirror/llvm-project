@@ -229,8 +229,6 @@ public:
   bool shouldReduceLoadWidth(SDNode *Load, ISD::LoadExtType ExtType, EVT ExtVT,
                              std::optional<unsigned> ByteOffset) const override;
 
-  bool shouldExpandPowerOf2DivRem(EVT VT) const override;
-
   bool isLoadBitCastBeneficial(EVT, EVT, const SelectionDAG &DAG,
                                const MachineMemOperand &MMO) const final;
 
