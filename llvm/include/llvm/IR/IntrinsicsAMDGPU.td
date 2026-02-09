@@ -1998,9 +1998,9 @@ class AMDGPURawBufferLoadLDS : Intrinsic <
   [IntrWillReturn, NoCapture<ArgIndex<1>>, ImmArg<ArgIndex<2>>, ImmArg<ArgIndex<5>>,
    ImmArg<ArgIndex<6>>, IntrNoCallback, IntrNoFree], "", [SDNPMemOperand]>, AMDGPURsrcIntrinsic<0>;
 def int_amdgcn_raw_buffer_load_lds : AMDGPURawBufferLoadLDS;
+def int_amdgcn_raw_buffer_load_async_lds : AMDGPURawBufferLoadLDS;
 
 class AMDGPURawPtrBufferLoadLDS :
-  ClangBuiltin<"__builtin_amdgcn_raw_ptr_buffer_load_lds">,
   Intrinsic <
   [],
   [AMDGPUBufferRsrcTy,        // rsrc(SGPR)
@@ -2021,7 +2021,11 @@ class AMDGPURawPtrBufferLoadLDS :
    WriteOnly<ArgIndex<1>>, NoCapture<ArgIndex<1>>,
    ImmArg<ArgIndex<2>>, ImmArg<ArgIndex<5>>,
    ImmArg<ArgIndex<6>>, IntrNoCallback, IntrNoFree], "", [SDNPMemOperand]>, AMDGPURsrcIntrinsic<0>;
-def int_amdgcn_raw_ptr_buffer_load_lds : AMDGPURawPtrBufferLoadLDS;
+def int_amdgcn_raw_ptr_buffer_load_lds : AMDGPURawPtrBufferLoadLDS,
+      ClangBuiltin<"__builtin_amdgcn_raw_ptr_buffer_load_lds">;
+def int_amdgcn_raw_ptr_buffer_load_async_lds : AMDGPURawPtrBufferLoadLDS,
+      ClangBuiltin<"__builtin_amdgcn_raw_ptr_buffer_load_async_lds">;
+
 
 class AMDGPUStructBufferLoadLDS : Intrinsic <
   [],
@@ -2042,9 +2046,9 @@ class AMDGPUStructBufferLoadLDS : Intrinsic <
   [IntrWillReturn, NoCapture<ArgIndex<1>>, ImmArg<ArgIndex<2>>, ImmArg<ArgIndex<6>>,
    ImmArg<ArgIndex<7>>, IntrNoCallback, IntrNoFree], "", [SDNPMemOperand]>, AMDGPURsrcIntrinsic<0>;
 def int_amdgcn_struct_buffer_load_lds : AMDGPUStructBufferLoadLDS;
+def int_amdgcn_struct_buffer_load_async_lds : AMDGPUStructBufferLoadLDS;
 
 class AMDGPUStructPtrBufferLoadLDS :
-  ClangBuiltin<"__builtin_amdgcn_struct_ptr_buffer_load_lds">,
   Intrinsic <
   [],
   [AMDGPUBufferRsrcTy,        // rsrc(SGPR)
@@ -2066,7 +2070,10 @@ class AMDGPUStructPtrBufferLoadLDS :
    WriteOnly<ArgIndex<1>>, NoCapture<ArgIndex<1>>,
    ImmArg<ArgIndex<2>>, ImmArg<ArgIndex<6>>,
    ImmArg<ArgIndex<7>>, IntrNoCallback, IntrNoFree], "", [SDNPMemOperand]>, AMDGPURsrcIntrinsic<0>;
-def int_amdgcn_struct_ptr_buffer_load_lds : AMDGPUStructPtrBufferLoadLDS;
+def int_amdgcn_struct_ptr_buffer_load_lds : AMDGPUStructPtrBufferLoadLDS,
+  ClangBuiltin<"__builtin_amdgcn_struct_ptr_buffer_load_lds">;
+def int_amdgcn_struct_ptr_buffer_load_async_lds : AMDGPUStructPtrBufferLoadLDS,
+  ClangBuiltin<"__builtin_amdgcn_struct_ptr_buffer_load_async_lds">;
 
 def int_amdgcn_s_buffer_prefetch_data : DefaultAttrsIntrinsic <
   [],
@@ -2794,10 +2801,9 @@ class AMDGPULoadToLDS :
      ImmArg<ArgIndex<2>>, ImmArg<ArgIndex<3>>, ImmArg<ArgIndex<4>>, IntrNoCallback, IntrNoFree],
      "", [SDNPMemOperand]>;
 def int_amdgcn_load_to_lds : AMDGPULoadToLDS;
+def int_amdgcn_load_async_to_lds : AMDGPULoadToLDS;
 
-class AMDGPUGlobalLoadLDS
-    : ClangBuiltin<"__builtin_amdgcn_global_load_lds">,
-      Intrinsic<
+class AMDGPUGlobalLoadLDS : Intrinsic<
           [],
           [LLVMQualPointerType<1>, // Base global pointer to load from
            LLVMQualPointerType<3>, // LDS base pointer to store to
@@ -2813,7 +2819,8 @@ class AMDGPUGlobalLoadLDS
            ImmArg<ArgIndex<2>>, ImmArg<ArgIndex<3>>, ImmArg<ArgIndex<4>>,
            IntrNoCallback, IntrNoFree],
           "", [SDNPMemOperand]>;
-def int_amdgcn_global_load_lds : AMDGPUGlobalLoadLDS;
+def int_amdgcn_global_load_lds : AMDGPUGlobalLoadLDS, ClangBuiltin<"__builtin_amdgcn_global_load_lds">;
+def int_amdgcn_global_load_async_lds : AMDGPUGlobalLoadLDS, ClangBuiltin<"__builtin_amdgcn_global_load_async_lds">;
 
 // This is IntrHasSideEffects because it reads from a volatile hardware register.
 def int_amdgcn_pops_exiting_wave_id :
