@@ -3923,21 +3923,19 @@ CGObjCCommonMac::GenerateDirectMethod(const ObjCMethodDecl *OMD,
                                       const ObjCContainerDecl *CD) {
   auto *COMD = OMD->getCanonicalDecl();
 
-  CodeGenTypes &Types = CGM.getTypes();
-  llvm::FunctionType *MethodTy =
-      Types.GetFunctionType(Types.arrangeObjCMethodDeclaration(OMD));
-
-  // Fast path: return cached entry if types match.
+  // Fast path: return cached entry if this is not an implementation (no body)
+  // or if the return types match between declaration and implementation.
   auto Cached = DirectMethodDefinitions.find(COMD);
   if (Cached != DirectMethodDefinitions.end()) {
-    llvm::Function *CachedFn = Cached->second.Implementation;
-    if (CachedFn->getFunctionType() == MethodTy)
+    if (!OMD->getBody() || COMD->getReturnType() == OMD->getReturnType())
       return Cached->second;
   }
 
-  std::string Name =
-      getSymbolNameForMethod(OMD, /*includeCategoryName*/ false,
-                             /*useDirectABI*/ CGM.usePreconditionThunk(OMD));
+  CodeGenTypes &Types = CGM.getTypes();
+  llvm::FunctionType *MethodTy =
+      Types.GetFunctionType(Types.arrangeObjCMethodDeclaration(OMD));
+  std::string Name = getSymbolNameForMethod(OMD, /*includeCategoryName*/ false,
+                                            CGM.usePreconditionThunk(OMD));
   std::string ThunkName = Name + "_thunk";
 
   // Replace OldFn with NewFn: transfer name, replace all uses, and erase.
@@ -3988,10 +3986,11 @@ CGObjCCommonMac::GenerateDirectMethod(const ObjCMethodDecl *OMD,
     Info.Thunk = NewThunk;
   }
 
-  // Whether the value has been Cached doesn't matter if there's a type
-  // mismatch, an insertion will override that.
-  auto [It, inserted] = DirectMethodDefinitions.insert({COMD, Info});
-  return It->second;
+  if (Cached != DirectMethodDefinitions.end()) {
+    Cached->second = Info;
+    return Cached->second;
+  }
+  return DirectMethodDefinitions.insert({COMD, Info}).first->second;
 }
 
 /// Start an Objective-C direct method thunk.

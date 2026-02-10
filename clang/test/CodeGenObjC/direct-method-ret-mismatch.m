@@ -14,19 +14,18 @@ Root* useMethod(Root *root) {
 }
 
 @implementation Root
-// CHECK-LABEL: define internal ptr @"\01-[Root something]"(
-// EXPOSE-DIRECT-LABEL: define internal ptr @"\01-[Root something]"(ptr noundef
-- (id)something {
-  // CHECK: %{{[^ ]*}} = call {{.*}} @"\01-[Root method]"
-  return [self method];
-}
-
 // CHECK-LABEL: define hidden ptr @"\01-[Root method]"(
 // EXPOSE-DIRECT-LABEL: define hidden ptr @"-[Root method]D"(ptr noundef
 - (id)method {
   return self;
 }
 
+// CHECK-LABEL: define internal ptr @"\01-[Root something]"(
+// EXPOSE-DIRECT-LABEL: define internal ptr @"\01-[Root something]"(ptr noundef
+- (id)something {
+  // CHECK: %{{[^ ]*}} = call {{.*}} @"\01-[Root method]"
+  return [self method];
+}
 @end
 
 // New thunk will be emitted after [Root method] instead of useMethod because its been updatd with method.
