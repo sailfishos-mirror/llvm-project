@@ -3917,92 +3917,87 @@ llvm::Function *CGObjCCommonMac::GenerateMethod(const ObjCMethodDecl *OMD,
   return Method;
 }
 
+/// Generate or retrieve a direct method info.
 CGObjCCommonMac::DirectMethodInfo &
 CGObjCCommonMac::GenerateDirectMethod(const ObjCMethodDecl *OMD,
                                       const ObjCContainerDecl *CD) {
   auto *COMD = OMD->getCanonicalDecl();
-  auto I = DirectMethodDefinitions.find(COMD);
-  llvm::Function *OldFn = nullptr, *Fn = nullptr;
-
-  if (I != DirectMethodDefinitions.end()) {
-    // Objective-C allows for the declaration and implementation types
-    // to differ slightly.
-    //
-    // If we're being asked for the Function associated for a method
-    // implementation, a previous value might have been cached
-    // based on the type of the canonical declaration.
-    //
-    // If these do not match, then we'll replace this function with
-    // a new one that has the proper type below.
-    if (!OMD->getBody() || COMD->getReturnType() == OMD->getReturnType())
-      return I->second;
-    OldFn = I->second.Implementation;
-  }
 
   CodeGenTypes &Types = CGM.getTypes();
   llvm::FunctionType *MethodTy =
       Types.GetFunctionType(Types.arrangeObjCMethodDeclaration(OMD));
 
-  if (OldFn) {
-    Fn = llvm::Function::Create(MethodTy, llvm::GlobalValue::ExternalLinkage,
-                                "", &CGM.getModule());
-    Fn->takeName(OldFn);
-    OldFn->replaceAllUsesWith(Fn);
-    OldFn->eraseFromParent();
-
-    // Replace the cached implementation in the map.
-    I->second.Implementation = Fn;
-    llvm::Function *OldThunk = I->second.Thunk;
-
-    // If implementation was replaced, and old thunk exists, invalidate the old
-    // thunk
-    //
-    // TODO: ideally, new thunk shouldn't be necessary, if the different return
-    // type are just subclasses, at IR level they are just pointers, i.e. the
-    // NewThunk and the OldThunk are identical.
-    if (OldThunk) {
-      llvm::Function *NewThunk = GenerateObjCDirectThunk(OMD, CD, Fn);
-
-      // Replace all uses before erasing
-      NewThunk->takeName(OldThunk);
-      OldThunk->replaceAllUsesWith(NewThunk);
-      OldThunk->eraseFromParent();
-
-      I->second.Thunk = NewThunk;
-    }
-  } else {
-    bool usePreconditionThunk = CGM.usePreconditionThunk(OMD);
-    auto Name = getSymbolNameForMethod(OMD, /*includeCategoryName*/ false,
-                                       /*useDirectABI*/ usePreconditionThunk);
-
-    // It's possible swift's IRGen already generated the function declaration
-    // for us, in that case, using existing ones. Reinforce the linkage since
-    // we are not sure what swift would do. Also double check the function type.
-    Fn = CGM.getModule().getFunction(Name);
-    if (Fn) {
-      Fn->setLinkage(llvm::GlobalValue::ExternalLinkage);
-      assert(Fn->getFunctionType() == MethodTy &&
-             "Existing function type is different");
-    } else {
-      // ALWAYS use ExternalLinkage for true implementation
-      Fn = llvm::Function::Create(MethodTy, llvm::GlobalValue::ExternalLinkage,
-                                  Name, &CGM.getModule());
-    }
-
-    auto [It, inserted] = DirectMethodDefinitions.insert(
-        std::make_pair(COMD, DirectMethodInfo(Fn)));
-    I = It;
+  // Fast path: return cached entry if types match.
+  auto Cached = DirectMethodDefinitions.find(COMD);
+  if (Cached != DirectMethodDefinitions.end()) {
+    llvm::Function *CachedFn = Cached->second.Implementation;
+    if (CachedFn->getFunctionType() == MethodTy)
+      return Cached->second;
   }
 
-  // Return reference to DirectMethodInfo (contains both Implementation and
-  // Thunk)
-  return I->second;
+  std::string Name =
+      getSymbolNameForMethod(OMD, /*includeCategoryName*/ false,
+                             /*useDirectABI*/ CGM.usePreconditionThunk(OMD));
+  std::string ThunkName = Name + "_thunk";
+
+  // Replace OldFn with NewFn: transfer name, replace all uses, and erase.
+  auto ReplaceFunction = [](llvm::Function *OldFn, llvm::Function *NewFn) {
+    NewFn->takeName(OldFn);
+    OldFn->replaceAllUsesWith(NewFn);
+    OldFn->eraseFromParent();
+  };
+
+  // Check if the function already exists in the module (created by Clang or
+  // Swift).
+  llvm::Function *Fn = CGM.getModule().getFunction(Name);
+
+  // Function doesn't exist yet.
+  if (!Fn) {
+    Fn = llvm::Function::Create(MethodTy, llvm::GlobalValue::ExternalLinkage,
+                                Name, &CGM.getModule());
+    return DirectMethodDefinitions.insert({COMD, DirectMethodInfo(Fn)})
+        .first->second;
+  }
+
+  // Function exists with matching type.
+  // Swift probably created this funciton for us.
+  if (Fn->getFunctionType() == MethodTy) {
+    // Reinforce linkage in case Swift created it with different linkage.
+    Fn->setLinkage(llvm::GlobalValue::ExternalLinkage);
+
+    // Check if Swift also created a thunk for this method.
+    DirectMethodInfo Info(Fn);
+    if (llvm::Function *Thunk = CGM.getModule().getFunction(ThunkName))
+      Info.Thunk = Thunk;
+
+    return DirectMethodDefinitions.insert({COMD, Info}).first->second;
+  }
+
+  // Function exists but with mismatched type - replace it.
+  // This happens when Swift's optional handling differs from ObjC, or when
+  // ObjC declaration and implementation have slightly different return types.
+  llvm::Function *NewFn = llvm::Function::Create(
+      MethodTy, llvm::GlobalValue::ExternalLinkage, "", &CGM.getModule());
+  ReplaceFunction(Fn, NewFn);
+
+  // Check if the thunk also needs replacement.
+  DirectMethodInfo Info(NewFn);
+  if (llvm::Function *OldThunk = CGM.getModule().getFunction(ThunkName)) {
+    llvm::Function *NewThunk = GenerateObjCDirectThunk(OMD, CD, NewFn);
+    ReplaceFunction(OldThunk, NewThunk);
+    Info.Thunk = NewThunk;
+  }
+
+  // Whether the value has been Cached doesn't matter if there's a type
+  // mismatch, an insertion will override that.
+  auto [It, inserted] = DirectMethodDefinitions.insert({COMD, Info});
+  return It->second;
 }
 
 /// Start an Objective-C direct method thunk.
 ///
 /// The thunk must use musttail to remain transparent to ARC - any
-/// ARC operations must happen in the caller, not in the thunk.
+/// ARC autorelease operations must happen in the caller, not in the thunk.
 void CodeGenFunction::StartObjCDirectThunk(const ObjCMethodDecl *OMD,
                                            llvm::Function *Fn,
                                            const CGFunctionInfo &FI) {

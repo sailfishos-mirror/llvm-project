@@ -32,12 +32,10 @@ using namespace clang;
 void clang::mangleObjCMethodName(raw_ostream &OS, bool includePrefixByte,
                                  bool isInstanceMethod, StringRef ClassName,
                                  std::optional<StringRef> CategoryName,
-                                 StringRef MethodName,
-                                 bool includePostfixByte) {
-
-  assert(!(includePrefixByte && includePostfixByte) &&
-         "includePrefixByte and includePostfixByte "
-         "shouldn't be set at the same time");
+                                 StringRef MethodName, bool useDirectABI) {
+  assert(
+      !(includePrefixByte && useDirectABI) &&
+      "includePrefixByte and useDirectABI shouldn't be set at the same time");
   // \01+[ContainerName(CategoryName) SelectorName]
   // Or for direct ABI: +[ContainerName(CategoryName) SelectorName]D
   if (includePrefixByte)
@@ -50,7 +48,7 @@ void clang::mangleObjCMethodName(raw_ostream &OS, bool includePrefixByte,
   OS << " ";
   OS << MethodName;
   OS << ']';
-  if (includePostfixByte)
+  if (useDirectABI)
     OS << 'D';
 }
 
@@ -441,7 +439,13 @@ void MangleContext::mangleObjCMethodName(const ObjCMethodDecl *MD,
   std::string MethodName;
   llvm::raw_string_ostream MethodNameOS(MethodName);
   MD->getSelector().print(MethodNameOS);
-  // When using direct ABI, we use postfix 'D' instead of prefix '\01'
+  // Normal methods always have internal linkage, and we prefix them with '\01'
+  // for reasons that are somewhat lost to time. We suppress this for direct
+  // methods because they have non-internal linkage and we don't want to make it
+  // unnecessarily difficult to refer to them, e.g. in things like export lists.
+  // Direct methods also have a distinct ABI, so we add a suffix to make them
+  // obvious to tools like debuggers and to elevate incompatible uses into
+  // linker errors.
   clang::mangleObjCMethodName(OS, includePrefixByte && !useDirectABI,
                               MD->isInstanceMethod(), ClassName, CategoryName,
                               MethodName, useDirectABI);

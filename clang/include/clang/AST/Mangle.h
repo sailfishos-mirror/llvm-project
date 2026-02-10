@@ -44,12 +44,12 @@ class VarDecl;
 /// it to prepare for ObjCDirect in swift.
 /// Produces the mangling:
 ///   \01-[ClassName(Category) method:arg1:arg2:]
-/// Or, if includePostfixByte is true (for Direct ABI):
+/// Or, if useDirectABI is true (for Direct ABI):
 ///   -[ClassName(Category) method:arg1:arg2:]D
 void mangleObjCMethodName(raw_ostream &OS, bool includePrefixByte,
                           bool isInstanceMethod, StringRef ClassName,
                           std::optional<StringRef> CategoryName,
-                          StringRef MethodName, bool includePostfixByte);
+                          StringRef MethodName, bool useDirectABI);
 
 /// MangleContext - Context for tracking state which persists across multiple
 /// calls to the C++ name mangler.
