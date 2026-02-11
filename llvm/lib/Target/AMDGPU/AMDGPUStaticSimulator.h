@@ -1895,6 +1895,7 @@ struct KernelPerfReport {
   }
 
   void print(raw_ostream &OS, StringRef FuncName = "") const;
+  void printJSON(raw_ostream &OS) const;
 };
 
 } // namespace AMDGPU

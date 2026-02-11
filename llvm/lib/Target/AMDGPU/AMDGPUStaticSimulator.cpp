@@ -62,7 +62,9 @@
 #include "llvm/CodeGen/TargetSchedule.h"
 #include "llvm/InitializePasses.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/FileSystem.h"
 #include "llvm/Support/FormatVariadic.h"
+#include "llvm/Support/JSON.h"
 #include "llvm/Support/raw_ostream.h"
 #include <cmath>
 #include <cstdlib>
@@ -113,6 +115,20 @@ static cl::opt<unsigned> DSReadLatency(
     "amdgpu-static-sim-ds-read-latency",
     cl::desc("DS (LDS) read latency in cycles"),
     cl::init(DefaultLatency::DS_READ), cl::Hidden);
+
+static cl::opt<std::string>
+    GPUCSIMJSONFile("amdgpu-gpu-csim-json",
+                    cl::desc("Write GPUCompilerSim metrics to JSON file"),
+                    cl::value_desc("filename"), cl::Hidden);
+
+/// Get JSON output path from cl::opt or AMDGPU_GPU_CSIM_JSON env var.
+static StringRef getJSONOutputPath() {
+  if (!GPUCSIMJSONFile.empty())
+    return GPUCSIMJSONFile;
+  if (const char *EnvVal = std::getenv("AMDGPU_GPU_CSIM_JSON"))
+    return StringRef(EnvVal);
+  return {};
+}
 
 /// Check if enabled via cl::opt or AMDGPU_ENABLE_STATIC_SIM env var.
 static bool isStaticSimulatorEnabled() {
@@ -2304,7 +2320,21 @@ bool runStaticSimulator(MachineFunction &MF, MachineLoopInfo *MLI,
   }
 
   KernelPerfReport Report = analyzeFunction(MF, *TII, MLI, MBFI);
+  Report.FunctionName = MF.getName().str();
   LLVM_DEBUG(Report.print(dbgs(), MF.getName()));
+
+  // Write JSON if requested
+  StringRef JSONPath = getJSONOutputPath();
+  if (!JSONPath.empty()) {
+    std::error_code EC;
+    raw_fd_ostream JSONFile(JSONPath, EC, sys::fs::OF_Text);
+    if (!EC) {
+      Report.printJSON(JSONFile);
+    } else {
+      errs() << "Warning: could not open JSON output file '" << JSONPath
+             << "': " << EC.message() << "\n";
+    }
+  }
 
   SIMachineFunctionInfo *MFI = MF.getInfo<SIMachineFunctionInfo>();
   MFI->setStaticSimReport(
@@ -2492,6 +2522,135 @@ void KernelPerfReport::print(raw_ostream &OS, StringRef FuncName) const {
   OS << ";\n";
 
   OS << "; ============================================================\n";
+}
+
+//===----------------------------------------------------------------------===//
+// JSON Output
+//===----------------------------------------------------------------------===//
+
+static json::Object blockMetricsToJSON(const BlockMetrics &M) {
+  json::Object O;
+  O["instructions"] = M.NumInstructions;
+  O["cycles"] = M.TotalCycles;
+  O["stall_cycles"] = M.StallCycles();
+
+  json::Object Insts;
+  Insts["valu"] = M.NumVALU;
+  Insts["salu"] = M.NumSALU;
+  Insts["trans"] = M.NumTRANS;
+  Insts["wmma"] = M.NumWMMA;
+  Insts["vopd"] = M.NumVOPD;
+  Insts["packed"] = M.NumPacked;
+  Insts["ds_read"] = M.NumDSRead;
+  Insts["ds_write"] = M.NumDSWrite;
+  Insts["vmem"] = M.NumVMEM;
+  Insts["smem"] = M.NumSMEM;
+  Insts["tdm"] = M.NumTDM;
+  Insts["branch"] = M.NumBranch;
+  Insts["barrier"] = M.NumBarrier;
+  Insts["delay_alu"] = M.NumDelayAlu;
+  Insts["msb_set"] = M.NumMSBSet;
+  Insts["msb_set_exposed"] = M.NumMSBSetExposed;
+  Insts["spill"] = M.NumSpill;
+  Insts["reload"] = M.NumReload;
+  O["instruction_counts"] = std::move(Insts);
+
+  json::Object Stalls;
+  Stalls["fu"] = M.StallFunctionalUnit;
+  Stalls["coexec"] = M.StallCoExec;
+  Stalls["delay_alu"] = M.StallDelayAlu;
+  Stalls["mem_fifo"] = M.StallMemFIFO;
+  Stalls["waitcnt"] = M.StallWaitCnt;
+  Stalls["regbank"] = M.StallRegBankConflict;
+  Stalls["regbank_in_wmma"] = M.RegBankConflictsInWMMAWindow;
+  Stalls["long_lat_valu"] = M.StallLongLatVALU;
+  Stalls["lolvalu_trans"] = M.StallLOLVALUTRANS;
+  Stalls["va_ssrc"] = M.StallVaSSRC;
+  Stalls["va_vdst"] = M.StallVaVdst;
+  Stalls["raw"] = M.StallRAW;
+  Stalls["is_fetch"] = M.StallISFetch;
+  O["stalls"] = std::move(Stalls);
+
+  json::Object FU;
+  FU["xdl"] = M.StallXDL;
+  FU["valu"] = M.StallVALU;
+  FU["salu"] = M.StallSALU;
+  FU["trans"] = M.StallTRANSUnit;
+  FU["lds"] = M.StallLDS;
+  FU["vmem"] = M.StallVMEMUnit;
+  O["fu_stalls"] = std::move(FU);
+
+  json::Object Waits;
+  Waits["total"] = M.NumWaitcnt;
+  Waits["false_waits"] = M.NumFalseWaits;
+  Waits["wasted_cycles"] = M.StallFalseWait;
+  O["waits"] = std::move(Waits);
+
+  json::Object WMMA;
+  WMMA["window_cycles"] = M.WMMAWindowCycles;
+  WMMA["coexec_used"] = M.WMMACoExecUsed;
+  WMMA["coexec_blocked"] = M.WMMACoExecBlocked;
+  WMMA["starved"] = M.WMMAStarved;
+  WMMA["occupancy"] = M.TotalWMMAOccupancy;
+  WMMA["islot_total"] = M.ISlotTotal;
+  WMMA["islot_valu"] = M.ISlotUsedByVALU;
+  WMMA["islot_wasted"] = M.ISlotWastedOnNonVALU;
+  O["wmma"] = std::move(WMMA);
+
+  json::Object Cache;
+  Cache["hits"] = M.VGPRCacheHits;
+  Cache["misses"] = M.VGPRCacheMisses;
+  Cache["evictions"] = M.VGPRCacheEvictions;
+  O["vgpr_cache"] = std::move(Cache);
+
+  json::Object IS;
+  IS["stall_cycles"] = M.StallISFetch;
+  IS["fetches"] = M.ISFetchesTriggered;
+  IS["bytes_consumed"] = M.ISBytesConsumed;
+  O["is_cache"] = std::move(IS);
+
+  return O;
+}
+
+void KernelPerfReport::printJSON(raw_ostream &OS) const {
+  json::Object Root;
+  Root["function"] = FunctionName;
+  Root["target"] = "gfx1250";
+  Root["raw"] = blockMetricsToJSON(Raw);
+  Root["scaled"] = blockMetricsToJSON(Scaled);
+
+  json::Object Derived;
+  Derived["ipc"] = static_cast<double>(IPC);
+  Derived["stall_ratio"] = static_cast<double>(StallRatio);
+  Derived["coexec_efficiency"] = static_cast<double>(CoExecEfficiency);
+  Derived["false_wait_ratio"] = static_cast<double>(FalseWaitRatio);
+  Root["derived"] = std::move(Derived);
+
+  json::Object CFG;
+  CFG["loops"] = NumLoops;
+  CFG["max_depth"] = MaxLoopDepth;
+  CFG["max_trip_count"] = MaxTripCount;
+  CFG["branches"] = NumBranches;
+  Root["cfg"] = std::move(CFG);
+
+  json::Array Blocks;
+  for (const auto &[MBB, Info] : PerBlock) {
+    json::Object Block;
+    Block["bb"] = MBB->getNumber();
+    if (const BasicBlock *BB = MBB->getBasicBlock()) {
+      if (BB->hasName())
+        Block["name"] = BB->getName().str();
+    }
+    Block["in_loop"] = Info.InLoop;
+    Block["is_loop_header"] = Info.IsLoopHeader;
+    Block["trip_count"] = Info.TripCount;
+    Block["frequency"] = static_cast<double>(Info.Frequency);
+    Block["metrics"] = blockMetricsToJSON(Info.Warm);
+    Blocks.push_back(std::move(Block));
+  }
+  Root["blocks"] = std::move(Blocks);
+
+  OS << formatv("{0:2}", json::Value(std::move(Root))) << "\n";
 }
 
 PreservedAnalyses
