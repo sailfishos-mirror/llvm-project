@@ -337,7 +337,7 @@ void AMDGPUAsmPrinter::emitBasicBlockStart(const MachineBasicBlock &MBB) {
         const AMDGPU::PerBlockInfo &Info = It->second;
         std::string Comment;
         raw_string_ostream OS(Comment);
-        const AMDGPU::BlockMetrics &M = Info.Cold;
+        const AMDGPU::BlockMetrics &M = Info.Warm;
 
         if (Info.InLoop) {
           OS << "=== Block (loop): Cold=" << Info.Cold.TotalCycles << "cyc"
