@@ -431,7 +431,6 @@ public:
                             NonNeg | NoNaNs | NoInfs | SameSign | InBounds,
     FastMathFlags = NoNaNs | NoInfs | NoSignedZeros | AllowReciprocal |
                     AllowContract | ApproximateFuncs | AllowReassociation,
-
   };
 
   /// Default constructor turns off all optimization flags.
