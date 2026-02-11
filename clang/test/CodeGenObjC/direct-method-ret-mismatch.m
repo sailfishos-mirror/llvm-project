@@ -20,14 +20,6 @@ Root* useMethod(Root *root) {
   return self;
 }
 
-// CHECK-LABEL: define internal ptr @"\01-[Root something]"(
-// EXPOSE-DIRECT-LABEL: define internal ptr @"\01-[Root something]"(ptr noundef
-- (id)something {
-  // CHECK: %{{[^ ]*}} = call {{.*}} @"\01-[Root method]"
-  return [self method];
-}
-@end
-
 // New thunk will be emitted after [Root method] instead of useMethod because its been updatd with method.
 // EXPOSE-DIRECT-LABEL: define linkonce_odr hidden ptr @"-[Root method]D_thunk"
 // EXPOSE-DIRECT-LABEL: entry:
@@ -40,3 +32,11 @@ Root* useMethod(Root *root) {
 // EXPOSE-DIRECT:           %[[RET:.*]] = musttail call ptr @"-[Root method]D"
 // EXPOSE-DIRECT:           ret ptr %[[RET]]
 // EXPOSE-DIRECT-LABEL: dummy_ret_block:
+
+// CHECK-LABEL: define internal ptr @"\01-[Root something]"(
+// EXPOSE-DIRECT-LABEL: define internal ptr @"\01-[Root something]"(ptr noundef
+- (id)something {
+  // CHECK: %{{[^ ]*}} = call {{.*}} @"\01-[Root method]"
+  return [self method];
+}
+@end
