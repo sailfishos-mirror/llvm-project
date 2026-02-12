@@ -101,7 +101,7 @@ static lto::Config createConfig(Ctx &ctx) {
       } else if (ctx.arg.ltoBasicBlockSections == "none") {
         options.BBSections = BasicBlockSection::None;
       } else {
-        options.BBSectionsFuncListBuf = std::move(mb);
+        options.BBSectionsFuncListBuf = mb;
         options.BBSections = BasicBlockSection::List;
       }
     }
