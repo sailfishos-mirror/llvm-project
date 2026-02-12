@@ -1897,6 +1897,11 @@ AArch64TargetLowering::AArch64TargetLowering(const TargetMachine &TM,
     setOperationAction(ISD::MUL, MVT::v1i64, Custom);
     setOperationAction(ISD::MUL, MVT::v2i64, Custom);
 
+    setOperationAction(ISD::VECREDUCE_SMAX, MVT::v2i64, Custom);
+    setOperationAction(ISD::VECREDUCE_SMIN, MVT::v2i64, Custom);
+    setOperationAction(ISD::VECREDUCE_UMAX, MVT::v2i64, Custom);
+    setOperationAction(ISD::VECREDUCE_UMIN, MVT::v2i64, Custom);
+
     // NOTE: Currently this has to happen after computeRegisterProperties rather
     // than the preferred option of combining it with the addRegisterClass call.
     if (Subtarget->useSVEForFixedLengthVectors()) {
@@ -1935,10 +1940,6 @@ AArch64TargetLowering::AArch64TargetLowering(const TargetMachine &TM,
       setOperationAction(ISD::UMAX, MVT::v2i64, Custom);
       setOperationAction(ISD::UMIN, MVT::v1i64, Custom);
       setOperationAction(ISD::UMIN, MVT::v2i64, Custom);
-      setOperationAction(ISD::VECREDUCE_SMAX, MVT::v2i64, Custom);
-      setOperationAction(ISD::VECREDUCE_SMIN, MVT::v2i64, Custom);
-      setOperationAction(ISD::VECREDUCE_UMAX, MVT::v2i64, Custom);
-      setOperationAction(ISD::VECREDUCE_UMIN, MVT::v2i64, Custom);
 
       // Int operations with no NEON support.
       for (auto VT : {MVT::v8i8, MVT::v16i8, MVT::v4i16, MVT::v8i16,
@@ -17319,17 +17320,24 @@ SDValue AArch64TargetLowering::LowerVECREDUCE(SDValue Op,
                        DAG.getExtractVectorElt(DL, MVT::f16, Src, 1));
   }
 
+  bool IsMinMax = Op.getOpcode() == ISD::VECREDUCE_SMIN ||
+                  Op.getOpcode() == ISD::VECREDUCE_UMIN ||
+                  Op.getOpcode() == ISD::VECREDUCE_SMAX ||
+                  Op.getOpcode() == ISD::VECREDUCE_UMAX;
+
   // Try to lower fixed length reductions to SVE.
-  bool OverrideNEON = !Subtarget->isNeonAvailable() ||
-                      Op.getOpcode() == ISD::VECREDUCE_AND ||
-                      Op.getOpcode() == ISD::VECREDUCE_OR ||
-                      Op.getOpcode() == ISD::VECREDUCE_XOR ||
-                      Op.getOpcode() == ISD::VECREDUCE_FADD ||
-                      (Op.getOpcode() != ISD::VECREDUCE_ADD &&
-                       SrcVT.getVectorElementType() == MVT::i64);
+  bool ForceSVE =
+      Subtarget->useSVEForFixedLengthVectors() &&
+      (!Subtarget->isNeonAvailable() || Op.getOpcode() == ISD::VECREDUCE_AND ||
+       Op.getOpcode() == ISD::VECREDUCE_OR ||
+       Op.getOpcode() == ISD::VECREDUCE_XOR ||
+       Op.getOpcode() == ISD::VECREDUCE_FADD ||
+       (Op.getOpcode() != ISD::VECREDUCE_ADD &&
+        SrcVT.getVectorElementType() == MVT::i64));
+  bool PreferSVE = IsMinMax && SrcVT == MVT::v2i64;
+
   if (SrcVT.isScalableVector() ||
-      useSVEForFixedLengthVectorVT(
-          SrcVT, OverrideNEON && Subtarget->useSVEForFixedLengthVectors())) {
+      useSVEForFixedLengthVectorVT(SrcVT, ForceSVE || PreferSVE)) {
 
     if (SrcVT.getVectorElementType() == MVT::i1)
       return LowerPredReductionToSVE(Op, DAG);
@@ -31487,9 +31495,7 @@ SDValue AArch64TargetLowering::LowerReductionToSVE(unsigned Opcode,
   SDValue VecOp = ScalarOp.getOperand(0);
   EVT SrcVT = VecOp.getValueType();
 
-  if (useSVEForFixedLengthVectorVT(
-          SrcVT,
-          /*OverrideNEON=*/Subtarget->useSVEForFixedLengthVectors())) {
+  if (!SrcVT.isScalableVector()) {
     EVT ContainerVT = getContainerForFixedLengthVector(DAG, SrcVT);
     VecOp = convertToScalableVector(DAG, ContainerVT, VecOp);
   }
