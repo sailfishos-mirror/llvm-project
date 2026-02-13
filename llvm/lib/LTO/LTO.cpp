@@ -1541,10 +1541,10 @@ public:
       const GVSummaryMapTy &DefinedGlobals,
       MapVector<StringRef, BitcodeModule> &ModuleMap, Triple TheTriple) {
     auto ModuleID = BM.getModuleIdentifier();
-    LTOLLVMContext BackendContext(Conf);
     llvm::TimeTraceScope timeScope("Run ThinLTO backend thread (in-process)",
                                    ModuleID);
     auto RunThinBackend = [&](AddStreamFn AddStream) {
+      LTOLLVMContext BackendContext(Conf);
       Expected<std::unique_ptr<Module>> MOrErr = BM.parseModule(BackendContext);
       if (!MOrErr)
         return MOrErr.takeError();
@@ -1658,9 +1658,9 @@ public:
     auto ModuleID = BM.getModuleIdentifier();
     llvm::TimeTraceScope timeScope("Run ThinLTO backend thread (first round)",
                                    ModuleID);
-    LTOLLVMContext BackendContext(Conf);
     auto RunThinBackend = [&](AddStreamFn CGAddStream,
                               AddStreamFn IRAddStream) {
+      LTOLLVMContext BackendContext(Conf);
       Expected<std::unique_ptr<Module>> MOrErr = BM.parseModule(BackendContext);
       if (!MOrErr)
         return MOrErr.takeError();
@@ -1756,8 +1756,8 @@ public:
     auto ModuleID = BM.getModuleIdentifier();
     llvm::TimeTraceScope timeScope("Run ThinLTO backend thread (second round)",
                                    ModuleID);
-    LTOLLVMContext BackendContext(Conf);
     auto RunThinBackend = [&](AddStreamFn AddStream) {
+      LTOLLVMContext BackendContext(Conf);
       std::unique_ptr<Module> LoadedModule =
           cgdata::loadModuleForTwoRounds(BM, Task, BackendContext, *IRFiles);
 
@@ -2379,7 +2379,7 @@ public:
       const FunctionImporter::ExportSetTy &ExportList,
       const std::map<GlobalValue::GUID, GlobalValue::LinkageTypes> &ResolvedODR,
       MapVector<StringRef, BitcodeModule> &ModuleMap,
-      class Triple TheTriple) override {
+      llvm::Triple TheTriple) override {
 
     StringRef ModulePath = BM.getModuleIdentifier();
 
