@@ -14,7 +14,12 @@
 #include "Plugins/Language/ObjC/ObjCLanguage.h"
 #include "Plugins/Language/ObjCPlusPlus/ObjCPlusPlusLanguage.h"
 #include "lldb/Core/Highlighter.h"
+#include "lldb/Host/Config.h"
 #include "lldb/Host/FileSystem.h"
+
+#if LLDB_ENABLE_TREESITTER
+#include "Plugins/Highlighter/TreeSitter/Rust/RustTreeSitterHighlighter.h"
+#endif
 
 #include "TestingSupport/SubsystemRAII.h"
 #include <optional>
@@ -25,8 +30,12 @@ namespace {
 class HighlighterTest : public testing::Test {
   // We need the language plugins for detecting the language based on the
   // filename.
-  SubsystemRAII<FileSystem, ClangHighlighter, DefaultHighlighter,
-                CPlusPlusLanguage, ObjCLanguage, ObjCPlusPlusLanguage>
+  SubsystemRAII<FileSystem, ClangHighlighter,
+#if LLDB_ENABLE_TREESITTER
+                RustTreeSitterHighlighter,
+#endif
+                DefaultHighlighter, CPlusPlusLanguage, ObjCLanguage,
+                ObjCPlusPlusLanguage>
       subsystems;
 };
 } // namespace
@@ -48,6 +57,10 @@ TEST_F(HighlighterTest, HighlighterSelectionType) {
   EXPECT_EQ(getName(lldb::eLanguageTypeC_plus_plus_14), "clang");
   EXPECT_EQ(getName(lldb::eLanguageTypeObjC), "clang");
   EXPECT_EQ(getName(lldb::eLanguageTypeObjC_plus_plus), "clang");
+
+#if LLDB_ENABLE_TREESITTER
+  EXPECT_EQ(getName(lldb::eLanguageTypeRust), "tree-sitter-rust");
+#endif
 
   EXPECT_EQ(getName(lldb::eLanguageTypeUnknown), "none");
   EXPECT_EQ(getName(lldb::eLanguageTypeJulia), "none");
@@ -322,3 +335,23 @@ TEST_F(HighlighterTest, ClangCursorPosInOtherToken) {
   EXPECT_EQ(" <id><c>foo</c></id> <id>c</id> = <id>bar</id>(); return 1;",
             highlightC(" foo c = bar(); return 1;", s, 3));
 }
+
+#if LLDB_ENABLE_TREESITTER
+static std::string
+highlightRust(llvm::StringRef code, HighlightStyle style,
+              std::optional<size_t> cursor = std::optional<size_t>()) {
+  HighlighterManager mgr;
+  const Highlighter &h =
+      mgr.getHighlighterFor(lldb::eLanguageTypeRust, "main.rs");
+  return h.Highlight(style, code, cursor);
+}
+
+TEST_F(HighlighterTest, RustComments) {
+  HighlightStyle s;
+  s.comment.Set("<cc>", "</cc>");
+
+  EXPECT_EQ(" <cc>// I'm feeling lucky today</cc>",
+            highlightRust(" // I'm feeling lucky today", s));
+}
+
+#endif

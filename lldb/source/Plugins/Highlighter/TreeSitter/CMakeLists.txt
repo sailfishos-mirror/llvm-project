@@ -1,3 +1,6 @@
+add_subdirectory(third-party)
+add_subdirectory(Rust)
+
 add_lldb_library(lldbTreeSitter
   TreeSitterHighlighter.cpp
 
