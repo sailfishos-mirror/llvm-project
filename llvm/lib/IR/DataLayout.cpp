@@ -153,6 +153,7 @@ bool DataLayout::PointerSpec::operator==(const PointerSpec &Other) const {
          IndexBitWidth == Other.IndexBitWidth &&
          HasUnstableRepresentation == Other.HasUnstableRepresentation &&
          HasExternalState == Other.HasExternalState &&
+         NullPtrValue == Other.NullPtrValue &&
          AddrSpaceName == Other.AddrSpaceName;
 }
 
@@ -191,10 +192,11 @@ constexpr DataLayout::PrimitiveSpec DefaultFloatSpecs[] = {
 
 DataLayout::DataLayout()
     : IntSpecs(ArrayRef(DefaultIntSpecs)),
-      FloatSpecs(ArrayRef(DefaultFloatSpecs)) {
+      FloatSpecs(ArrayRef(DefaultFloatSpecs)),
+      DefaultNullPtrValue(APInt::getZero(1)) {
   // Default pointer type specifications.
   setPointerSpec(0, 64, Align::Constant<8>(), Align::Constant<8>(), 64, false,
-                 false, "");
+                 false, "", std::nullopt);
 }
 
 DataLayout::DataLayout(StringRef LayoutString) : DataLayout() {
@@ -220,6 +222,7 @@ DataLayout &DataLayout::operator=(const DataLayout &Other) {
   FloatSpecs = Other.FloatSpecs;
   VectorSpecs = Other.VectorSpecs;
   PointerSpecs = Other.PointerSpecs;
+  DefaultNullPtrValue = Other.DefaultNullPtrValue;
   StructABIAlignment = Other.StructABIAlignment;
   StructPrefAlignment = Other.StructPrefAlignment;
   return *this;
@@ -239,6 +242,7 @@ bool DataLayout::operator==(const DataLayout &Other) const {
          LegalIntWidths == Other.LegalIntWidths && IntSpecs == Other.IntSpecs &&
          FloatSpecs == Other.FloatSpecs && VectorSpecs == Other.VectorSpecs &&
          PointerSpecs == Other.PointerSpecs &&
+         DefaultNullPtrValue == Other.DefaultNullPtrValue &&
          StructABIAlignment == Other.StructABIAlignment &&
          StructPrefAlignment == Other.StructPrefAlignment;
 }
@@ -446,6 +450,9 @@ Error DataLayout::parsePointerSpec(
   unsigned AddrSpace = 0;
   bool ExternalState = false;
   bool UnstableRepr = false;
+  // Null pointer value flags: default, z = all-zeros, o = all-ones.
+  enum class NullPtrKind { Default, Zero, AllOnes };
+  NullPtrKind NullPtrFlag = NullPtrKind::Default;
   StringRef AddrSpaceName;
   StringRef AddrSpaceStr = Components[0];
   while (!AddrSpaceStr.empty()) {
@@ -454,6 +461,14 @@ Error DataLayout::parsePointerSpec(
       ExternalState = true;
     } else if (C == 'u') {
       UnstableRepr = true;
+    } else if (C == 'z') {
+      if (NullPtrFlag != NullPtrKind::Default)
+        return createStringError("only one of 'z' or 'o' may be specified");
+      NullPtrFlag = NullPtrKind::Zero;
+    } else if (C == 'o') {
+      if (NullPtrFlag != NullPtrKind::Default)
+        return createStringError("only one of 'z' or 'o' may be specified");
+      NullPtrFlag = NullPtrKind::AllOnes;
     } else if (isAlpha(C)) {
       return createStringError("'%c' is not a valid pointer specification flag",
                                C);
@@ -506,8 +521,33 @@ Error DataLayout::parsePointerSpec(
     return createStringError(
         "index size cannot be larger than the pointer size");
 
+  std::optional<APInt> NullPtrValue;
+  if (NullPtrFlag != NullPtrKind::Default)
+    NullPtrValue = NullPtrFlag == NullPtrKind::AllOnes
+                       ? APInt::getAllOnes(BitWidth)
+                       : APInt::getZero(BitWidth);
+
   setPointerSpec(AddrSpace, BitWidth, ABIAlign, PrefAlign, IndexBitWidth,
-                 UnstableRepr, ExternalState, AddrSpaceName);
+                 UnstableRepr, ExternalState, AddrSpaceName, NullPtrValue);
+  return Error::success();
+}
+
+Error DataLayout::parseNullPointerDefaultSpec(StringRef Spec) {
+  // N<null-value>, where <null-value> is one of: z (all-zeros), o (all-ones).
+  assert(Spec.starts_with("N"));
+  StringRef Rest = Spec.drop_front();
+  if (Rest.size() != 1)
+    return createSpecFormatError("N<null-value>");
+
+  char NullValue = Rest.front();
+  if (NullValue == 'z') {
+    DefaultNullPtrValue = APInt::getZero(1);
+  } else if (NullValue == 'o') {
+    DefaultNullPtrValue = APInt::getAllOnes(1);
+  } else {
+    return createStringError("unknown default null pointer value '" +
+                             Twine(NullValue) + "'");
+  }
   return Error::success();
 }
 
@@ -551,6 +591,9 @@ Error DataLayout::parseSpecification(
 
   if (Specifier == 'p')
     return parsePointerSpec(Spec, AddrSpaceNames);
+
+  if (Specifier == 'N')
+    return parseNullPointerDefaultSpec(Spec);
 
   StringRef Rest = Spec.drop_front();
   switch (Specifier) {
@@ -692,7 +735,7 @@ Error DataLayout::parseLayoutString(StringRef LayoutString) {
     const PointerSpec &PS = getPointerSpec(AS);
     setPointerSpec(AS, PS.BitWidth, PS.ABIAlign, PS.PrefAlign, PS.IndexBitWidth,
                    /*HasUnstableRepr=*/true, /*HasExternalState=*/false,
-                   getAddressSpaceName(AS));
+                   getAddressSpaceName(AS), PS.NullPtrValue);
   }
 
   return Error::success();
@@ -741,13 +784,14 @@ DataLayout::getPointerSpec(uint32_t AddrSpace) const {
 void DataLayout::setPointerSpec(uint32_t AddrSpace, uint32_t BitWidth,
                                 Align ABIAlign, Align PrefAlign,
                                 uint32_t IndexBitWidth, bool HasUnstableRepr,
-                                bool HasExternalState,
-                                StringRef AddrSpaceName) {
+                                bool HasExternalState, StringRef AddrSpaceName,
+                                std::optional<APInt> NullPtrValue) {
   auto I = lower_bound(PointerSpecs, AddrSpace, LessPointerAddrSpace());
   if (I == PointerSpecs.end() || I->AddrSpace != AddrSpace) {
     PointerSpecs.insert(I, PointerSpec{AddrSpace, BitWidth, ABIAlign, PrefAlign,
                                        IndexBitWidth, HasUnstableRepr,
-                                       HasExternalState, AddrSpaceName.str()});
+                                       HasExternalState, AddrSpaceName.str(),
+                                       std::move(NullPtrValue)});
   } else {
     I->BitWidth = BitWidth;
     I->ABIAlign = ABIAlign;
@@ -756,7 +800,19 @@ void DataLayout::setPointerSpec(uint32_t AddrSpace, uint32_t BitWidth,
     I->HasUnstableRepresentation = HasUnstableRepr;
     I->HasExternalState = HasExternalState;
     I->AddrSpaceName = AddrSpaceName.str();
+    I->NullPtrValue = std::move(NullPtrValue);
   }
+}
+
+APInt DataLayout::getNullPtrValue(unsigned AS) const {
+  auto I = lower_bound(PointerSpecs, AS, LessPointerAddrSpace());
+  if (I != PointerSpecs.end() && I->AddrSpace == AS && I->NullPtrValue)
+    return *I->NullPtrValue;
+
+  unsigned BitWidth = getPointerSizeInBits(AS);
+  if (DefaultNullPtrValue->isZero())
+    return APInt::getZero(BitWidth);
+  return APInt::getAllOnes(BitWidth);
 }
 
 Align DataLayout::getIntegerAlignment(uint32_t BitWidth,

@@ -87,6 +87,14 @@ Changes to LLVM infrastructure
   will be reintroduced in the future with bitwise-all-zeros semantics
   to support non-zero null pointers.
 
+* Added support for specifying the null pointer bit representation per
+  address space in ``DataLayout``. Pointer specifications (``p``) accept new
+  flags: ``z`` (null is all-zeros) and ``o`` (null is all-ones). A new
+  top-level specifier ``N<null-value>`` (``Nz`` or ``No``) sets the default
+  for address spaces that do not specify a flag. When ``N`` is absent, the
+  default is all-zeros. See the ``DataLayout`` section of the
+  `LangRef <https://llvm.org/docs/LangRef.html#data-layout>`_ for details.
+
 * Removed TypePromoteFloat legalization from SelectionDAG
 
 * Removed `bugpoint`. Usage has been replaced by `llvm-reduce` and
