@@ -77,7 +77,6 @@ static std::shared_ptr<MemoryBuffer> getBBSectionsMemoryBuffer(Ctx &ctx) {
 
 static lto::Config createConfig(Ctx &ctx) {
   lto::Config c;
-
   std::shared_ptr<MemoryBuffer> mbPtr = getBBSectionsMemoryBuffer(ctx);
 
   // Set up the callback to modify TargetOptions.
