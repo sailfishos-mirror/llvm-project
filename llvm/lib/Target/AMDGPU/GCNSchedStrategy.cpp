@@ -1886,6 +1886,8 @@ void PreRARematStage::finalizeGCNRegion() {
 void GCNSchedStage::checkScheduling() {
   // Check the results of scheduling.
   PressureAfter = DAG.getRealRegPressure(RegionIdx);
+  DAG.Pressure[RegionIdx] = PressureAfter;
+  SIMachineFunctionInfo *SMI = static_cast<SIMachineFunctionInfo *>(&DAG.MFI);
 
   LLVM_DEBUG(dbgs() << "Pressure after scheduling: " << print(PressureAfter));
   LLVM_DEBUG(dbgs() << "Region: " << RegionIdx << ".\n");
@@ -1895,7 +1897,7 @@ void GCNSchedStage::checkScheduling() {
   if (PressureAfter.getSGPRNum() <= S.SGPRCriticalLimit &&
       PressureAfter.getVGPRNum(ST.hasGFX90AInsts()) <= S.VGPRCriticalLimit) {
     DAG.Pressure[RegionIdx] = PressureAfter;
-
+    SMI->setMaxRP(DAG.Pressure[RegionIdx].getArchVGPRNum());
     // Early out if we have achieved the occupancy target.
     LLVM_DEBUG(dbgs() << "Pressure in desired limits, done.\n");
     return;
@@ -1954,6 +1956,7 @@ void GCNSchedStage::checkScheduling() {
     std::tie(DAG.RegionBegin, DAG.RegionEnd) = DAG.Regions[RegionIdx];
   } else {
     DAG.Pressure[RegionIdx] = PressureAfter;
+    SMI->setMaxRP(DAG.Pressure[RegionIdx].getArchVGPRNum());
   }
 }
 

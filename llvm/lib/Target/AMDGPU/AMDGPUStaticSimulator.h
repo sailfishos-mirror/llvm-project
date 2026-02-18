@@ -1230,32 +1230,66 @@ struct GPUSimState {
   // Register scoreboard: tracks when each register's result will be ready
   // Enables RAW dependency detection without s_delay_alu
   DenseMap<MCRegUnit, unsigned> RegScoreboard;
+  DenseMap<Register, SmallVector<std::pair<LaneBitmask, unsigned>, 2>> VRegScoreboard;
 
   // Check RAW stall for reading a register
-  unsigned getRAWStall(Register Reg, const TargetRegisterInfo *TRI) const {
-    if (!TRI || !Reg.isPhysical())
+  unsigned getRAWStall(const MachineOperand &Op, const TargetRegisterInfo *TRI) const {
+    if (!TRI)
       return 0;
+    auto Reg = Op.getReg();
     unsigned MaxStall = 0;
+    if (Reg.isPhysical()) {
     for (MCRegUnit Unit : TRI->regunits(Reg)) {
       auto It = RegScoreboard.find(Unit);
       if (It != RegScoreboard.end() && It->second > CurrentCycle)
         MaxStall = std::max(MaxStall, It->second - CurrentCycle);
     }
+    }
+
+    else {
+      auto It = VRegScoreboard.find(Reg);
+
+      if (It != VRegScoreboard.end()) {
+        unsigned SubRegIdx = Op.getSubReg();
+        LaneBitmask UseMask = TRI->getSubRegIndexLaneMask(SubRegIdx);
+        errs() << "Checking overlap with: "; Op.dump();
+        for (auto Entry : It->second) {
+          errs() << "Entry has mask: " << Entry.first.getAsInteger() << "\n";
+          if ((UseMask & Entry.first).any() && Entry.second > CurrentCycle) {
+            //errs() << "Def cycle of entry: " << Entry.second << "\n";
+            MaxStall = std::max(MaxStall, Entry.second - CurrentCycle);
+          }
+        }
+      }
+    }
+         
+  
     return MaxStall;
   }
 
   // Record a write - register will be ready at CurrentCycle + Latency
-  void recordRegWrite(Register Reg, unsigned Latency,
-                      const TargetRegisterInfo *TRI) {
-    if (!TRI || !Reg.isPhysical())
+  void recordRegWrite(const MachineOperand &Op, unsigned Latency, const TargetRegisterInfo *TRI) {
+    if (!TRI)
       return;
+    auto Reg = Op.getReg();
     unsigned ReadyCycle = CurrentCycle + Latency;
+    if (Reg.isPhysical()) {
     for (MCRegUnit Unit : TRI->regunits(Reg))
       RegScoreboard[Unit] = ReadyCycle;
+    }
+    else {
+      unsigned SubRegIdx = Op.getSubReg();
+      LaneBitmask DefMask = TRI->getSubRegIndexLaneMask(SubRegIdx);
+      auto Entry =  std::make_pair(DefMask, ReadyCycle);
+      if (!VRegScoreboard.contains(Reg)) {
+        VRegScoreboard[Reg] = {};
+      }
+      VRegScoreboard[Reg].push_back(Entry);
+    }
   }
 
   // Clear scoreboard - called when memory ops implicitly wait for VA_VDST==0
-  void clearRegScoreboard() { RegScoreboard.clear(); }
+  void clearRegScoreboard() { RegScoreboard.clear(); VRegScoreboard.clear();}
 
   // Get max stall across ALL pending writes (for implicit VA_VDST waits)
   unsigned getMaxPendingRAW() const {
@@ -1264,6 +1298,13 @@ struct GPUSimState {
       if (KV.second > CurrentCycle)
         MaxStall = std::max(MaxStall, KV.second - CurrentCycle);
     }
+    for (const auto &KV : VRegScoreboard) {
+      for (auto Entry : KV.second) {
+        if (Entry.second > CurrentCycle)
+          MaxStall = std::max(MaxStall, Entry.second - CurrentCycle);
+      }
+    }
+
     return MaxStall;
   }
 

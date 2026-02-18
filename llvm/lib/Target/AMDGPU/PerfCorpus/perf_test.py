@@ -3,11 +3,13 @@
 Performance regression testing for AMDGPU static simulator warm cycle counts.
 
 Usage:
-    ./perf_test.py                    # Run tests against baseline
-    ./perf_test.py --update           # Update baseline with current results
-    ./perf_test.py --update-on-pass   # Update baseline only if all tests pass
-    ./perf_test.py --verbose          # Show detailed output
-    ./perf_test.py --migration-target # Use note.txt warm cycles as baseline
+    ./perf_test.py                              # Run tests against baseline.json
+    ./perf_test.py --sched-only                 # Run with --amdgpu-static-sim-measure-sched=1 against sched_baseline.json
+    ./perf_test.py --migration-target           # Use note.txt warm cycles as baseline
+    ./perf_test.py --sched-only --migration-target  # Use Sched Perf entries from note.txt
+    ./perf_test.py --update                     # Update both baseline.json and sched_baseline.json
+    ./perf_test.py --update-on-pass             # Update both baselines only if all tests pass
+    ./perf_test.py --verbose                    # Show detailed output
 """
 
 from __future__ import annotations
@@ -46,6 +48,7 @@ class TestResult:
 
 SCRIPT_DIR = Path(__file__).parent.resolve()
 BASELINE_FILE = SCRIPT_DIR / "baseline.json"
+SCHED_BASELINE_FILE = SCRIPT_DIR / "sched_baseline.json"
 
 # Pattern to match innermost loop warm cycles
 # Format: ;=== Block (loop): Cold=XXXXcyc Warm=XXXXcyc Trip=XX Scaled=XXXXcyc [header] ===
@@ -54,6 +57,10 @@ WARM_PATTERN = re.compile(r"Block \(loop\):.*Warm=(\d+)cyc")
 # Pattern to extract warm cycles from note.txt migration target
 # Format: "XX% xdl util, YYY warm cycles"
 NOTE_WARM_PATTERN = re.compile(r"(\d+)\s*warm cycles")
+
+# Pattern to extract warm cycles from note.txt Sched Perf section
+# Format: "Sched Perf\nXXX warm cycles"
+SCHED_PERF_PATTERN = re.compile(r"Sched Perf\s*\n\s*(\d+)\s*warm cycles")
 
 # Pattern to match the Flags section header in note.txt
 # Supports both "Flags" and "Flags:" formats
@@ -142,7 +149,7 @@ def parse_flags_from_note(note_file: Path) -> List[str]:
         return []
 
 
-def run_llc(llc_path: Path, ll_file: Path, extra_flags: Optional[List[str]] = None) -> Tuple[Optional[int], Optional[str]]:
+def run_llc(llc_path: Path, ll_file: Path, extra_flags: Optional[List[str]] = None, sched_only: bool = False) -> Tuple[Optional[int], Optional[str]]:
     """Run llc and extract the warm cycle count for the innermost loop."""
     cmd = [
         str(llc_path),
@@ -155,6 +162,10 @@ def run_llc(llc_path: Path, ll_file: Path, extra_flags: Optional[List[str]] = No
         "--enable-post-misched=0",
         "-o", "-",
     ]
+
+    # Add sched-only flag if requested
+    if sched_only:
+        cmd.append("--amdgpu-static-sim-measure-sched=1")
 
     # Add any extra flags from note.txt
     if extra_flags:
@@ -185,11 +196,12 @@ def run_llc(llc_path: Path, ll_file: Path, extra_flags: Optional[List[str]] = No
         return None, str(e)
 
 
-def load_baseline() -> Dict[str, int]:
+def load_baseline(sched_only: bool = False) -> Dict[str, int]:
     """Load baseline warm cycle counts."""
-    if not BASELINE_FILE.exists():
+    baseline_file = SCHED_BASELINE_FILE if sched_only else BASELINE_FILE
+    if not baseline_file.exists():
         return {}
-    with open(BASELINE_FILE) as f:
+    with open(baseline_file) as f:
         return json.load(f)
 
 
@@ -214,20 +226,45 @@ def load_migration_targets() -> Dict[str, int]:
     return targets
 
 
-def save_baseline(baseline: Dict[str, int]) -> None:
+def load_sched_perf_targets() -> Dict[str, int]:
+    """Load Sched Perf targets from note.txt files in test directories."""
+    targets = {}
+    mi450_dir = SCRIPT_DIR / "MI450"
+    if not mi450_dir.exists():
+        return targets
+
+    for ll_file in mi450_dir.rglob("*.ll"):
+        test_name = get_test_name(ll_file)
+        note_file = ll_file.parent / "note.txt"
+        if note_file.exists():
+            try:
+                content = note_file.read_text()
+                match = SCHED_PERF_PATTERN.search(content)
+                if match:
+                    targets[test_name] = int(match.group(1))
+            except Exception:
+                pass
+    return targets
+
+
+def save_baseline(baseline: Dict[str, int], sched_only: bool = False) -> None:
     """Save baseline warm cycle counts."""
-    with open(BASELINE_FILE, "w") as f:
+    baseline_file = SCHED_BASELINE_FILE if sched_only else BASELINE_FILE
+    with open(baseline_file, "w") as f:
         json.dump(baseline, f, indent=2, sort_keys=True)
         f.write("\n")
 
 
-def run_tests(verbose: bool = False, migration_target: bool = False) -> List[TestResult]:
+def run_tests(verbose: bool = False, migration_target: bool = False, sched_only: bool = False) -> List[TestResult]:
     """Run all tests and return results."""
     llc_path = get_llc_path()
     if migration_target:
-        baseline = load_migration_targets()
+        if sched_only:
+            baseline = load_sched_perf_targets()
+        else:
+            baseline = load_migration_targets()
     else:
-        baseline = load_baseline()
+        baseline = load_baseline(sched_only=sched_only)
     ll_files = find_test_files()
 
     if not ll_files:
@@ -245,7 +282,7 @@ def run_tests(verbose: bool = False, migration_target: bool = False) -> List[Tes
         note_file = ll_file.parent / "note.txt"
         extra_flags = parse_flags_from_note(note_file)
 
-        warm_cycles, error = run_llc(llc_path, ll_file, extra_flags)
+        warm_cycles, error = run_llc(llc_path, ll_file, extra_flags, sched_only=sched_only)
         baseline_cycles = baseline.get(test_name)
 
         if error:
@@ -270,7 +307,7 @@ def run_tests(verbose: bool = False, migration_target: bool = False) -> List[Tes
             if error:
                 print(f"ERROR: {error}")
             elif baseline_cycles is None:
-                if migration_target:
+                if migration_target or sched_only:
                     print(f"NO TARGET ({warm_cycles} cycles)")
                 else:
                     print(f"NEW ({warm_cycles} cycles)")
@@ -286,7 +323,7 @@ def run_tests(verbose: bool = False, migration_target: bool = False) -> List[Tes
     return results
 
 
-def print_summary(results: List[TestResult], migration_target: bool = False) -> None:
+def print_summary(results: List[TestResult], migration_target: bool = False, sched_only: bool = False) -> None:
     """Print test summary."""
     passed = sum(1 for r in results if r.passed)
     failed = sum(1 for r in results if not r.passed)
@@ -296,14 +333,14 @@ def print_summary(results: List[TestResult], migration_target: bool = False) -> 
     print("\n" + "=" * 60)
     print(f"Results: {passed} passed, {failed} failed", end="")
     if no_baseline:
-        label = "no target" if migration_target else "new"
+        label = "no target" if (migration_target or sched_only) else "new"
         print(f", {no_baseline} {label}", end="")
     if errors:
         print(f", {errors} errors", end="")
     print()
 
     if failed > 0:
-        label = "target" if migration_target else "baseline"
+        label = "target" if (migration_target or sched_only) else "baseline"
         print(f"\nFailed tests (exceeded {label}):")
         for r in results:
             if not r.passed and not r.error:
@@ -316,14 +353,15 @@ def print_summary(results: List[TestResult], migration_target: bool = False) -> 
                 print(f"  {r.name}: {r.error}")
 
 
-def update_baseline(results: List[TestResult]) -> None:
+def update_baseline(results: List[TestResult], sched_only: bool = False) -> None:
     """Update baseline with current results."""
     baseline = {}
     for r in results:
         if r.warm_cycles is not None:
             baseline[r.name] = r.warm_cycles
-    save_baseline(baseline)
-    print(f"Updated baseline with {len(baseline)} entries.")
+    save_baseline(baseline, sched_only=sched_only)
+    baseline_name = "sched_baseline.json" if sched_only else "baseline.json"
+    print(f"Updated {baseline_name} with {len(baseline)} entries.")
 
 
 def main():
@@ -338,6 +376,8 @@ def main():
                         help="List all test files without running")
     parser.add_argument("--migration-target", action="store_true",
                         help="Use warm cycles from note.txt files as baseline instead of baseline.json")
+    parser.add_argument("--sched-only", action="store_true",
+                        help="Use Sched Perf entries from note.txt and add --amdgpu-static-sim-measure-sched=1 to llc")
     args = parser.parse_args()
 
     if args.list:
@@ -347,21 +387,49 @@ def main():
 
     print(f"Running performance tests...")
     print(f"LLC: {get_llc_path()}")
-    if args.migration_target:
+
+    # --update updates both baselines, ignoring --sched-only
+    if args.update or args.update_on_pass:
+        print(f"Baseline: {BASELINE_FILE}")
+        print()
+        results = run_tests(verbose=args.verbose, migration_target=args.migration_target, sched_only=False)
+        print_summary(results, migration_target=args.migration_target, sched_only=False)
+        all_passed = all(r.passed for r in results)
+
+        print(f"\nRunning sched-only tests...")
+        print(f"Baseline: {SCHED_BASELINE_FILE}")
+        print(f"Mode: sched-only (--amdgpu-static-sim-measure-sched=1)")
+        print()
+        sched_results = run_tests(verbose=args.verbose, migration_target=args.migration_target, sched_only=True)
+        print_summary(sched_results, migration_target=args.migration_target, sched_only=True)
+        sched_all_passed = all(r.passed for r in sched_results)
+
+        if args.update:
+            update_baseline(results, sched_only=False)
+            update_baseline(sched_results, sched_only=True)
+        elif args.update_on_pass and all_passed and sched_all_passed:
+            update_baseline(results, sched_only=False)
+            update_baseline(sched_results, sched_only=True)
+
+        return 0 if (all_passed and sched_all_passed) else 1
+
+    # Normal run (not updating)
+    if args.sched_only:
+        if args.migration_target:
+            print(f"Baseline: Sched Perf targets from note.txt files")
+        else:
+            print(f"Baseline: {SCHED_BASELINE_FILE}")
+        print(f"Mode: sched-only (--amdgpu-static-sim-measure-sched=1)")
+    elif args.migration_target:
         print(f"Baseline: migration targets from note.txt files")
     else:
         print(f"Baseline: {BASELINE_FILE}")
     print()
 
-    results = run_tests(verbose=args.verbose, migration_target=args.migration_target)
-    print_summary(results, migration_target=args.migration_target)
+    results = run_tests(verbose=args.verbose, migration_target=args.migration_target, sched_only=args.sched_only)
+    print_summary(results, migration_target=args.migration_target, sched_only=args.sched_only)
 
     all_passed = all(r.passed for r in results)
-
-    if args.update:
-        update_baseline(results)
-    elif args.update_on_pass and all_passed:
-        update_baseline(results)
 
     return 0 if all_passed else 1
 
