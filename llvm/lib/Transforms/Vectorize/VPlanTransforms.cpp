@@ -6388,11 +6388,12 @@ void VPlanTransforms::makeMemOpWideningDecisions(
       continue;
     }
 
-    if (VPI->getOpcode() == Instruction::Store)
+    if (VPI->getOpcode() == Instruction::Store) {
       if (auto HistInfo = Legal.getHistogramInfo(cast<StoreInst>(Instr))) {
         ReplaceWith(RecipeBuilder.tryToWidenHistogram(*HistInfo, VPI));
         continue;
       }
+    }
 
     VPRecipeBase *Recipe = RecipeBuilder.tryToWidenMemory(VPI, Range);
     if (!Recipe)
