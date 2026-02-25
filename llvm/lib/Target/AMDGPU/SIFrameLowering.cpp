@@ -1308,6 +1308,11 @@ void SIFrameLowering::emitCSRSpillStores(
         LiveUnits.addReg(Reg);
     }
   }
+
+  // Remove the spill entry created for EXEC. It is needed only for CFISaves in
+  // the prologue.
+  if (TRI.isCFISavedRegsSpillEnabled())
+    FuncInfo->removePrologEpilogSGPRSpillEntry(TRI.getExec());
 }
 
 void SIFrameLowering::emitCSRSpillRestores(
@@ -1873,6 +1878,18 @@ void SIFrameLowering::determinePrologEpilogSGPRSaves(
     // Reset it at this point. There are no whole-wave copies and spills
     // encountered.
     MFI->setSGPRForEXECCopy(AMDGPU::NoRegister);
+  }
+
+  if (TRI->isCFISavedRegsSpillEnabled()) {
+    Register Exec = TRI->getExec();
+    assert(!MFI->hasPrologEpilogSGPRSpillEntry(Exec) &&
+           "Re-reserving spill slot for EXEC");
+    // FIXME: Machine Copy Propagation currently optimizes away the EXEC copy to
+    // the scratch as we emit it only in the prolog. This optimization should
+    // not happen for frame related instructions. Until this is fixed ignore
+    // copy to scratch SGPR.
+    getVGPRSpillLaneOrTempRegister(MF, LiveUnits, Exec, RC,
+                                   /*IncludeScratchCopy=*/false);
   }
 
   // Chain functions don't return to the caller, so they don't need to preserve
