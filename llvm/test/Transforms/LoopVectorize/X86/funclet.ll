@@ -2,7 +2,7 @@
 target datalayout = "e-m:x-p:32:32-i64:64-f80:32-n8:16:32-a:0:32-S32"
 target triple = "i686-pc-windows-msvc18.0.0"
 
-define void @test1() #0 personality ptr @__CxxFrameHandler3 {
+define void @test1(ptr noalias %p) #0 personality ptr @__CxxFrameHandler3 {
 entry:
   invoke void @_CxxThrowException(ptr null, ptr null)
           to label %unreachable unwind label %catch.dispatch
@@ -19,7 +19,9 @@ for.cond.cleanup:
 
 for.body:
   %i.07 = phi i32 [ 0, %catch ], [ %inc, %for.body ]
+  %gep = getelementptr double, ptr %p, i32 %i.07
   %call = call double @floor(double 1.0) #1 [ "funclet"(token %1) ]
+  store double %call, ptr %gep
   %inc = add nuw nsw i32 %i.07, 1
   %exitcond = icmp eq i32 %inc, 1024
   br i1 %exitcond, label %for.cond.cleanup, label %for.body
@@ -33,7 +35,7 @@ unreachable:
 
 ; CHECK-LABEL: define void @test1(
 ; CHECK: %[[cpad:.*]] = catchpad within {{.*}} [ptr null, i32 64, ptr null]
-; CHECK: call <16 x double> @llvm.floor.v16f64(<16 x double> {{.*}}) [ "funclet"(token %[[cpad]]) ]
+; CHECK: call <2 x double> @llvm.floor.v2f64(<2 x double> {{.*}}) [ "funclet"(token %[[cpad]]) ]
 
 declare x86_stdcallcc void @_CxxThrowException(ptr, ptr)
 
