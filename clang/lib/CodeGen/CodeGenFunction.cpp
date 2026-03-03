@@ -3090,13 +3090,8 @@ void CodeGenFunction::EmitMultiVersionResolver(
   }
 }
 
-/*
- *  Desc_t *foo_desc = ppc_get_function_descriptor(&foo);
- *  if (foo_desc->addr == ppc_get_function_entry(&foo)) {
- *    FuncPtr fp = resolver();
- *    __c11_atomic_store((_Atomic FuncPtr *)&foo_desc->addr, fp, 0);
- *  }
- *  return ((int (*)(int)) foo_desc)(a);
+/**
+ *
  */
 void CodeGenFunction::EmitPPCAIXMultiVersionResolver(
     llvm::Function *Resolver, ArrayRef<FMVResolverOption> Options) {
@@ -3127,15 +3122,20 @@ void CodeGenFunction::EmitPPCAIXMultiVersionResolver(
     //   br label %resolver_exit
     assert(RO.Features.size() == 1 &&
            "for now one feature requirement per version");
-    llvm::Value *Condition;
-    if (RO.Features[0].starts_with("cpu=")) {
-      Condition =
-          EmitPPCBuiltinCpu(Builtin::BI__builtin_cpu_is, Builder.getInt1Ty(),
-                            RO.Features[0].split("=").second.trim());
-    } else {
-      Condition = EmitPPCBuiltinCpu(Builtin::BI__builtin_cpu_supports,
-                                    Builder.getInt1Ty(), RO.Features[0]);
-    }
+
+    assert(RO.Features[0].starts_with("cpu="));
+    StringRef CPU = RO.Features[0].split("=").second.trim();
+    StringRef Feature = llvm::StringSwitch<StringRef>(CPU)
+        .Cases({"power7","pwr7"}, "arch_2_06")
+        .Cases({"power8","pwr8"}, "arch_2_07")
+        .Cases({"power9","pwr9"}, "arch_3_00")
+        .Cases({"power10","pwr10"}, "arch_3_1")
+        .Cases({"power11","pwr11"}, "arch_3_1")
+        .Default("error");
+
+    llvm::Value *Condition = EmitPPCBuiltinCpu(
+        Builtin::BI__builtin_cpu_supports, Builder.getInt1Ty(), Feature);
+
     llvm::BasicBlock *ThenBlock = createBasicBlock("if.version", Resolver);
     CurBlock = createBasicBlock("if.else", Resolver);
     Builder.CreateCondBr(Condition, ThenBlock, CurBlock);

@@ -714,7 +714,23 @@ ParsedTargetAttr PPCTargetInfo::parseTargetAttr(StringRef Features) const {
 }
 
 llvm::APInt PPCTargetInfo::getFMVPriority(ArrayRef<StringRef> Features) const {
-  return llvm::APInt(32, Features.empty() ? 0 : 1);
+  if (Features.empty())
+    return llvm::APInt(32, 0);
+  assert(Features.size() == 1 && "one feature/cpu per clone on PowerPC");
+  ParsedTargetAttr ParsedAttr = parseTargetAttr(Features[0]);
+  if (!ParsedAttr.CPU.empty()) {
+    StringRef CPU = llvm::PPC::normalizeCPUName(ParsedAttr.CPU);
+    int Priority = llvm::StringSwitch<int>(CPU)
+                       .Case("pwr7", 1)
+                       .Case("pwr8", 2)
+                       .Case("pwr9", 3)
+                       .Case("pwr10", 4)
+                       .Case("pwr11", 5)
+                       .Default(0);
+    return llvm::APInt(32, Priority);
+  }
+  assert(false && "unimplemented");
+  return llvm::APInt(32, 0);
 }
 
 // Make sure that registers are added in the correct array index which should be

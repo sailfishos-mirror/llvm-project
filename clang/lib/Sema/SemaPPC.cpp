@@ -608,16 +608,17 @@ bool SemaPPC::checkTargetClonesAttr(
           return Diag(CurLoc, diag::warn_unsupported_target_attribute)
                  << Unsupported << CPU << LHS.drop_front(sizeof("cpu=") - 1)
                  << TargetClones;
-      } else if (LHS == "default")
+      } else if (LHS == "default") {
         HasDefault = true;
-      else if (!getASTContext().getTargetInfo().isValidFeatureName(LHS) ||
-               getASTContext().getTargetInfo().getFMVPriority(LHS) == 0)
+      } else if (!getASTContext().getTargetInfo().isValidFeatureName(LHS) ||
+               getASTContext().getTargetInfo().getFMVPriority(LHS) == 0) {
         return Diag(CurLoc, diag::warn_unsupported_target_attribute)
                << Unsupported << None << LHS << TargetClones;
-
-      if (llvm::is_contained(NewParams, LHS))
+      }
+      if (llvm::is_contained(NewParams, LHS)) {
         Diag(CurLoc, diag::warn_target_clone_duplicate_options);
-      // Note: Add even if there are duplicates, since it changes name mangling.
+        continue;
+      }
       NewParams.push_back(LHS);
     } while (!RHS.empty());
   }

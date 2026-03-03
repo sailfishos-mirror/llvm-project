@@ -148,32 +148,16 @@ void AIXABIInfo::appendAttributeMangling(StringRef AttrStr,
     return;
   }
 
-  Out << '.';
   const TargetInfo &TI = CGT.getTarget();
   ParsedTargetAttr Info = TI.parseTargetAttr(AttrStr);
 
-  llvm::sort(Info.Features, [&TI](StringRef LHS, StringRef RHS) {
-    // Multiversioning doesn't allow "no-${feature}", so we can
-    // only have "+" prefixes here.
-    assert(LHS.starts_with("+") && RHS.starts_with("+") &&
-           "Features should always have a prefix.");
-    return TI.getFMVPriority({LHS.substr(1)})
-        .ugt(TI.getFMVPriority({RHS.substr(1)}));
-  });
-
-  bool IsFirst = true;
   if (!Info.CPU.empty()) {
-    IsFirst = false;
-    Out << "cpu_" << Info.CPU;
+    assert(Info.Features.empty() && "cannot have both a CPU and a feature");
+    Out << ".cpu_" << Info.CPU;
+    return;
   }
 
-  assert(Info.Features.empty() && "unhandled case");
-  for (StringRef Feat : Info.Features) {
-    if (!IsFirst)
-      Out << '_';
-    IsFirst = false;
-    Out << Feat.substr(1);
-  }
+  assert(false && "specifying target features on an FMV is not supported on AIX");
 }
 
 class AIXTargetCodeGenInfo : public TargetCodeGenInfo {
