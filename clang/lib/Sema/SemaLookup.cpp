@@ -2211,6 +2211,52 @@ bool LookupResult::isAvailableForLookup(Sema &SemaRef, NamedDecl *ND) {
   return false;
 }
 
+/// Try to create a builtin __memory_scope typedef or enumerator.
+/// Returns true if a declaration was added to R.
+static bool TryCreateMemoryScopeBuiltin(Sema &S, LookupResult &R,
+                                        const IdentifierInfo &II) {
+  // Don't create builtins during redeclaration lookup - this would conflict
+  // with user declarations of the same name
+  if (R.isForRedeclaration())
+    return false;
+
+  if (II.getName() == "__memory_scope") {
+    // Looking up __memory_scope typedef itself
+    if (TypedefDecl *TD = S.Context.getMemoryScopeDecl()) {
+      R.addDecl(TD);
+      R.resolveKind();
+      return true;
+    }
+    return false;
+  }
+
+  if (II.getName().starts_with("__memory_scope_")) {
+    // Looking up a __memory_scope enumerator
+    TypedefDecl *TD = S.Context.getMemoryScopeDecl();
+    if (!TD) {
+      // getMemoryScopeDecl() returned nullptr - user declared __memory_scope
+      // The enumerator won't be found, resulting in an "undeclared identifier"
+      // error
+      return false;
+    }
+
+    // Find the specific enumerator
+    if (const EnumType *ET = TD->getUnderlyingType()->getAs<EnumType>()) {
+      if (EnumDecl *ED = ET->getDecl()) {
+        for (auto *Enumerator : ED->enumerators()) {
+          if (Enumerator->getName() == II.getName()) {
+            R.addDecl(Enumerator);
+            R.resolveKind();
+            return true;
+          }
+        }
+      }
+    }
+  }
+
+  return false;
+}
+
 bool Sema::LookupName(LookupResult &R, Scope *S, bool AllowBuiltinCreation,
                       bool ForceNoCPlusPlus) {
   DeclarationName Name = R.getLookupName();
@@ -2306,6 +2352,13 @@ bool Sema::LookupName(LookupResult &R, Scope *S, bool AllowBuiltinCreation,
   } else {
     // Perform C++ unqualified name lookup.
     if (CppLookupName(R, S))
+      return true;
+  }
+
+  // Check for __memory_scope builtins even when AllowBuiltinCreation is false,
+  // because we want to support __memory_scope as a builtin type name.
+  if (IdentifierInfo *II = Name.getAsIdentifierInfo()) {
+    if (TryCreateMemoryScopeBuiltin(*this, R, *II))
       return true;
   }
 

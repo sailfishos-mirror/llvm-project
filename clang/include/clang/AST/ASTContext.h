@@ -515,6 +515,9 @@ class ASTContext : public RefCountedBase<ASTContext> {
   /// Declaration for the CUDA cudaLaunchDevice function.
   FunctionDecl *cudaLaunchDeviceDecl = nullptr;
 
+  /// The typedef for the __memory_scope enum type.
+  mutable TypedefDecl *MemoryScopeDecl = nullptr;
+
   /// Keeps track of all declaration attributes.
   ///
   /// Since so few decls have attrs, we keep them in a hash map instead of
@@ -1447,6 +1450,9 @@ public:
 
   /// Retrieve the declaration for the 128-bit unsigned integer type.
   TypedefDecl *getUInt128Decl() const;
+
+  /// Retrieve the declaration for the __memory_scope enum type.
+  TypedefDecl *getMemoryScopeDecl() const;
 
   //===--------------------------------------------------------------------===//
   //                           Type Constructors

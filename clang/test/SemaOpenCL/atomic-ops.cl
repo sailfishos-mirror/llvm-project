@@ -175,8 +175,8 @@ void syncscope_checks(atomic_int *Ap, int scope) {
 
   // non-integer memory scope is casted to integer type.
   float fscope;
-  (void)__opencl_atomic_load(Ap, memory_order_relaxed, 1.0f);
-  (void)__opencl_atomic_load(Ap, memory_order_relaxed, fscope);
+  (void)__opencl_atomic_load(Ap, memory_order_relaxed, 1.0f); //expected-error{{synchronization scope argument to atomic operation is invalid}}
+  (void)__opencl_atomic_load(Ap, memory_order_relaxed, fscope); //expected-error{{synchronization scope argument to atomic operation is invalid}}
   struct S s;
   (void)__opencl_atomic_load(Ap, memory_order_relaxed, s); //expected-error{{passing '__private struct S' to parameter of incompatible type 'int'}}
 }

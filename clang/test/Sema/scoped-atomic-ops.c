@@ -6,14 +6,14 @@
 int fi1a(int *i) {
   int v;
   __scoped_atomic_load(i, &v, __ATOMIC_RELAXED); // expected-error {{too few arguments to function call, expected 4, have 3}}
-  __scoped_atomic_load(i, &v, __ATOMIC_RELAXED, 42); // expected-error {{synchronization scope argument to atomic operation is invalid}}
+  __scoped_atomic_load(i, &v, __ATOMIC_RELAXED, 42); // expected-warning {{synchronization scope should be of type __memory_scope}} expected-error {{synchronization scope argument to atomic operation is invalid}}
   __scoped_atomic_load(i, &v, __ATOMIC_RELAXED, __MEMORY_SCOPE_SYSTEM);
   return v;
 }
 
 int fi1b(int *i) {
   *i = __scoped_atomic_load_n(i, __ATOMIC_RELAXED); // expected-error {{too few arguments to function call, expected 3, have 2}}
-  *i = __scoped_atomic_load_n(i, __ATOMIC_RELAXED, 42); // expected-error {{synchronization scope argument to atomic operation is invalid}}
+  *i = __scoped_atomic_load_n(i, __ATOMIC_RELAXED, 42); // expected-warning {{synchronization scope should be of type __memory_scope}} expected-error {{synchronization scope argument to atomic operation is invalid}}
   *i = __scoped_atomic_load_n(i, __ATOMIC_RELAXED, __MEMORY_SCOPE_SYSTEM);
   return *i;
 }
@@ -21,14 +21,14 @@ int fi1b(int *i) {
 int fi2a(int *i) {
   int v;
   __scoped_atomic_store(i, &v, __ATOMIC_RELAXED); // expected-error {{too few arguments to function call, expected 4, have 3}}
-  __scoped_atomic_store(i, &v, __ATOMIC_RELAXED, 42); // expected-error {{synchronization scope argument to atomic operation is invalid}}
+  __scoped_atomic_store(i, &v, __ATOMIC_RELAXED, 42); // expected-warning {{synchronization scope should be of type __memory_scope}} expected-error {{synchronization scope argument to atomic operation is invalid}}
   __scoped_atomic_store(i, &v, __ATOMIC_RELAXED, __MEMORY_SCOPE_SYSTEM);
   return v;
 }
 
 void fi2b(int *i) {
   __scoped_atomic_store_n(i, 1, __ATOMIC_RELAXED); // expected-error {{too few arguments to function call, expected 4, have 3}}
-  __scoped_atomic_store_n(i, 1, __ATOMIC_RELAXED, 42); // expected-error {{synchronization scope argument to atomic operation is invalid}}
+  __scoped_atomic_store_n(i, 1, __ATOMIC_RELAXED, 42); // expected-warning {{synchronization scope should be of type __memory_scope}} expected-error {{synchronization scope argument to atomic operation is invalid}}
   __scoped_atomic_store_n(i, 1, __ATOMIC_RELAXED, __MEMORY_SCOPE_SYSTEM);
 }
 
@@ -72,16 +72,16 @@ void fi3c(int *a, int *b, int *c, int *d, int *e, int *f, int *g, int *h, unsign
 }
 
 void fi3d(int *a, int *b, int *c, int *d, int *e, int *f, int *g, int *h, unsigned *i, unsigned *j) {
-  *a = __scoped_atomic_fetch_add(a, 1, __ATOMIC_RELAXED, 42); // expected-error {{synchronization scope argument to atomic operation is invalid}}
-  *b = __scoped_atomic_fetch_sub(b, 1, __ATOMIC_RELAXED, 42); // expected-error {{synchronization scope argument to atomic operation is invalid}}
-  *c = __scoped_atomic_fetch_and(c, 1, __ATOMIC_RELAXED, 42); // expected-error {{synchronization scope argument to atomic operation is invalid}}
-  *d = __scoped_atomic_fetch_or(d, 1, __ATOMIC_RELAXED, 42); // expected-error {{synchronization scope argument to atomic operation is invalid}}
-  *e = __scoped_atomic_fetch_xor(e, 1, __ATOMIC_RELAXED, 42); // expected-error {{synchronization scope argument to atomic operation is invalid}}
-  *f = __scoped_atomic_fetch_nand(f, 1, __ATOMIC_RELAXED, 42); // expected-error {{synchronization scope argument to atomic operation is invalid}}
-  *g = __scoped_atomic_fetch_min(g, 1, __ATOMIC_RELAXED, 42); // expected-error {{synchronization scope argument to atomic operation is invalid}}
-  *h = __scoped_atomic_fetch_max(h, 1, __ATOMIC_RELAXED, 42); // expected-error {{synchronization scope argument to atomic operation is invalid}}
-  *i = __scoped_atomic_fetch_uinc(i, 1u, __ATOMIC_RELAXED, 42); // expected-error {{synchronization scope argument to atomic operation is invalid}}
-  *j = __scoped_atomic_fetch_udec(j, 1u, __ATOMIC_RELAXED, 42); // expected-error {{synchronization scope argument to atomic operation is invalid}}
+  *a = __scoped_atomic_fetch_add(a, 1, __ATOMIC_RELAXED, 42); // expected-warning {{synchronization scope should be of type __memory_scope}} expected-error {{synchronization scope argument to atomic operation is invalid}}
+  *b = __scoped_atomic_fetch_sub(b, 1, __ATOMIC_RELAXED, 42); // expected-warning {{synchronization scope should be of type __memory_scope}} expected-error {{synchronization scope argument to atomic operation is invalid}}
+  *c = __scoped_atomic_fetch_and(c, 1, __ATOMIC_RELAXED, 42); // expected-warning {{synchronization scope should be of type __memory_scope}} expected-error {{synchronization scope argument to atomic operation is invalid}}
+  *d = __scoped_atomic_fetch_or(d, 1, __ATOMIC_RELAXED, 42); // expected-warning {{synchronization scope should be of type __memory_scope}} expected-error {{synchronization scope argument to atomic operation is invalid}}
+  *e = __scoped_atomic_fetch_xor(e, 1, __ATOMIC_RELAXED, 42); // expected-warning {{synchronization scope should be of type __memory_scope}} expected-error {{synchronization scope argument to atomic operation is invalid}}
+  *f = __scoped_atomic_fetch_nand(f, 1, __ATOMIC_RELAXED, 42); // expected-warning {{synchronization scope should be of type __memory_scope}} expected-error {{synchronization scope argument to atomic operation is invalid}}
+  *g = __scoped_atomic_fetch_min(g, 1, __ATOMIC_RELAXED, 42); // expected-warning {{synchronization scope should be of type __memory_scope}} expected-error {{synchronization scope argument to atomic operation is invalid}}
+  *h = __scoped_atomic_fetch_max(h, 1, __ATOMIC_RELAXED, 42); // expected-warning {{synchronization scope should be of type __memory_scope}} expected-error {{synchronization scope argument to atomic operation is invalid}}
+  *i = __scoped_atomic_fetch_uinc(i, 1u, __ATOMIC_RELAXED, 42); // expected-warning {{synchronization scope should be of type __memory_scope}} expected-error {{synchronization scope argument to atomic operation is invalid}}
+  *j = __scoped_atomic_fetch_udec(j, 1u, __ATOMIC_RELAXED, 42); // expected-warning {{synchronization scope should be of type __memory_scope}} expected-error {{synchronization scope argument to atomic operation is invalid}}
 }
 
 void fi3e(float *a, float *b, float *c, float *d, float *e, float *f) {

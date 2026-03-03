@@ -2099,6 +2099,27 @@ CheckBuiltinTargetInSupported(Sema &S, CallExpr *TheCall,
   return true;
 }
 
+/// CheckScopedAtomicScopeArgument - Check the scope argument for scoped atomic
+/// operations and fences. Emits a deprecation warning if an integer type is
+/// used instead of the __memory_scope enum.
+static void CheckScopedAtomicScopeArgument(Sema &S, Expr *Scope) {
+  assert(Scope->getType()->isIntegerType() &&
+         "Non-integer type should have emitted an error before reaching here");
+  // Strip implicit casts to get the original expression type
+  Expr *OrigScope = Scope->IgnoreParenImpCasts();
+
+  // Check if it's the __memory_scope enum type
+  if (const auto *EnumTy = OrigScope->getType()->getAs<EnumType>()) {
+    if (EnumTy->getDecl()->getName() == "__memory_scope") {
+      return;
+    }
+  }
+
+  // Use of any other integer type gets a warning
+  S.Diag(Scope->getBeginLoc(), diag::warn_atomic_op_scope_should_be_enum)
+      << Scope->getSourceRange();
+}
+
 static void CheckNonNullArgument(Sema &S, const Expr *ArgExpr,
                                  SourceLocation CallSiteLoc);
 
@@ -3181,6 +3202,14 @@ Sema::CheckBuiltinFunctionCall(FunctionDecl *FDecl, unsigned BuiltinID,
     Diag(TheCall->getBeginLoc(), diag::warn_atomic_implicit_seq_cst)
         << TheCall->getCallee()->getSourceRange();
     break;
+  case Builtin::BI__scoped_atomic_thread_fence: {
+    // Validate the scope argument (second argument)
+    if (TheCall->getNumArgs() >= 2) {
+      Expr *Scope = TheCall->getArg(1);
+      CheckScopedAtomicScopeArgument(*this, Scope);
+    }
+    break;
+  }
   case Builtin::BI__builtin_nontemporal_load:
   case Builtin::BI__builtin_nontemporal_store:
     return BuiltinNontemporalOverloaded(TheCallResult);
@@ -5157,12 +5186,25 @@ ExprResult Sema::BuildAtomicExpr(SourceRange CallRange, SourceRange ExprRange,
 
   if (auto ScopeModel = AtomicExpr::getScopeModel(Op)) {
     auto *Scope = Args[Args.size() - 1];
+
+    // If the scope is an integer constant, validate its value
     if (std::optional<llvm::APSInt> Result =
             Scope->getIntegerConstantExpr(Context)) {
       if (!ScopeModel->isValid(Result->getZExtValue()))
         Diag(Scope->getBeginLoc(), diag::err_atomic_op_has_invalid_sync_scope)
             << Scope->getSourceRange();
     }
+
+    if (!Scope->getType()->isIntegerType()) {
+      // Ensure that it is an integer.
+      Diag(Scope->getBeginLoc(), diag::err_atomic_op_has_invalid_sync_scope)
+          << Scope->getSourceRange();
+    } else if (BuiltinInfo && BuiltinInfo->Langs == ALL_LANGUAGES) {
+      // In the case of language-agnostic builtins, also check if it uses the
+      // builtin enum type "__memory_scope".
+      CheckScopedAtomicScopeArgument(*this, Scope);
+    }
+
     SubExprs.push_back(Scope);
   }
 
