@@ -536,8 +536,7 @@ struct VPlanTransforms {
   /// Make VPlan-based scalarization decision prior to delegating to the ones
   /// made by the legacy CM. Only transforms "usesFirstLaneOnly` def-use chains
   /// enabled by prior widening of consecutive memory operations for now.
-  static void makeScalarizationDecisions(VPlan &Plan, VFRange &Range,
-                                         VPRecipeBuilder &RecipeBuilder);
+  static void makeScalarizationDecisions(VPlan &Plan, VFRange &Range);
 };
 
 } // namespace llvm
