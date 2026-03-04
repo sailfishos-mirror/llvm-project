@@ -3091,7 +3091,20 @@ void CodeGenFunction::EmitMultiVersionResolver(
 }
 
 /**
+ * define internal ptr @foo.resolver() {
+ * entry:
+ *   %is_version_1 = __builtin_cpu_supports(version_1)
+ *   br i1 %1, label %if.version_1, label %if.else_2
  *
+ * if.version_1:
+ *   ret ptr @foo.version_1
+ *
+ * if.else_2:
+ *   %is_version_2 = __builtin_cpu_supports(version_2)
+ * ...
+ * if.else:                                          ; preds = %entry
+ *   ret ptr @foo.default
+ * }
  */
 void CodeGenFunction::EmitPPCAIXMultiVersionResolver(
     llvm::Function *Resolver, ArrayRef<FMVResolverOption> Options) {
@@ -3105,9 +3118,8 @@ void CodeGenFunction::EmitPPCAIXMultiVersionResolver(
     Builder.SetInsertPoint(CurBlock);
     // The 'default' or 'generic' case.
     if (!RO.Architecture && RO.Features.empty()) {
-      // if.default:
-      //   %fmv.default = call ptr @getEntryPoint(ptr noundef @foo_default)
-      //   br label %resolver_exit
+      // if.else:
+      //   ret ptr @foo.default
       assert(&RO == Options.end() - 1 &&
              "Default or Generic case must be last");
       Builder.CreateRet(RO.Function);
@@ -3115,11 +3127,10 @@ void CodeGenFunction::EmitPPCAIXMultiVersionResolver(
     }
     // if.else_n:
     //   %is_version_n = __builtin_cpu_supports(version_n)
-    //   br i1 %is_version_n, label %if.version_n, label %if.default
+    //   br i1 %is_version_n, label %if.version_n, label %if.else_n+1
     //
     // if.version_n:
-    //   %fmv.version.n = call ptr @getEntryPoint(ptr noundef @foo_version_n)
-    //   br label %resolver_exit
+    //   ret ptr @foo_version_n
     assert(RO.Features.size() == 1 &&
            "for now one feature requirement per version");
 
