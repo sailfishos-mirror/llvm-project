@@ -2467,10 +2467,11 @@ fillAffinityIteratorLoop(mlir::omp::IteratorOp itersOp,
     // Extract affinity entry from omp.yield and store into list[linearIV].
     auto yield =
         mlir::dyn_cast<mlir::omp::YieldOp>(iteratorRegionBlock.getTerminator());
-    assert(yield.getResults().size() == 1 &&
+    assert(yield && yield.getResults().size() == 1 &&
            "expect omp.yield in iterator region to have one result");
     auto entryOp =
         yield.getResults()[0].getDefiningOp<mlir::omp::AffinityEntryOp>();
+    assert(entryOp && "expect yield generate an affinity entry");
 
     llvm::Value *addr = moduleTranslation.lookupValue(entryOp.getAddr());
     llvm::Value *len = moduleTranslation.lookupValue(entryOp.getLen());
