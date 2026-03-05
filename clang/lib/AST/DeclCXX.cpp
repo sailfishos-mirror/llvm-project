@@ -3318,7 +3318,7 @@ NamespaceDecl *UsingDirectiveDecl::getNominatedNamespace() {
   return cast_or_null<NamespaceDecl>(NominatedNamespace);
 }
 
-NamespaceDecl::NamespaceDecl(ASTContext &C, DeclContext *DC, bool Inline,
+NamespaceDecl::NamespaceDecl(const ASTContext &C, DeclContext *DC, bool Inline,
                              SourceLocation StartLoc, SourceLocation IdLoc,
                              IdentifierInfo *Id, NamespaceDecl *PrevDecl,
                              bool Nested)
@@ -3329,7 +3329,7 @@ NamespaceDecl::NamespaceDecl(ASTContext &C, DeclContext *DC, bool Inline,
   setPreviousDecl(PrevDecl);
 }
 
-NamespaceDecl *NamespaceDecl::Create(ASTContext &C, DeclContext *DC,
+NamespaceDecl *NamespaceDecl::Create(const ASTContext &C, DeclContext *DC,
                                      bool Inline, SourceLocation StartLoc,
                                      SourceLocation IdLoc, IdentifierInfo *Id,
                                      NamespaceDecl *PrevDecl, bool Nested) {
@@ -3337,7 +3337,7 @@ NamespaceDecl *NamespaceDecl::Create(ASTContext &C, DeclContext *DC,
       NamespaceDecl(C, DC, Inline, StartLoc, IdLoc, Id, PrevDecl, Nested);
 }
 
-NamespaceDecl *NamespaceDecl::CreateDeserialized(ASTContext &C,
+NamespaceDecl *NamespaceDecl::CreateDeserialized(const ASTContext &C,
                                                  GlobalDeclID ID) {
   return new (C, ID) NamespaceDecl(C, nullptr, false, SourceLocation(),
                                    SourceLocation(), nullptr, nullptr, false);

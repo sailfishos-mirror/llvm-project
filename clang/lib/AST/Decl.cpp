@@ -100,7 +100,7 @@ bool Decl::isOutOfLine() const {
   return !getLexicalDeclContext()->Equals(getDeclContext());
 }
 
-TranslationUnitDecl::TranslationUnitDecl(ASTContext &ctx)
+TranslationUnitDecl::TranslationUnitDecl(const ASTContext &ctx)
     : Decl(TranslationUnit, nullptr, SourceLocation()),
       DeclContext(TranslationUnit), redeclarable_base(ctx), Ctx(ctx) {}
 
@@ -2143,7 +2143,7 @@ const char *VarDecl::getStorageClassSpecifierString(StorageClass SC) {
   llvm_unreachable("Invalid storage class");
 }
 
-VarDecl::VarDecl(Kind DK, ASTContext &C, DeclContext *DC,
+VarDecl::VarDecl(Kind DK, const ASTContext &C, DeclContext *DC,
                  SourceLocation StartLoc, SourceLocation IdLoc,
                  const IdentifierInfo *Id, QualType T, TypeSourceInfo *TInfo,
                  StorageClass SC)
@@ -2160,13 +2160,14 @@ VarDecl::VarDecl(Kind DK, ASTContext &C, DeclContext *DC,
   // Everything else is implicitly initialized to false.
 }
 
-VarDecl *VarDecl::Create(ASTContext &C, DeclContext *DC, SourceLocation StartL,
-                         SourceLocation IdL, const IdentifierInfo *Id,
-                         QualType T, TypeSourceInfo *TInfo, StorageClass S) {
+VarDecl *VarDecl::Create(const ASTContext &C, DeclContext *DC,
+                         SourceLocation StartL, SourceLocation IdL,
+                         const IdentifierInfo *Id, QualType T,
+                         TypeSourceInfo *TInfo, StorageClass S) {
   return new (C, DC) VarDecl(Var, C, DC, StartL, IdL, Id, T, TInfo, S);
 }
 
-VarDecl *VarDecl::CreateDeserialized(ASTContext &C, GlobalDeclID ID) {
+VarDecl *VarDecl::CreateDeserialized(const ASTContext &C, GlobalDeclID ID) {
   return new (C, ID)
       VarDecl(Var, C, nullptr, SourceLocation(), SourceLocation(), nullptr,
               QualType(), nullptr, SC_None);
@@ -2955,7 +2956,7 @@ VarDecl::setInstantiationOfStaticDataMember(VarDecl *VD,
 // ParmVarDecl Implementation
 //===----------------------------------------------------------------------===//
 
-ParmVarDecl *ParmVarDecl::Create(ASTContext &C, DeclContext *DC,
+ParmVarDecl *ParmVarDecl::Create(const ASTContext &C, DeclContext *DC,
                                  SourceLocation StartLoc, SourceLocation IdLoc,
                                  const IdentifierInfo *Id, QualType T,
                                  TypeSourceInfo *TInfo, StorageClass S,
@@ -2972,7 +2973,8 @@ QualType ParmVarDecl::getOriginalType() const {
   return T;
 }
 
-ParmVarDecl *ParmVarDecl::CreateDeserialized(ASTContext &C, GlobalDeclID ID) {
+ParmVarDecl *ParmVarDecl::CreateDeserialized(const ASTContext &C,
+                                             GlobalDeclID ID) {
   return new (C, ID)
       ParmVarDecl(ParmVar, C, nullptr, SourceLocation(), SourceLocation(),
                   nullptr, QualType(), nullptr, SC_None, nullptr);
@@ -3077,7 +3079,7 @@ unsigned ParmVarDecl::getParameterIndexLarge() const {
 // FunctionDecl Implementation
 //===----------------------------------------------------------------------===//
 
-FunctionDecl::FunctionDecl(Kind DK, ASTContext &C, DeclContext *DC,
+FunctionDecl::FunctionDecl(Kind DK, const ASTContext &C, DeclContext *DC,
                            SourceLocation StartLoc,
                            const DeclarationNameInfo &NameInfo, QualType T,
                            TypeSourceInfo *TInfo, StorageClass S,
@@ -3139,7 +3141,7 @@ bool FunctionDecl::isVariadic() const {
 
 FunctionDecl::DefaultedOrDeletedFunctionInfo *
 FunctionDecl::DefaultedOrDeletedFunctionInfo::Create(
-    ASTContext &Context, ArrayRef<DeclAccessPair> Lookups,
+    const ASTContext &Context, ArrayRef<DeclAccessPair> Lookups,
     StringLiteral *DeletedMessage) {
   static constexpr size_t Alignment =
       std::max({alignof(DefaultedOrDeletedFunctionInfo),
@@ -4707,7 +4709,7 @@ FieldDecl *FieldDecl::Create(const ASTContext &C, DeclContext *DC,
                                BW, Mutable, InitStyle);
 }
 
-FieldDecl *FieldDecl::CreateDeserialized(ASTContext &C, GlobalDeclID ID) {
+FieldDecl *FieldDecl::CreateDeserialized(const ASTContext &C, GlobalDeclID ID) {
   return new (C, ID) FieldDecl(Field, nullptr, SourceLocation(),
                                SourceLocation(), nullptr, QualType(), nullptr,
                                nullptr, false, ICIS_NoInit);
@@ -5055,9 +5057,10 @@ void TagDecl::setTemplateParameterListsInfo(
 // EnumDecl Implementation
 //===----------------------------------------------------------------------===//
 
-EnumDecl::EnumDecl(ASTContext &C, DeclContext *DC, SourceLocation StartLoc,
-                   SourceLocation IdLoc, IdentifierInfo *Id, EnumDecl *PrevDecl,
-                   bool Scoped, bool ScopedUsingClassTag, bool Fixed)
+EnumDecl::EnumDecl(const ASTContext &C, DeclContext *DC,
+                   SourceLocation StartLoc, SourceLocation IdLoc,
+                   IdentifierInfo *Id, EnumDecl *PrevDecl, bool Scoped,
+                   bool ScopedUsingClassTag, bool Fixed)
     : TagDecl(Enum, TagTypeKind::Enum, C, DC, IdLoc, Id, PrevDecl, StartLoc) {
   assert(Scoped || !ScopedUsingClassTag);
   IntegerType = nullptr;
@@ -5072,16 +5075,16 @@ EnumDecl::EnumDecl(ASTContext &C, DeclContext *DC, SourceLocation StartLoc,
 
 void EnumDecl::anchor() {}
 
-EnumDecl *EnumDecl::Create(ASTContext &C, DeclContext *DC,
+EnumDecl *EnumDecl::Create(const ASTContext &C, DeclContext *DC,
                            SourceLocation StartLoc, SourceLocation IdLoc,
-                           IdentifierInfo *Id,
-                           EnumDecl *PrevDecl, bool IsScoped,
-                           bool IsScopedUsingClassTag, bool IsFixed) {
+                           IdentifierInfo *Id, EnumDecl *PrevDecl,
+                           bool IsScoped, bool IsScopedUsingClassTag,
+                           bool IsFixed) {
   return new (C, DC) EnumDecl(C, DC, StartLoc, IdLoc, Id, PrevDecl, IsScoped,
                               IsScopedUsingClassTag, IsFixed);
 }
 
-EnumDecl *EnumDecl::CreateDeserialized(ASTContext &C, GlobalDeclID ID) {
+EnumDecl *EnumDecl::CreateDeserialized(const ASTContext &C, GlobalDeclID ID) {
   return new (C, ID) EnumDecl(C, nullptr, SourceLocation(), SourceLocation(),
                               nullptr, nullptr, false, false, false);
 }
@@ -5487,7 +5490,7 @@ SourceRange BlockDecl::getSourceRange() const {
 
 void TranslationUnitDecl::anchor() {}
 
-TranslationUnitDecl *TranslationUnitDecl::Create(ASTContext &C) {
+TranslationUnitDecl *TranslationUnitDecl::Create(const ASTContext &C) {
   return new (C, (DeclContext *)nullptr) TranslationUnitDecl(C);
 }
 
@@ -5513,7 +5516,7 @@ PragmaCommentDecl *PragmaCommentDecl::Create(const ASTContext &C,
   return PCD;
 }
 
-PragmaCommentDecl *PragmaCommentDecl::CreateDeserialized(ASTContext &C,
+PragmaCommentDecl *PragmaCommentDecl::CreateDeserialized(const ASTContext &C,
                                                          GlobalDeclID ID,
                                                          unsigned ArgSize) {
   return new (C, ID, additionalSizeToAlloc<char>(ArgSize + 1))
@@ -5537,9 +5540,8 @@ PragmaDetectMismatchDecl::Create(const ASTContext &C, TranslationUnitDecl *DC,
   return PDMD;
 }
 
-PragmaDetectMismatchDecl *
-PragmaDetectMismatchDecl::CreateDeserialized(ASTContext &C, GlobalDeclID ID,
-                                             unsigned NameValueSize) {
+PragmaDetectMismatchDecl *PragmaDetectMismatchDecl::CreateDeserialized(
+    const ASTContext &C, GlobalDeclID ID, unsigned NameValueSize) {
   return new (C, ID, additionalSizeToAlloc<char>(NameValueSize + 1))
       PragmaDetectMismatchDecl(nullptr, SourceLocation(), 0);
 }
@@ -5553,19 +5555,19 @@ ExternCContextDecl *ExternCContextDecl::Create(const ASTContext &C,
 
 void LabelDecl::anchor() {}
 
-LabelDecl *LabelDecl::Create(ASTContext &C, DeclContext *DC,
+LabelDecl *LabelDecl::Create(const ASTContext &C, DeclContext *DC,
                              SourceLocation IdentL, IdentifierInfo *II) {
   return new (C, DC) LabelDecl(DC, IdentL, II, nullptr, IdentL);
 }
 
-LabelDecl *LabelDecl::Create(ASTContext &C, DeclContext *DC,
+LabelDecl *LabelDecl::Create(const ASTContext &C, DeclContext *DC,
                              SourceLocation IdentL, IdentifierInfo *II,
                              SourceLocation GnuLabelL) {
   assert(GnuLabelL != IdentL && "Use this only for GNU local labels");
   return new (C, DC) LabelDecl(DC, IdentL, II, nullptr, GnuLabelL);
 }
 
-LabelDecl *LabelDecl::CreateDeserialized(ASTContext &C, GlobalDeclID ID) {
+LabelDecl *LabelDecl::CreateDeserialized(const ASTContext &C, GlobalDeclID ID) {
   return new (C, ID) LabelDecl(nullptr, SourceLocation(), nullptr, nullptr,
                                SourceLocation());
 }
@@ -5600,30 +5602,30 @@ bool ValueDecl::isParameterPack() const {
 
 void ImplicitParamDecl::anchor() {}
 
-ImplicitParamDecl *ImplicitParamDecl::Create(ASTContext &C, DeclContext *DC,
+ImplicitParamDecl *ImplicitParamDecl::Create(const ASTContext &C,
+                                             DeclContext *DC,
                                              SourceLocation IdLoc,
                                              IdentifierInfo *Id, QualType Type,
                                              ImplicitParamKind ParamKind) {
   return new (C, DC) ImplicitParamDecl(C, DC, IdLoc, Id, Type, ParamKind);
 }
 
-ImplicitParamDecl *ImplicitParamDecl::Create(ASTContext &C, QualType Type,
+ImplicitParamDecl *ImplicitParamDecl::Create(const ASTContext &C, QualType Type,
                                              ImplicitParamKind ParamKind) {
   return new (C, nullptr) ImplicitParamDecl(C, Type, ParamKind);
 }
 
-ImplicitParamDecl *ImplicitParamDecl::CreateDeserialized(ASTContext &C,
+ImplicitParamDecl *ImplicitParamDecl::CreateDeserialized(const ASTContext &C,
                                                          GlobalDeclID ID) {
   return new (C, ID) ImplicitParamDecl(C, QualType(), ImplicitParamKind::Other);
 }
 
-FunctionDecl *
-FunctionDecl::Create(ASTContext &C, DeclContext *DC, SourceLocation StartLoc,
-                     const DeclarationNameInfo &NameInfo, QualType T,
-                     TypeSourceInfo *TInfo, StorageClass SC, bool UsesFPIntrin,
-                     bool isInlineSpecified, bool hasWrittenPrototype,
-                     ConstexprSpecKind ConstexprKind,
-                     const AssociatedConstraint &TrailingRequiresClause) {
+FunctionDecl *FunctionDecl::Create(
+    const ASTContext &C, DeclContext *DC, SourceLocation StartLoc,
+    const DeclarationNameInfo &NameInfo, QualType T, TypeSourceInfo *TInfo,
+    StorageClass SC, bool UsesFPIntrin, bool isInlineSpecified,
+    bool hasWrittenPrototype, ConstexprSpecKind ConstexprKind,
+    const AssociatedConstraint &TrailingRequiresClause) {
   FunctionDecl *New = new (C, DC) FunctionDecl(
       Function, C, DC, StartLoc, NameInfo, T, TInfo, SC, UsesFPIntrin,
       isInlineSpecified, ConstexprKind, TrailingRequiresClause);
@@ -5631,7 +5633,8 @@ FunctionDecl::Create(ASTContext &C, DeclContext *DC, SourceLocation StartLoc,
   return New;
 }
 
-FunctionDecl *FunctionDecl::CreateDeserialized(ASTContext &C, GlobalDeclID ID) {
+FunctionDecl *FunctionDecl::CreateDeserialized(const ASTContext &C,
+                                               GlobalDeclID ID) {
   return new (C, ID) FunctionDecl(
       Function, C, nullptr, SourceLocation(), DeclarationNameInfo(), QualType(),
       nullptr, SC_None, false, false, ConstexprSpecKind::Unspecified,
@@ -5643,11 +5646,12 @@ bool FunctionDecl::isReferenceableKernel() const {
          DeviceKernelAttr::isOpenCLSpelling(getAttr<DeviceKernelAttr>());
 }
 
-BlockDecl *BlockDecl::Create(ASTContext &C, DeclContext *DC, SourceLocation L) {
+BlockDecl *BlockDecl::Create(const ASTContext &C, DeclContext *DC,
+                             SourceLocation L) {
   return new (C, DC) BlockDecl(DC, L);
 }
 
-BlockDecl *BlockDecl::CreateDeserialized(ASTContext &C, GlobalDeclID ID) {
+BlockDecl *BlockDecl::CreateDeserialized(const ASTContext &C, GlobalDeclID ID) {
   return new (C, ID) BlockDecl(nullptr, SourceLocation());
 }
 
@@ -5656,7 +5660,7 @@ OutlinedFunctionDecl::OutlinedFunctionDecl(DeclContext *DC, unsigned NumParams)
       DeclContext(OutlinedFunction), NumParams(NumParams),
       BodyAndNothrow(nullptr, false) {}
 
-OutlinedFunctionDecl *OutlinedFunctionDecl::Create(ASTContext &C,
+OutlinedFunctionDecl *OutlinedFunctionDecl::Create(const ASTContext &C,
                                                    DeclContext *DC,
                                                    unsigned NumParams) {
   return new (C, DC, additionalSizeToAlloc<ImplicitParamDecl *>(NumParams))
@@ -5664,7 +5668,7 @@ OutlinedFunctionDecl *OutlinedFunctionDecl::Create(ASTContext &C,
 }
 
 OutlinedFunctionDecl *
-OutlinedFunctionDecl::CreateDeserialized(ASTContext &C, GlobalDeclID ID,
+OutlinedFunctionDecl::CreateDeserialized(const ASTContext &C, GlobalDeclID ID,
                                          unsigned NumParams) {
   return new (C, ID, additionalSizeToAlloc<ImplicitParamDecl *>(NumParams))
       OutlinedFunctionDecl(nullptr, NumParams);
@@ -5684,13 +5688,14 @@ CapturedDecl::CapturedDecl(DeclContext *DC, unsigned NumParams)
     : Decl(Captured, DC, SourceLocation()), DeclContext(Captured),
       NumParams(NumParams), ContextParam(0), BodyAndNothrow(nullptr, false) {}
 
-CapturedDecl *CapturedDecl::Create(ASTContext &C, DeclContext *DC,
+CapturedDecl *CapturedDecl::Create(const ASTContext &C, DeclContext *DC,
                                    unsigned NumParams) {
   return new (C, DC, additionalSizeToAlloc<ImplicitParamDecl *>(NumParams))
       CapturedDecl(DC, NumParams);
 }
 
-CapturedDecl *CapturedDecl::CreateDeserialized(ASTContext &C, GlobalDeclID ID,
+CapturedDecl *CapturedDecl::CreateDeserialized(const ASTContext &C,
+                                               GlobalDeclID ID,
                                                unsigned NumParams) {
   return new (C, ID, additionalSizeToAlloc<ImplicitParamDecl *>(NumParams))
       CapturedDecl(nullptr, NumParams);
@@ -5709,14 +5714,14 @@ EnumConstantDecl::EnumConstantDecl(const ASTContext &C, DeclContext *DC,
   setInitVal(C, V);
 }
 
-EnumConstantDecl *EnumConstantDecl::Create(ASTContext &C, EnumDecl *CD,
-                                           SourceLocation L,
-                                           IdentifierInfo *Id, QualType T,
-                                           Expr *E, const llvm::APSInt &V) {
+EnumConstantDecl *EnumConstantDecl::Create(const ASTContext &C, EnumDecl *CD,
+                                           SourceLocation L, IdentifierInfo *Id,
+                                           QualType T, Expr *E,
+                                           const llvm::APSInt &V) {
   return new (C, CD) EnumConstantDecl(C, CD, L, Id, T, E, V);
 }
 
-EnumConstantDecl *EnumConstantDecl::CreateDeserialized(ASTContext &C,
+EnumConstantDecl *EnumConstantDecl::CreateDeserialized(const ASTContext &C,
                                                        GlobalDeclID ID) {
   return new (C, ID) EnumConstantDecl(C, nullptr, SourceLocation(), nullptr,
                                       QualType(), nullptr, llvm::APSInt());
@@ -5724,7 +5729,7 @@ EnumConstantDecl *EnumConstantDecl::CreateDeserialized(ASTContext &C,
 
 void IndirectFieldDecl::anchor() {}
 
-IndirectFieldDecl::IndirectFieldDecl(ASTContext &C, DeclContext *DC,
+IndirectFieldDecl::IndirectFieldDecl(const ASTContext &C, DeclContext *DC,
                                      SourceLocation L, DeclarationName N,
                                      QualType T,
                                      MutableArrayRef<NamedDecl *> CH)
@@ -5736,15 +5741,15 @@ IndirectFieldDecl::IndirectFieldDecl(ASTContext &C, DeclContext *DC,
     IdentifierNamespace |= IDNS_Tag;
 }
 
-IndirectFieldDecl *IndirectFieldDecl::Create(ASTContext &C, DeclContext *DC,
-                                             SourceLocation L,
+IndirectFieldDecl *IndirectFieldDecl::Create(const ASTContext &C,
+                                             DeclContext *DC, SourceLocation L,
                                              const IdentifierInfo *Id,
                                              QualType T,
                                              MutableArrayRef<NamedDecl *> CH) {
   return new (C, DC) IndirectFieldDecl(C, DC, L, Id, T, CH);
 }
 
-IndirectFieldDecl *IndirectFieldDecl::CreateDeserialized(ASTContext &C,
+IndirectFieldDecl *IndirectFieldDecl::CreateDeserialized(const ASTContext &C,
                                                          GlobalDeclID ID) {
   return new (C, ID) IndirectFieldDecl(C, nullptr, SourceLocation(),
                                        DeclarationName(), QualType(), {});
@@ -5759,7 +5764,7 @@ SourceRange EnumConstantDecl::getSourceRange() const {
 
 void TypeDecl::anchor() {}
 
-TypedefDecl *TypedefDecl::Create(ASTContext &C, DeclContext *DC,
+TypedefDecl *TypedefDecl::Create(const ASTContext &C, DeclContext *DC,
                                  SourceLocation StartLoc, SourceLocation IdLoc,
                                  const IdentifierInfo *Id,
                                  TypeSourceInfo *TInfo) {
@@ -5805,12 +5810,13 @@ bool TypedefNameDecl::isTransparentTagSlow() const {
   return isTransparent;
 }
 
-TypedefDecl *TypedefDecl::CreateDeserialized(ASTContext &C, GlobalDeclID ID) {
+TypedefDecl *TypedefDecl::CreateDeserialized(const ASTContext &C,
+                                             GlobalDeclID ID) {
   return new (C, ID) TypedefDecl(C, nullptr, SourceLocation(), SourceLocation(),
                                  nullptr, nullptr);
 }
 
-TypeAliasDecl *TypeAliasDecl::Create(ASTContext &C, DeclContext *DC,
+TypeAliasDecl *TypeAliasDecl::Create(const ASTContext &C, DeclContext *DC,
                                      SourceLocation StartLoc,
                                      SourceLocation IdLoc,
                                      const IdentifierInfo *Id,
@@ -5818,7 +5824,7 @@ TypeAliasDecl *TypeAliasDecl::Create(ASTContext &C, DeclContext *DC,
   return new (C, DC) TypeAliasDecl(C, DC, StartLoc, IdLoc, Id, TInfo);
 }
 
-TypeAliasDecl *TypeAliasDecl::CreateDeserialized(ASTContext &C,
+TypeAliasDecl *TypeAliasDecl::CreateDeserialized(const ASTContext &C,
                                                  GlobalDeclID ID) {
   return new (C, ID) TypeAliasDecl(C, nullptr, SourceLocation(),
                                    SourceLocation(), nullptr, nullptr);
@@ -5842,13 +5848,13 @@ SourceRange TypeAliasDecl::getSourceRange() const {
 
 void FileScopeAsmDecl::anchor() {}
 
-FileScopeAsmDecl *FileScopeAsmDecl::Create(ASTContext &C, DeclContext *DC,
+FileScopeAsmDecl *FileScopeAsmDecl::Create(const ASTContext &C, DeclContext *DC,
                                            Expr *Str, SourceLocation AsmLoc,
                                            SourceLocation RParenLoc) {
   return new (C, DC) FileScopeAsmDecl(DC, Str, AsmLoc, RParenLoc);
 }
 
-FileScopeAsmDecl *FileScopeAsmDecl::CreateDeserialized(ASTContext &C,
+FileScopeAsmDecl *FileScopeAsmDecl::CreateDeserialized(const ASTContext &C,
                                                        GlobalDeclID ID) {
   return new (C, ID) FileScopeAsmDecl(nullptr, nullptr, SourceLocation(),
                                       SourceLocation());
@@ -5860,7 +5866,8 @@ std::string FileScopeAsmDecl::getAsmString() const {
 
 void TopLevelStmtDecl::anchor() {}
 
-TopLevelStmtDecl *TopLevelStmtDecl::Create(ASTContext &C, Stmt *Statement) {
+TopLevelStmtDecl *TopLevelStmtDecl::Create(const ASTContext &C,
+                                           Stmt *Statement) {
   assert(C.getLangOpts().IncrementalExtensions &&
          "Must be used only in incremental mode");
 
@@ -5870,7 +5877,7 @@ TopLevelStmtDecl *TopLevelStmtDecl::Create(ASTContext &C, Stmt *Statement) {
   return new (C, DC) TopLevelStmtDecl(DC, Loc, Statement);
 }
 
-TopLevelStmtDecl *TopLevelStmtDecl::CreateDeserialized(ASTContext &C,
+TopLevelStmtDecl *TopLevelStmtDecl::CreateDeserialized(const ASTContext &C,
                                                        GlobalDeclID ID) {
   return new (C, ID)
       TopLevelStmtDecl(/*DC=*/nullptr, SourceLocation(), /*S=*/nullptr);
@@ -5888,11 +5895,12 @@ void TopLevelStmtDecl::setStmt(Stmt *S) {
 
 void EmptyDecl::anchor() {}
 
-EmptyDecl *EmptyDecl::Create(ASTContext &C, DeclContext *DC, SourceLocation L) {
+EmptyDecl *EmptyDecl::Create(const ASTContext &C, DeclContext *DC,
+                             SourceLocation L) {
   return new (C, DC) EmptyDecl(DC, L);
 }
 
-EmptyDecl *EmptyDecl::CreateDeserialized(ASTContext &C, GlobalDeclID ID) {
+EmptyDecl *EmptyDecl::CreateDeserialized(const ASTContext &C, GlobalDeclID ID) {
   return new (C, ID) EmptyDecl(nullptr, SourceLocation());
 }
 
@@ -5903,7 +5911,7 @@ HLSLBufferDecl::HLSLBufferDecl(DeclContext *DC, bool CBuffer,
       DeclContext(Decl::Kind::HLSLBuffer), LBraceLoc(LBrace), KwLoc(KwLoc),
       IsCBuffer(CBuffer), HasValidPackoffset(false), LayoutStruct(nullptr) {}
 
-HLSLBufferDecl *HLSLBufferDecl::Create(ASTContext &C,
+HLSLBufferDecl *HLSLBufferDecl::Create(const ASTContext &C,
                                        DeclContext *LexicalParent, bool CBuffer,
                                        SourceLocation KwLoc, IdentifierInfo *ID,
                                        SourceLocation IDLoc,
@@ -5926,7 +5934,8 @@ HLSLBufferDecl *HLSLBufferDecl::Create(ASTContext &C,
 }
 
 HLSLBufferDecl *
-HLSLBufferDecl::CreateDefaultCBuffer(ASTContext &C, DeclContext *LexicalParent,
+HLSLBufferDecl::CreateDefaultCBuffer(const ASTContext &C,
+                                     DeclContext *LexicalParent,
                                      ArrayRef<Decl *> DefaultCBufferDecls) {
   DeclContext *DC = LexicalParent;
   IdentifierInfo *II = &C.Idents.get("$Globals", tok::TokenKind::identifier);
@@ -5937,7 +5946,7 @@ HLSLBufferDecl::CreateDefaultCBuffer(ASTContext &C, DeclContext *LexicalParent,
   return Result;
 }
 
-HLSLBufferDecl *HLSLBufferDecl::CreateDeserialized(ASTContext &C,
+HLSLBufferDecl *HLSLBufferDecl::CreateDeserialized(const ASTContext &C,
                                                    GlobalDeclID ID) {
   return new (C, ID) HLSLBufferDecl(nullptr, false, SourceLocation(), nullptr,
                                     SourceLocation(), SourceLocation());
@@ -5990,8 +5999,8 @@ HLSLRootSignatureDecl::HLSLRootSignatureDecl(
       Version(Version), NumElems(NumElems) {}
 
 HLSLRootSignatureDecl *HLSLRootSignatureDecl::Create(
-    ASTContext &C, DeclContext *DC, SourceLocation Loc, IdentifierInfo *ID,
-    llvm::dxbc::RootSignatureVersion Version,
+    const ASTContext &C, DeclContext *DC, SourceLocation Loc,
+    IdentifierInfo *ID, llvm::dxbc::RootSignatureVersion Version,
     ArrayRef<llvm::hlsl::rootsig::RootElement> RootElements) {
   HLSLRootSignatureDecl *RSDecl =
       new (C, DC,
@@ -6004,7 +6013,8 @@ HLSLRootSignatureDecl *HLSLRootSignatureDecl::Create(
 }
 
 HLSLRootSignatureDecl *
-HLSLRootSignatureDecl::CreateDeserialized(ASTContext &C, GlobalDeclID ID) {
+HLSLRootSignatureDecl::CreateDeserialized(const ASTContext &C,
+                                          GlobalDeclID ID) {
   HLSLRootSignatureDecl *Result = new (C, ID)
       HLSLRootSignatureDecl(nullptr, SourceLocation(), nullptr,
                             /*Version*/ llvm::dxbc::RootSignatureVersion::V1_1,
@@ -6044,7 +6054,7 @@ ImportDecl::ImportDecl(DeclContext *DC, SourceLocation StartLoc,
   *getTrailingObjects() = EndLoc;
 }
 
-ImportDecl *ImportDecl::Create(ASTContext &C, DeclContext *DC,
+ImportDecl *ImportDecl::Create(const ASTContext &C, DeclContext *DC,
                                SourceLocation StartLoc, Module *Imported,
                                ArrayRef<SourceLocation> IdentifierLocs) {
   return new (C, DC,
@@ -6052,7 +6062,7 @@ ImportDecl *ImportDecl::Create(ASTContext &C, DeclContext *DC,
       ImportDecl(DC, StartLoc, Imported, IdentifierLocs);
 }
 
-ImportDecl *ImportDecl::CreateImplicit(ASTContext &C, DeclContext *DC,
+ImportDecl *ImportDecl::CreateImplicit(const ASTContext &C, DeclContext *DC,
                                        SourceLocation StartLoc,
                                        Module *Imported,
                                        SourceLocation EndLoc) {
@@ -6062,7 +6072,7 @@ ImportDecl *ImportDecl::CreateImplicit(ASTContext &C, DeclContext *DC,
   return Import;
 }
 
-ImportDecl *ImportDecl::CreateDeserialized(ASTContext &C, GlobalDeclID ID,
+ImportDecl *ImportDecl::CreateDeserialized(const ASTContext &C, GlobalDeclID ID,
                                            unsigned NumLocations) {
   return new (C, ID, additionalSizeToAlloc<SourceLocation>(NumLocations))
       ImportDecl(EmptyShell());
@@ -6088,12 +6098,13 @@ SourceRange ImportDecl::getSourceRange() const {
 
 void ExportDecl::anchor() {}
 
-ExportDecl *ExportDecl::Create(ASTContext &C, DeclContext *DC,
+ExportDecl *ExportDecl::Create(const ASTContext &C, DeclContext *DC,
                                SourceLocation ExportLoc) {
   return new (C, DC) ExportDecl(DC, ExportLoc);
 }
 
-ExportDecl *ExportDecl::CreateDeserialized(ASTContext &C, GlobalDeclID ID) {
+ExportDecl *ExportDecl::CreateDeserialized(const ASTContext &C,
+                                           GlobalDeclID ID) {
   return new (C, ID) ExportDecl(nullptr, SourceLocation());
 }
 
