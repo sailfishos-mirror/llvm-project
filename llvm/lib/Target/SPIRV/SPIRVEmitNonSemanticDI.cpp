@@ -585,7 +585,7 @@ bool SPIRVEmitNonSemanticDI::emitFunctionDI(MachineFunction &MF) {
   }
 }
 
-// TODO: Deduplicate instructions
+// TODO: Deduplicate instructions.
 bool SPIRVEmitNonSemanticDI::runOnMachineFunction(MachineFunction &MF) {
   CompileUnitRegMap.clear();
   bool Res = emitGlobalDI(MF);
