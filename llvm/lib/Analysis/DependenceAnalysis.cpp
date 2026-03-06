@@ -1153,6 +1153,29 @@ static const SCEV *minusSCEVNoSignedOverflow(const SCEV *A, const SCEV *B,
   return nullptr;
 }
 
+/// Returns whether \p A is guaranteed not to be the signed minimum value for
+/// its type.
+static bool isKnownNonSignedMinimum(const SCEV *A, ScalarEvolution &SE) {
+  IntegerType *Ty = cast<IntegerType>(A->getType());
+  if (!Ty)
+    return false;
+
+  const SCEV *SMin =
+      SE.getConstant(APInt::getSignedMinValue(Ty->getBitWidth()));
+  return SE.isKnownPredicate(CmpInst::ICMP_NE, A, SMin);
+}
+
+/// Returns the absolute value of \p A. In the context of dependence analysis,
+/// we need a negative value in a mathematical sense. If \p A is the signed
+/// minimum value, we cannot represent its negative value unless extending the
+/// original type. In that case, nullptr is returned to indicate the failure.
+static const SCEV *negativeSCEVNoSignedOverflow(const SCEV *A,
+                                                ScalarEvolution &SE) {
+  if (!isKnownNonSignedMinimum(A, SE))
+    return nullptr;
+  return SE.getNegativeSCEV(A);
+}
+
 /// Returns true iff \p Test is enabled.
 static bool isDependenceTestEnabled(DependenceTestType Test) {
   if (EnableDependenceTest == DependenceTestType::All)
@@ -1852,8 +1875,11 @@ bool DependenceInfo::weakZeroSrcSIVtest(const SCEV *DstCoeff,
   const SCEV *AbsCoeff = SE->isKnownNegative(ConstCoeff)
                              ? SE->getNegativeSCEV(ConstCoeff)
                              : ConstCoeff;
-  const SCEV *NewDelta =
-      SE->isKnownNegative(ConstCoeff) ? SE->getNegativeSCEV(Delta) : Delta;
+  const SCEV *NewDelta = SE->isKnownNegative(ConstCoeff)
+                             ? negativeSCEVNoSignedOverflow(Delta, *SE)
+                             : Delta;
+  if (!NewDelta)
+    return false;
 
   // check that Delta/SrcCoeff < iteration count
   // really check NewDelta < count*AbsCoeff
@@ -1964,8 +1990,11 @@ bool DependenceInfo::weakZeroDstSIVtest(const SCEV *SrcCoeff,
   const SCEV *AbsCoeff = SE->isKnownNegative(ConstCoeff)
                              ? SE->getNegativeSCEV(ConstCoeff)
                              : ConstCoeff;
-  const SCEV *NewDelta =
-      SE->isKnownNegative(ConstCoeff) ? SE->getNegativeSCEV(Delta) : Delta;
+  const SCEV *NewDelta = SE->isKnownNegative(ConstCoeff)
+                             ? negativeSCEVNoSignedOverflow(Delta, *SE)
+                             : Delta;
+  if (!NewDelta)
+    return false;
 
   // check that Delta/SrcCoeff < iteration count
   // really check NewDelta < count*AbsCoeff
