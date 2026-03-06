@@ -133,6 +133,9 @@ static std::string format(const char *fmt, Ts... values) {
   return os.str();
 }
 
+parser::Message &SayReason(
+    parser::Messages &msgs, const std::string &why, parser::CharBlock source);
+
 std::pair<std::optional<int64_t>, Reason> GetArgumentValueWithReason(
     const parser::OmpDirectiveSpecification &spec, llvm::omp::Clause clauseId,
     unsigned version);

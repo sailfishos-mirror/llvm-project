@@ -243,6 +243,7 @@ void OmpStructureChecker::CheckSIMDNest(const parser::OpenMPConstruct &c) {
 void OmpStructureChecker::CheckNestedConstruct(
     const parser::OpenMPLoopConstruct &x) {
   const parser::OmpDirectiveSpecification &beginSpec{x.BeginDir()};
+  llvm::omp::Directive dir{beginSpec.DirId()};
   unsigned version{context_.langOptions().OpenMPVersion};
 
   // End-directive is not allowed in such cases:
@@ -266,8 +267,8 @@ void OmpStructureChecker::CheckNestedConstruct(
   // Check constructs contained in the body of the loop construct.
   auto &body{std::get<parser::Block>(x.t)};
   for (auto &stmt : BlockRange(body, BlockRange::Step::Over)) {
-    if (auto *dir{parser::Unwrap<parser::CompilerDirective>(stmt)}) {
-      context_.Say(dir->source,
+    if (auto *d{parser::Unwrap<parser::CompilerDirective>(stmt)}) {
+      context_.Say(d->source,
           "Compiler directives are not allowed inside OpenMP loop constructs"_warn_en_US);
     } else if (auto *omp{parser::Unwrap<parser::OpenMPLoopConstruct>(stmt)}) {
       if (!IsLoopTransforming(omp->BeginDir().DirId())) {
@@ -289,6 +290,9 @@ void OmpStructureChecker::CheckNestedConstruct(
 
   // Check if a loop-nest-associated construct has only one top-level loop
   // in it.
+  auto [needFirst, needCount, rangeReason]{
+      GetAffectedLoopRangeWithReason(x, version)};
+
   if (std::optional<int64_t> numLoops{sequence.length()}) {
     if (*numLoops == 0) {
       context_.Say(beginSpec.DirName().source,
@@ -300,7 +304,58 @@ void OmpStructureChecker::CheckNestedConstruct(
             "This construct applies to a loop nest, but has a loop sequence of length %ld"_err_en_US,
             *numLoops);
       }
+      if (assoc == llvm::omp::Association::LoopSeq) {
+        if (auto requiredCount{GetRequiredCount(needFirst, needCount)}) {
+          if (*requiredCount > 0 && *numLoops < *requiredCount) {
+            auto &msg{context_.Say(beginSpec.DirName().source,
+                "This construct requires a sequence of %ld loops, but the loop sequence has a length of %ld"_err_en_US,
+                *requiredCount, *numLoops)};
+            if (rangeReason) {
+              parser::Messages reasons;
+              SayReason(reasons, rangeReason.text, rangeReason.source);
+              reasons.AttachTo(msg);
+            }
+          }
+        }
+      }
     }
+  }
+
+  // Check requirements on nest depth.
+  auto [needDepth, needPerfect, depthReason]{
+      GetAffectedNestDepthWithReason(x, version)};
+  auto [haveSema, havePerf]{sequence.depth()};
+
+  if (dir != llvm::omp::Directive::OMPD_fuse) {
+    auto haveDepth = needPerfect ? havePerf : haveSema;
+    // If the present depth is 0, it's likely that the construct doesn't
+    // have any loops in it, which would be diagnosed above.
+    if (needDepth && haveDepth && *haveDepth > 0) {
+      if (*needDepth > *haveDepth) {
+        if (needPerfect) {
+          auto &msg{context_.Say(beginSpec.DirName().source,
+              "This construct requires a perfect nest of depth %ld, but the associated nest is a perfect nest of depth %ld"_err_en_US,
+              *needDepth, *haveDepth)};
+          if (depthReason) {
+            parser::Messages reasons;
+            SayReason(reasons, depthReason.text, depthReason.source);
+            reasons.AttachTo(msg);
+          }
+        } else {
+          auto &msg{context_.Say(beginSpec.DirName().source,
+              "This construct requires a nest of depth %ld, but the associated nest has a depth of %ld"_err_en_US,
+              *needDepth, *haveDepth)};
+          if (depthReason) {
+            parser::Messages reasons;
+            SayReason(reasons, depthReason.text, depthReason.source);
+            reasons.AttachTo(msg);
+          }
+        }
+      }
+    }
+  } else {
+    // FUSE requires a sequence of perfect nests.
+    // TODO: Defer this check for now.
   }
 }
 
@@ -501,27 +556,6 @@ void OmpStructureChecker::CheckDistLinear(
   }
 }
 
-void OmpStructureChecker::CheckLooprangeBounds(
-    const parser::OpenMPLoopConstruct &x) {
-  unsigned version{context_.langOptions().OpenMPVersion};
-  if (auto *clause{parser::omp::FindClause(
-          x.BeginDir(), llvm::omp::Clause::OMPC_looprange)}) {
-    auto *lrClause{parser::Unwrap<parser::OmpLooprangeClause>(clause)};
-    auto first{GetIntValue(std::get<0>(lrClause->t))};
-    auto count{GetIntValue(std::get<1>(lrClause->t))};
-    if (auto requiredCount{GetRequiredCount(first, count)}) {
-      LoopSequence sequence(std::get<parser::Block>(x.t), version, true);
-      if (auto loopCount{sequence.length()}) {
-        if (*loopCount < *requiredCount) {
-          context_.Say(clause->source,
-              "The specified loop range requires %ld loops, but the loop sequence has a length of %ld"_err_en_US,
-              *requiredCount, *loopCount);
-        }
-      }
-    }
-  }
-}
-
 void OmpStructureChecker::CheckScanModifier(
     const parser::OmpClause::Reduction &x) {
   using ReductionModifier = parser::OmpReductionModifier;
@@ -569,9 +603,6 @@ void OmpStructureChecker::Leave(const parser::OpenMPLoopConstruct &x) {
     if (auto *reduction{std::get_if<parser::OmpClause::Reduction>(&clause.u)}) {
       CheckScanModifier(*reduction);
     }
-  }
-  if (beginSpec.DirName().v == llvm::omp::Directive::OMPD_fuse) {
-    CheckLooprangeBounds(x);
   }
   if (llvm::omp::allSimdSet.test(beginSpec.DirName().v)) {
     ExitDirectiveNest(SIMDNest);

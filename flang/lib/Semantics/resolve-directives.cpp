@@ -1123,7 +1123,6 @@ private:
 
   void CheckDataCopyingClause(
       const parser::Name &, const Symbol &, Symbol::Flag);
-  void CheckAssocLoopLevel(std::int64_t level, const parser::OmpClause *clause);
   void CheckObjectIsPrivatizable(
       const parser::Name &, const Symbol &, Symbol::Flag);
   void CheckSourceLabel(const parser::Label &);
@@ -2145,11 +2144,6 @@ std::int64_t OmpAttributeVisitor::SetAssociatedMaxClause(
   const parser::OmpClause *maxClause = nullptr;
   for (auto [level, clause] : llvm::zip_equal(levels, clauses)) {
     if (tileLevel > 0 && tileLevel < level) {
-      context_.Say(clause->source,
-          "The value of the parameter in the COLLAPSE clause must"
-          " not be larger than the number of the number of tiled loops"
-          " because collapse currently is limited to independent loop"
-          " iterations."_err_en_US);
       return 1;
     }
 
@@ -2285,40 +2279,13 @@ void OmpAttributeVisitor::CheckPerfectNestAndRectangularLoop(
         // Recurse into nested loop
         const auto &block{std::get<parser::Block>(loop->t)};
         if (block.empty()) {
-          // Insufficient number of nested loops already reported by
-          // CheckAssocLoopLevel()
           break;
         }
 
         loop = GetDoConstructIf(block.front());
         if (!loop) {
-          // Insufficient number of nested loops already reported by
-          // CheckAssocLoopLevel()
           break;
         }
-
-        auto checkPerfectNest = [&, this]() {
-          if (block.empty())
-            return;
-          auto last = block.end();
-          --last;
-
-          // A trailing CONTINUE is not considered part of the loop body
-          if (parser::Unwrap<parser::ContinueStmt>(*last))
-            --last;
-
-          // In a perfectly nested loop, the nested loop must be the only
-          // statement
-          if (last == block.begin())
-            return;
-
-          // Non-perfectly nested loop
-          // TODO: Point to non-DO statement, directiveSource as a note
-          context_.Say(dirContext.directiveSource,
-              "Canonical loop nest must be perfectly nested."_err_en_US);
-        };
-
-        checkPerfectNest();
 
         ++curLevel;
       }
@@ -2393,25 +2360,6 @@ void OmpAttributeVisitor::PrivatizeAssociatedLoopIndexAndCheckLoopLevel(
           loop = it != block.end() ? GetDoConstructIf(*it) : nullptr;
         }
       }
-      CheckAssocLoopLevel(level, GetAssociatedClause());
-    }
-  }
-}
-
-void OmpAttributeVisitor::CheckAssocLoopLevel(
-    std::int64_t level, const parser::OmpClause *clause) {
-  if (clause && level != 0) {
-    switch (clause->Id()) {
-    case llvm::omp::OMPC_sizes:
-      context_.Say(clause->source,
-          "The SIZES clause has more entries than there are nested canonical loops."_err_en_US);
-      break;
-    default:
-      context_.Say(clause->source,
-          "The value of the parameter in the COLLAPSE or ORDERED clause must"
-          " not be larger than the number of nested loops"
-          " following the construct."_err_en_US);
-      break;
     }
   }
 }

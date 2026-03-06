@@ -528,6 +528,15 @@ MaybeExpr MakeEvaluateExpr(const parser::OmpStylizedInstance &inp) {
       instance.u);
 }
 
+parser::Message &SayReason(
+    parser::Messages &msgs, const std::string &why, parser::CharBlock source) {
+  parser::MessageFixedText msg(
+      why.c_str(), why.size(), parser::Severity::Because);
+  // Use MessageFormattedText because it owns the storage for the message
+  // text.
+  return msgs.Say(source, parser::MessageFormattedText(msg));
+}
+
 std::pair<std::optional<int64_t>, Reason> GetArgumentValueWithReason(
     const parser::OmpDirectiveSpecification &spec, llvm::omp::Clause clauseId,
     unsigned version) {
