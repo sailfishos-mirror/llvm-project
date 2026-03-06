@@ -22,11 +22,14 @@
 #include "flang/Semantics/tools.h"
 
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/Support/Format.h"
 
 #include <optional>
 #include <string>
+#include <tuple>
 #include <type_traits>
 #include <utility>
+#include <vector>
 
 namespace Fortran::semantics {
 class Scope;
@@ -109,6 +112,34 @@ bool IsPointerAssignment(const evaluate::Assignment &x);
 
 MaybeExpr MakeEvaluateExpr(const parser::OmpStylizedInstance &inp);
 
+// A representation of a "because" message. The `text` member is a formatted
+// message (i.e. without any printf-like formatting characters like %d, etc).
+// `source` is the location to which the "because" message will refer.
+struct Reason {
+  std::string text;
+  parser::CharBlock source;
+
+  Reason() = default;
+  Reason(const std::string t, parser::CharBlock s) : text(t), source(s) {}
+  operator bool() const { return !source.empty(); }
+};
+
+// Helper that formats the inputs into a std::string.
+template <typename ...Ts>
+static std::string format(const char *fmt, Ts... values) {
+  std::string str;
+  llvm::raw_string_ostream os(str);
+  os << llvm::format(fmt, values...);
+  return os.str();
+}
+
+std::pair<std::optional<int64_t>, Reason> GetArgumentValueWithReason(
+    const parser::OmpDirectiveSpecification &spec, llvm::omp::Clause clauseId,
+    unsigned version);
+std::pair<std::optional<int64_t>, Reason> GetNumArgumentsWithReason(
+    const parser::OmpDirectiveSpecification &spec, llvm::omp::Clause clauseId,
+    unsigned version);
+
 bool IsLoopTransforming(llvm::omp::Directive dir);
 bool IsFullUnroll(const parser::OpenMPLoopConstruct &x);
 
@@ -116,13 +147,29 @@ std::optional<int64_t> GetNumGeneratedNestsFrom(
     const parser::ExecutionPartConstruct &epc,
     std::optional<int64_t> nestedCount);
 
+// Return the depth of the affected nests:
+//   {affected-depth, must-be-perfect-nest, reason}.
+std::tuple<std::optional<int64_t>, bool, Reason> GetAffectedNestDepthWithReason(
+    const parser::OpenMPLoopConstruct &x, unsigned version);
+// Return the range of the affected nests in the sequence:
+//   {first, count, reason}.
+// If the range is "the whole sequence", the return value will be {1, -1, ...}.
+std::tuple<std::optional<int64_t>, std::optional<int64_t>, Reason>
+GetAffectedLoopRangeWithReason(
+    const parser::OpenMPLoopConstruct &x, unsigned version);
+
+// Count the required loop count from range. If count == -1, return -1,
+// indicating all loops in the sequence.
+std::optional<int64_t> GetRequiredCount(
+    std::optional<int64_t> first, std::optional<int64_t> count);
+
 struct LoopSequence {
-  LoopSequence(
-      const parser::ExecutionPartConstruct &root, bool allowAllLoops = false);
+  LoopSequence(const parser::ExecutionPartConstruct &root, unsigned version,
+      bool allowAllLoops = false);
 
   template <typename R, typename = std::enable_if_t<is_range_v<R>>>
-  LoopSequence(const R &range, bool allowAllLoops = false)
-      : allowAllLoops_(allowAllLoops) {
+  LoopSequence(const R &range, unsigned version, bool allowAllLoops = false)
+      : version_(version), allowAllLoops_(allowAllLoops) {
     entry_ = std::make_unique<Construct>(range, nullptr);
     createChildrenFromRange(entry_->location);
     calculateEverything();
@@ -145,7 +192,8 @@ struct LoopSequence {
 private:
   using Construct = ExecutionPartIterator::Construct;
 
-  LoopSequence(std::unique_ptr<Construct> entry, bool allowAllLoops);
+  LoopSequence(
+      std::unique_ptr<Construct> entry, unsigned version, bool allowAllLoops);
 
   template <typename R, typename = std::enable_if_t<is_range_v<R>>>
   void createChildrenFromRange(const R &range) {
@@ -182,6 +230,7 @@ private:
   Depth depth_;
 
   // The core structure of the class:
+  unsigned version_; // Needed for GetXyzWithReason
   bool allowAllLoops_;
   std::unique_ptr<Construct> entry_;
   std::vector<LoopSequence> children_;
