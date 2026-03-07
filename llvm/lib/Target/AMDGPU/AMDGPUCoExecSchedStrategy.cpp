@@ -136,10 +136,12 @@ void HardwareUnitInfo::schedule(SUnit *SU, unsigned BlockingCycles) {
   if (TotalCycles == 0)
     return;
 
+  ScheduledSUs.push_back(SU);
   AllSUs.remove(SU);
   PrioritySUs.remove(SU);
 
-  TotalCycles -= BlockingCycles;
+  if (BufferSize <= 1 || (ScheduledSUs.size() % BufferSize == 0))
+    TotalCycles -= BlockingCycles;
 
   if (AllSUs.empty())
     return;
@@ -164,6 +166,14 @@ void HardwareUnitInfo::schedule(SUnit *SU, unsigned BlockingCycles) {
       PrioritySUs.insert(SU);
     }
   }
+}
+
+void HardwareUnitInfo::finalizeCycles() {
+  if (BufferSize <= 1 || !AllSUs.size())
+    return;
+
+  BufferCycles = TotalCycles / AllSUs.size();
+  TotalCycles /= BufferSize;
 }
 
 HardwareUnitInfo *
@@ -214,6 +224,7 @@ void CandidateHeuristics::initialize(ScheduleDAGMI *SchedDAG,
   HWUInfo[(int)InstructionFlavor::WMMA].setProducesCoexecWindow(true);
   HWUInfo[(int)InstructionFlavor::MultiCycleVALU].setProducesCoexecWindow(true);
   HWUInfo[(int)InstructionFlavor::TRANS].setProducesCoexecWindow(true);
+  HWUInfo[(int)InstructionFlavor::DS].setBufferSize(DefaultBufferSizes::DS);
 
   collectHWUIPressure();
 }
@@ -225,6 +236,10 @@ void CandidateHeuristics::collectHWUIPressure() {
   for (auto &SU : DAG->SUnits) {
     const InstructionFlavor Flavor = classifyFlavor(*SU.getInstr(), *SII);
     HWUInfo[(int)(Flavor)].insert(&SU, getHWUICyclesForInst(&SU));
+  }
+
+  for (auto &HWUI : HWUInfo) {
+    HWUI.finalizeCycles();
   }
 
   LLVM_DEBUG(dumpRegionSummary());
@@ -658,35 +673,53 @@ bool AMDGPUCoExecSchedStrategy::tryCandidateCoexec(SchedCandidate &Cand,
 
 bool AMDGPUCoExecSchedStrategy::tryEffectiveStall(SchedCandidate &Cand,
                                                   SchedCandidate &TryCand,
-                                                  SchedBoundary &Zone) const {
+                                                  SchedBoundary &Zone) {
+  auto getBufferFullStalls = [this,
+                              &Zone](SchedCandidate &SchedCand) -> unsigned {
+    SUnit *SU = SchedCand.SU;
+    InstructionFlavor Flavor = classifyFlavor(
+        *SU->getInstr(), *static_cast<const SIInstrInfo *>(DAG->TII));
+    HardwareUnitInfo *HWUI = Heurs.getHWUIFromFlavor(Flavor);
+
+    if (HWUI->getBufferSize() <= 1)
+      return 0;
+
+    // getBufferAvailableCycle assumes top-down scheduling.
+    assert(Zone.isTop());
+    unsigned CurrCycle = Zone.getCurrCycle();
+    unsigned BufferReadyCycle = HWUI->getBufferAvailableCycle(CurrCycle);
+    if (BufferReadyCycle <= CurrCycle)
+      return 0;
+
+    return BufferReadyCycle - CurrCycle;
+  };
+
   // Treat structural and latency stalls as a single scheduling cost for the
   // current cycle.
   unsigned CurrCycle = Zone.getCurrCycle();
-  unsigned TryReadyCycle =
-      Zone.isTop() ? TryCand.SU->TopReadyCycle : TryCand.SU->BotReadyCycle;
-  unsigned TryStructStall = getStructuralStallCycles(Zone, TryCand.SU);
-  unsigned TryLatencyStall = Zone.getLatencyStallCycles(TryCand.SU);
-  unsigned TryReadyStall =
-      TryReadyCycle > CurrCycle ? TryReadyCycle - CurrCycle : 0;
-  unsigned TryEffectiveStall =
-      std::max({TryReadyStall, TryStructStall, TryLatencyStall});
 
-  unsigned CandReadyCycle =
-      Zone.isTop() ? Cand.SU->TopReadyCycle : Cand.SU->BotReadyCycle;
-  unsigned CandStructStall = getStructuralStallCycles(Zone, Cand.SU);
-  unsigned CandLatencyStall = Zone.getLatencyStallCycles(Cand.SU);
-  unsigned CandReadyStall =
-      CandReadyCycle > CurrCycle ? CandReadyCycle - CurrCycle : 0;
-  unsigned CandEffectiveStall =
-      std::max({CandReadyStall, CandStructStall, CandLatencyStall});
+  auto getMaxStall = [this, &Zone, CurrCycle, &getBufferFullStalls](
+                         SchedCandidate &SchedCand) -> unsigned {
+    unsigned ReadyCycle = Zone.isTop() ? SchedCand.SU->TopReadyCycle
+                                       : SchedCand.SU->BotReadyCycle;
+    unsigned StructStall = getStructuralStallCycles(Zone, SchedCand.SU);
+    unsigned LatencyStall = Zone.getLatencyStallCycles(SchedCand.SU);
+    unsigned ReadyStall = ReadyCycle > CurrCycle ? ReadyCycle - CurrCycle : 0;
+    unsigned SchedStall = getBufferFullStalls(SchedCand);
+    unsigned EffectiveStall =
+        std::max({ReadyStall, StructStall, LatencyStall, SchedStall});
 
-  LLVM_DEBUG(if (TryEffectiveStall || CandEffectiveStall) {
-    dbgs() << "Effective stalls: try=" << TryEffectiveStall
-           << " (ready=" << TryReadyStall << ", struct=" << TryStructStall
-           << ", lat=" << TryLatencyStall << ") cand=" << CandEffectiveStall
-           << " (ready=" << CandReadyStall << ", struct=" << CandStructStall
-           << ", lat=" << CandLatencyStall << ")\n";
-  });
+    LLVM_DEBUG(if (EffectiveStall) {
+      dbgs() << "Effective stalls: SU(" << SchedCand.SU->NodeNum
+             << ")=" << EffectiveStall << " (ready=" << ReadyStall
+             << ", struct=" << StructStall << ", lat=" << LatencyStall << ")\n";
+    });
+
+    return EffectiveStall;
+  };
+
+  unsigned TryEffectiveStall = getMaxStall(TryCand);
+  unsigned CandEffectiveStall = getMaxStall(Cand);
 
   return tryLess(TryEffectiveStall, CandEffectiveStall, TryCand, Cand, Stall);
 }
