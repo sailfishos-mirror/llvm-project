@@ -147,10 +147,12 @@ void HardwareUnitInfo::markScheduled(SUnit *SU, unsigned BlockingCycles) {
   if (TotalCycles == 0)
     return;
 
+  ScheduledSUs.push_back(SU);
   AllSUs.remove(SU);
   PrioritySUs.remove(SU);
 
-  TotalCycles -= BlockingCycles;
+  if (BufferSize <= 1 || (ScheduledSUs.size() % BufferSize == 0))
+    TotalCycles -= BlockingCycles;
 
   if (AllSUs.empty())
     return;
@@ -175,6 +177,14 @@ void HardwareUnitInfo::markScheduled(SUnit *SU, unsigned BlockingCycles) {
       PrioritySUs.insert(SU);
     }
   }
+}
+
+void HardwareUnitInfo::finalizeCycles() {
+  if (BufferSize <= 1 || !AllSUs.size())
+    return;
+
+  BufferCycles = TotalCycles / AllSUs.size();
+  TotalCycles /= BufferSize;
 }
 
 HardwareUnitInfo *
@@ -234,6 +244,7 @@ void CandidateHeuristics::initialize(ScheduleDAGMI *SchedDAG,
   HWUInfo[(int)InstructionFlavor::WMMA].setProducesCoexecWindow(true);
   HWUInfo[(int)InstructionFlavor::MultiCycleVALU].setProducesCoexecWindow(true);
   HWUInfo[(int)InstructionFlavor::TRANS].setProducesCoexecWindow(true);
+  HWUInfo[(int)InstructionFlavor::DS].setBufferSize(DefaultBufferSizes::DS);
 
   collectHWUIPressure();
 }
@@ -245,6 +256,10 @@ void CandidateHeuristics::collectHWUIPressure() {
   for (auto &SU : DAG->SUnits) {
     const InstructionFlavor Flavor = classifyFlavor(*SU.getInstr(), *SII);
     HWUInfo[(int)(Flavor)].insert(&SU, getHWUICyclesForInst(&SU));
+  }
+
+  for (auto &HWUI : HWUInfo) {
+    HWUI.finalizeCycles();
   }
 
   LLVM_DEBUG(dumpRegionSummary());
@@ -691,29 +706,52 @@ bool AMDGPUCoExecSchedStrategy::tryCandidateCoexec(SchedCandidate &Cand,
 
 bool AMDGPUCoExecSchedStrategy::tryEffectiveStall(SchedCandidate &Cand,
                                                   SchedCandidate &TryCand,
-                                                  SchedBoundary &Zone) const {
-  // Treat structural and latency stalls as a single scheduling cost for the
-  // current cycle.
+                                                  SchedBoundary &Zone) {
+  auto getBufferFullStalls = [this, &Zone](SchedCandidate &SchedCand) -> unsigned {
+    SUnit *SU = SchedCand.SU;
+    InstructionFlavor Flavor = classifyFlavor(
+        *SU->getInstr(), *static_cast<const SIInstrInfo *>(DAG->TII));
+    HardwareUnitInfo *HWUI = Heurs.getHWUIFromFlavor(Flavor);
+
+    if (HWUI->getBufferSize() <= 1)
+      return 0;
+
+    // getBufferAvailableCycle assumes top-down scheduling.
+    assert(Zone.isTop());
+    unsigned CurrCycle = Zone.getCurrCycle();
+    unsigned BufferReadyCycle = HWUI->getBufferAvailableCycle(CurrCycle);
+    if (BufferReadyCycle <= CurrCycle)
+      return 0;
+
+    return BufferReadyCycle - CurrCycle;
+  };
+
+  // Treat structural, latency, and buffer-full stalls as a single scheduling
+  // cost for the current cycle.
   struct StallCosts {
     unsigned Ready = 0;
     unsigned Structural = 0;
     unsigned Latency = 0;
+    unsigned BufferFull = 0;
     unsigned Effective = 0;
   };
 
   unsigned CurrCycle = Zone.getCurrCycle();
-  auto GetStallCosts = [&](SUnit *SU) {
+  auto GetStallCosts = [&](SchedCandidate &SchedCand) {
+    SUnit *SU = SchedCand.SU;
     unsigned ReadyCycle = Zone.isTop() ? SU->TopReadyCycle : SU->BotReadyCycle;
     StallCosts Costs;
     Costs.Ready = ReadyCycle > CurrCycle ? ReadyCycle - CurrCycle : 0;
     Costs.Structural = getStructuralStallCycles(Zone, SU);
     Costs.Latency = Zone.getLatencyStallCycles(SU);
-    Costs.Effective = std::max({Costs.Ready, Costs.Structural, Costs.Latency});
+    Costs.BufferFull = getBufferFullStalls(SchedCand);
+    Costs.Effective = std::max(
+        {Costs.Ready, Costs.Structural, Costs.Latency, Costs.BufferFull});
     return Costs;
   };
 
-  StallCosts TryCosts = GetStallCosts(TryCand.SU);
-  StallCosts CandCosts = GetStallCosts(Cand.SU);
+  StallCosts TryCosts = GetStallCosts(TryCand);
+  StallCosts CandCosts = GetStallCosts(Cand);
 
   LLVM_DEBUG(if (TryCosts.Effective || CandCosts.Effective) {
     dbgs() << "Effective stalls: try=" << TryCosts.Effective
