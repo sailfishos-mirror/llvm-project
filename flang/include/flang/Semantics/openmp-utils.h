@@ -125,7 +125,7 @@ struct Reason {
 };
 
 // Helper that formats the inputs into a std::string.
-template <typename ...Ts>
+template <typename... Ts>
 static std::string format(const char *fmt, Ts... values) {
   std::string str;
   llvm::raw_string_ostream os(str);
