@@ -575,24 +575,10 @@ static cl::opt<std::string>
                         cl::desc("Select custom AMDGPU scheduling strategy."),
                         cl::Hidden, cl::init(""));
 
-enum class AMDGPUPostSchedStrategy {
-  Default,
-  Nop,
-};
-
-static StringRef getAMDGPUWorkloadType(const Module *M) {
-  if (!M)
-    return "";
-
-  auto *WorkloadType =
-      dyn_cast_or_null<MDString>(M->getModuleFlag("amdgpu-workload-type"));
-  if (!WorkloadType)
-    return "";
-
-  return WorkloadType->getString();
-}
-
-static StringRef getAMDGPUSchedStrategy(const Function &F) {
+// Scheduler selection is consulted both when creating the scheduler and from
+// overrideSchedPolicy(), so keep the attribute and global command line handling
+// in one helper.
+StringRef llvm::AMDGPU::getSchedStrategy(const Function &F) {
   Attribute SchedStrategyAttr = F.getFnAttribute("amdgpu-sched-strategy");
   if (SchedStrategyAttr.isValid())
     return SchedStrategyAttr.getValueAsString();
@@ -600,31 +586,14 @@ static StringRef getAMDGPUSchedStrategy(const Function &F) {
   if (!AMDGPUSchedStrategy.empty())
     return AMDGPUSchedStrategy;
 
-  StringRef WorkloadType = getAMDGPUWorkloadType(F.getParent());
-  // ML workloads use coexec scheduling defaults.
-  if (WorkloadType.equals_insensitive("ml"))
-    return "coexec";
-
   return "";
 }
 
-static AMDGPUPostSchedStrategy getAMDGPUPostSchedStrategy(const Function &F) {
+static bool useNoopPostScheduler(const Function &F) {
   Attribute PostSchedStrategyAttr =
       F.getFnAttribute("amdgpu-post-sched-strategy");
-  if (PostSchedStrategyAttr.isValid()) {
-    StringRef PostSchedStrategy = PostSchedStrategyAttr.getValueAsString();
-    if (PostSchedStrategy == "nop")
-      return AMDGPUPostSchedStrategy::Nop;
-    // Allow explicit override to keep post-RA scheduling enabled even when
-    // preRA resolves to coexec via module defaults.
-    if (PostSchedStrategy == "default")
-      return AMDGPUPostSchedStrategy::Default;
-  }
-
-  if (getAMDGPUSchedStrategy(F) == "coexec")
-    return AMDGPUPostSchedStrategy::Nop;
-
-  return AMDGPUPostSchedStrategy::Default;
+  return PostSchedStrategyAttr.isValid() &&
+         PostSchedStrategyAttr.getValueAsString() == "nop";
 }
 
 static cl::opt<bool> EnableRewritePartialRegUses(
@@ -1294,7 +1263,7 @@ GCNTargetMachine::createMachineScheduler(MachineSchedContext *C) const {
   if (ST.enableSIScheduler())
     return createSIMachineScheduler(C);
 
-  StringRef SchedStrategy = getAMDGPUSchedStrategy(C->MF->getFunction());
+  StringRef SchedStrategy = AMDGPU::getSchedStrategy(C->MF->getFunction());
 
   if (SchedStrategy == "max-ilp")
     return createGCNMaxILPMachineScheduler(C);
@@ -1319,12 +1288,8 @@ GCNTargetMachine::createMachineScheduler(MachineSchedContext *C) const {
 
 ScheduleDAGInstrs *
 GCNTargetMachine::createPostMachineScheduler(MachineSchedContext *C) const {
-  // Post-RA scheduler selection can be controlled per-function
-  // ("amdgpu-post-sched-strategy"), and coexec disables post-RA scheduling
-  // based on function/module scheduler policy.
-  if (getAMDGPUPostSchedStrategy(C->MF->getFunction()) ==
-      AMDGPUPostSchedStrategy::Nop)
-    return createGCNCoExecPostMachineScheduler(C);
+  if (useNoopPostScheduler(C->MF->getFunction()))
+    return createGCNNoopPostMachineScheduler(C);
 
   ScheduleDAGMI *DAG =
       new GCNPostScheduleDAGMILive(C, std::make_unique<PostGenericScheduler>(C),

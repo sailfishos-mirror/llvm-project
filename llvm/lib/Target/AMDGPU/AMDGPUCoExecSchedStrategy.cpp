@@ -50,10 +50,18 @@ AMDGPUCoExecSchedStrategy::AMDGPUCoExecSchedStrategy(
   UseGCNTrackers = true;
 }
 
-void AMDGPUCoExecSchedStrategy::initialize(ScheduleDAGMI *DAG) {
+void AMDGPUCoExecSchedStrategy::initPolicy(
+    MachineBasicBlock::iterator Begin, MachineBasicBlock::iterator End,
+    unsigned NumRegionInstrs) {
+  GCNSchedStrategy::initPolicy(Begin, End, NumRegionInstrs);
   assert((PreRADirection == MISched::Unspecified ||
           PreRADirection == MISched::TopDown) &&
          "coexec scheduler only supports top-down scheduling");
+  RegionPolicy.OnlyTopDown = true;
+  RegionPolicy.OnlyBottomUp = false;
+}
+
+void AMDGPUCoExecSchedStrategy::initialize(ScheduleDAGMI *DAG) {
   // Coexecution scheduling strategy is only done top-down to support new
   // resource balancing heuristics.
   RegionPolicy.OnlyTopDown = true;
@@ -268,8 +276,8 @@ llvm::createGCNCoExecMachineScheduler(MachineSchedContext *C) {
 }
 
 ScheduleDAGInstrs *
-llvm::createGCNCoExecPostMachineScheduler(MachineSchedContext *C) {
-  LLVM_DEBUG(dbgs() << "AMDGPU coexec postRA scheduler selected (nop) for "
+llvm::createGCNNoopPostMachineScheduler(MachineSchedContext *C) {
+  LLVM_DEBUG(dbgs() << "AMDGPU nop postRA scheduler selected for "
                     << C->MF->getName() << '\n');
   return new GCNNoopPostScheduleDAG(C);
 }

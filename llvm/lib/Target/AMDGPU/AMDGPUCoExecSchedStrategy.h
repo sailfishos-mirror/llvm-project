@@ -31,12 +31,15 @@ protected:
 public:
   AMDGPUCoExecSchedStrategy(const MachineSchedContext *C);
 
+  void initPolicy(MachineBasicBlock::iterator Begin,
+                  MachineBasicBlock::iterator End,
+                  unsigned NumRegionInstrs) override;
   void initialize(ScheduleDAGMI *DAG) override;
   SUnit *pickNode(bool &IsTopNode) override;
 };
 
 ScheduleDAGInstrs *createGCNCoExecMachineScheduler(MachineSchedContext *C);
-ScheduleDAGInstrs *createGCNCoExecPostMachineScheduler(MachineSchedContext *C);
+ScheduleDAGInstrs *createGCNNoopPostMachineScheduler(MachineSchedContext *C);
 
 } // End namespace llvm
 
