@@ -2,13 +2,6 @@ add_llvm_component_group(AMDGPU)
 
 set(LLVM_TARGET_DEFINITIONS AMDGPU.td)
 
-set_source_files_properties(
-  SIRegisterInfo.cpp
-  SIISelLowering.cpp
-  SIWholeQuadMode.cpp
-  PROPERTIES COMPILE_FLAGS "-O0 -g"  
-)
-
 tablegen(LLVM AMDGPUGenAsmMatcher.inc -gen-asm-matcher)
 tablegen(LLVM AMDGPUGenAsmWriter.inc -gen-asm-writer)
 tablegen(LLVM AMDGPUGenCallingConv.inc -gen-callingconv)
