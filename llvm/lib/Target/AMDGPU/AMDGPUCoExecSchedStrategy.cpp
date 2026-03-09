@@ -50,9 +50,9 @@ AMDGPUCoExecSchedStrategy::AMDGPUCoExecSchedStrategy(
   UseGCNTrackers = true;
 }
 
-void AMDGPUCoExecSchedStrategy::initPolicy(
-    MachineBasicBlock::iterator Begin, MachineBasicBlock::iterator End,
-    unsigned NumRegionInstrs) {
+void AMDGPUCoExecSchedStrategy::initPolicy(MachineBasicBlock::iterator Begin,
+                                           MachineBasicBlock::iterator End,
+                                           unsigned NumRegionInstrs) {
   GCNSchedStrategy::initPolicy(Begin, End, NumRegionInstrs);
   assert((PreRADirection == MISched::Unspecified ||
           PreRADirection == MISched::TopDown) &&
