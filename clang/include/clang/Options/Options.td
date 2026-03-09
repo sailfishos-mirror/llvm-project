@@ -3076,8 +3076,7 @@ def finput_charset_EQ : Joined<["-"], "finput-charset=">,
   Visibility<[ClangOption, FlangOption, FC1Option]>, Group<f_Group>,
   HelpText<"Specify the default character set for source files">;
 def fexec_charset_EQ
-    : Joined<["-"], "fexec-charset=">,
-      Group<f_Group>,
+    : Joined<["-"], "fexec-charset=">, Group<f_Group>,
       HelpText<
           "Set the execution <encoding> for string and character literals. "
           "Supported character encodings include ISO-8859-1, UTF-8, IBM1047, "
@@ -7676,8 +7675,8 @@ let Visibility = [CC1Option, CC1AsOption, FC1Option] in {
 def tune_cpu : Separate<["-"], "tune-cpu">,
   HelpText<"Tune for a specific cpu type">,
   MarshallingInfoString<TargetOpts<"TuneCPU">>;
-def fexec_charset : Separate<["-"], "fexec-charset">, MetaVarName<"<charset>">,
-  HelpText<"Set the execution <charset> for string and character literals. "
+def fexec_charset : Separate<["-"], "fexec-charset">, MetaVarName<"<encoding>">,
+  HelpText<"Set the execution <encoding> for string and character literals. "
            "Supported character encodings include ISO-8859-1, UTF-8, IBM1047, "
            "and possibly those supported by ICU or the host iconv library.">,
   MarshallingInfoString<LangOpts<"ExecEncoding">>;
