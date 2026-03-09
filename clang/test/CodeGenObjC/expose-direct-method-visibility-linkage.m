@@ -1,29 +1,27 @@
-// REQUIRES: system-darwin
-
 // RUN: rm -rf %t
 // RUN: split-file %s %t
 
 // Test 1: Check IR from library implementation (visibility attributes)
-// RUN: %clang -target arm64-apple-darwin -fobjc-arc \
-// RUN:   -fobjc-direct-precondition-thunk -S -emit-llvm -o - %t/foo.m \
+// RUN: %clang_cc1 -triple arm64-apple-darwin -fobjc-arc \
+// RUN:   -fobjc-direct-precondition-thunk -emit-llvm -o - %t/foo.m \
 // RUN:   -I %t | FileCheck %s --check-prefix=FOO_M
 
 // Test 2: Check IR from main (consumer)
-// RUN: %clang -target arm64-apple-darwin -fobjc-arc \
-// RUN:   -fobjc-direct-precondition-thunk -S -emit-llvm -o - %t/main.m \
+// RUN: %clang_cc1 -triple arm64-apple-darwin -fobjc-arc \
+// RUN:   -fobjc-direct-precondition-thunk -emit-llvm -o - %t/main.m \
 // RUN:   -I %t | FileCheck %s --check-prefix=MAIN_M
 
 //--- foo.h
 // Header for libFoo
-#import <Foundation/Foundation.h>
-
-@interface Foo : NSObject
+__attribute__((objc_root_class))
+@interface Foo
 // Direct properties with default hidden visibility
 @property (nonatomic, direct) int privateValue;
 
 // Direct properties with explicit default visibility
 @property (nonatomic, direct) int exportedValue __attribute__((visibility("default")));
 
++ (instancetype)alloc;
 - (instancetype)initWithprivateValue:(int)x exportedValue:(int)y;
 // Default hidden visibility
 - (int)instanceMethod:(int)x __attribute__((objc_direct));
@@ -44,11 +42,8 @@
 
 // FOO_M-LABEL: define internal ptr @"\01-[Foo initWithprivateValue:exportedValue:]"
 - (instancetype)initWithprivateValue:(int)x exportedValue:(int)y {
-  self = [super init];
-  if (self) {
     _privateValue = x;
     _exportedValue = y;
-  }
   return self;
 }
 
@@ -95,10 +90,10 @@
 //--- main.m
 // Consumer of libFoo (separate linkage unit)
 #import "foo.h"
-#include <stdio.h>
+
+int printf(const char *, ...);
 
 int main() {
-@autoreleasepool {
     Foo *obj = [[Foo alloc] initWithprivateValue:10 exportedValue:20];
     printf("Allocated Foo\n");
 
@@ -113,7 +108,7 @@ int main() {
 
     // MAIN_M: call i32 @"+[Foo exportedClassMethod:]_thunk"
     printf("Exported class: %d\n", [Foo exportedClassMethod:10]);
-}
+
     return 0;
 }
 
