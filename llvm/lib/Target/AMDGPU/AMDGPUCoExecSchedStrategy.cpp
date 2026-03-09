@@ -15,6 +15,7 @@
 #include "llvm/Support/Debug.h"
 
 using namespace llvm;
+using namespace llvm::AMDGPU;
 
 #define DEBUG_TYPE "machine-scheduler"
 
@@ -41,12 +42,12 @@ static SUnit *pickOnlyChoice(SchedBoundary &Zone) {
   return OnlyChoice;
 }
 
-InstructionFlavor llvm::classifyFlavor(const MachineInstr *MI,
-                                       const SIInstrInfo *SII) {
-  if (!MI || MI->isDebugInstr())
+InstructionFlavor llvm::AMDGPU::classifyFlavor(const MachineInstr &MI,
+                                               const SIInstrInfo &SII) {
+  if (MI.isDebugInstr())
     return InstructionFlavor::Other;
 
-  unsigned Opc = MI->getOpcode();
+  unsigned Opc = MI.getOpcode();
 
   // Check for specific opcodes first.
   if (Opc == AMDGPU::ATOMIC_FENCE || Opc == AMDGPU::S_WAIT_ASYNCCNT ||
@@ -60,22 +61,22 @@ InstructionFlavor llvm::classifyFlavor(const MachineInstr *MI,
       Opc == AMDGPU::GLOBAL_LOAD_ASYNC_TO_LDS_B32_SADDR)
     return InstructionFlavor::DMA;
 
-  if (SII->isMFMAorWMMA(*MI))
+  if (SII.isMFMAorWMMA(MI))
     return InstructionFlavor::WMMA;
 
-  if (SII->isTRANS(*MI))
+  if (SII.isTRANS(MI))
     return InstructionFlavor::TRANS;
 
-  if (SII->isVALU(*MI))
+  if (SII.isVALU(MI))
     return InstructionFlavor::SingleCycleVALU;
 
-  if (SII->isDS(*MI))
+  if (SII.isDS(MI))
     return InstructionFlavor::DS;
 
-  if (SII->isFLAT(*MI) || SII->isFLATGlobal(*MI) || SII->isFLATScratch(*MI))
+  if (SII.isFLAT(MI) || SII.isFLATGlobal(MI) || SII.isFLATScratch(MI))
     return InstructionFlavor::VMEM;
 
-  if (SII->isSALU(*MI))
+  if (SII.isSALU(MI))
     return InstructionFlavor::SALU;
 
   return InstructionFlavor::Other;
@@ -195,7 +196,7 @@ unsigned CandidateHeuristics::getHWUICyclesForInst(SUnit *SU) {
 
 void CandidateHeuristics::schedNode(SUnit *SU) {
   HardwareUnitInfo *HWUI =
-      getHWUIFromFlavor(classifyFlavor(SU->getInstr(), SII));
+      getHWUIFromFlavor(classifyFlavor(*SU->getInstr(), *SII));
   HWUI->schedule(SU, getHWUICyclesForInst(SU));
 }
 
@@ -227,7 +228,7 @@ void CandidateHeuristics::collectHWUIPressure() {
     return;
 
   for (auto &SU : DAG->SUnits) {
-    InstructionFlavor Flavor = classifyFlavor(SU.getInstr(), SII);
+    const InstructionFlavor Flavor = classifyFlavor(*SU.getInstr(), *SII);
     HWUInfo[(int)(Flavor)].insert(&SU, getHWUICyclesForInst(&SU));
   }
 
@@ -279,8 +280,8 @@ bool CandidateHeuristics::tryCriticalResourceDependency(
   auto IsCandidateResource = [this, &Cand, &TryCand](unsigned ResourceIdx) {
     HardwareUnitInfo HWUI = HWUInfo[ResourceIdx];
 
-    auto CandFlavor = classifyFlavor(Cand.SU->getInstr(), SII);
-    auto TryCandFlavor = classifyFlavor(TryCand.SU->getInstr(), SII);
+    auto CandFlavor = classifyFlavor(*Cand.SU->getInstr(), *SII);
+    auto TryCandFlavor = classifyFlavor(*TryCand.SU->getInstr(), *SII);
     bool LookDeep = (CandFlavor == InstructionFlavor::DS ||
                      TryCandFlavor == InstructionFlavor::DS) &&
                     HWUI.getType() == InstructionFlavor::WMMA;
@@ -295,7 +296,7 @@ bool CandidateHeuristics::tryCriticalResourceDependency(
 
   auto TryEnablesResource = [&Cand, &TryCand, this](unsigned ResourceIdx) {
     HardwareUnitInfo HWUI = HWUInfo[ResourceIdx];
-    auto CandFlavor = classifyFlavor(Cand.SU->getInstr(), SII);
+    auto CandFlavor = classifyFlavor(*Cand.SU->getInstr(), *SII);
 
     // We want to ensure our DS order matches WMMA order.
     bool LookDeep = CandFlavor == InstructionFlavor::DS &&
@@ -550,7 +551,7 @@ void AMDGPUCoExecSchedStrategy::dumpPickSummary(SUnit *SU, bool IsTopNode,
 
   dbgs() << "=== Pick @ Cycle " << Cycle << " ===\n";
 
-  InstructionFlavor Flavor = classifyFlavor(SU->getInstr(), SII);
+  const InstructionFlavor Flavor = classifyFlavor(*SU->getInstr(), *SII);
   dbgs() << "Picked: SU(" << SU->NodeNum << ") ";
   SU->getInstr()->print(dbgs(), /*IsStandalone=*/true, /*SkipOpers=*/false,
                         /*SkipDebugLoc=*/true);

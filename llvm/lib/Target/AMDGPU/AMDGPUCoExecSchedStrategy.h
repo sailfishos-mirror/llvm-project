@@ -19,6 +19,8 @@
 
 namespace llvm {
 
+namespace AMDGPU {
+
 //===----------------------------------------------------------------------===//
 // Instruction Flavor Classification
 //===----------------------------------------------------------------------===//
@@ -93,8 +95,8 @@ inline StringRef getFlavorShortName(InstructionFlavor F) {
   llvm_unreachable("Unknown InstructionFlavor");
 }
 
-InstructionFlavor classifyFlavor(const MachineInstr *MI,
-                                 const SIInstrInfo *SII);
+InstructionFlavor classifyFlavor(const MachineInstr &MI,
+                                 const SIInstrInfo &SII);
 
 using FlavorGroup = SmallVector<InstructionFlavor, 4>;
 
@@ -140,6 +142,8 @@ inline StringRef getReasonName(AMDGPUSchedReason R) {
   llvm_unreachable("Unknown AMDGPUSchedReason");
 }
 
+} // End namespace AMDGPU
+
 //===----------------------------------------------------------------------===//
 // Hardware Unit Information
 //===----------------------------------------------------------------------===//
@@ -162,7 +166,7 @@ private:
   /// The total number of busy cycles for this HardwareUnit for a given region.
   unsigned TotalCycles = 0;
   // InstructionFlavor mapping
-  InstructionFlavor Type;
+  AMDGPU::InstructionFlavor Type;
   // Idx mappuing
   unsigned Idx;
   // Whether or not instructions on this HardwareUnit may produce a window in
@@ -179,11 +183,11 @@ public:
   unsigned getTotalCycles() { return TotalCycles; }
 
   void setType(unsigned TheType) {
-    assert(TheType < (unsigned)InstructionFlavor::NUM_FLAVORS);
-    Type = (InstructionFlavor)(TheType);
+    assert(TheType < (unsigned)AMDGPU::InstructionFlavor::NUM_FLAVORS);
+    Type = (AMDGPU::InstructionFlavor)(TheType);
   }
 
-  InstructionFlavor getType() const { return Type; }
+  AMDGPU::InstructionFlavor getType() const { return Type; }
 
   unsigned getIdx() const { return Idx; }
 
@@ -260,7 +264,7 @@ protected:
 
   /// Given a \p Flavor , find the corresponding HardwareUnit. \returns the
   /// mapped HardwareUnit.
-  HardwareUnitInfo *getHWUIFromFlavor(InstructionFlavor Flavor);
+  HardwareUnitInfo *getHWUIFromFlavor(AMDGPU::InstructionFlavor Flavor);
 
 public:
   CandidateHeuristics() = default;
@@ -300,7 +304,7 @@ class AMDGPUCoExecSchedStrategy final : public GCNSchedStrategy {
 protected:
   bool tryEffectiveStall(SchedCandidate &Cand, SchedCandidate &TryCand,
                          SchedBoundary &Zone) const;
-  AMDGPUSchedReason LastAMDGPUReason = AMDGPUSchedReason::None;
+  AMDGPU::AMDGPUSchedReason LastAMDGPUReason = AMDGPU::AMDGPUSchedReason::None;
   CandidateHeuristics Heurs;
 
   void dumpPickSummary(SUnit *SU, bool IsTopNode, SchedCandidate &Cand);
