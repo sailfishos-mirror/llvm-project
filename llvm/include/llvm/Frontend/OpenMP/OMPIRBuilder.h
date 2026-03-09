@@ -1510,6 +1510,10 @@ public:
         : DepKind(DepKind), DepValueType(DepValueType), DepVal(DepVal) {}
   };
 
+  /// Return the LLVM struct type matching runtime `kmp_task_affinity_info_t`.
+  /// `{ kmp_intptr_t base_addr; size_t len; flags (bitfield storage as i32) }`
+  LLVM_ABI llvm::StructType *getKmpTaskAffinityInfoTy();
+
   /// A struct to pack the relevant information for an OpenMP affinity clause.
   struct AffinityData {
     Value *Count; // number of kmp_task_affinity_info_t entries

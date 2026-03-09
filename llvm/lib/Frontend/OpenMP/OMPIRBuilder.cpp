@@ -2431,6 +2431,13 @@ OpenMPIRBuilder::InsertPointOrErrorTy OpenMPIRBuilder::createTaskloop(
   return Builder.saveIP();
 }
 
+llvm::StructType *OpenMPIRBuilder::getKmpTaskAffinityInfoTy() {
+  llvm::Type *IntPtrTy = llvm::Type::getIntNTy(
+      M.getContext(), M.getDataLayout().getPointerSizeInBits());
+  return llvm::StructType::get(IntPtrTy, IntPtrTy,
+                               llvm::Type::getInt32Ty(M.getContext()));
+}
+
 OpenMPIRBuilder::InsertPointOrErrorTy OpenMPIRBuilder::createTask(
     const LocationDescription &Loc, InsertPointTy AllocaIP,
     BodyGenCallbackTy BodyGenCB, bool Tied, Value *Final, Value *IfCondition,
@@ -2558,10 +2565,55 @@ OpenMPIRBuilder::InsertPointOrErrorTy OpenMPIRBuilder::createTask(
     if (!Affinities.empty()) {
       Function *RegAffFn = getOrCreateRuntimeFunctionPtr(
           OMPRTL___kmpc_omp_reg_task_with_affinity);
-      for (const auto &Affinity : Affinities) {
-        createRuntimeFunctionCall(RegAffFn, {Ident, ThreadID, TaskData,
-                                             Affinity.Count, Affinity.Info});
+
+      Value *TotalAffinityCount = Builder.getInt32(0);
+      for (const auto &Affinity : Affinities)
+        TotalAffinityCount = Builder.CreateAdd(
+            TotalAffinityCount,
+            Builder.CreateIntCast(Affinity.Count, Builder.getInt32Ty(),
+                                  /*isSigned=*/false));
+
+      Value *AffinityInfo = Affinities.front().Info;
+      if (Affinities.size() > 1) {
+        StructType *KmpTaskAffinityInfoTy = getKmpTaskAffinityInfoTy();
+        Value *AffinityInfoElemSize = Builder.getInt64(
+            M.getDataLayout().getTypeAllocSize(KmpTaskAffinityInfoTy));
+        Value *PackedAffinityInfo = Builder.CreateAlloca(
+            KmpTaskAffinityInfoTy, TotalAffinityCount, "omp.affinity_list");
+        Value *PackedAffinityInfoOffset = Builder.getInt32(0);
+
+        for (const auto &Affinity : Affinities) {
+          Value *AffinityCount = Builder.CreateIntCast(
+              Affinity.Count, Builder.getInt32Ty(), /*isSigned=*/false);
+          Value *AffinityCountInt64 = Builder.CreateIntCast(
+              AffinityCount, Builder.getInt64Ty(), /*isSigned=*/false);
+          Value *AffinityInfoSize =
+              Builder.CreateMul(AffinityCountInt64, AffinityInfoElemSize);
+
+          Value *PackedAffinityInfoIndex = Builder.CreateIntCast(
+              PackedAffinityInfoOffset,
+              KmpTaskAffinityInfoTy->getElementType(0), /*isSigned=*/false);
+          PackedAffinityInfoIndex = Builder.CreateInBoundsGEP(
+              KmpTaskAffinityInfoTy, PackedAffinityInfo,
+              PackedAffinityInfoIndex);
+
+          Builder.CreateMemCpy(
+              PackedAffinityInfoIndex, Align(1),
+              Builder.CreatePointerBitCastOrAddrSpaceCast(
+                  Affinity.Info,
+                  Builder.getPtrTy(PackedAffinityInfoIndex->getType()
+                                       ->getPointerAddressSpace())),
+              Align(1), AffinityInfoSize);
+
+          PackedAffinityInfoOffset =
+              Builder.CreateAdd(PackedAffinityInfoOffset, AffinityCount);
+        }
+
+        AffinityInfo = PackedAffinityInfo;
       }
+
+      createRuntimeFunctionCall(RegAffFn, {Ident, ThreadID, TaskData,
+                                           TotalAffinityCount, AffinityInfo});
     }
 
     // Emit detach clause initialization.
@@ -11584,8 +11636,18 @@ OpenMPIRBuilder::InsertPointOrErrorTy OpenMPIRBuilder::createIteratorLoop(
   if (llvm::Error Err = BodyGen(BodyIP, CLI->getIndVar()))
     return Err;
 
-  // Ensure we end the loop body by jumping to the latch
-  if (!CLI->getBody()->getTerminator()) {
+  // Body must either fallthrough to the latch or branch directly to it.
+  if (Instruction *BodyTerminator = CLI->getBody()->getTerminator()) {
+    auto *BodyBr = dyn_cast<BranchInst>(BodyTerminator);
+    if (!BodyBr || !BodyBr->isUnconditional() ||
+        BodyBr->getSuccessor(0) != CLI->getLatch()) {
+      return make_error<StringError>(
+          "iterator bodygen must terminate the canonical body with an "
+          "unconditional branch to the loop latch",
+          inconvertibleErrorCode());
+    }
+  } else {
+    // Ensure we end the loop body by jumping to the latch.
     Builder.SetInsertPoint(CLI->getBody());
     Builder.CreateBr(CLI->getLatch());
   }

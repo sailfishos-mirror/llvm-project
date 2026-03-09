@@ -2261,10 +2261,10 @@ public:
                mlir::LLVM::ModuleTranslation &moduleTranslation,
                llvm::IRBuilderBase &builder) {
     dims = itersOp.getLoopLowerBounds().size();
-    this->lowerBounds.resize(dims);
-    this->upperBounds.resize(dims);
-    this->steps.resize(dims);
-    this->trips.resize(dims);
+    lowerBounds.resize(dims);
+    upperBounds.resize(dims);
+    steps.resize(dims);
+    trips.resize(dims);
 
     for (unsigned d = 0; d < dims; ++d) {
       llvm::Value *lb = lookUpAsI64(itersOp.getLoopLowerBounds()[d],
@@ -2276,20 +2276,20 @@ public:
       assert(lb && ub && st &&
              "Expect lowerBounds, upperBounds, and steps in IteratorOp");
 
-      this->lowerBounds[d] = lb;
-      this->upperBounds[d] = ub;
-      this->steps[d] = st;
+      lowerBounds[d] = lb;
+      upperBounds[d] = ub;
+      steps[d] = st;
 
       // trips = ((ub - lb) / step) + 1  (inclusive ub, assume positive step)
       llvm::Value *diff = builder.CreateSub(ub, lb);
       llvm::Value *div = builder.CreateSDiv(diff, st);
-      this->trips[d] = builder.CreateAdd(
+      trips[d] = builder.CreateAdd(
           div, llvm::ConstantInt::get(builder.getInt64Ty(), 1));
     }
 
-    this->totalTrips = llvm::ConstantInt::get(builder.getInt64Ty(), 1);
+    totalTrips = llvm::ConstantInt::get(builder.getInt64Ty(), 1);
     for (unsigned d = 0; d < dims; ++d)
-      this->totalTrips = builder.CreateMul(this->totalTrips, this->trips[d]);
+      totalTrips = builder.CreateMul(totalTrips, trips[d]);
   }
 
   unsigned getDims() const { return dims; }
@@ -2375,21 +2375,20 @@ void TaskContextStructManager::freeStructPtr() {
 }
 
 static void storeAffinityEntry(llvm::IRBuilderBase &builder,
+                               llvm::OpenMPIRBuilder &ompBuilder,
                                llvm::Value *affinityList, llvm::Value *index,
                                llvm::Value *addr, llvm::Value *len) {
-  auto &ctx = builder.getContext();
-  // { base_addr (i64), len (i64), flags (i32) }
-  llvm::StructType *kmpTaskAffinityInfoTy = llvm::StructType::get(
-      llvm::Type::getInt64Ty(ctx), llvm::Type::getInt64Ty(ctx),
-      llvm::Type::getInt32Ty(ctx));
-
+  llvm::StructType *kmpTaskAffinityInfoTy =
+      ompBuilder.getKmpTaskAffinityInfoTy();
   llvm::Value *entry = builder.CreateInBoundsGEP(
       kmpTaskAffinityInfoTy, affinityList, index, "omp.affinity.entry");
 
-  llvm::Value *baseAddrI64 = builder.CreatePtrToInt(addr, builder.getInt64Ty());
+  addr = builder.CreatePtrToInt(addr, kmpTaskAffinityInfoTy->getElementType(0));
+  len = builder.CreateIntCast(len, kmpTaskAffinityInfoTy->getElementType(1),
+                              /*isSigned=*/false);
   llvm::Value *flags = builder.getInt32(0);
 
-  builder.CreateStore(baseAddrI64,
+  builder.CreateStore(addr,
                       builder.CreateStructGEP(kmpTaskAffinityInfoTy, entry, 0));
   builder.CreateStore(len,
                       builder.CreateStructGEP(kmpTaskAffinityInfoTy, entry, 1));
@@ -2408,7 +2407,8 @@ static void fillAffinityLocators(Operation::operand_range affinityVars,
     llvm::Value *addr = moduleTranslation.lookupValue(entryOp.getAddr());
     llvm::Value *len = moduleTranslation.lookupValue(entryOp.getLen());
     assert(addr && len && "expect affinity addr and len to be non-null");
-    storeAffinityEntry(builder, affinityList, builder.getInt64(i), addr, len);
+    storeAffinityEntry(builder, *moduleTranslation.getOpenMPBuilder(),
+                       affinityList, builder.getInt64(i), addr, len);
   }
 }
 
@@ -2475,7 +2475,8 @@ fillAffinityIteratorLoop(mlir::omp::IteratorOp itersOp,
 
     llvm::Value *addr = moduleTranslation.lookupValue(entryOp.getAddr());
     llvm::Value *len = moduleTranslation.lookupValue(entryOp.getLen());
-    storeAffinityEntry(builder, affinityList, linearIV, addr, len);
+    storeAffinityEntry(builder, *moduleTranslation.getOpenMPBuilder(),
+                       affinityList, linearIV, addr, len);
 
     // Iterator-region block/value mappings are temporary for this conversion,
     // clear them to avoid stale entries in ModuleTranslation.
@@ -2500,10 +2501,8 @@ static mlir::LogicalResult buildAffinityData(
     mlir::omp::TaskOp &taskOp, llvm::IRBuilderBase &builder,
     mlir::LLVM::ModuleTranslation &moduleTranslation,
     llvm::SmallVectorImpl<llvm::OpenMPIRBuilder::AffinityData> &ads) {
-  auto &ctx = builder.getContext();
-  llvm::StructType *kmpTaskAffinityInfoTy = llvm::StructType::get(
-      llvm::Type::getInt64Ty(ctx), llvm::Type::getInt64Ty(ctx),
-      llvm::Type::getInt32Ty(ctx));
+  llvm::StructType *kmpTaskAffinityInfoTy =
+      moduleTranslation.getOpenMPBuilder()->getKmpTaskAffinityInfoTy();
 
   auto allocateAffinityList = [&](llvm::Value *count) -> llvm::Value * {
     return builder.CreateAlloca(kmpTaskAffinityInfoTy, count,

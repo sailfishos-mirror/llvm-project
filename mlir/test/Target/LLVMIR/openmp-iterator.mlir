@@ -191,8 +191,12 @@ llvm.func @task_affinity_iterator_multiple(%arr: !llvm.ptr {llvm.nocapture}) {
 
 // CHECK: codeRepl:
 // CHECK: call ptr @__kmpc_omp_task_alloc
-// CHECK: call i32 @__kmpc_omp_reg_task_with_affinity{{.*}}i32 24{{.*}}ptr [[AFFLIST0]]
-// CHECK: call i32 @__kmpc_omp_reg_task_with_affinity{{.*}}i32 3{{.*}}ptr [[AFFLIST1]]
+// CHECK: [[AFFINITY_LIST:%.*]] = alloca { i64, i64, i32 }, i32 27, align 8
+// CHECK: [[AFFINITY_LIST_1:%.*]] = getelementptr inbounds { i64, i64, i32 }, ptr [[AFFINITY_LIST]], i64 0
+// CHECK: call void @llvm.memcpy.p0.p0.i64(ptr align 1 [[AFFINITY_LIST_1]], ptr align 1 [[AFFLIST0]], i64 480, i1 false)
+// CHECK: [[AFFINITY_LIST_2:%.*]] = getelementptr inbounds { i64, i64, i32 }, ptr [[AFFINITY_LIST]], i64 24
+// CHECK: call void @llvm.memcpy.p0.p0.i64(ptr align 1 [[AFFINITY_LIST_2]], ptr align 1 [[AFFLIST1]], i64 60, i1 false)
+// CHECK: call i32 @__kmpc_omp_reg_task_with_affinity{{.*}}i32 27{{.*}}ptr [[AFFINITY_LIST]]
 // CHECK: call i32 @__kmpc_omp_task
 
 // Second iterator body

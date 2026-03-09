@@ -7713,6 +7713,30 @@ TEST_F(OpenMPIRBuilderTest, CreateIteratorLoop) {
   EXPECT_FALSE(verifyModule(*M, &errs()));
 }
 
+TEST_F(OpenMPIRBuilderTest, CreateIteratorLoopInvalidLoopBody) {
+  using InsertPointTy = OpenMPIRBuilder::InsertPointTy;
+  OpenMPIRBuilder OMPBuilder(*M);
+  OMPBuilder.initialize();
+  F->setName("func");
+  IRBuilder<> Builder(BB);
+
+  auto BodyGenCB = [&](InsertPointTy BodyIP, Value *LinearIV) -> Error {
+    Builder.restoreIP(BodyIP);
+    Builder.CreateAdd(LinearIV, Builder.getInt64(1));
+    BasicBlock *BadDest =
+        BasicBlock::Create(Builder.getContext(), "iterator.bad.dest", F);
+    Builder.CreateBr(BadDest);
+    Builder.SetInsertPoint(BadDest);
+    Builder.CreateUnreachable();
+    return Error::success();
+  };
+
+  OpenMPIRBuilder::LocationDescription Loc(Builder.saveIP(), DL);
+  OpenMPIRBuilder::InsertPointOrErrorTy AfterIP = OMPBuilder.createIteratorLoop(
+      Loc, Builder.getInt64(4), BodyGenCB, "iterator");
+  ASSERT_TRUE(errorToBool(AfterIP.takeError()));
+}
+
 TEST_F(OpenMPIRBuilderTest, CreateTaskgroup) {
   using InsertPointTy = OpenMPIRBuilder::InsertPointTy;
   OpenMPIRBuilder OMPBuilder(*M);
