@@ -3210,7 +3210,8 @@ Sema::CheckBuiltinFunctionCall(FunctionDecl *FDecl, unsigned BuiltinID,
   }
 #define ATOMIC_BUILTIN(ID, TYPE, ATTRS, LANGS)                                 \
   case Builtin::BI##ID:                                                        \
-    return AtomicOpsOverloaded(TheCallResult, AtomicExpr::AO##ID);
+    return AtomicOpsOverloaded(TheCallResult, AtomicExpr::AO##ID,              \
+                               &Context.BuiltinInfo.getInfo(Builtin::BI##ID));
 #include "clang/Basic/Builtins.inc"
   case Builtin::BI__annotation:
     if (BuiltinMSVCAnnotation(*this, TheCall))
@@ -4558,18 +4559,20 @@ static bool isValidOrderingForOp(int64_t Ordering, AtomicExpr::AtomicOp Op) {
 }
 
 ExprResult Sema::AtomicOpsOverloaded(ExprResult TheCallResult,
-                                     AtomicExpr::AtomicOp Op) {
+                                     AtomicExpr::AtomicOp Op,
+                                     const Builtin::Info *BuiltinInfo) {
   CallExpr *TheCall = cast<CallExpr>(TheCallResult.get());
   DeclRefExpr *DRE =cast<DeclRefExpr>(TheCall->getCallee()->IgnoreParenCasts());
   MultiExprArg Args{TheCall->getArgs(), TheCall->getNumArgs()};
   return BuildAtomicExpr({TheCall->getBeginLoc(), TheCall->getEndLoc()},
                          DRE->getSourceRange(), TheCall->getRParenLoc(), Args,
-                         Op);
+                         Op, BuiltinInfo);
 }
 
 ExprResult Sema::BuildAtomicExpr(SourceRange CallRange, SourceRange ExprRange,
                                  SourceLocation RParenLoc, MultiExprArg Args,
                                  AtomicExpr::AtomicOp Op,
+                                 const Builtin::Info *BuiltinInfo,
                                  AtomicArgumentOrder ArgOrder) {
   // All the non-OpenCL operations take one of the following forms.
   // The OpenCL operations take the __c11 forms with one extra argument for

@@ -2738,6 +2738,7 @@ public:
   BuildAtomicExpr(SourceRange CallRange, SourceRange ExprRange,
                   SourceLocation RParenLoc, MultiExprArg Args,
                   AtomicExpr::AtomicOp Op,
+                  const Builtin::Info *BuiltinInfo = nullptr,
                   AtomicArgumentOrder ArgOrder = AtomicArgumentOrder::API);
 
   /// Check to see if a given expression could have '.c_str()' called on it.
@@ -3032,7 +3033,8 @@ private:
   /// builtins.
   ExprResult BuiltinNontemporalOverloaded(ExprResult TheCallResult);
   ExprResult AtomicOpsOverloaded(ExprResult TheCallResult,
-                                 AtomicExpr::AtomicOp Op);
+                                 AtomicExpr::AtomicOp Op,
+                                 const Builtin::Info *BuiltinInfo);
 
   /// \param FPOnly restricts the arguments to floating-point types.
   bool BuiltinElementwiseMath(CallExpr *TheCall,

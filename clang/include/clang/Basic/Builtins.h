@@ -466,11 +466,11 @@ public:
     return strchr(getAttributesString(ID), 'G') != nullptr;
   }
 
+  const Info &getInfo(unsigned ID) const { return getShardAndInfo(ID).second; }
+
 private:
   std::pair<const InfosShard &, const Info &>
   getShardAndInfo(unsigned ID) const;
-
-  const Info &getInfo(unsigned ID) const { return getShardAndInfo(ID).second; }
 
   /// Helper function for isPrintfLike and isScanfLike.
   bool isLike(unsigned ID, unsigned &FormatIdx, bool &HasVAListArg,

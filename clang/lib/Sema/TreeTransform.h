@@ -4163,7 +4163,7 @@ public:
     // between the call and the expr at this point.
     SourceRange Range{BuiltinLoc, RParenLoc};
     return getSema().BuildAtomicExpr(Range, Range, RParenLoc, SubExprs, Op,
-                                     Sema::AtomicArgumentOrder::AST);
+                                     nullptr, Sema::AtomicArgumentOrder::AST);
   }
 
   ExprResult RebuildRecoveryExpr(SourceLocation BeginLoc, SourceLocation EndLoc,
