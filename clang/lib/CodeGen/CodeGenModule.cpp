@@ -2191,8 +2191,7 @@ static std::string getMangledNameImpl(CodeGenModule &CGM, GlobalDecl GD,
   }
 
   if (const auto *FD = dyn_cast<FunctionDecl>(ND)) {
-    if (FD->isMultiVersion() && !OmitMultiVersionMangling &&
-        !IgnoreFMVOnADeclaration(CGM.getTriple(), FD)) {
+    if (FD->isMultiVersion() && !OmitMultiVersionMangling) {
       switch (FD->getMultiVersionKind()) {
       case MultiVersionKind::CPUDispatch:
       case MultiVersionKind::CPUSpecific:
@@ -5267,7 +5266,6 @@ llvm::Constant *CodeGenModule::GetOrCreateLLVMFunction(
           NameWithoutMultiVersionMangling = getMangledNameImpl(
               *this, GD, FD, /*OmitMultiVersionMangling=*/true);
         } else if (IgnoreFMVOnADeclaration(getTriple(), FD)) {
-          // TODO this might not be necessary after fix in getMangledNameImpl
           NameWithoutMultiVersionMangling = getMangledNameImpl(
               *this, GD, FD, /*OmitMultiVersionMangling=*/true);
         } else
