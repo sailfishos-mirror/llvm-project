@@ -4843,7 +4843,7 @@ void SemaHLSL::ActOnVariableDeclarator(VarDecl *VD) {
     if (VD->getStorageClass() != SC_Static && VDTy->isHLSLIntangibleType() &&
         !isResourceRecordTypeOrArrayOf(VD))
       handleGlobalStructOrArrayOfWithResources(VD);
-      
+
     // Mark groupshared variables as extern so they will have
     // external storage and won't be default initialized
     if (VD->hasAttr<HLSLGroupSharedAddressSpaceAttr>())
