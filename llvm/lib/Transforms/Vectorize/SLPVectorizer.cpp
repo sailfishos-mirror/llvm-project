@@ -25604,7 +25604,7 @@ private:
       }
     }
     // Merge 1 element reduced value groups into larger group of shl, if only 2
-    // grouos available. May trigger extra vectorization with the copyables.
+    // groups available. May trigger extra vectorization with the copyables.
     if (ReducedVals.size() == 2 &&
         (ReducedVals.front().size() == 1 || ReducedVals.back().size() == 1)) {
       SmallVector<Value *> Ops(ReducedVals.front().size() +
