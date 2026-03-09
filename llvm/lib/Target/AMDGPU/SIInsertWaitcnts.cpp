@@ -160,7 +160,8 @@ static constexpr VMEMID toVMEMID(MCRegUnit RU) {
   DECL(VGPR_XDL_WRITE)           /* write VGPR dest in XDL VALU */             \
   DECL(VGPR_LDS_READ)            /* read VGPR source in LDS */                 \
   DECL(VGPR_FLAT_READ)           /* read VGPR source in FLAT */                \
-  DECL(VGPR_VMEM_READ)           /* read VGPR source in other VMEM */
+  DECL(VGPR_VMEM_READ)           /* read VGPR source in other VMEM */          \
+  DECL(ASYNC_ACCESS)             /* access that uses ASYNC_CNT */
 
 // clang-format off
 #define AMDGPU_EVENT_ENUM(Name) Name,
@@ -217,7 +218,7 @@ enum VmemType {
 static const unsigned instrsForExtendedCounterTypes[NUM_EXTENDED_INST_CNTS] = {
     AMDGPU::S_WAIT_LOADCNT,  AMDGPU::S_WAIT_DSCNT,     AMDGPU::S_WAIT_EXPCNT,
     AMDGPU::S_WAIT_STORECNT, AMDGPU::S_WAIT_SAMPLECNT, AMDGPU::S_WAIT_BVHCNT,
-    AMDGPU::S_WAIT_KMCNT,    AMDGPU::S_WAIT_XCNT};
+    AMDGPU::S_WAIT_KMCNT,    AMDGPU::S_WAIT_XCNT,      AMDGPU::S_WAIT_ASYNCCNT};
 
 static bool updateVMCntOnly(const MachineInstr &Inst) {
   return (SIInstrInfo::isVMEM(Inst) && !SIInstrInfo::isFLAT(Inst)) ||
@@ -405,6 +406,8 @@ public:
 
   // Returns a new waitcnt with all counters except VScnt set to 0. If
   // IncludeVSCnt is true, VScnt is set to 0, otherwise it is set to ~0u.
+  // AsyncCnt always defaults to ~0u (don't wait for it). It is only updated
+  // when a call to @llvm.amdgcn.wait.asyncmark() is processed.
   virtual AMDGPU::Waitcnt getAllZeroWaitcnt(bool IncludeVSCnt) const = 0;
 
   virtual ~WaitcntGenerator() = default;
@@ -459,6 +462,7 @@ protected:
           WaitEventSet({VMEM_BVH_READ_ACCESS}),
           WaitEventSet({SMEM_ACCESS, SQ_MESSAGE, SCC_WRITE}),
           WaitEventSet({VMEM_GROUP, SMEM_GROUP}),
+          WaitEventSet({ASYNC_ACCESS}),
           WaitEventSet({VGPR_CSMACC_WRITE, VGPR_DPMACC_WRITE, VGPR_TRANS_WRITE,
                         VGPR_XDL_WRITE}),
           WaitEventSet({VGPR_LDS_READ, VGPR_FLAT_READ, VGPR_VMEM_READ})};
@@ -1314,6 +1318,9 @@ void WaitcntBrackets::print(raw_ostream &OS) const {
     case X_CNT:
       OS << "    X_CNT(" << SR << "):";
       break;
+    case ASYNC_CNT:
+      OS << "    ASYNC_CNT(" << SR << "):";
+      break;
     case VA_VDST:
       OS << "    VA_VDST(" << SR << "): ";
       break;
@@ -1418,6 +1425,9 @@ void WaitcntBrackets::print(raw_ostream &OS) const {
       case X_CNT:
         OS << "  X_CNT: " << MarkedScore;
         break;
+      case ASYNC_CNT:
+        OS << "  ASYNC_CNT: " << MarkedScore;
+        break;
       default:
         OS << "  UNKNOWN: " << MarkedScore;
         break;
@@ -1442,6 +1452,7 @@ void WaitcntBrackets::simplifyWaitcnt(const AMDGPU::Waitcnt &CheckWait,
   simplifyXcnt(CheckWait, UpdateWait);
   simplifyWaitcnt(UpdateWait, VA_VDST);
   simplifyVmVsrc(CheckWait, UpdateWait);
+  simplifyWaitcnt(UpdateWait, ASYNC_CNT);
 }
 
 void WaitcntBrackets::simplifyWaitcnt(InstCounterType T,
@@ -1977,7 +1988,8 @@ AMDGPU::Waitcnt
 WaitcntGeneratorGFX12Plus::getAllZeroWaitcnt(bool IncludeVSCnt) const {
   unsigned ExpertVal = IsExpertMode ? 0 : ~0u;
   return AMDGPU::Waitcnt(0, 0, 0, IncludeVSCnt ? 0 : ~0u, 0, 0, 0,
-                         ~0u /* XCNT */, ExpertVal, ExpertVal);
+                         ~0u /* XCNT */, ~0u /* ASYNC_CNT */, ExpertVal,
+                         ExpertVal);
 }
 
 /// Combine consecutive S_WAIT_*CNT instructions that precede \p It and
@@ -2917,6 +2929,10 @@ void SIInsertWaitcnts::updateEventWaitcntAfter(MachineInstr &Inst,
         TII->hasModifiersSet(Inst, AMDGPU::OpName::gds)) {
       ScoreBrackets->setPendingGDS();
     }
+  } else if (SIInstrInfo::usesASYNC_CNT(Inst)) {
+    // Async instructions use flat encoding, so this needs to happen before the
+    // isFLAT() check below.
+    ScoreBrackets->updateByEvent(ASYNC_ACCESS, Inst);
   } else if (TII->isFLAT(Inst)) {
     if (Inst.mayLoadOrStore() && TII->mayAccessVMEMThroughFlat(Inst) &&
         TII->mayAccessLDSThroughFlat(Inst) && !SIInstrInfo::isLDSDMA(Inst))
@@ -2927,7 +2943,8 @@ void SIInsertWaitcnts::updateEventWaitcntAfter(MachineInstr &Inst,
       // pointers so that both VM and LGKM counters are flushed.
       ScoreBrackets->setPendingFlat();
   } else if (Inst.isCall()) {
-    // Act as a wait on everything
+    // Act as a wait on everything, but AsyncCnt is never included in such
+    // blanket waits.
     ScoreBrackets->applyWaitcnt(WCG->getAllZeroWaitcnt(/*IncludeVSCnt=*/false));
     ScoreBrackets->setStateOnFunctionEntryOrReturn();
   } else if (TII->isVINTERP(Inst)) {
@@ -3265,12 +3282,9 @@ bool SIInsertWaitcnts::insertWaitcntInBlock(MachineFunction &MF,
     OldWaitcntInstr = nullptr;
 
     if (Inst.getOpcode() == AMDGPU::ASYNCMARK) {
-      // FIXME: Not supported on GFX12 yet. Will need a new feature when we do.
-      //
       // Asyncmarks record the current wait state and so should not allow
       // waitcnts that occur after them to be merged into waitcnts that occur
       // before.
-      assert(ST->getGeneration() < AMDGPUSubtarget::GFX12);
       ScoreBrackets.recordAsyncMark(Inst);
       continue;
     }
@@ -3677,7 +3691,8 @@ bool SIInsertWaitcnts::run(MachineFunction &MF) {
       BuildMI(EntryBB, I, DebugLoc(), TII->get(AMDGPU::S_WAIT_LOADCNT_DSCNT))
           .addImm(0);
       for (auto CT : inst_counter_types(NUM_EXTENDED_INST_CNTS)) {
-        if (CT == LOAD_CNT || CT == DS_CNT || CT == STORE_CNT || CT == X_CNT)
+        if (CT == LOAD_CNT || CT == DS_CNT || CT == STORE_CNT || CT == X_CNT ||
+            CT == ASYNC_CNT)
           continue;
 
         if (!ST->hasImageInsts() &&

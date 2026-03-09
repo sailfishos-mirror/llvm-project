@@ -1096,6 +1096,7 @@ enum InstCounterType {
   BVH_CNT,                           // gfx12+ only.
   KM_CNT,                            // gfx12+ only.
   X_CNT,                             // gfx1250.
+  ASYNC_CNT,                         // gfx1250.
   NUM_EXTENDED_INST_CNTS,
   VA_VDST = NUM_EXTENDED_INST_CNTS, // gfx12+ expert mode only.
   VM_VSRC,                          // gfx12+ expert mode only.
@@ -1130,6 +1131,7 @@ class Waitcnt {
   unsigned BvhCnt = ~0u;    // gfx12+ only.
   unsigned KmCnt = ~0u;     // gfx12+ only.
   unsigned XCnt = ~0u;      // gfx1250.
+  unsigned AsyncCnt = ~0u;  // gfx1250.
   unsigned VaVdst = ~0u;    // gfx12+ expert scheduling mode only.
   unsigned VmVsrc = ~0u;    // gfx12+ expert scheduling mode only.
 
@@ -1152,6 +1154,8 @@ public:
       return KmCnt;
     case X_CNT:
       return XCnt;
+    case ASYNC_CNT:
+      return AsyncCnt;
     case VA_VDST:
       return VaVdst;
     case VM_VSRC:
@@ -1186,6 +1190,9 @@ public:
     case X_CNT:
       XCnt = Val;
       break;
+    case ASYNC_CNT:
+      AsyncCnt = Val;
+      break;
     case VA_VDST:
       VaVdst = Val;
       break;
@@ -1205,10 +1212,10 @@ public:
   // gfx12+ constructor.
   Waitcnt(unsigned LoadCnt, unsigned ExpCnt, unsigned DsCnt, unsigned StoreCnt,
           unsigned SampleCnt, unsigned BvhCnt, unsigned KmCnt, unsigned XCnt,
-          unsigned VaVdst, unsigned VmVsrc)
+          unsigned AsyncCnt, unsigned VaVdst, unsigned VmVsrc)
       : LoadCnt(LoadCnt), ExpCnt(ExpCnt), DsCnt(DsCnt), StoreCnt(StoreCnt),
         SampleCnt(SampleCnt), BvhCnt(BvhCnt), KmCnt(KmCnt), XCnt(XCnt),
-        VaVdst(VaVdst), VmVsrc(VmVsrc) {}
+        AsyncCnt(AsyncCnt), VaVdst(VaVdst), VmVsrc(VmVsrc) {}
 
   bool hasWait() const { return StoreCnt != ~0u || hasWaitExceptStoreCnt(); }
 
@@ -1230,7 +1237,8 @@ public:
         std::min(DsCnt, Other.DsCnt), std::min(StoreCnt, Other.StoreCnt),
         std::min(SampleCnt, Other.SampleCnt), std::min(BvhCnt, Other.BvhCnt),
         std::min(KmCnt, Other.KmCnt), std::min(XCnt, Other.XCnt),
-        std::min(VaVdst, Other.VaVdst), std::min(VmVsrc, Other.VmVsrc));
+        std::min(AsyncCnt, Other.AsyncCnt), std::min(VaVdst, Other.VaVdst),
+        std::min(VmVsrc, Other.VmVsrc));
   }
 
   friend raw_ostream &operator<<(raw_ostream &OS, const AMDGPU::Waitcnt &Wait);
@@ -1246,6 +1254,7 @@ struct HardwareLimits {
   unsigned BvhcntMax;    // gfx12+ only.
   unsigned KmcntMax;     // gfx12+ only.
   unsigned XcntMax;      // gfx1250.
+  unsigned AsyncMax;     // gfx1250.
   unsigned VaVdstMax;    // gfx12+ expert mode only.
   unsigned VmVsrcMax;    // gfx12+ expert mode only.
 
@@ -1348,6 +1357,10 @@ unsigned getSamplecntBitMask(const IsaVersion &Version);
 /// \returns Bvhcnt bit mask for given isa \p Version.
 /// Returns 0 for versions that do not support BVHcnt
 unsigned getBvhcntBitMask(const IsaVersion &Version);
+
+/// \returns Asynccnt bit mask for given isa \p Version.
+/// Returns 0 for versions that do not support Asynccnt
+unsigned getAsynccntBitMask(const IsaVersion &Version);
 
 /// \returns Dscnt bit mask for given isa \p Version.
 /// Returns 0 for versions that do not support DScnt
