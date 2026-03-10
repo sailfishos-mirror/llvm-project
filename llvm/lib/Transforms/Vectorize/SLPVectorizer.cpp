@@ -25931,7 +25931,7 @@ public:
         States.push_back(getSameOpcode(RV, TLI));
         continue;
       }
-      // Do some copyables analysis only if more than 2 groups exists or they
+      // Do some copyables analysis only if more than 2 groups exist or they
       // are large enough.
       if (!TwoGroupsOfSameSmallSize) {
         SmallVector<Value *> Ops;
@@ -25956,12 +25956,12 @@ public:
         // overall.
         if (TwoGroupsOnly) {
           auto [MainOp, AltOp] = getMainAltOpsNoStateVL(Ops);
+          OpS = InstructionsState(MainOp, AltOp);
           // Last chance to try to vectorize alternate node.
           SmallVector<Value *> Op1, Op2;
           BoUpSLP::OrdersType ReorderIndices;
           if (MainOp && AltOp &&
-              V.canBuildSplitNode(Ops, InstructionsState(MainOp, AltOp), Op1,
-                                  Op2, ReorderIndices)) {
+              V.canBuildSplitNode(Ops, OpS, Op1, Op2, ReorderIndices)) {
             if (LocalReducedVals.empty()) {
               LocalReducedVals.push_back(Ops);
               States.push_back(OpS);

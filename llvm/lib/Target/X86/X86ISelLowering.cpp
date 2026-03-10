@@ -22928,8 +22928,7 @@ SDValue X86TargetLowering::LowerFP_EXTEND(SDValue Op, SelectionDAG &DAG) const {
                        DAG.getUNDEF(MVT::v4i32), In,
                        DAG.getVectorIdxConstant(0, DL));
       In = DAG.getBitcast(MVT::v8i16, In);
-      Res = DAG.getNode(X86ISD::CVTPH2PS, DL, MVT::v4f32, In,
-                        DAG.getTargetConstant(4, DL, MVT::i32));
+      Res = DAG.getNode(X86ISD::CVTPH2PS, DL, MVT::v4f32, In);
     }
     Res = DAG.getNode(ISD::EXTRACT_VECTOR_ELT, DL, MVT::f32, Res,
                       DAG.getVectorIdxConstant(0, DL));
@@ -28181,8 +28180,7 @@ EmitTruncSStore(bool SignedSat, SDValue Chain, const SDLoc &DL, SDValue Val,
                 SDValue Ptr, EVT MemVT, MachineMemOperand *MMO,
                 SelectionDAG &DAG) {
   SDVTList VTs = DAG.getVTList(MVT::Other);
-  SDValue Undef = DAG.getUNDEF(Ptr.getValueType());
-  SDValue Ops[] = { Chain, Val, Ptr, Undef };
+  SDValue Ops[] = {Chain, Val, Ptr};
   unsigned Opc = SignedSat ? X86ISD::VTRUNCSTORES : X86ISD::VTRUNCSTOREUS;
   return DAG.getMemIntrinsicNode(Opc, DL, VTs, Ops, MemVT, MMO);
 }
