@@ -611,7 +611,7 @@ bool SemaPPC::checkTargetClonesAttr(
       } else if (LHS == "default") {
         HasDefault = true;
       } else if (!getASTContext().getTargetInfo().isValidFeatureName(LHS) ||
-               getASTContext().getTargetInfo().getFMVPriority(LHS) == 0) {
+                 getASTContext().getTargetInfo().getFMVPriority(LHS) == 0) {
         return Diag(CurLoc, diag::warn_unsupported_target_attribute)
                << Unsupported << None << LHS << TargetClones;
       }

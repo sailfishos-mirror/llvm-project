@@ -3137,12 +3137,12 @@ void CodeGenFunction::EmitPPCAIXMultiVersionResolver(
     assert(RO.Features[0].starts_with("cpu="));
     StringRef CPU = RO.Features[0].split("=").second.trim();
     StringRef Feature = llvm::StringSwitch<StringRef>(CPU)
-        .Cases({"power7","pwr7"}, "arch_2_06")
-        .Cases({"power8","pwr8"}, "arch_2_07")
-        .Cases({"power9","pwr9"}, "arch_3_00")
-        .Cases({"power10","pwr10"}, "arch_3_1")
-        .Cases({"power11","pwr11"}, "arch_3_1")
-        .Default("error");
+                            .Cases({"power7", "pwr7"}, "arch_2_06")
+                            .Cases({"power8", "pwr8"}, "arch_2_07")
+                            .Cases({"power9", "pwr9"}, "arch_3_00")
+                            .Cases({"power10", "pwr10"}, "arch_3_1")
+                            .Cases({"power11", "pwr11"}, "arch_3_1")
+                            .Default("error");
 
     llvm::Value *Condition = EmitPPCBuiltinCpu(
         Builtin::BI__builtin_cpu_supports, Builder.getInt1Ty(), Feature);

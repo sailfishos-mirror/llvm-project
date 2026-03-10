@@ -157,7 +157,7 @@ void AIXABIInfo::appendAttributeMangling(StringRef AttrStr,
     return;
   }
 
-  assert(false && "specifying target features on an FMV is not supported on AIX");
+  assert(0 && "specifying target features on an FMV is unsupported on AIX");
 }
 
 class AIXTargetCodeGenInfo : public TargetCodeGenInfo {
