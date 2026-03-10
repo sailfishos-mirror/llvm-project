@@ -582,6 +582,7 @@ bool SemaPPC::checkTargetClonesAttr(
   assert(Params.size() == Locs.size() &&
          "Mismatch between number of string parameters and locations");
 
+  auto &TargetInfo = getASTContext().getTargetInfo();
   bool HasDefault = false;
   bool HasComma = false;
   for (unsigned I = 0, E = Params.size(); I < E; ++I) {
@@ -604,15 +605,14 @@ bool SemaPPC::checkTargetClonesAttr(
           Loc.getLocWithOffset(LHS.data() - Param.data());
 
       if (LHS.starts_with("cpu=")) {
-        if (!getASTContext().getTargetInfo().isValidCPUName(
-                LHS.drop_front(sizeof("cpu=") - 1)))
+        if (!TargetInfo.isValidCPUName(LHS.drop_front(sizeof("cpu=") - 1)))
           return Diag(CurLoc, diag::warn_unsupported_target_attribute)
                  << Unsupported << CPU << LHS.drop_front(sizeof("cpu=") - 1)
                  << TargetClones;
       } else if (LHS == "default") {
         HasDefault = true;
-      } else if (!getASTContext().getTargetInfo().isValidFeatureName(LHS) ||
-                 getASTContext().getTargetInfo().getFMVPriority(LHS) == 0) {
+      } else if (!TargetInfo.isValidFeatureName(LHS) ||
+                 TargetInfo.getFMVPriority(LHS) == 0) {
         return Diag(CurLoc, diag::warn_unsupported_target_attribute)
                << Unsupported << None << LHS << TargetClones;
       }
