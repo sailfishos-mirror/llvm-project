@@ -18,6 +18,11 @@ MIR_BASIC_BLOCK_RE = re.compile(r" *bb\.[0-9]+.*:$")
 MIR_PREFIX_DATA_RE = re.compile(r"^ *(;|bb.[0-9].*: *$|[a-z]+:( |$)|$)")
 
 VREG_RE = re.compile(r"(%[0-9]+)(?:\.[a-z0-9_]+)?(?::[a-z0-9_]+)?(?:\([<>a-z0-9 ]+\))?")
+# Pattern to match register class IDs in INLINEASM instructions
+# Matches: any digit sequence followed by /* regdef:... */ or /* reguse:... */
+# The presence of the register class comment makes the pattern specific enough
+# to avoid false matches with other numeric operands in INLINEASM.
+REGCLASS_ID_RE = re.compile(r'\b(\d+)\s+(\/\*\s*reg(?:def|use|def-ec)(?:-ec)?:[^*]+\*\/)')
 MI_FLAGS_STR = (
     r"(frame-setup |frame-destroy |nnan |ninf |nsz |arcp |contract |afn "
     r"|reassoc |nuw |nsw |exact |nofpexcept |nomerge |unpredictable "
@@ -82,6 +87,8 @@ def build_function_info_dictionary(
                 func_line = re.sub(
                     r"{}\b".format(number), "[[{}]]".format(name), func_line
                 )
+            # Generalize register class IDs in INLINEASM instructions
+            func_line = generalize_regclass_ids(func_line)
             mangled.append(func_line)
         body = "".join(mangled)
 
@@ -132,6 +139,14 @@ def mangle_vreg(opcode, current_names):
     if i:
         return "{}{}".format(base, i)
     return base
+
+
+def generalize_regclass_ids(line):
+    # Replace hardcoded register class IDs in INLINEASM with [[#]].
+    if 'INLINEASM' not in line:
+        return line
+
+    return REGCLASS_ID_RE.sub(r'[[#]] \2', line)
 
 
 def find_mir_functions_with_one_bb(lines, verbose=False):

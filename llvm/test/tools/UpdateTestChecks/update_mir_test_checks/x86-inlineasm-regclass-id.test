@@ -1,0 +1,5 @@
+# REQUIRES: x86-registered-target
+## Check that update_mir_test_checks replaces register class IDs in INLINEASM with [[#]]
+
+# RUN: cp -f %S/Inputs/x86-inlineasm-regclass-id.mir %t.mir && %update_mir_test_checks %t.mir
+# RUN: diff -u %S/Inputs/x86-inlineasm-regclass-id.mir.expected %t.mir
