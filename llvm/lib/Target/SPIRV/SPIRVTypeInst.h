@@ -49,6 +49,10 @@ public:
   operator bool() const { return MI; }
 
   friend struct DenseMapInfo<SPIRVTypeInst>;
+
+  bool isIntegerType() const;
+  bool isFloatingPointType() const;
+  bool isIntegerOrFloatingPointType() const;
 };
 
 template <> struct DenseMapInfo<SPIRVTypeInst> {

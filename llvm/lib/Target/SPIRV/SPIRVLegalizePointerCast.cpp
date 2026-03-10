@@ -240,7 +240,8 @@ class SPIRVLegalizePointerCast : public FunctionPass {
 
       Types = {Element->getType(), ElementPtr->getType()};
       Align NewAlign = commonAlignment(Alignment, i * ElemSize);
-      Args = {Element, ElementPtr, B.getInt16(2), B.getInt32(NewAlign.value())};
+      Args = {Element, ElementPtr, B.getInt16(2), B.getInt32(NewAlign.value()),
+              B.getInt8(static_cast<uint8_t>(AtomicOrdering::NotAtomic))};
       B.CreateIntrinsic(Intrinsic::spv_store, {Types}, {Args});
     }
   }

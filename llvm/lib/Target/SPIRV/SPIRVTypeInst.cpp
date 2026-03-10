@@ -13,6 +13,8 @@
 #include "SPIRVTypeInst.h"
 #include "SPIRVInstrInfo.h"
 
+#include "SPIRV.h"
+
 namespace llvm {
 [[maybe_unused]] static bool definesATypeRegister(const MachineInstr &MI) {
   const MachineRegisterInfo &MRI = MI.getMF()->getRegInfo();
@@ -22,5 +24,17 @@ namespace llvm {
 SPIRVTypeInst::SPIRVTypeInst(const MachineInstr *MI) : MI(MI) {
   // A SPIRV Type whose result is not a type is invalid.
   assert(!MI || definesATypeRegister(*MI));
+}
+
+bool SPIRVTypeInst::isIntegerType() const {
+  return MI->getOpcode() == SPIRV::OpTypeInt;
+}
+
+bool SPIRVTypeInst::isFloatingPointType() const {
+  return MI->getOpcode() == SPIRV::OpTypeFloat;
+}
+
+bool SPIRVTypeInst::isIntegerOrFloatingPointType() const {
+  return isIntegerType() || isFloatingPointType();
 }
 } // namespace llvm
