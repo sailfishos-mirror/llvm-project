@@ -22,7 +22,9 @@ VREG_RE = re.compile(r"(%[0-9]+)(?:\.[a-z0-9_]+)?(?::[a-z0-9_]+)?(?:\([<>a-z0-9 
 # Matches: any digit sequence followed by /* regdef:... */ or /* reguse:... */
 # The presence of the register class comment makes the pattern specific enough
 # to avoid false matches with other numeric operands in INLINEASM.
-REGCLASS_ID_RE = re.compile(r'\b(\d+)\s+(\/\*\s*reg(?:def|use|def-ec)(?:-ec)?:[^*]+\*\/)')
+REGCLASS_ID_RE = re.compile(
+    r"\b(\d+)\s+(\/\*\s*reg(?:def|use)(?:-ec)?:[^*]+\*\/)"
+)
 MI_FLAGS_STR = (
     r"(frame-setup |frame-destroy |nnan |ninf |nsz |arcp |contract |afn "
     r"|reassoc |nuw |nsw |exact |nofpexcept |nomerge |unpredictable "
@@ -143,10 +145,10 @@ def mangle_vreg(opcode, current_names):
 
 def generalize_regclass_ids(line):
     # Replace hardcoded register class IDs in INLINEASM with [[#]].
-    if 'INLINEASM' not in line:
+    if "INLINEASM" not in line:
         return line
 
-    return REGCLASS_ID_RE.sub(r'[[#]] \2', line)
+    return REGCLASS_ID_RE.sub(r"[[#]] \2", line)
 
 
 def find_mir_functions_with_one_bb(lines, verbose=False):
