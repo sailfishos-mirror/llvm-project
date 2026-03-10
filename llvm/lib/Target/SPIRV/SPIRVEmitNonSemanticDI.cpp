@@ -45,7 +45,9 @@ enum SourceLanguage {
   NZSL = 9,
   WGSL = 10,
   Slang = 11,
-  Zig = 12
+  Zig = 12,
+  Rust = 13,
+  Max = 0x7fffffff
 };
 
 struct SPIRVEmitNonSemanticDI : public MachineFunctionPass {
@@ -114,6 +116,8 @@ SourceLanguage SPIRVEmitNonSemanticDI::convertDWARFToSPIRVSourceLanguage(
     return SourceLanguage::SYCL;
   case dwarf::DW_LANG_Zig:
     return SourceLanguage::Zig;
+  case dwarf::DW_LANG_Rust:
+    return SourceLanguage::Rust;
   default:
     return SourceLanguage::Unknown;
   }
