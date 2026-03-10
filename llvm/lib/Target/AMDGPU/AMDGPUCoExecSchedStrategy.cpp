@@ -55,10 +55,7 @@ InstructionFlavor llvm::AMDGPU::classifyFlavor(const MachineInstr &MI,
       Opc == AMDGPU::S_BARRIER_SIGNAL_IMM)
     return InstructionFlavor::Fence;
 
-  if (Opc == AMDGPU::TENSOR_LOAD_TO_LDS_D2 ||
-      Opc == AMDGPU::TENSOR_LOAD_TO_LDS ||
-      Opc == AMDGPU::GLOBAL_LOAD_ASYNC_TO_LDS_B32 ||
-      Opc == AMDGPU::GLOBAL_LOAD_ASYNC_TO_LDS_B32_SADDR)
+  if (SII.isLDSDMA(MI))
     return InstructionFlavor::DMA;
 
   if (SII.isMFMAorWMMA(MI))
