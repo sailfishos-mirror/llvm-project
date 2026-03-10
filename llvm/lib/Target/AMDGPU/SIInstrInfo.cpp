@@ -11373,17 +11373,6 @@ MachineInstr *SIInstrInfo::getNextRealInstr(MachineInstr *MI) {
 }
 
 unsigned SIInstrInfo::getRepeatRate(const MachineInstr &MI) const {
-#if 0
-  // XDL WMMA uses an unbuffered resource, so the ReleaseAtCycle from the
-  // sched model is the repeat rate.
-  if (isXDLWMMA(MI)) {
-    const MCSchedClassDesc *SC = SchedModel.resolveSchedClass(&MI);
-    if (SchedModel.getWriteProcResBegin(SC) !=
-        SchedModel.getWriteProcResEnd(SC))
-      return SchedModel.getWriteProcResBegin(SC)->ReleaseAtCycle;
-  }
-#endif
-
   if (!AMDGPU::isGFX1250(ST) || !isVALU(MI))
     return 1;
 
