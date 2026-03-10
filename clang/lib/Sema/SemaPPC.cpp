@@ -574,7 +574,8 @@ bool SemaPPC::BuiltinVSX(CallExpr *TheCall) {
 }
 
 bool SemaPPC::checkTargetClonesAttr(
-    SmallVectorImpl<StringRef> &Params, SmallVectorImpl<SourceLocation> &Locs,
+    const SmallVectorImpl<StringRef> &Params,
+    const SmallVectorImpl<SourceLocation> &Locs,
     SmallVectorImpl<SmallString<64>> &NewParams) {
   using namespace DiagAttrParams;
 

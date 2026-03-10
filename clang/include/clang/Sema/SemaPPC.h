@@ -54,8 +54,8 @@ public:
   // vector short vec_xxsldwi(vector short, vector short, int);
   bool BuiltinVSX(CallExpr *TheCall);
 
-  bool checkTargetClonesAttr(SmallVectorImpl<StringRef> &Params,
-                             SmallVectorImpl<SourceLocation> &Locs,
+  bool checkTargetClonesAttr(const SmallVectorImpl<StringRef> &Params,
+                             const SmallVectorImpl<SourceLocation> &Locs,
                              SmallVectorImpl<SmallString<64>> &NewParams);
 };
 } // namespace clang
