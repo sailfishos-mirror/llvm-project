@@ -73,6 +73,8 @@ static llvm::Value *emitPPCLoadReserveIntrinsic(CodeGenFunction &CGF,
 Value *CodeGenFunction::EmitPPCBuiltinCpu(unsigned BuiltinID,
                                           llvm::Type *ReturnType,
                                           StringRef CPUStr) {
+  assert(BuiltinID == Builtin::BI__builtin_cpu_is ||
+         BuiltinID == Builtin::BI__builtin_cpu_supports);
 
 #include "llvm/TargetParser/PPCTargetParser.def"
   auto GenAIXPPCBuiltinCpuExpr = [&](unsigned SupportMethod, unsigned FieldIdx,
@@ -160,45 +162,44 @@ Value *CodeGenFunction::EmitPPCBuiltinCpu(unsigned BuiltinID,
     Value *TheCall = Builder.CreateCall(F, {Op0}, "cpu_is");
     return Builder.CreateICmpEQ(TheCall,
                                 llvm::ConstantInt::get(Int32Ty, LinuxIDValue));
-  } else if (BuiltinID == Builtin::BI__builtin_cpu_supports) {
-    llvm::Triple Triple = getTarget().getTriple();
-    if (Triple.isOSAIX()) {
-      typedef std::tuple<unsigned, unsigned, unsigned, CmpInst::Predicate,
-                         unsigned>
-          CPUSupportType;
-      auto [SupportMethod, FieldIdx, Mask, CompOp, Value] =
-          static_cast<CPUSupportType>(StringSwitch<CPUSupportType>(CPUStr)
+  }
+  // else BuiltinID == Builtin::BI__builtin_cpu_supports
+  llvm::Triple Triple = getTarget().getTriple();
+  if (Triple.isOSAIX()) {
+    typedef std::tuple<unsigned, unsigned, unsigned, CmpInst::Predicate,
+                       unsigned>
+        CPUSupportType;
+    auto [SupportMethod, FieldIdx, Mask, CompOp, Value] =
+        static_cast<CPUSupportType>(
+            StringSwitch<CPUSupportType>(CPUStr)
 #define PPC_AIX_FEATURE(NAME, DESC, SUPPORT_METHOD, INDEX, MASK, COMP_OP,      \
                         VALUE)                                                 \
   .Case(NAME, {SUPPORT_METHOD, INDEX, MASK, COMP_OP, VALUE})
 #include "llvm/TargetParser/PPCTargetParser.def"
-                                          .Default({BUILTIN_PPC_FALSE, 0, 0,
-                                                    CmpInst::Predicate(), 0}));
-      return GenAIXPPCBuiltinCpuExpr(SupportMethod, FieldIdx, Mask, CompOp,
-                                     Value);
-    }
+                .Default({BUILTIN_PPC_FALSE, 0, 0, CmpInst::Predicate(), 0}));
+    return GenAIXPPCBuiltinCpuExpr(SupportMethod, FieldIdx, Mask, CompOp,
+                                   Value);
+  }
 
-    assert(Triple.isOSLinux() &&
-           "__builtin_cpu_supports() is only supported for AIX and Linux.");
-    auto [FeatureWord, BitMask] =
-        StringSwitch<std::pair<unsigned, unsigned>>(CPUStr)
+  assert(Triple.isOSLinux() &&
+         "__builtin_cpu_supports() is only supported for AIX and Linux.");
+  auto [FeatureWord, BitMask] =
+      StringSwitch<std::pair<unsigned, unsigned>>(CPUStr)
 #define PPC_LNX_FEATURE(Name, Description, EnumName, Bitmask, FA_WORD)         \
   .Case(Name, {FA_WORD, Bitmask})
 #include "llvm/TargetParser/PPCTargetParser.def"
-            .Default({0, 0});
-    if (!BitMask)
-      return Builder.getFalse();
-    Value *Op0 = llvm::ConstantInt::get(Int32Ty, FeatureWord);
-    llvm::Function *F = CGM.getIntrinsic(Intrinsic::ppc_fixed_addr_ld);
-    Value *TheCall = Builder.CreateCall(F, {Op0}, "cpu_supports");
-    Value *Mask =
-        Builder.CreateAnd(TheCall, llvm::ConstantInt::get(Int32Ty, BitMask));
-    return Builder.CreateICmpNE(Mask, llvm::Constant::getNullValue(Int32Ty));
+          .Default({0, 0});
+  if (!BitMask)
+    return Builder.getFalse();
+  Value *Op0 = llvm::ConstantInt::get(Int32Ty, FeatureWord);
+  llvm::Function *F = CGM.getIntrinsic(Intrinsic::ppc_fixed_addr_ld);
+  Value *TheCall = Builder.CreateCall(F, {Op0}, "cpu_supports");
+  Value *Mask =
+      Builder.CreateAnd(TheCall, llvm::ConstantInt::get(Int32Ty, BitMask));
+  return Builder.CreateICmpNE(Mask, llvm::Constant::getNullValue(Int32Ty));
 #undef PPC_FAWORD_HWCAP
 #undef PPC_FAWORD_HWCAP2
 #undef PPC_FAWORD_CPUID
-  } else
-    assert(0 && "unexpected builtin");
 }
 
 Value *CodeGenFunction::EmitPPCBuiltinExpr(unsigned BuiltinID,
