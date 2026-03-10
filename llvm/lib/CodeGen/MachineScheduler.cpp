@@ -420,9 +420,7 @@ INITIALIZE_PASS_DEPENDENCY(MachineBlockFrequencyInfoWrapperPass);
 INITIALIZE_PASS_END(MachineSchedulerLegacy, DEBUG_TYPE,
                     "Machine Instruction Scheduler", false, false)
 
-MachineSchedulerLegacy::MachineSchedulerLegacy() : MachineFunctionPass(ID) {
-  initializeMachineSchedulerLegacyPass(*PassRegistry::getPassRegistry());
-}
+MachineSchedulerLegacy::MachineSchedulerLegacy() : MachineFunctionPass(ID) {}
 
 void MachineSchedulerLegacy::getAnalysisUsage(AnalysisUsage &AU) const {
   AU.setPreservesCFG();
@@ -451,9 +449,7 @@ INITIALIZE_PASS_END(PostMachineSchedulerLegacy, "postmisched",
                     "PostRA Machine Instruction Scheduler", false, false)
 
 PostMachineSchedulerLegacy::PostMachineSchedulerLegacy()
-    : MachineFunctionPass(ID) {
-  initializePostMachineSchedulerLegacyPass(*PassRegistry::getPassRegistry());
-}
+    : MachineFunctionPass(ID) {}
 
 void PostMachineSchedulerLegacy::getAnalysisUsage(AnalysisUsage &AU) const {
   AU.setPreservesCFG();
@@ -2946,17 +2942,6 @@ unsigned SchedBoundary::countResource(const MCSchedClassDesc *SC, unsigned PIdx,
 
 /// Move the boundary of scheduled code by one SUnit.
 void SchedBoundary::bumpNode(SUnit *SU) {
-  // Update the reservation table.
-  if (HazardRec->isEnabled()) {
-    if (!isTop() && SU->isCall) {
-      // Calls are scheduled with their preceding instructions. For bottom-up
-      // scheduling, clear the pipeline state before emitting.
-      HazardRec->Reset();
-    }
-    HazardRec->EmitInstruction(SU);
-    // Scheduling an instruction may have made pending instructions available.
-    CheckPending = true;
-  }
   // checkHazard should prevent scheduling multiple instructions per cycle that
   // exceed the issue width.
   const MCSchedClassDesc *SC = DAG->getSchedClass(SU);
@@ -3082,6 +3067,18 @@ void SchedBoundary::bumpNode(SUnit *SU) {
     IsResourceLimited =
         checkResourceLimit(SchedModel->getLatencyFactor(), getCriticalCount(),
                            getScheduledLatency(), true);
+
+  // Update the reservation table.
+  if (HazardRec->isEnabled()) {
+    if (!isTop() && SU->isCall) {
+      // Calls are scheduled with their preceding instructions. For bottom-up
+      // scheduling, clear the pipeline state before emitting.
+      HazardRec->Reset();
+    }
+    HazardRec->EmitInstruction(SU);
+    // Scheduling an instruction may have made pending instructions available.
+    CheckPending = true;
+  }
 
   // Update CurrMOps after calling bumpCycle to handle stalls, since bumpCycle
   // resets CurrMOps. Loop to handle instructions with more MOps than issue in
