@@ -2127,20 +2127,6 @@ static bool isUniqueInternalLinkageDecl(GlobalDecl GD,
          (CGM.getFunctionLinkage(GD) == llvm::GlobalValue::InternalLinkage);
 }
 
-// On certain platforms, a declared (but not defined) FMV shall be treated
-// like a regular non-FMV function.
-static bool IgnoreFMVOnADeclaration(const llvm::Triple &Triple,
-                                    const FunctionDecl *FD) {
-  if (!FD->isMultiVersion())
-    return false;
-
-  if (Triple.isOSAIX()) {
-    assert(FD->isTargetClonesMultiVersion());
-    return !FD->isDefined();
-  }
-  return false;
-}
-
 static std::string getMangledNameImpl(CodeGenModule &CGM, GlobalDecl GD,
                                       const NamedDecl *ND,
                                       bool OmitMultiVersionMangling = false) {
@@ -5265,7 +5251,13 @@ llvm::Constant *CodeGenModule::GetOrCreateLLVMFunction(
           AddDeferredMultiVersionResolverToEmit(GD);
           NameWithoutMultiVersionMangling = getMangledNameImpl(
               *this, GD, FD, /*OmitMultiVersionMangling=*/true);
-        } else if (IgnoreFMVOnADeclaration(getTriple(), FD)) {
+        }
+        // On AIX, a declared (but not defined) FMV shall be treated like a
+        // regular non-FMV function. If a definition is later seen, then
+        // GetOrCreateMultiVersionResolver will get called (when processing said
+        // definition) which will replace the IR declaration we're creating here
+        // with the FMV ifunc.
+        else if (getTriple().isOSAIX() && !FD->isDefined()) {
           NameWithoutMultiVersionMangling = getMangledNameImpl(
               *this, GD, FD, /*OmitMultiVersionMangling=*/true);
         } else
