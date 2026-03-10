@@ -259,6 +259,7 @@ static BuiltinTypeDeclBuilder setupTextureType(CXXRecordDecl *Decl, Sema &S,
   return BuiltinTypeDeclBuilder(S, Decl)
       .addTextureHandle(RC, IsROV, Dim)
       .addTextureLoadMethods(Dim)
+      .addArraySubscriptOperators(Dim)
       .addDefaultHandleConstructor()
       .addCopyConstructor()
       .addCopyAssignmentOperator()
@@ -475,7 +476,7 @@ void HLSLExternalSemaSource::defineHLSLTypesWithForwardDeclarations() {
   onCompletion(Decl, [this](CXXRecordDecl *Decl) {
     setupBufferType(Decl, *SemaPtr, ResourceClass::SRV, /*IsROV=*/false,
                     /*RawBuffer=*/false, /*HasCounter=*/false)
-        .addArraySubscriptOperators()
+        .addArraySubscriptOperators(ResourceDimension::Unknown)
         .addLoadMethods()
         .addGetDimensionsMethodForBuffer()
         .completeDefinition();
@@ -488,7 +489,7 @@ void HLSLExternalSemaSource::defineHLSLTypesWithForwardDeclarations() {
   onCompletion(Decl, [this](CXXRecordDecl *Decl) {
     setupBufferType(Decl, *SemaPtr, ResourceClass::UAV, /*IsROV=*/false,
                     /*RawBuffer=*/false, /*HasCounter=*/false)
-        .addArraySubscriptOperators()
+        .addArraySubscriptOperators(ResourceDimension::Unknown)
         .addLoadMethods()
         .addGetDimensionsMethodForBuffer()
         .completeDefinition();
@@ -501,7 +502,7 @@ void HLSLExternalSemaSource::defineHLSLTypesWithForwardDeclarations() {
   onCompletion(Decl, [this](CXXRecordDecl *Decl) {
     setupBufferType(Decl, *SemaPtr, ResourceClass::UAV, /*IsROV=*/true,
                     /*RawBuffer=*/false, /*HasCounter=*/false)
-        .addArraySubscriptOperators()
+        .addArraySubscriptOperators(ResourceDimension::Unknown)
         .addLoadMethods()
         .addGetDimensionsMethodForBuffer()
         .completeDefinition();
@@ -513,7 +514,7 @@ void HLSLExternalSemaSource::defineHLSLTypesWithForwardDeclarations() {
   onCompletion(Decl, [this](CXXRecordDecl *Decl) {
     setupBufferType(Decl, *SemaPtr, ResourceClass::SRV, /*IsROV=*/false,
                     /*RawBuffer=*/true, /*HasCounter=*/false)
-        .addArraySubscriptOperators()
+        .addArraySubscriptOperators(ResourceDimension::Unknown)
         .addLoadMethods()
         .addGetDimensionsMethodForBuffer()
         .completeDefinition();
@@ -525,7 +526,7 @@ void HLSLExternalSemaSource::defineHLSLTypesWithForwardDeclarations() {
   onCompletion(Decl, [this](CXXRecordDecl *Decl) {
     setupBufferType(Decl, *SemaPtr, ResourceClass::UAV, /*IsROV=*/false,
                     /*RawBuffer=*/true, /*HasCounter=*/true)
-        .addArraySubscriptOperators()
+        .addArraySubscriptOperators(ResourceDimension::Unknown)
         .addLoadMethods()
         .addIncrementCounterMethod()
         .addDecrementCounterMethod()
@@ -564,7 +565,7 @@ void HLSLExternalSemaSource::defineHLSLTypesWithForwardDeclarations() {
   onCompletion(Decl, [this](CXXRecordDecl *Decl) {
     setupBufferType(Decl, *SemaPtr, ResourceClass::UAV, /*IsROV=*/true,
                     /*RawBuffer=*/true, /*HasCounter=*/true)
-        .addArraySubscriptOperators()
+        .addArraySubscriptOperators(ResourceDimension::Unknown)
         .addLoadMethods()
         .addIncrementCounterMethod()
         .addDecrementCounterMethod()
