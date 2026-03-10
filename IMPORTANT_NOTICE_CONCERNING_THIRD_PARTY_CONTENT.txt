@@ -1,0 +1,3 @@
+Certain material in this repository may be separately licensed by AMD or third parties and may be subject to open-source licenses. 
+
+Note: Licensee is solely responsible for checking the header files and other accompanying source files made available in this repository because such header and/or source files may contain or describe various copyright notices and license terms governing such files, which vary from case to case based on usage and are beyond the control of AMD. Licensee is solely responsible for complying with any such terms. 

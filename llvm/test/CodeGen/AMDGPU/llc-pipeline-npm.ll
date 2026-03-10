@@ -85,6 +85,7 @@
 ; GCN-O0-NEXT: amdgpu-wait-sgpr-hazards
 ; GCN-O0-NEXT: amdgpu-lower-vgpr-encoding
 ; GCN-O0-NEXT: branch-relaxation
+; GCN-O0-NEXT: AMDGPUStaticSimulatorPass
 ; GCN-O0-NEXT: reg-usage-collector
 ; GCN-O0-NEXT: remove-loads-into-fake-uses
 ; GCN-O0-NEXT: live-debug-values
@@ -256,6 +257,7 @@
 ; GCN-O2-NEXT: amdgpu-lower-vgpr-encoding
 ; GCN-O2-NEXT: amdgpu-insert-delay-alu
 ; GCN-O2-NEXT: branch-relaxation
+; GCN-O2-NEXT: AMDGPUStaticSimulatorPass
 ; GCN-O2-NEXT: reg-usage-collector
 ; GCN-O2-NEXT: remove-loads-into-fake-uses
 ; GCN-O2-NEXT: live-debug-values
@@ -427,6 +429,7 @@
 ; GCN-O3-NEXT: amdgpu-lower-vgpr-encoding
 ; GCN-O3-NEXT: amdgpu-insert-delay-alu
 ; GCN-O3-NEXT: branch-relaxation
+; GCN-O3-NEXT: AMDGPUStaticSimulatorPass
 ; GCN-O3-NEXT: reg-usage-collector
 ; GCN-O3-NEXT: remove-loads-into-fake-uses
 ; GCN-O3-NEXT: live-debug-values
