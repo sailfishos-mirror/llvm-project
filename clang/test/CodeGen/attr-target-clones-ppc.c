@@ -99,15 +99,30 @@ int test_foo_used_no_defn(void) {
 }
 // CHECK: declare {{.*}}i32 @foo_used_no_defn()
 
-// test that the CPU checks are done in most to least restrictive (highest to lowest CPU)
-int __attribute__((target_clones("cpu=pwr7", "cpu=pwr9", "default", "cpu=pwr8")))
+// Test that the CPU conditions are checked from the most to the least
+// restrictive (highest to lowest CPU). Also test the codegen for the
+// conditions
+int __attribute__((target_clones("cpu=pwr10", "cpu=pwr7", "cpu=pwr9", "default", "cpu=pwr8")))
 foo_priority(int x) { return x & (x - 1); }
 // CHECK: define internal ptr @foo_priority.resolver()
+// CHECK-NEXT: entry
+//   if (__builtin_cpu_supports("arch_3_1")) return &foo_priority.cpu_pwr10;
+// CHECK-NEXT: %[[#L1:]] = load i32, {{.*}} ptr @_system_configuration, i32 0, i32 1)
+// CHECK-NEXT: icmp uge i32 %[[#L1]], 262144
+// CHECK: ret ptr @foo_priority.cpu_pwr10
+//   if (__builtin_cpu_supports("arch_3_00")) return &foo_priority.cpu_pwr9;
+// CHECK: %[[#L2:]] = load i32, {{.*}} ptr @_system_configuration, i32 0, i32 1)
+// CHECK-NEXT: icmp uge i32 %[[#L2]], 131072
 // CHECK: ret ptr @foo_priority.cpu_pwr9
+//   if (__builtin_cpu_supports("arch_2_07")) return &foo_priority.cpu_pwr8;
+// CHECK: %[[#L3:]] = load i32, {{.*}} ptr @_system_configuration, i32 0, i32 1)
+// CHECK-NEXT: icmp uge i32 %[[#L3]], 65536
 // CHECK: ret ptr @foo_priority.cpu_pwr8
+//   if (__builtin_cpu_supports("arch_2_06")) return &foo_priority.cpu_pwr8;
+// CHECK: %[[#L4:]] = load i32, {{.*}} ptr @_system_configuration, i32 0, i32 1)
+// CHECK-NEXT: icmp uge i32 %[[#L4]], 32768
 // CHECK: ret ptr @foo_priority.cpu_pwr7
 // CHECK: ret ptr @foo_priority.default
-
 
 // CHECK: attributes #[[#ATTR_P7]] = {{.*}} "target-cpu"="pwr7"
 // CHECK: attributes #[[#ATTR_P10]] = {{.*}} "target-cpu"="pwr10"
