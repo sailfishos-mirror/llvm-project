@@ -13,9 +13,11 @@
 #include "clang/ScalableStaticAnalysisFramework/Core/ASTEntityMapping.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/Model/EntityId.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/Model/EntityName.h"
+#include "clang/ScalableStaticAnalysisFramework/Core/Serialization/JSONFormat.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/TUSummary/TUSummary.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/TUSummary/TUSummaryBuilder.h"
 #include "clang/Tooling/Tooling.h"
+#include "llvm/Testing/Support/Error.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -79,11 +81,6 @@ protected:
         findDeclByName<ContributorDecl>(ContributorName, AST->getASTContext());
 
     if (!ContributorDefn)
-      return nullptr;
-
-    std::optional<EntityName> EN = getEntityName(ContributorDefn);
-
-    if (!EN)
       return nullptr;
 
     llvm::Error Error = llvm::ErrorSuccess();
@@ -182,6 +179,129 @@ TEST_F(UnsafeBufferUsageTest, UnsafeBufferUsageEntityPointerLevelSetTest) {
   EXPECT_THAT(getSubsetOf(Set, E1), UnorderedElementsAre(P1, P2));
   EXPECT_THAT(getSubsetOf(Set, E2), UnorderedElementsAre(P3, P4));
   EXPECT_THAT(getSubsetOf(Set, E3), UnorderedElementsAre(P5));
+}
+
+//////////////////////////////////////////////////////////////
+//                     JSON Tests                           //
+//////////////////////////////////////////////////////////////
+// Oracle JSON output for the example:
+// void foo(int ***p, int ****q, int x) {
+//   p[5][5][5];
+//   q[5][5][5][5];
+// }
+constexpr const char *const SerilizationTestOracle = R"cpp({
+  "UnsafeBuffers": [
+    [
+      {
+        "@": 42
+      },
+      1
+    ],
+    [
+      {
+        "@": 42
+      },
+      2
+    ],
+    [
+      {
+        "@": 42
+      },
+      3
+    ],
+    [
+      {
+        "@": 108
+      },
+      1
+    ],
+    [
+      {
+        "@": 108
+      },
+      2
+    ],
+    [
+      {
+        "@": 108
+      },
+      3
+    ],
+    [
+      {
+        "@": 108
+      },
+      4
+    ]
+  ]
+})cpp";
+
+TEST_F(UnsafeBufferUsageTest, UnsafeBufferUsageSerializeTest) {
+  auto Sum = setUpTest(R"cpp(
+    void foo(int ***p, int ****q, int x) {
+      p[5][5][5];
+      q[5][5][5][5];
+    }
+  )cpp",
+                       "foo");
+  ASSERT_NE(Sum, nullptr);
+  EXPECT_EQ(*Sum, makeSet(__LINE__, {{"p", 1U},
+                                     {"p", 2U},
+                                     {"p", 3U},
+                                     {"q", 1U},
+                                     {"q", 2U},
+                                     {"q", 3U},
+                                     {"q", 4U}}));
+
+  using Object = llvm::json::Object;
+  using Value = llvm::json::Value;
+  std::map<EntityId, uint64_t> DummyTable{{*getEntityId("p"), 42},
+                                          {*getEntityId("q"), 108}};
+  Object JData = UnsafeBufferUsageEntitySummary::jsonSerializeFn(
+      *Sum, [&DummyTable](EntityId Id) {
+        return Object{{"@", Value(DummyTable[Id])}};
+      });
+
+  EXPECT_EQ(llvm::formatv("{0:2}", llvm::json::Value(std::move(JData))).str(),
+            SerilizationTestOracle);
+}
+
+TEST_F(UnsafeBufferUsageTest, UnsafeBufferUsageDeserializeTest) {
+  auto Sum = setUpTest(R"cpp(
+    void foo(int ***p, int ****q, int x) {
+      p[5][5][5];
+      q[5][5][5][5];
+    }
+  )cpp",
+                       "foo");
+  ASSERT_NE(Sum, nullptr);
+  EXPECT_EQ(*Sum, makeSet(__LINE__, {{"p", 1U},
+                                     {"p", 2U},
+                                     {"p", 3U},
+                                     {"q", 1U},
+                                     {"q", 2U},
+                                     {"q", 3U},
+                                     {"q", 4U}}));
+
+  using Object = llvm::json::Object;
+  using Value = llvm::json::Value;
+  std::map<uint64_t, EntityId> DummyTable{{42, *getEntityId("p")},
+                                          {108, *getEntityId("q")}};
+  Expected<Value> ParsedJSON = llvm::json::parse(SerilizationTestOracle);
+
+  ASSERT_THAT_EXPECTED(ParsedJSON, llvm::Succeeded());
+  ASSERT_NE(ParsedJSON->getAsObject(), nullptr);
+
+  EntityIdTable Ignored;
+  auto ParsedSum = UnsafeBufferUsageEntitySummary::jsonDeserializeFn(
+      *ParsedJSON->getAsObject(), Ignored,
+      [&DummyTable](const Object &O) -> Expected<EntityId> {
+        return DummyTable.at(O.getInteger("@").value());
+      });
+
+  ASSERT_THAT_EXPECTED(ParsedSum, llvm::Succeeded());
+  EXPECT_EQ(*static_cast<UnsafeBufferUsageEntitySummary *>(ParsedSum->get()),
+            *Sum);
 }
 
 //////////////////////////////////////////////////////////////

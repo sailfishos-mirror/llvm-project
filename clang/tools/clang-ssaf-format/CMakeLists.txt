@@ -10,5 +10,6 @@ add_clang_tool(clang-ssaf-format
 clang_target_link_libraries(clang-ssaf-format
   PRIVATE
   clangBasic
-  clangScalableStaticAnalysisFrameworkCore
+  clangScalableStaticAnalysisFrameworkAnalyses
+  clangScalableStaticAnalysisFrameworkCore  
   )

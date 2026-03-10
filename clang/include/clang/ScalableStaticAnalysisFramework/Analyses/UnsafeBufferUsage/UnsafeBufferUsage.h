@@ -11,6 +11,7 @@
 
 #include "clang/ScalableStaticAnalysisFramework/Core/Model/EntityId.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/Model/SummaryName.h"
+#include "clang/ScalableStaticAnalysisFramework/Core/Serialization/JSONFormat.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/TUSummary/EntitySummary.h"
 #include <set>
 
@@ -38,6 +39,7 @@ class EntityPointerLevel {
   unsigned PointerLevel;
 
   friend class UnsafeBufferUsageTUSummaryExtractor;
+  friend class UnsafeBufferUsageEntitySummary;
 
   EntityPointerLevel(EntityId Entity, unsigned PointerLevel)
       : Entity(Entity), PointerLevel(PointerLevel) {}
@@ -91,15 +93,35 @@ class UnsafeBufferUsageEntitySummary final : public EntitySummary {
       : EntitySummary(), UnsafeBuffers(std::move(UnsafeBuffers)) {}
 
 public:
-  SummaryName getSummaryName() const override {
-    return SummaryName{"UnsafeBufferUsage"};
-  };
+  SummaryName getSummaryName() const override { return summaryName(); };
 
   bool operator==(const EntityPointerLevelSet &Other) const {
     return UnsafeBuffers == Other;
   }
 
+  bool operator==(const UnsafeBufferUsageEntitySummary &Other) const {
+    return UnsafeBuffers == Other.UnsafeBuffers;
+  }
+
   bool empty() const { return UnsafeBuffers.empty(); }
+
+  static llvm::json::Object
+  jsonSerializeFn(const EntitySummary &ES,
+                  JSONFormat::EntityIdToJSONFn EntityId2JSON);
+
+  static llvm::Expected<std::unique_ptr<EntitySummary>>
+  jsonDeserializeFn(const llvm::json::Object &Data, EntityIdTable &,
+                    JSONFormat::EntityIdFromJSONFn EntityIdFromJSON);
+
+  static SummaryName summaryName() { return SummaryName{"UnsafeBufferUsage"}; }
+};
+
+struct UnsafeBufferUsageJSONFormatInfo : JSONFormat::FormatInfo {
+  UnsafeBufferUsageJSONFormatInfo()
+      : JSONFormat::FormatInfo(
+            UnsafeBufferUsageEntitySummary::summaryName(),
+            UnsafeBufferUsageEntitySummary::jsonSerializeFn,
+            UnsafeBufferUsageEntitySummary::jsonDeserializeFn) {}
 };
 } // namespace clang::ssaf
 

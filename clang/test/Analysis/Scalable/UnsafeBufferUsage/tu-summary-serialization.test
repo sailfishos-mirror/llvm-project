@@ -1,0 +1,4 @@
+// RUN: rm -f %t.json
+// RUN: clang-ssaf-format -type=tu  %S/tu-summary.json -o %t.json
+// RUN: diff %S/tu-summary.json %t.json
+//

@@ -25,4 +25,8 @@ extern volatile int SSAFJSONFormatAnchorSource;
 [[maybe_unused]] static int SSAFJSONFormatAnchorDestination =
     SSAFJSONFormatAnchorSource;
 
+extern volatile int UnsafeBufferUsageSSAFJSONFormatAnchorSource;
+[[maybe_unused]] static int UnsafeBufferUsageSSAFJSONFormatAnchorDestination =
+    UnsafeBufferUsageSSAFJSONFormatAnchorSource;
+
 #endif // LLVM_CLANG_SCALABLESTATICANALYSISFRAMEWORK_SSAFBUILTINFORCELINKER_H
