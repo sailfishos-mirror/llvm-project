@@ -1578,6 +1578,10 @@ public:
   ///                    cannot be resumed until execution of the structured
   ///                    block that is associated with the generated task is
   ///                    completed.
+  /// \param Dependencies Vector of DependData objects holding information of
+  ///        dependencies as specified by the 'depend' clause.
+  /// \param Affinities AffinityData object holding information of accumulated
+  ///        affinities as specified by the 'affinity' clause.
   /// \param EventHandle If present, signifies the event handle as part of
   ///			 the detach clause
   /// \param Mergeable	 If the given task is `mergeable`
@@ -1587,7 +1591,7 @@ public:
       const LocationDescription &Loc, InsertPointTy AllocaIP,
       BodyGenCallbackTy BodyGenCB, bool Tied = true, Value *Final = nullptr,
       Value *IfCondition = nullptr, SmallVector<DependData> Dependencies = {},
-      SmallVector<AffinityData> Affinities = {}, bool Mergeable = false,
+      AffinityData Affinities = {}, bool Mergeable = false,
       Value *EventHandle = nullptr, Value *Priority = nullptr);
 
   /// Generator for the taskgroup construct

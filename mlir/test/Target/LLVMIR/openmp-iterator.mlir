@@ -166,8 +166,10 @@ llvm.func @task_affinity_iterator_multiple(%arr: !llvm.ptr {llvm.nocapture}) {
   llvm.return
 }
 
-// CHECK-LABEL: define internal void @task_affinity_iterator_multiple..omp_par.3(
-// CHECK: [[AFFLIST0:%.*]] = alloca { i64, i64, i32 }, i64 24, align 8
+// CHECK-LABEL: define internal void @task_affinity_iterator_multiple
+// CHECK-DAG: [[AFFLIST0:%.*]] = alloca { i64, i64, i32 }, i64 24, align 8
+// CHECK-DAG: [[AFFLIST1:%.*]] = alloca { i64, i64, i32 }, i64 3, align 8
+// CHECK-DAG: [[AFFINITY_LIST:%.*]] = alloca { i64, i64, i32 }, i32 27, align 8
 
 // First iterator header
 // CHECK: omp_iterator.preheader:
@@ -180,7 +182,6 @@ llvm.func @task_affinity_iterator_multiple(%arr: !llvm.ptr {llvm.nocapture}) {
 // CHECK: br i1 [[CMP0]], label %[[BODY0:.+]], label %omp_iterator.exit
 
 // Second iterator header
-// CHECK: [[AFFLIST1:%.*]] = alloca { i64, i64, i32 }, i64 3, align 8
 // CHECK: omp_iterator.preheader{{.*}}:
 // CHECK: [[HEADER1:.+]]:
 // CHECK: [[IV1:%.*]] = phi i64 [ 0, %omp_iterator.preheader{{.*}} ], [ [[NEXT1:%.*]], %[[INC1:.+]] ]
@@ -189,13 +190,12 @@ llvm.func @task_affinity_iterator_multiple(%arr: !llvm.ptr {llvm.nocapture}) {
 // CHECK: [[CMP1:%.*]] = icmp ult i64 [[IV1]], 3
 // CHECK: br i1 [[CMP1]], label %[[BODY1:.+]], label %omp_iterator.exit{{.*}}
 
-// CHECK: codeRepl:
-// CHECK: call ptr @__kmpc_omp_task_alloc
-// CHECK: [[AFFINITY_LIST:%.*]] = alloca { i64, i64, i32 }, i32 27, align 8
 // CHECK: [[AFFINITY_LIST_1:%.*]] = getelementptr inbounds { i64, i64, i32 }, ptr [[AFFINITY_LIST]], i64 0
 // CHECK: call void @llvm.memcpy.p0.p0.i64(ptr align 1 [[AFFINITY_LIST_1]], ptr align 1 [[AFFLIST0]], i64 480, i1 false)
 // CHECK: [[AFFINITY_LIST_2:%.*]] = getelementptr inbounds { i64, i64, i32 }, ptr [[AFFINITY_LIST]], i64 24
 // CHECK: call void @llvm.memcpy.p0.p0.i64(ptr align 1 [[AFFINITY_LIST_2]], ptr align 1 [[AFFLIST1]], i64 60, i1 false)
+// CHECK: codeRepl:
+// CHECK: call ptr @__kmpc_omp_task_alloc
 // CHECK: call i32 @__kmpc_omp_reg_task_with_affinity{{.*}}i32 27{{.*}}ptr [[AFFINITY_LIST]]
 // CHECK: call i32 @__kmpc_omp_task
 

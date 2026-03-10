@@ -2497,14 +2497,25 @@ fillAffinityIteratorLoop(mlir::omp::IteratorOp itersOp,
   return mlir::success();
 }
 
-static mlir::LogicalResult buildAffinityData(
-    mlir::omp::TaskOp &taskOp, llvm::IRBuilderBase &builder,
-    mlir::LLVM::ModuleTranslation &moduleTranslation,
-    llvm::SmallVectorImpl<llvm::OpenMPIRBuilder::AffinityData> &ads) {
+static mlir::LogicalResult
+buildAffinityData(mlir::omp::TaskOp &taskOp, llvm::IRBuilderBase &builder,
+                  mlir::LLVM::ModuleTranslation &moduleTranslation,
+                  llvm::OpenMPIRBuilder::AffinityData &ad) {
+
+  if (taskOp.getAffinityVars().empty() && taskOp.getIterated().empty()) {
+    ad.Count = nullptr;
+    ad.Info = nullptr;
+    return mlir::success();
+  }
+
+  llvm::SmallVector<llvm::OpenMPIRBuilder::AffinityData> ads;
   llvm::StructType *kmpTaskAffinityInfoTy =
       moduleTranslation.getOpenMPBuilder()->getKmpTaskAffinityInfoTy();
 
   auto allocateAffinityList = [&](llvm::Value *count) -> llvm::Value * {
+    llvm::IRBuilderBase::InsertPointGuard guard(builder);
+    if (llvm::isa<llvm::Constant>(count) || llvm::isa<llvm::Argument>(count))
+      builder.restoreIP(findAllocaInsertPoint(builder, moduleTranslation));
     return builder.CreateAlloca(kmpTaskAffinityInfoTy, count,
                                 "omp.affinity_list");
   };
@@ -2540,6 +2551,55 @@ static mlir::LogicalResult buildAffinityData(
       ads.emplace_back(createAffinity(iterInfo.getTotalTrips(), affList));
     }
   }
+
+  llvm::Value *totalAffinityCount = builder.getInt32(0);
+  for (const auto &affinity : ads)
+    totalAffinityCount = builder.CreateAdd(
+        totalAffinityCount,
+        builder.CreateIntCast(affinity.Count, builder.getInt32Ty(),
+                              /*isSigned=*/false));
+
+  llvm::Value *affinityInfo = ads.front().Info;
+  if (ads.size() > 1) {
+    llvm::StructType *kmpTaskAffinityInfoTy =
+        moduleTranslation.getOpenMPBuilder()->getKmpTaskAffinityInfoTy();
+    llvm::Value *affinityInfoElemSize = builder.getInt64(
+        moduleTranslation.getLLVMModule()->getDataLayout().getTypeAllocSize(
+            kmpTaskAffinityInfoTy));
+
+    llvm::Value *packedAffinityInfo = allocateAffinityList(totalAffinityCount);
+    llvm::Value *packedAffinityInfoOffset = builder.getInt32(0);
+    for (const auto &affinity : ads) {
+      llvm::Value *affinityCount = builder.CreateIntCast(
+          affinity.Count, builder.getInt32Ty(), /*isSigned=*/false);
+      llvm::Value *affinityCountInt64 = builder.CreateIntCast(
+          affinityCount, builder.getInt64Ty(), /*isSigned=*/false);
+      llvm::Value *affinityInfoSize =
+          builder.CreateMul(affinityCountInt64, affinityInfoElemSize);
+
+      llvm::Value *packedAffinityInfoIndex = builder.CreateIntCast(
+          packedAffinityInfoOffset, kmpTaskAffinityInfoTy->getElementType(0),
+          /*isSigned=*/false);
+      packedAffinityInfoIndex = builder.CreateInBoundsGEP(
+          kmpTaskAffinityInfoTy, packedAffinityInfo, packedAffinityInfoIndex);
+
+      builder.CreateMemCpy(
+          packedAffinityInfoIndex, llvm::Align(1),
+          builder.CreatePointerBitCastOrAddrSpaceCast(
+              affinity.Info, builder.getPtrTy(packedAffinityInfoIndex->getType()
+                                                  ->getPointerAddressSpace())),
+          llvm::Align(1), affinityInfoSize);
+
+      packedAffinityInfoOffset =
+          builder.CreateAdd(packedAffinityInfoOffset, affinityCount);
+    }
+
+    affinityInfo = packedAffinityInfo;
+  }
+
+  ad.Count = totalAffinityCount;
+  ad.Info = affinityInfo;
+
   return mlir::success();
 }
 
@@ -2657,8 +2717,8 @@ convertOmpTaskOp(omp::TaskOp taskOp, llvm::IRBuilderBase &builder,
           taskOp.getPrivateNeedsBarrier())))
     return llvm::failure();
 
-  llvm::SmallVector<llvm::OpenMPIRBuilder::AffinityData> ads;
-  if (failed(buildAffinityData(taskOp, builder, moduleTranslation, ads)))
+  llvm::OpenMPIRBuilder::AffinityData ad;
+  if (failed(buildAffinityData(taskOp, builder, moduleTranslation, ad)))
     return llvm::failure();
 
   // Set up for call to createTask()
@@ -2764,7 +2824,7 @@ convertOmpTaskOp(omp::TaskOp taskOp, llvm::IRBuilderBase &builder,
       moduleTranslation.getOpenMPBuilder()->createTask(
           ompLoc, allocaIP, bodyCB, !taskOp.getUntied(),
           moduleTranslation.lookupValue(taskOp.getFinal()),
-          moduleTranslation.lookupValue(taskOp.getIfExpr()), dds, ads,
+          moduleTranslation.lookupValue(taskOp.getIfExpr()), dds, ad,
           taskOp.getMergeable(),
           moduleTranslation.lookupValue(taskOp.getEventHandle()),
           moduleTranslation.lookupValue(taskOp.getPriority()));
