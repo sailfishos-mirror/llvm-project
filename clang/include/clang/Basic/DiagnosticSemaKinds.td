@@ -9639,6 +9639,9 @@ def err_atomic_op_has_invalid_sync_scope : Error<
 def warn_atomic_op_scope_should_be_enum : Warning<
   "synchronization scope should be of type __memory_scope">,
   InGroup<DiagGroup<"atomic-memory-scope">>;
+def warn_memory_scope_redeclared : Warning<
+  "user declaration of '%0' conflicts with builtin memory scope enum">,
+  InGroup<DiagGroup<"atomic-memory-scope">>;
 def warn_atomic_implicit_seq_cst : Warning<
   "implicit use of sequentially-consistent atomic may incur stronger memory barriers than necessary">,
   InGroup<DiagGroup<"atomic-implicit-seq-cst">>, DefaultIgnore;

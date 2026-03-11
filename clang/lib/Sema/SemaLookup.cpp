@@ -2211,6 +2211,24 @@ bool LookupResult::isAvailableForLookup(Sema &SemaRef, NamedDecl *ND) {
   return false;
 }
 
+/// Diagnose user redeclaration of the __memory_scope builtin.
+static void DiagnoseMemoryScopeConflict(Sema &S, LookupResult &R) {
+  // Don't diagnose during typo correction
+  if (R.isSuppressingAmbiguousDiagnostics())
+    return;
+
+  IdentifierInfo &II = S.Context.Idents.get("__memory_scope");
+  DeclContext::lookup_result Existing =
+      S.Context.getTranslationUnitDecl()->lookup(DeclarationName(&II));
+  if (!Existing.empty()) {
+    S.Diag(R.getNameLoc(), diag::warn_memory_scope_redeclared)
+        << "__memory_scope";
+    for (NamedDecl *D : Existing) {
+      S.Diag(D->getLocation(), diag::note_previous_decl) << D;
+    }
+  }
+}
+
 /// Try to create a builtin __memory_scope typedef or enumerator.
 /// Returns true if a declaration was added to R.
 static bool TryCreateMemoryScopeBuiltin(Sema &S, LookupResult &R,
@@ -2227,6 +2245,8 @@ static bool TryCreateMemoryScopeBuiltin(Sema &S, LookupResult &R,
       R.resolveKind();
       return true;
     }
+    // getMemoryScopeDecl() returned nullptr - user declared __memory_scope
+    DiagnoseMemoryScopeConflict(S, R);
     return false;
   }
 
@@ -2235,8 +2255,7 @@ static bool TryCreateMemoryScopeBuiltin(Sema &S, LookupResult &R,
     TypedefDecl *TD = S.Context.getMemoryScopeDecl();
     if (!TD) {
       // getMemoryScopeDecl() returned nullptr - user declared __memory_scope
-      // The enumerator won't be found, resulting in an "undeclared identifier"
-      // error
+      DiagnoseMemoryScopeConflict(S, R);
       return false;
     }
 
