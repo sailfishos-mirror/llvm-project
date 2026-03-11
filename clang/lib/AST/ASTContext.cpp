@@ -1220,19 +1220,9 @@ TypedefDecl *ASTContext::getMemoryScopeDecl() const {
   if (MemoryScopeDecl)
     return MemoryScopeDecl;
 
-    // Create the enum
-#define MEMORY_SCOPE_ENUMERATORS(ENUM)                                         \
-  ENUM(__memory_scope_system, 0)                                               \
-  ENUM(__memory_scope_device, 1)                                               \
-  ENUM(__memory_scope_workgroup, 2)                                            \
-  ENUM(__memory_scope_wavefront, 3)                                            \
-  ENUM(__memory_scope_singlethread, 4)                                         \
-  ENUM(__memory_scope_cluster, 5)
-
-  const char *EnumName = "__memory_scope";
-
   // Check if user has already declared enum __memory_scope
   // If so, we cannot create our builtin - return nullptr to signal error
+  const char *EnumName = "__memory_scope";
   IdentifierInfo &II = Idents.get(EnumName);
   DeclContext::lookup_result Existing =
       getTranslationUnitDecl()->lookup(DeclarationName(&II));
@@ -1251,11 +1241,17 @@ TypedefDecl *ASTContext::getMemoryScopeDecl() const {
   MemoryScopeEnum->setImplicit();
   MemoryScopeEnum->startDefinition();
 
-  // Track max value for bit calculation
-  int MaxValue = 0;
-
   // Create enumerators
+  int MaxValue = 0;
   llvm::APSInt Val(getIntWidth(IntTy), false);
+
+#define MEMORY_SCOPE_ENUMERATORS(ENUM)                                         \
+  ENUM(__memory_scope_system, 0)                                               \
+  ENUM(__memory_scope_device, 1)                                               \
+  ENUM(__memory_scope_workgroup, 2)                                            \
+  ENUM(__memory_scope_wavefront, 3)                                            \
+  ENUM(__memory_scope_singlethread, 4)                                         \
+  ENUM(__memory_scope_cluster, 5)
 
 #define ADD_ENUMERATOR(Name, Value)                                            \
   Val = Value;                                                                 \
@@ -1271,21 +1267,17 @@ TypedefDecl *ASTContext::getMemoryScopeDecl() const {
 
   MEMORY_SCOPE_ENUMERATORS(ADD_ENUMERATOR)
 #undef ADD_ENUMERATOR
+#undef MEMORY_SCOPE_ENUMERATORS
 
-  // Calculate bits needed for max value
   unsigned NumPositiveBits =
       MaxValue > 0 ? llvm::APInt(32, MaxValue).getActiveBits() : 0;
-
-  // Complete definition
   MemoryScopeEnum->completeDefinition(IntTy, IntTy, NumPositiveBits, 0);
 
-  // Set enumerator types to the enum type (for C++)
   QualType EnumType = getCanonicalTagType(MemoryScopeEnum);
   for (EnumConstantDecl *Constant : MemoryScopeEnum->enumerators()) {
     Constant->setType(EnumType);
   }
 
-  // Add enum to TranslationUnit
   getTranslationUnitDecl()->addDecl(MemoryScopeEnum);
 
   // Create a typedef so we can use it without 'enum' keyword in C
@@ -1297,9 +1289,6 @@ TypedefDecl *ASTContext::getMemoryScopeDecl() const {
 
   // Cache the typedef (mutable field allows modification in const method)
   MemoryScopeDecl = TypedefD;
-
-#undef MEMORY_SCOPE_ENUMERATORS
-
   return TypedefD;
 }
 
