@@ -5,8 +5,8 @@
 #
 # Compiler-RT has two mechanisms for the path (simplified):
 #
-# * LLVM_ENABLE_PER_TARGET_RUNTIME_DIR=0: lib/${oslibname}/libclang_rt.builtins-${arch}.a
-# * LLVM_ENABLE_PER_TARGET_RUNTIME_DIR=1: lib/${triple}/libclang_rt.builtins.a
+# * LLVM_ENABLE_PER_TARGET_RUNTIME_DIR=OFF: lib/${oslibname}/libclang_rt.builtins-${arch}.a
+# * LLVM_ENABLE_PER_TARGET_RUNTIME_DIR=ON : lib/${triple}/libclang_rt.builtins.a
 #
 # LLVM_ENABLE_PER_TARGET_RUNTIME_DIR=ON is the newer scheme, but the old one is
 # currently still used for some platforms such as Windows. Clang looks for which
@@ -30,8 +30,8 @@ function (get_toolchain_library_subdir outvar)
     get_toolchain_os_dirname(os_dirname)
     set(outval "${outval}/${os_dirname}")
   else ()
-    get_toolchain_arch_dirname(arch_dirname)
-    set(outval "${outval}/${arch_dirname}")
+    get_toolchain_target_dirname(target_dirname)
+    set(outval "${outval}/${target_dirname}")
   endif ()
 
   set(${outvar} "${outval}" PARENT_SCOPE)
@@ -42,8 +42,8 @@ endfunction ()
 function (get_toolchain_fortran_module_subdir outvar)
   set(outval "finclude/flang")
 
-  get_toolchain_arch_dirname(arch_dirname)
-  set(outval "${outval}/${arch_dirname}")
+  get_toolchain_target_dirname(target_dirname)
+  set(outval "${outval}/${target_dirname}")
 
   set(${outvar} "${outval}" PARENT_SCOPE)
 endfunction ()
@@ -62,7 +62,7 @@ function (get_toolchain_os_dirname outvar)
 endfunction ()
 
 
-# Internal function extracted from compiler-rt. Use get_toolchain_arch_dirname
+# Internal function extracted from compiler-rt. Use get_toolchain_target_dirname
 # instead for new code.
 function(get_runtimes_target_libdir_common default_target_triple arch variable)
   string(FIND "${default_target_triple}" "-" dash_index)
@@ -116,7 +116,7 @@ endfunction()
 
 
 # Corresponds to Clang's ToolChain::getRuntimePath().
-function (get_toolchain_arch_dirname outvar)
+function (get_toolchain_target_dirname outvar)
   string(FIND "${LLVM_TARGET_TRIPLE}" "-" dash_index)
   string(SUBSTRING "${LLVM_TARGET_TRIPLE}" 0 "${dash_index}" triple_cpu)
   set(arch "${triple_cpu}")
