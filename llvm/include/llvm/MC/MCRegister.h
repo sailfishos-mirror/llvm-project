@@ -43,7 +43,20 @@ class MCRegister {
   unsigned Reg;
 
 public:
-  constexpr MCRegister(unsigned Val = 0) : Reg(Val) {}
+  constexpr MCRegister(unsigned Val = 0) : Reg(Val) {
+    // N.B. this does not assert `isPhysicalRegister(Val)` to avoid paying the
+    // compilation/runtime cost for developers of the compiler. Every consumer
+    // is expected to `assert(Reg.isPhysicalRegister())`, so this should only
+    // cost developers having to add an assert here while debugging the original
+    // source of such an assert.
+    //
+    // Where the producer wishes to `assert` they can use `Register::asMCReg`
+    // and/or `MCRegister::from`.
+    //
+    // See the thread "[llvm-dev] Relation between Register and MCRegister"
+    // (https://groups.google.com/g/llvm-dev/c/36h4LluUaJY/m/dgItXNwQCgAJ)
+    // for more historical context.
+  }
 
   // Register numbers can represent physical registers, virtual registers, and
   // sometimes stack slots. The unsigned values are divided into these ranges:
@@ -73,8 +86,8 @@ public:
 
   constexpr operator unsigned() const { return Reg; }
 
-  /// Check the provided unsigned value is a valid MCRegister.
-  static MCRegister from(unsigned Val) {
+  /// Check-convert the provided unsigned value to an MCRegister.
+  static constexpr MCRegister from(unsigned Val) {
     assert(Val == NoRegister || isPhysicalRegister(Val));
     return MCRegister(Val);
   }
