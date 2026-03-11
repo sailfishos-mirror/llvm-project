@@ -257,3 +257,39 @@ llvm.func @task_affinity_iterator_dynamic_tripcount(
 // CHECK: [[TRIPS:%.*]] = add i64 [[DIV]], 1
 // CHECK: [[SCALED:%.*]] = mul i64 1, [[TRIPS]]
 // CHECK: [[AFFLIST:%.*]] = alloca { i64, i64, i32 }, i64 [[SCALED]]
+
+llvm.func @task_affinity_iterator_negative_step(%arr: !llvm.ptr {llvm.nocapture}) {
+  %c4 = llvm.mlir.constant(4 : i64) : i64
+  %c1 = llvm.mlir.constant(1 : i64) : i64
+  %cn1 = llvm.mlir.constant(-1 : i64) : i64
+
+  omp.parallel {
+    omp.single {
+      %it = omp.iterator(%i: i64) = (%c4 to %c1 step %cn1) {
+        %entry = omp.affinity_entry %arr, %i
+            : (!llvm.ptr, i64) -> !omp.affinity_entry_ty<!llvm.ptr, i64>
+        omp.yield(%entry : !omp.affinity_entry_ty<!llvm.ptr, i64>)
+      } -> !omp.iterated<!omp.affinity_entry_ty<!llvm.ptr, i64>>
+
+      omp.task affinity(%it : !omp.iterated<!omp.affinity_entry_ty<!llvm.ptr, i64>>) {
+        omp.terminator
+      }
+      omp.terminator
+    }
+    omp.terminator
+  }
+  llvm.return
+}
+
+// CHECK-LABEL: define internal void @task_affinity_iterator_negative_step
+// CHECK: [[AFFLIST:%.*]] = alloca { i64, i64, i32 }, i64 4, align 8
+// CHECK: omp_iterator.cond:
+// CHECK: [[CMP:%.*]] = icmp ult i64 %omp_iterator.iv, 4
+// CHECK: br i1 [[CMP]], label %omp_iterator.body, label %omp_iterator.exit
+// CHECK: omp_iterator.body:
+// CHECK: [[IDX:%.*]] = urem i64 %omp_iterator.iv, 4
+// CHECK: [[STEPMUL:%.*]] = mul i64 [[IDX]], -1
+// CHECK: [[PHYSIV:%.*]] = add i64 4, [[STEPMUL]]
+// CHECK: [[ENTRY:%.*]] = getelementptr inbounds { i64, i64, i32 }, ptr [[AFFLIST]], i64 %omp_iterator.iv
+// CHECK: [[LENPTR:%.*]] = getelementptr inbounds nuw { i64, i64, i32 }, ptr [[ENTRY]], i32 0, i32 1
+// CHECK: store i64 [[PHYSIV]], ptr [[LENPTR]]

@@ -2275,6 +2275,9 @@ public:
           lookUpAsI64(itersOp.getLoopSteps()[d], moduleTranslation, builder);
       assert(lb && ub && st &&
              "Expect lowerBounds, upperBounds, and steps in IteratorOp");
+      assert((!llvm::isa<llvm::ConstantInt>(st) ||
+              !llvm::cast<llvm::ConstantInt>(st)->isZero()) &&
+             "Expect non-zero step in IteratorOp");
 
       lowerBounds[d] = lb;
       upperBounds[d] = ub;
