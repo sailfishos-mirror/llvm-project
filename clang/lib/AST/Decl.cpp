@@ -100,7 +100,7 @@ bool Decl::isOutOfLine() const {
   return !getLexicalDeclContext()->Equals(getDeclContext());
 }
 
-TranslationUnitDecl::TranslationUnitDecl(ASTContext &ctx)
+TranslationUnitDecl::TranslationUnitDecl(const ASTContext &ctx)
     : Decl(TranslationUnit, nullptr, SourceLocation()),
       DeclContext(TranslationUnit), redeclarable_base(ctx), Ctx(ctx) {}
 
@@ -3141,7 +3141,7 @@ bool FunctionDecl::isVariadic() const {
 
 FunctionDecl::DefaultedOrDeletedFunctionInfo *
 FunctionDecl::DefaultedOrDeletedFunctionInfo::Create(
-    ASTContext &Context, ArrayRef<DeclAccessPair> Lookups,
+    const ASTContext &Context, ArrayRef<DeclAccessPair> Lookups,
     StringLiteral *DeletedMessage) {
   static constexpr size_t Alignment =
       std::max({alignof(DefaultedOrDeletedFunctionInfo),
@@ -5490,7 +5490,7 @@ SourceRange BlockDecl::getSourceRange() const {
 
 void TranslationUnitDecl::anchor() {}
 
-TranslationUnitDecl *TranslationUnitDecl::Create(ASTContext &C) {
+TranslationUnitDecl *TranslationUnitDecl::Create(const ASTContext &C) {
   return new (C, (DeclContext *)nullptr) TranslationUnitDecl(C);
 }
 

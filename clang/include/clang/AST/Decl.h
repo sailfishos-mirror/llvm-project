@@ -117,13 +117,13 @@ class TranslationUnitDecl : public Decl,
     return getMostRecentDecl();
   }
 
-  ASTContext &Ctx;
+  const ASTContext &Ctx;
 
   /// The (most recently entered) anonymous namespace for this
   /// translation unit, if one has been created.
   NamespaceDecl *AnonymousNamespace = nullptr;
 
-  explicit TranslationUnitDecl(ASTContext &ctx);
+  explicit TranslationUnitDecl(const ASTContext &ctx);
 
   virtual void anchor();
 
@@ -138,12 +138,14 @@ public:
   using redeclarable_base::redecls_begin;
   using redeclarable_base::redecls_end;
 
-  ASTContext &getASTContext() const { return Ctx; }
+  ASTContext &getASTContext() const {
+    return const_cast<ASTContext &>(Ctx);
+  }
 
   NamespaceDecl *getAnonymousNamespace() const { return AnonymousNamespace; }
   void setAnonymousNamespace(NamespaceDecl *D);
 
-  static TranslationUnitDecl *Create(ASTContext &C);
+  static TranslationUnitDecl *Create(const ASTContext &C);
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) { return classofKind(D->getKind()); }
@@ -2042,7 +2044,7 @@ public:
 
   public:
     static DefaultedOrDeletedFunctionInfo *
-    Create(ASTContext &Context, ArrayRef<DeclAccessPair> Lookups,
+    Create(const ASTContext &Context, ArrayRef<DeclAccessPair> Lookups,
            StringLiteral *DeletedMessage = nullptr);
 
     /// Get the unqualified lookup results that should be used in this
