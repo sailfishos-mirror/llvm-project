@@ -536,8 +536,7 @@ bool PPCTargetInfo::initFeatureMap(
   const llvm::Triple &TheTriple = getTriple();
 
   std::optional<llvm::StringMap<bool>> FeaturesOpt =
-      llvm::PPC::getPPCDefaultTargetFeatures(TheTriple,
-                                             llvm::PPC::normalizeCPUName(CPU));
+      llvm::PPC::getPPCDefaultTargetFeatures(TheTriple, CPU);
   if (FeaturesOpt)
     Features = FeaturesOpt.value();
 
@@ -699,7 +698,6 @@ ParsedTargetAttr PPCTargetInfo::parseTargetAttr(StringRef Features) const {
     // accepting it weirdly.
     Feature = Feature.trim();
 
-    // While we're here iterating check for a different target cpu.
     if (Feature.starts_with("cpu=")) {
       if (!Ret.CPU.empty())
         Ret.Duplicate = "cpu=";
@@ -715,8 +713,6 @@ ParsedTargetAttr PPCTargetInfo::parseTargetAttr(StringRef Features) const {
     else
       Ret.Features.push_back("+" + Feature.str());
   }
-  Ret.CPU = llvm::PPC::normalizeCPUName(Ret.CPU);
-  Ret.Tune = llvm::PPC::normalizeCPUName(Ret.Tune);
   return Ret;
 }
 
@@ -726,8 +722,7 @@ llvm::APInt PPCTargetInfo::getFMVPriority(ArrayRef<StringRef> Features) const {
   assert(Features.size() == 1 && "one feature/cpu per clone on PowerPC");
   ParsedTargetAttr ParsedAttr = parseTargetAttr(Features[0]);
   if (!ParsedAttr.CPU.empty()) {
-    StringRef CPU = llvm::PPC::normalizeCPUName(ParsedAttr.CPU);
-    int Priority = llvm::StringSwitch<int>(CPU)
+    int Priority = llvm::StringSwitch<int>(ParsedAttr.CPU)
                        .Case("pwr7", 1)
                        .Case("pwr8", 2)
                        .Case("pwr9", 3)
