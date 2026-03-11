@@ -56,7 +56,8 @@ public:
 
   bool checkTargetClonesAttr(const SmallVectorImpl<StringRef> &Params,
                              const SmallVectorImpl<SourceLocation> &Locs,
-                             SmallVectorImpl<SmallString<64>> &NewParams);
+                             SmallVectorImpl<SmallString<64>> &NewParams,
+                             SourceLocation AttrLoc);
 };
 } // namespace clang
 

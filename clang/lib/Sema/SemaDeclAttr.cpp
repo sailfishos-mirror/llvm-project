@@ -3644,7 +3644,8 @@ static void handleTargetClonesAttr(Sema &S, Decl *D, const ParsedAttr &AL) {
                                       AL.getLoc()))
       return;
   } else if (S.Context.getTargetInfo().getTriple().isOSAIX()) {
-    if (S.PPC().checkTargetClonesAttr(Params, Locations, NewParams))
+    if (S.PPC().checkTargetClonesAttr(Params, Locations, NewParams,
+                                      AL.getLoc()))
       return;
   }
   Params.clear();

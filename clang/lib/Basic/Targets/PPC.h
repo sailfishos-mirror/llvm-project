@@ -199,6 +199,7 @@ public:
 
   bool supportsTargetAttributeTune() const override { return true; }
 
+  bool isValidFeatureName(StringRef Name) const override;
   ParsedTargetAttr parseTargetAttr(StringRef Str) const override;
 
   llvm::APInt getFMVPriority(ArrayRef<StringRef> Features) const override;

@@ -22,6 +22,7 @@
 #include "clang/Basic/TargetInfo.h"
 #include "clang/Sema/Sema.h"
 #include "llvm/ADT/APSInt.h"
+#include "llvm/TargetParser/PPCTargetParser.h"
 
 namespace clang {
 
@@ -573,10 +574,10 @@ bool SemaPPC::BuiltinVSX(CallExpr *TheCall) {
   return false;
 }
 
-bool SemaPPC::checkTargetClonesAttr(
-    const SmallVectorImpl<StringRef> &Params,
-    const SmallVectorImpl<SourceLocation> &Locs,
-    SmallVectorImpl<SmallString<64>> &NewParams) {
+bool SemaPPC::checkTargetClonesAttr(const SmallVectorImpl<StringRef> &Params,
+                                    const SmallVectorImpl<SourceLocation> &Locs,
+                                    SmallVectorImpl<SmallString<64>> &NewParams,
+                                    SourceLocation AttrLoc) {
   using namespace DiagAttrParams;
 
   assert(Params.size() == Locs.size() &&
@@ -615,6 +616,15 @@ bool SemaPPC::checkTargetClonesAttr(
                  TargetInfo.getFMVPriority(LHS) == 0) {
         return Diag(CurLoc, diag::warn_unsupported_target_attribute)
                << Unsupported << None << LHS << TargetClones;
+      } else
+        assert(0 && "specifying target-features on target clones not supported yet");
+
+      SmallString<64> CPU;
+      if (LHS.starts_with("cpu=")) {
+        CPU.append("cpu=");
+        CPU.append(
+            llvm::PPC::normalizeCPUName(LHS.drop_front(sizeof("cpu=") - 1)));
+        LHS = CPU.str();
       }
       if (llvm::is_contained(NewParams, LHS)) {
         Diag(CurLoc, diag::warn_target_clone_duplicate_options);
@@ -627,7 +637,7 @@ bool SemaPPC::checkTargetClonesAttr(
     Diag(Locs[0], diag::warn_target_clone_mixed_values);
 
   if (!HasDefault)
-    return Diag(Locs[0], diag::err_target_clone_must_have_default);
+    return Diag(AttrLoc, diag::err_target_clone_must_have_default);
 
   return false;
 }
