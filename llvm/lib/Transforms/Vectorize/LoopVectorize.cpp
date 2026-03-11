@@ -7753,6 +7753,7 @@ VPRecipeBase *VPRecipeBuilder::tryToWidenMemory(VPInstruction *VPI,
                                                 : GEPNoWrapFlags::none(),
                                             VPI->getDebugLoc());
     }
+    Builder.setInsertPoint(VPI);
     Builder.insert(VectorPtr);
     Ptr = VectorPtr;
   }
