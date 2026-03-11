@@ -1578,7 +1578,7 @@ void SIRegisterInfo::buildSpillLoadStore(
   // SPILL_SCRATCH_DWORD $vgpr1
   // SPILL_SCRATCH_DWORD $vgpr2_vgpr3_vgpr4_vgpr5
   unsigned LastChunk = ((RemSize / 4) + 3) % 4;
-  if (IsRegMisaligned && LastChunk)
+  if (IsRegMisaligned && (LastChunk = (LastChunk * 4)))
     NumSubRegs += 1;
   unsigned NumRemSubRegs = RemSize ? 1 : 0;
   int64_t Offset = InstOffset + MFI.getObjectOffset(Index);
@@ -1741,7 +1741,6 @@ void SIRegisterInfo::buildSpillLoadStore(
     Desc = &TII->get(LoadStoreOp);
   }
 
-  unsigned SavedEltSize = EltSize;
   for (unsigned i = 0, e = NumSubRegs + NumRemSubRegs, RegOffset = 0; i != e;
        ++i, RegOffset += EltSize) {
     if (i == 0 && IsRegMisaligned) {
@@ -1752,11 +1751,11 @@ void SIRegisterInfo::buildSpillLoadStore(
     }
     if (i == 1 && IsRegMisaligned) {
       // The first sub-reg was spilt in the previous iteration.
-      EltSize = RegWidth <= 16 ? RegWidth - 4u : SavedEltSize;
+      EltSize = RegWidth <= 16 ? RegWidth - 4u : 16u;
       LoadStoreOp = getFlatScratchSpillOpcode(TII, LoadStoreOp, EltSize);
     }
     if (IsRegMisaligned && i == (e - 1)) {
-      EltSize = LastChunk * 4;
+      EltSize = LastChunk;
       LoadStoreOp = getFlatScratchSpillOpcode(TII, LoadStoreOp, EltSize);
     } else if (i == NumSubRegs) {
       EltSize = RemSize;
