@@ -5256,7 +5256,7 @@ llvm::Constant *CodeGenModule::GetOrCreateLLVMFunction(
         // regular non-FMV function. If a definition is later seen, then
         // GetOrCreateMultiVersionResolver will get called (when processing said
         // definition) which will replace the IR declaration we're creating here
-        // with the FMV ifunc.
+        // with the FMV ifunc (see replaceDeclarationWith).
         else if (getTriple().isOSAIX() && !FD->isDefined()) {
           NameWithoutMultiVersionMangling = getMangledNameImpl(
               *this, GD, FD, /*OmitMultiVersionMangling=*/true);

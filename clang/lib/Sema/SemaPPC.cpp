@@ -612,13 +612,11 @@ bool SemaPPC::checkTargetClonesAttr(const SmallVectorImpl<StringRef> &Params,
                  << TargetClones;
       } else if (LHS == "default") {
         HasDefault = true;
-      } else if (!TargetInfo.isValidFeatureName(LHS) ||
-                 TargetInfo.getFMVPriority(LHS) == 0) {
+      } else {
+        // it's a feature string, but not supported yet.
         return Diag(CurLoc, diag::warn_unsupported_target_attribute)
                << Unsupported << None << LHS << TargetClones;
-      } else
-        assert(0 && "specifying target-features on target clones not supported yet");
-
+      }
       SmallString<64> CPU;
       if (LHS.starts_with("cpu=")) {
         CPU.append("cpu=");
