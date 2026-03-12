@@ -503,7 +503,10 @@ private:
     // zero).
     return MRI->isReserved(CopyOperand);
   }
-  bool isNeverRedundant(const MachineInstr &Copy) { return false; }
+  bool isNeverRedundant(const MachineInstr &Copy) {
+    return Copy.getFlag(MachineInstr::FrameSetup) ||
+           Copy.getFlag(MachineInstr::FrameDestroy);
+  }
   bool isNeverRedundant(const MachineInstr &Copy,
                         const DefSrcPair &CopyOperands) {
     auto [Def, Src] = CopyOperands.getDefSrcMCRegs();
