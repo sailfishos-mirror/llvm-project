@@ -231,6 +231,7 @@ private:
   Depth depth_;
 
   // The core structure of the class:
+  unsigned version_; // Needed for GetXyzWithReason
   bool allowAllLoops_;
   std::unique_ptr<Construct> entry_;
   std::vector<LoopSequence> children_;
