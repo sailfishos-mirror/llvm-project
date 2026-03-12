@@ -34,6 +34,7 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/STLExtras.h"
 
+#include <cinttypes>
 #include <optional>
 #include <string>
 #include <tuple>
