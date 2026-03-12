@@ -15,11 +15,20 @@ static int __attribute__((target_clones("cpu=power10, default"))) internal(void)
 int use(void) { return internal(); }
 // CHECK: define internal ptr @internal.resolver() 
 
-int __attribute__((target_clones("cpu=power10, default"))) foo(void) { return 0; }
+// test all supported cpus
+int __attribute__((target_clones("cpu=power10, cpu=power11, cpu=pwr9, cpu=pwr7, cpu=power8, default"))) foo(void) { return 0; }
 // CHECK: define internal {{.*}}i32 @foo.cpu_pwr10() #[[#ATTR_P10:]]
+// CHECK: define internal {{.*}}i32 @foo.cpu_pwr11() #[[#ATTR_P11:]]
+// CHECK: define internal {{.*}}i32 @foo.cpu_pwr9() #[[#ATTR_P9:]]
+// CHECK: define internal {{.*}}i32 @foo.cpu_pwr7() #[[#ATTR_P7:]]
+// CHECK: define internal {{.*}}i32 @foo.cpu_pwr8() #[[#ATTR_P8:]]
 // CHECK: define internal {{.*}}i32 @foo.default() #[[#ATTR_P7:]]
 // CHECK: define internal ptr @foo.resolver()
+// CHECK: ret ptr @foo.cpu_pwr11
 // CHECK: ret ptr @foo.cpu_pwr10
+// CHECK: ret ptr @foo.cpu_pwr9
+// CHECK: ret ptr @foo.cpu_pwr8
+// CHECK: ret ptr @foo.cpu_pwr7
 // CHECK: ret ptr @foo.default
 
 __attribute__((target_clones("default,default ,cpu=pwr8"))) void foo_dupes(void) {}
@@ -124,8 +133,10 @@ foo_priority(int x) { return x & (x - 1); }
 // CHECK: ret ptr @foo_priority.cpu_pwr7
 // CHECK: ret ptr @foo_priority.default
 
+
 // CHECK: attributes #[[#ATTR_P7]] = {{.*}} "target-cpu"="pwr7"
 // CHECK: attributes #[[#ATTR_P10]] = {{.*}} "target-cpu"="pwr10"
-// CHECK: attributes #[[#ATTR_P8]] = {{.*}} "target-cpu"="pwr8"
+// CHECK: attributes #[[#ATTR_P11]] = {{.*}} "target-cpu"="pwr11"
 // CHECK: attributes #[[#ATTR_P9]] = {{.*}} "target-cpu"="pwr9"
+// CHECK: attributes #[[#ATTR_P8]] = {{.*}} "target-cpu"="pwr8"
 
