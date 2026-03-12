@@ -944,7 +944,7 @@ LoopSequence::LoopSequence(const parser::ExecutionPartConstruct &root,
   assert(entry_ && "Expecting loop like code");
 
   createChildrenFromRange(entry_->location);
-  calculateEverything();
+  precalculate();
 }
 
 LoopSequence::LoopSequence(

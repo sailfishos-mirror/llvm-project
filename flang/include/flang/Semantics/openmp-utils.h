@@ -112,9 +112,9 @@ bool IsPointerAssignment(const evaluate::Assignment &x);
 
 MaybeExpr MakeEvaluateExpr(const parser::OmpStylizedInstance &inp);
 
-// A representation of a "because" message. The `text` member is a formatted
-// message (i.e. without any printf-like formatting characters like %d, etc).
-// `source` is the location to which the "because" message will refer.
+/// A representation of a "because" message. The `text` member is a formatted
+/// message (i.e. without any printf-like formatting characters like %d, etc).
+/// `source` is the location to which the "because" message will refer.
 struct Reason {
   std::string text;
   parser::CharBlock source;
@@ -172,7 +172,7 @@ struct LoopSequence {
       : version_(version), allowAllLoops_(allowAllLoops) {
     entry_ = std::make_unique<Construct>(range, nullptr);
     createChildrenFromRange(entry_->location);
-    calculateEverything();
+    precalculate();
   }
 
   struct Depth {
