@@ -47,6 +47,35 @@ public:
 
     return mlir::success();
   }
+
+  /// Any named attribute in the CIR dialect, i.e, with name started with
+  /// "cir.", will be handled here.
+  virtual mlir::LogicalResult amendOperation(
+      mlir::Operation *op, llvm::ArrayRef<llvm::Instruction *> instructions,
+      mlir::NamedAttribute attribute,
+      mlir::LLVM::ModuleTranslation &moduleTranslation) const override {
+    if (auto func = dyn_cast<mlir::LLVM::LLVMFuncOp>(op)) {
+      amendFunction(func, instructions, attribute, moduleTranslation);
+    } else if (auto mod = dyn_cast<mlir::ModuleOp>(op)) {
+      amendModule(mod, attribute, moduleTranslation);
+    }
+    return mlir::success();
+  }
+
+private:
+  // Translate CIR's extra function attributes to LLVM's function attributes.
+  void amendFunction(mlir::LLVM::LLVMFuncOp func,
+                     llvm::ArrayRef<llvm::Instruction *> instructions,
+                     mlir::NamedAttribute attribute,
+                     mlir::LLVM::ModuleTranslation &moduleTranslation) const {
+    // TODO(cir): Implement this
+  }
+
+  // Translate CIR's module attributes to LLVM's module metadata
+  void amendModule(mlir::ModuleOp mod, mlir::NamedAttribute attribute,
+                   mlir::LLVM::ModuleTranslation &moduleTranslation) const {
+    // TODO(cir): Implement this
+  }
 };
 
 void registerCIRDialectTranslation(mlir::DialectRegistry &registry) {
