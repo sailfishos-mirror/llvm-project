@@ -534,12 +534,12 @@ std::pair<std::optional<int64_t>, Reason> GetArgumentValueWithReason(
   if (auto *clause{parser::omp::FindClause(spec, clauseId)}) {
     if (auto *expr{parser::Unwrap<parser::Expr>(clause->u)}) {
       if (auto value{GetIntValue(*expr)}) {
-        llvm::StringRef name{llvm::omp::getOpenMPClauseName(clauseId, version)};
-        Reason reason( //
-            format("%s clause was specified with argument %ld",
-                parser::ToUpperCaseLetters(name.str()).c_str(), *value),
-            clause->source);
-        return {*value, reason};
+        std::string name{GetUpperName(clauseId, version)};
+        Reason reason;
+        reason.Say(clause->source,
+            "%s clause was specified with argument %" PRId64 ""_because_en_US,
+            name.c_str(), *value);
+        return {*value, std::move(reason)};
       }
     }
   }
@@ -552,13 +552,13 @@ std::pair<std::optional<int64_t>, Reason> GetNumArgumentsWithReason(
   if (auto *clause{parser::omp::FindClause(spec, clauseId)}) {
     using ArgumentList = std::list<parser::ScalarIntExpr>;
     if (auto *args{parser::Unwrap<ArgumentList>(clause->u)}) {
-      llvm::StringRef name{llvm::omp::getOpenMPClauseName(clauseId, version)};
+      std::string name{GetUpperName(clauseId, version)};
       auto num{static_cast<int64_t>(args->size())};
-      Reason reason( //
-          format("%s clause was specified with %ld arguments",
-              parser::ToUpperCaseLetters(name.str()).c_str(), num),
-          clause->source);
-      return {num, reason};
+      Reason reason;
+      reason.Say(clause->source,
+          "%s clause was specified with %" PRId64 " arguments"_because_en_US,
+          name.c_str(), num);
+      return {num, std::move(reason)};
     }
   }
   return {std::nullopt, Reason()};
@@ -833,10 +833,10 @@ std::tuple<std::optional<int64_t>, bool, Reason> GetAffectedNestDepthWithReason(
     if (vo) {
       if (!count || *count < *vo) {
         count = vo;
-        reason = ro;
+        reason = std::move(ro);
       }
     }
-    return {count, true, reason};
+    return {count, true, std::move(reason)};
   }
 
   if (IsLoopTransforming(dir)) {
@@ -845,14 +845,14 @@ std::tuple<std::optional<int64_t>, bool, Reason> GetAffectedNestDepthWithReason(
       // Get the length of the argument list to PERMUTATION.
       auto [num, reason]{GetNumArgumentsWithReason(
           beginSpec, llvm::omp::Clause::OMPC_permutation, version)};
-      return {num, true, reason};
+      return {num, true, std::move(reason)};
     }
     case llvm::omp::Directive::OMPD_stripe:
     case llvm::omp::Directive::OMPD_tile: {
       // Get the length of the argument list to SIZES.
       auto [num, reason]{GetNumArgumentsWithReason(
           beginSpec, llvm::omp::Clause::OMPC_sizes, version)};
-      return {num, true, reason};
+      return {num, true, std::move(reason)};
       return {std::nullopt, true, Reason()};
     }
     case llvm::omp::Directive::OMPD_fuse: {
@@ -860,15 +860,15 @@ std::tuple<std::optional<int64_t>, bool, Reason> GetAffectedNestDepthWithReason(
       if (parser::omp::FindClause(beginSpec, llvm::omp::Clause::OMPC_depth)) {
         auto [count, reason]{GetArgumentValueWithReason(
             beginSpec, llvm::omp::Clause::OMPC_depth, version)};
-        return {count, true, reason};
+        return {count, true, std::move(reason)};
       }
       std::string name{
           parser::omp::GetUpperName(llvm::omp::Clause::OMPC_depth, version)};
-      Reason reason(
-          format("%s clause was not specified, a value of 1 was assumed",
-              name.c_str()),
-          beginSpec.source);
-      return {1, true, reason};
+      Reason reason;
+      reason.Say(beginSpec.source,
+          "%s clause was not specified, a value of 1 was assumed"_because_en_US,
+          name.c_str());
+      return {1, true, std::move(reason)};
     }
     case llvm::omp::Directive::OMPD_reverse:
     case llvm::omp::Directive::OMPD_unroll:
@@ -884,7 +884,7 @@ std::tuple<std::optional<int64_t>, bool, Reason> GetAffectedNestDepthWithReason(
 }
 
 // Return the range of the affected nests in the sequence:
-//   {first, count, reason}.
+//   {first, count, std::move(reason)}.
 std::tuple<std::optional<int64_t>, std::optional<int64_t>, Reason>
 GetAffectedLoopRangeWithReason(
     const parser::OpenMPLoopConstruct &x, unsigned version) {
@@ -892,8 +892,7 @@ GetAffectedLoopRangeWithReason(
   llvm::omp::Directive dir{beginSpec.DirId()};
 
   if (dir == llvm::omp::Directive::OMPD_fuse) {
-    std::string name{parser::ToUpperCaseLetters(llvm::omp::getOpenMPClauseName(
-        llvm::omp::Clause::OMPC_looprange, version))};
+    std::string name{GetUpperName(llvm::omp::Clause::OMPC_looprange, version)};
     if (auto *clause{parser::omp::FindClause(
             beginSpec, llvm::omp::Clause::OMPC_looprange)}) {
       auto &range{DEREF(parser::Unwrap<parser::OmpLooprangeClause>(clause->u))};
@@ -904,18 +903,20 @@ GetAffectedLoopRangeWithReason(
       }
       std::string name{parser::omp::GetUpperName(
           llvm::omp::Clause::OMPC_looprange, version)};
-      Reason reason(
-          format("%s clause was specified with a count of %ld starting at loop "
-                 "%ld",
-              name.c_str(), *count, *first),
-          clause->source);
-      return {*first, *count, reason};
+      Reason reason;
+      reason.Say(clause->source,
+          "%s clause was specified with a count of %" PRId64
+          " starting at loop %" PRId64 ""_because_en_US,
+          name.c_str(), *count, *first);
+      return {*first, *count, std::move(reason)};
     }
     // If LOOPRANGE was not found, return {1, -1}, where -1 means "the whole
     // associated sequence".
-    Reason reason(
-        "%s clause was not specified, a value of 1 was assumed", name.c_str());
-    return {1, -1, reason};
+    Reason reason;
+    reason.Say(x.source,
+        "%s clause was not specified, a value of 1 was assumed"_because_en_US,
+        name.c_str());
+    return {1, -1, std::move(reason)};
   }
 
   assert(llvm::omp::getDirectiveAssociation(dir) ==

@@ -16,13 +16,13 @@
 #include "flang/Common/indirection.h"
 #include "flang/Evaluate/type.h"
 #include "flang/Parser/char-block.h"
+#include "flang/Parser/message.h"
 #include "flang/Parser/openmp-utils.h"
 #include "flang/Parser/parse-tree.h"
 #include "flang/Parser/tools.h"
 #include "flang/Semantics/tools.h"
 
 #include "llvm/ADT/ArrayRef.h"
-#include "llvm/Support/Format.h"
 
 #include <optional>
 #include <string>
@@ -112,26 +112,16 @@ bool IsPointerAssignment(const evaluate::Assignment &x);
 
 MaybeExpr MakeEvaluateExpr(const parser::OmpStylizedInstance &inp);
 
-/// A representation of a "because" message. The `text` member is a formatted
-/// message (i.e. without any printf-like formatting characters like %d, etc).
-/// `source` is the location to which the "because" message will refer.
+/// A representation of a "because" message.
 struct Reason {
-  std::string text;
-  parser::CharBlock source;
+  parser::Messages msgs;
 
-  Reason() = default;
-  Reason(const std::string t, parser::CharBlock s) : text(t), source(s) {}
-  operator bool() const { return !source.empty(); }
+  template <typename... Ts> Reason &Say(Ts &&...args) {
+    msgs.Say(std::forward<Ts>(args)...);
+    return *this;
+  };
+  operator bool() const { return !msgs.empty(); }
 };
-
-// Helper that formats the inputs into a std::string.
-template <typename... Ts>
-static std::string format(const char *fmt, Ts... values) {
-  std::string str;
-  llvm::raw_string_ostream os(str);
-  os << llvm::format(fmt, values...);
-  return os.str();
-}
 
 std::pair<std::optional<int64_t>, Reason> GetArgumentValueWithReason(
     const parser::OmpDirectiveSpecification &spec, llvm::omp::Clause clauseId,
