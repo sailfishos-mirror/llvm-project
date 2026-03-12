@@ -1,6 +1,6 @@
 ; RUN: opt < %s -passes='print<scalar-evolution>,loop(loop-rotate),invalidate<scalar-evolution>,print<scalar-evolution>' -disable-output 2>&1 | FileCheck -check-prefixes CHECK-SCEV %s
 ; RUN: opt < %s -passes='print<scalar-evolution>,loop(loop-rotate),print<scalar-evolution>' -disable-output 2>&1 | FileCheck -check-prefixes CHECK-SCEV %s
-; RUN: opt < %s -passes='loop(canon-freeze),loop(loop-rotate),print<scalar-evolution>' -disable-output
+; RUN: opt < %s -passes='canon-freeze,loop(loop-rotate),print<scalar-evolution>' -disable-output
 
 ; In the first two RUN lines print<scalar-evolution> is used to populate the
 ; analysis cache before loop-rotate. That was enough to see the problem by

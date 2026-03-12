@@ -30,6 +30,7 @@
 
 #include "llvm/Transforms/Utils/CanonicalizeFreezeInLoops.h"
 #include "llvm/ADT/DenseMapInfo.h"
+#include "llvm/ADT/PriorityWorklist.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Analysis/IVDescriptors.h"
@@ -43,6 +44,7 @@
 #include "llvm/Pass.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Transforms/Utils.h"
+#include "llvm/Transforms/Utils/LoopUtils.h"
 
 using namespace llvm;
 
@@ -248,13 +250,30 @@ bool CanonicalizeFreezeInLoops::runOnLoop(Loop *L, LPPassManager &) {
 }
 
 PreservedAnalyses
-CanonicalizeFreezeInLoopsPass::run(Loop &L, LoopAnalysisManager &AM,
-                                   LoopStandardAnalysisResults &AR,
-                                   LPMUpdater &U) {
-  if (!CanonicalizeFreezeInLoopsImpl(&L, AR.SE, AR.DT).run())
+CanonicalizeFreezeInLoopsPass::run(Function &F, FunctionAnalysisManager &FAM) {
+  LoopInfo &LI = FAM.getResult<LoopAnalysis>(F);
+  if (LI.empty())
     return PreservedAnalyses::all();
 
-  return getLoopPassPreservedAnalyses();
+  DominatorTree &DT = FAM.getResult<DominatorTreeAnalysis>(F);
+  ScalarEvolution &SE = FAM.getResult<ScalarEvolutionAnalysis>(F);
+
+  SmallPriorityWorklist<Loop *, 4> Worklist;
+  appendLoopsToWorklist(LI, Worklist);
+
+  bool Changed = false;
+  do {
+    Loop *L = Worklist.pop_back_val();
+    Changed |= CanonicalizeFreezeInLoopsImpl(L, SE, DT).run();
+  } while (!Worklist.empty());
+
+  if (!Changed)
+    return PreservedAnalyses::all();
+
+  PreservedAnalyses PA;
+  return PA.preserve<DominatorTreeAnalysis>()
+      .preserve<LoopAnalysis>()
+      .preserve<ScalarEvolutionAnalysis>();
 }
 
 INITIALIZE_PASS_BEGIN(CanonicalizeFreezeInLoops, "canon-freeze",

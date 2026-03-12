@@ -124,8 +124,9 @@
 ; GCN-O2-NEXT: amdgpu-codegenprepare
 ; GCN-O2-NEXT: loop-mssa(licm<allowspeculation>)
 ; GCN-O2-NEXT: verify
-; GCN-O2-NEXT: loop(canon-freeze
-; GCN-O2-NEXT: loop-reduce)
+; GCN-O2-NEXT: loop-simplify
+; GCN-O2-NEXT: canon-freeze
+; GCN-O2-NEXT: loop-reduce
 ; GCN-O2-NEXT: mergeicmps
 ; GCN-O2-NEXT: expand-memcmp
 ; GCN-O2-NEXT: unreachableblockelim
@@ -295,8 +296,9 @@
 ; GCN-O3-NEXT: amdgpu-codegenprepare
 ; GCN-O3-NEXT: loop-mssa(licm<allowspeculation>)
 ; GCN-O3-NEXT: verify
-; GCN-O3-NEXT: loop(canon-freeze
-; GCN-O3-NEXT: loop-reduce)
+; GCN-O3-NEXT: loop-simplify
+; GCN-O3-NEXT: canon-freeze
+; GCN-O3-NEXT: loop-reduce
 ; GCN-O3-NEXT: mergeicmps
 ; GCN-O3-NEXT: expand-memcmp
 ; GCN-O3-NEXT: unreachableblockelim

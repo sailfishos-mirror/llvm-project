@@ -85,8 +85,9 @@
 ; O2-NEXT: x86-lower-amx-intrinsics
 ; O2-NEXT: x86-lower-amx-type
 ; O2-NEXT: verify
-; O2-NEXT: loop(canon-freeze
-; O2-NEXT: loop-reduce)
+; O2-NEXT: loop-simplify
+; O2-NEXT: canon-freeze
+; O2-NEXT: loop-reduce
 ; O2-NEXT: mergeicmps
 ; O2-NEXT: expand-memcmp
 ; O2-NEXT: gc-lowering)
@@ -273,8 +274,9 @@
 ; O3-WINDOWS-NEXT: x86-lower-amx-intrinsics
 ; O3-WINDOWS-NEXT: x86-lower-amx-type
 ; O3-WINDOWS-NEXT: verify
-; O3-WINDOWS-NEXT: loop(canon-freeze
-; O3-WINDOWS-NEXT: loop-reduce)
+; O3-WINDOWS-NEXT: loop-simplify
+; O3-WINDOWS-NEXT: canon-freeze
+; O3-WINDOWS-NEXT: loop-reduce
 ; O3-WINDOWS-NEXT: mergeicmps
 ; O3-WINDOWS-NEXT: expand-memcmp
 ; O3-WINDOWS-NEXT: gc-lowering)

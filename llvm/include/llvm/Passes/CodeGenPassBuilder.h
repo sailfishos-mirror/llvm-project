@@ -120,6 +120,7 @@
 #include "llvm/Transforms/Scalar/ScalarizeMaskedMemIntrin.h"
 #include "llvm/Transforms/Utils/CanonicalizeFreezeInLoops.h"
 #include "llvm/Transforms/Utils/EntryExitInstrumenter.h"
+#include "llvm/Transforms/Utils/LoopSimplify.h"
 #include "llvm/Transforms/Utils/LowerInvoke.h"
 #include <cassert>
 #include <utility>
@@ -719,15 +720,14 @@ void CodeGenPassBuilder<Derived, TargetMachineT>::addIRPasses(
 
   // Run loop strength reduction before anything else.
   if (getOptLevel() != CodeGenOptLevel::None && !Opt.DisableLSR) {
-    // These passes do not use MSSA.
-    LoopPassManager LPM;
-    LPM.addPass(CanonicalizeFreezeInLoopsPass());
-    LPM.addPass(LoopStrengthReducePass());
+    addFunctionPass(LoopSimplifyPass(), PMW);
+    addFunctionPass(CanonicalizeFreezeInLoopsPass(), PMW);
+    addFunctionPass(LoopStrengthReducePass(), PMW);
+
     if (Opt.EnableLoopTermFold)
-      LPM.addPass(LoopTermFoldPass());
-    addFunctionPass(createFunctionToLoopPassAdaptor(std::move(LPM),
-                                                    /*UseMemorySSA=*/false),
-                    PMW);
+      addFunctionPass(createFunctionToLoopPassAdaptor(LoopTermFoldPass(),
+                                                      /*UseMemorySSA=*/false),
+                      PMW);
   }
 
   if (getOptLevel() != CodeGenOptLevel::None) {

@@ -568,6 +568,8 @@ FUNCTION_PASS("view-dom-only", DomOnlyViewer())
 FUNCTION_PASS("view-post-dom", PostDomViewer())
 FUNCTION_PASS("view-post-dom-only", PostDomOnlyViewer())
 FUNCTION_PASS("wasm-eh-prepare", WasmEHPreparePass())
+FUNCTION_PASS("canon-freeze", CanonicalizeFreezeInLoopsPass())
+FUNCTION_PASS("loop-reduce", LoopStrengthReducePass())
 #undef FUNCTION_PASS
 
 #ifndef FUNCTION_PASS_WITH_PARAMS
@@ -762,7 +764,6 @@ LOOP_ANALYSIS("should-run-extra-simple-loop-unswitch",
 #ifndef LOOP_PASS
 #define LOOP_PASS(NAME, CREATE_PASS)
 #endif
-LOOP_PASS("canon-freeze", CanonicalizeFreezeInLoopsPass())
 LOOP_PASS("dot-ddg", DDGDotPrinterPass())
 LOOP_PASS("guard-widening", GuardWideningPass())
 LOOP_PASS("extra-simple-loop-unswitch-passes",
@@ -775,7 +776,6 @@ LOOP_PASS("loop-idiom", LoopIdiomRecognizePass())
 LOOP_PASS("loop-idiom-vectorize", LoopIdiomVectorizePass())
 LOOP_PASS("loop-instsimplify", LoopInstSimplifyPass())
 LOOP_PASS("loop-predication", LoopPredicationPass())
-LOOP_PASS("loop-reduce", LoopStrengthReducePass())
 LOOP_PASS("loop-term-fold", LoopTermFoldPass())
 LOOP_PASS("loop-simplifycfg", LoopSimplifyCFGPass())
 LOOP_PASS("loop-unroll-full", LoopFullUnrollPass())
