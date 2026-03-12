@@ -4837,7 +4837,8 @@ void DeclareSimdOp::build(OpBuilder &odsBuilder, OperationState &odsState,
                        clauses.linearVars, clauses.linearStepVars,
                        clauses.linearVarTypes, clauses.linearModifiers,
                        clauses.notinbranch, clauses.simdlen,
-                       clauses.uniformVars);
+                       clauses.uniformVars,
+                       /*arg_types=*/nullptr);
 }
 
 //===----------------------------------------------------------------------===//
