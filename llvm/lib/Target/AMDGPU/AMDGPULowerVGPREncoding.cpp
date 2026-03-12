@@ -155,6 +155,9 @@ private:
   /// Last hard clause instruction.
   MachineInstr *Clause;
 
+  /// List of S_SETREG_IMM32_B32 instructions seen since last mode change.
+  SmallVector<MachineInstr *> SetRegImmList;
+
   /// S_SET_VGPR_MSB immediately after S_SETREG_IMM32_B32 targeting MODE is
   /// silently dropped on GFX1250. When set, the next S_SET_VGPR_MSB insertion
   /// must be preceded by S_NOP to avoid the hazard.
@@ -205,7 +208,8 @@ private:
 
   /// Update bits[12:19] of the imm operand in S_SETREG_IMM32_B32 to contain
   /// the VGPR MSB mode value. \returns true if the immediate was changed.
-  bool updateSetregModeImm(MachineInstr &MI, int64_t ModeValue);
+  bool updateSetregModeImm(MachineInstr &MI, int64_t ModeValue,
+                           unsigned Offset);
 };
 
 bool AMDGPULowerVGPREncoding::setMode(ModeTy NewMode,
@@ -234,31 +238,23 @@ bool AMDGPULowerVGPREncoding::setMode(ModeTy NewMode,
   LLVM_DEBUG(dbgs() << "    Rewritten=" << Rewritten << " after update\n");
 
   if (MostRecentModeSet && !Rewritten) {
-    // Update MostRecentModeSet with the new mode. It can be either
-    // S_SET_VGPR_MSB or S_SETREG_IMM32_B32 (with Size <= 12).
-    if (MostRecentModeSet->getOpcode() == AMDGPU::S_SET_VGPR_MSB) {
-      MachineOperand &Op = MostRecentModeSet->getOperand(0);
-      // Carry old mode bits from the existing instruction.
-      int64_t OldModeBits = Op.getImm() & (ModeMask << ModeWidth);
-      Op.setImm(CurrentMode.encode() | OldModeBits);
-      LLVM_DEBUG(dbgs() << "    -> piggybacked onto S_SET_VGPR_MSB: "
-                        << *MostRecentModeSet);
-    } else {
-      assert(MostRecentModeSet->getOpcode() == AMDGPU::S_SETREG_IMM32_B32 &&
-             "unexpected MostRecentModeSet opcode");
-      updateSetregModeImm(*MostRecentModeSet, CurrentMode.encode());
-      LLVM_DEBUG(dbgs() << "    -> piggybacked onto S_SETREG_IMM32_B32: "
-                        << *MostRecentModeSet);
-    }
+    // Update MostRecentModeSet with the new mode.
+    MachineOperand &Op = MostRecentModeSet->getOperand(0);
+    // Carry old mode bits from the existing instruction.
+    int64_t OldModeBits = Op.getImm() & (ModeMask << ModeWidth);
+    Op.setImm(CurrentMode.encode() | OldModeBits);
+    LLVM_DEBUG(dbgs() << "    -> piggybacked onto S_SET_VGPR_MSB: "
+                      << *MostRecentModeSet);
+    for (MachineInstr *I : SetRegImmList)
+      handleSetregMode(*I);
+    NeedNopBeforeSetVGPRMSB = false;
 
     return true;
   }
 
   I = handleClause(I);
   I = handleCoissue(I);
-  // Case 2 match in handleSetregMode: the setreg's imm[12:19] matched
-  // current MSBs, but the next VALU needs different MSBs, so this
-  // S_SET_VGPR_MSB would land right after the setreg. Insert S_NOP to
+  // This S_SET_VGPR_MSB would land right after the setreg. Insert S_NOP to
   // prevent it from being silently dropped.
   if (NeedNopBeforeSetVGPRMSB) {
     BuildMI(*MBB, I, {}, TII->get(AMDGPU::S_NOP)).addImm(0);
@@ -270,6 +266,7 @@ bool AMDGPULowerVGPREncoding::setMode(ModeTy NewMode,
                     << *MostRecentModeSet);
 
   CurrentMode = NewMode;
+  SetRegImmList.clear();
   return true;
 }
 
@@ -443,7 +440,8 @@ static int64_t convertModeToSetregFormat(int64_t Mode) {
 }
 
 bool AMDGPULowerVGPREncoding::updateSetregModeImm(MachineInstr &MI,
-                                                  int64_t ModeValue) {
+                                                  int64_t ModeValue,
+                                                  unsigned Offset) {
   assert(MI.getOpcode() == AMDGPU::S_SETREG_IMM32_B32);
 
   // Convert from S_SET_VGPR_MSB format to MODE register format
@@ -451,8 +449,8 @@ bool AMDGPULowerVGPREncoding::updateSetregModeImm(MachineInstr &MI,
 
   MachineOperand *ImmOp = TII->getNamedOperand(MI, AMDGPU::OpName::imm);
   int64_t OldImm = ImmOp->getImm();
-  int64_t NewImm =
-      (OldImm & ~AMDGPU::Hwreg::VGPR_MSB_MASK) | (SetregMode << VGPRMSBShift);
+  int64_t NewImm = (OldImm & ~AMDGPU::Hwreg::VGPR_MSB_MASK) |
+                   (SetregMode << (VGPRMSBShift - Offset));
   ImmOp->setImm(NewImm);
   return NewImm != OldImm;
 }
@@ -469,13 +467,14 @@ bool AMDGPULowerVGPREncoding::handleSetregMode(MachineInstr &MI) {
   assert(SIMM16Op && "SIMM16Op must be present");
 
   auto [HwRegId, Offset, Size] = HwregEncoding::decode(SIMM16Op->getImm());
-  (void)Offset;
   LLVM_DEBUG(dbgs() << "    HwRegId=" << HwRegId << " Offset=" << Offset
                     << " Size=" << Size << '\n');
   if (HwRegId != ID_MODE) {
     LLVM_DEBUG(dbgs() << "    -> not ID_MODE, skipping\n");
     return false;
   }
+
+  NeedNopBeforeSetVGPRMSB = true;
 
   int64_t ModeValue = CurrentMode.encode();
   LLVM_DEBUG({
@@ -485,57 +484,43 @@ bool AMDGPULowerVGPREncoding::handleSetregMode(MachineInstr &MI) {
            << " VGPRMSBShift=" << VGPRMSBShift << '\n';
   });
 
-  // Case 1: Size <= 12 - the original instruction uses imm32[0:Size-1], so
-  // imm32[12:19] is unused. Safe to set imm32[12:19] to the correct VGPR
-  // MSBs.
-  if (Size <= VGPRMSBShift) {
+  // Case 1: immediate has mode bits, we can update it.
+  if (Offset <= VGPRMSBShift) {
+    // Set imm32[12:19] to the correct VGPR MSBs.
     LLVM_DEBUG(dbgs() << "    Case 1: Size(" << Size << ") <= VGPRMSBShift("
-                      << VGPRMSBShift
-                      << "), treating as mode scope boundary\n");
-    // This instruction is at the boundary of the old mode's control range.
-    // Reset CurrentMode so that the next setMode call can freely piggyback
-    // the required mode into bits[12:19] without triggering Rewritten.
-    MostRecentModeSet = &MI;
-    CurrentMode = {};
-    bool Changed = updateSetregModeImm(MI, 0);
-    LLVM_DEBUG(dbgs() << "    -> reset CurrentMode, cleared bits[12:19]: "
-                      << MI);
+                      << VGPRMSBShift << "), update mode bits[12:19]\n");
+    bool Changed = updateSetregModeImm(MI, ModeValue, Offset);
+    LLVM_DEBUG(dbgs() << "    -> " << MI);
     return Changed;
   }
 
-  // Case 2: Size > 12 - the original instruction uses bits beyond 11, so we
-  // cannot arbitrarily modify imm32[12:19]. Check if it already matches VGPR
-  // MSBs. Note: imm32[12:19] is in MODE register format, while ModeValue is
-  // in S_SET_VGPR_MSB format, so we need to convert before comparing.
+  // Case 2: Offset > 12 - the original instruction does not fully cover mode
+  // bit. Check if it already matches VGPR MSBs. Note: imm32[12:19] is in MODE
+  // register format, while ModeValue is in S_SET_VGPR_MSB format, so we need to
+  // convert before comparing.
   MachineOperand *ImmOp = TII->getNamedOperand(MI, AMDGPU::OpName::imm);
   assert(ImmOp && "ImmOp must be present");
-  int64_t ImmBits12To19 = (ImmOp->getImm() & VGPR_MSB_MASK) >> VGPRMSBShift;
+  int64_t ImmBits12To19 =
+      ((ImmOp->getImm() << Offset) & VGPR_MSB_MASK) >> VGPRMSBShift;
   int64_t SetregModeValue = convertModeToSetregFormat(ModeValue);
   LLVM_DEBUG(dbgs() << "    Case 2: Size(" << Size << ") > VGPRMSBShift, "
                     << "ImmBits12To19=0x" << Twine::utohexstr(ImmBits12To19)
                     << " SetregModeValue=0x"
                     << Twine::utohexstr(SetregModeValue) << '\n');
   if (ImmBits12To19 == SetregModeValue) {
-    // Already correct, but we must invalidate MostRecentModeSet because this
-    // instruction will overwrite mode[12:19]. We can't update this instruction
-    // via piggybacking (bits[12:19] are meaningful), so if CurrentMode changes,
-    // a new s_set_vgpr_msb will be inserted after this instruction.
-    MostRecentModeSet = nullptr;
-    NeedNopBeforeSetVGPRMSB = true;
     LLVM_DEBUG(dbgs() << "    -> bits[12:19] already correct, "
                          "invalidated MostRecentModeSet\n");
     return false;
   }
 
-  // imm32[12:19] doesn't match VGPR MSBs - insert s_set_vgpr_msb after
-  // the original instruction to restore the correct value. Insert S_NOP
-  // to avoid the GFX1250 hazard where S_SET_VGPR_MSB immediately after
-  // S_SETREG_IMM32_B32(MODE) is silently dropped.
+  // We cannot update immediate as offset it does not cover all mode bits.
   MachineBasicBlock::iterator InsertPt = std::next(MI.getIterator());
   BuildMI(*MBB, InsertPt, MI.getDebugLoc(), TII->get(AMDGPU::S_NOP)).addImm(0);
   MostRecentModeSet = BuildMI(*MBB, InsertPt, MI.getDebugLoc(),
                               TII->get(AMDGPU::S_SET_VGPR_MSB))
                           .addImm(ModeValue);
+  SetRegImmList.clear();
+  NeedNopBeforeSetVGPRMSB = false;
   LLVM_DEBUG(dbgs() << "    -> inserted S_SET_VGPR_MSB after setreg: "
                     << *MostRecentModeSet);
   return true;
@@ -558,6 +543,7 @@ bool AMDGPULowerVGPREncoding::run(MachineFunction &MF) {
   for (auto &MBB : MF) {
     MostRecentModeSet = nullptr;
     NeedNopBeforeSetVGPRMSB = false;
+    SetRegImmList.clear();
     this->MBB = &MBB;
 
     LLVM_DEBUG(dbgs() << "BB#" << MBB.getNumber() << ' ' << MBB.getName()
@@ -600,6 +586,8 @@ bool AMDGPULowerVGPREncoding::run(MachineFunction &MF) {
       if (MI.getOpcode() == AMDGPU::S_SETREG_IMM32_B32 &&
           ST.hasSetregVGPRMSBFixup()) {
         Changed |= handleSetregMode(MI);
+        if (NeedNopBeforeSetVGPRMSB)
+          SetRegImmList.push_back(&MI);
         continue;
       }
 
