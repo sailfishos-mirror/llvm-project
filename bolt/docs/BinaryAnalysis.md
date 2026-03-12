@@ -327,7 +327,7 @@ call or as another kind of branch (such as jump table or computed goto).
 A report is generated if a tail call is performed with an untrusted link register.
 This basically means that the tail-called function would have the link register
 untrusted on its entry (unlike the inherently correct address placed in the link
-register by one of `bl*` instructions when a non-tail call is performed).
+register by one of the `bl*` instructions when a non-tail call is performed).
 
 ```asm
 non_protected_tail_call:
@@ -356,10 +356,9 @@ tail_callee:
 Even though `x30` is likely to be safe-to-dereference before exit from a function
 (whether via return or tail call) in a consistently pac-ret-protected program,
 with respect to this gadget kind it further must be fully "trusted".
-With `x30` being safe-to-dereference, but not fully trusted at the entry to the
-tail callee, the subsequent `pacibsp` instruction may act as a [signing oracle](#signing-oracles-ptrauth-sign-oracles).
-
-**FIXME:** Is it actually possible when none of `FEAT_FPAC`, `FEAT_EPAC`, or `FEAT_PAuth2` are implemented?
+This corresponds to the way tail calls are emitted when `--aarch64-authenticated-lr-check-method=`
+option is specified with an argument other than `none`, or when such checks are
+requested for the particular subtarget by default.
 
 Properly mitigating this issue would usually require inserting an explicit
 check after a regular authentication instruction, which may be either too
@@ -442,8 +441,10 @@ bad_call_dataflow:
 Reports signing of untrusted values, as this could make arbitrary and possibly
 attacker-controlled values indistinguishable from perfectly trusted and protected ones.
 
-**FIXME:** Is `aut** + pac**` sequence actually exploitable when none of
-`FEAT_FPAC`, `FEAT_EPAC`, or `FEAT_PAuth2` are implemented?
+In absence of `--auth-traps-on-failure` command line option, this detector
+reports auth+sign pairs unless an explicit check is emitted to make sure the
+authentication operation succeeded. This corresponds to the way LLVM emits
+instructions on AArch64.
 
 **Examples:**
 
@@ -697,6 +698,9 @@ which is also supported by Clang.
 
 #### Other known issues
 
+* No lightweight variant of [`ptrauth-tail-calls`](#return-address-protection-before-tail-call-ptrauth-tail-calls),
+  see issue [#186204](https://github.com/llvm/llvm-project/issues/186204)
+  for the details.
 * Not handling "no-return" functions. See issue
   [#115154](https://github.com/llvm/llvm-project/issues/115154) for details and
   pointers to open PRs to fix this.
