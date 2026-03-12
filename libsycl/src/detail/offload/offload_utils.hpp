@@ -108,7 +108,7 @@ info::device_type convertDeviceTypeToSYCL(ol_device_type_t DeviceType);
 /// \param DeviceType SYCL USM type.
 ///
 /// \returns ol_alloc_type_t matching the specified SYCL USM kind.
-ol_alloc_type_t convertUSMTypeToOL(usm::alloc USMType);
+ol_alloc_type_t getOlAllocType(usm::alloc USMType);
 
 /// Helper to map SYCL information descriptors to OL_<HANDLE>_INFO_<SMTH>.
 ///

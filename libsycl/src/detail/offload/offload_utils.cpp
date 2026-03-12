@@ -88,7 +88,7 @@ info::device_type convertDeviceTypeToSYCL(ol_device_type_t DeviceType) {
   }
 }
 
-ol_alloc_type_t convertUSMTypeToOL(usm::alloc USMType) {
+ol_alloc_type_t getOlAllocType(usm::alloc USMType) {
   switch (USMType) {
   case usm::alloc::host:
     return OL_ALLOC_TYPE_HOST;

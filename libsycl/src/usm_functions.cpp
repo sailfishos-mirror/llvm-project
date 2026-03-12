@@ -76,14 +76,11 @@ static aspect getAspectByAllocationKind(usm::alloc kind) {
     return aspect::usm_device_allocations;
   case usm::alloc::shared:
     return aspect::usm_shared_allocations;
-  default:
-    assert(false &&
-           "Must be unreachable, usm::unknown allocation can't be requested");
+  case usm::alloc::unknown:
     // usm::alloc::unknown can be returned to user from get_pointer_type but
-    // it can't be converted to a valid backend type and there is no need to
-    // do that.
-    throw exception(sycl::make_error_code(sycl::errc::runtime),
-                    "USM type is not supported");
+    // it can't be converted to a valid backend type.
+    throw exception(sycl::make_error_code(sycl::errc::invalid),
+                    "Invalid USM allocation kind requested");
   }
 }
 
@@ -107,7 +104,7 @@ void *malloc(std::size_t numBytes, const device &syclDevice,
   void *Ptr{};
   auto Result = detail::callNoCheck(
       olMemAlloc, detail::getSyclObjImpl(syclDevice)->getOLHandle(),
-      detail::convertUSMTypeToOL(kind), numBytes, &Ptr);
+      detail::getOlAllocType(kind), numBytes, &Ptr);
   assert(!!Result != !!Ptr && "Successful USM allocation can't return nullptr");
   return detail::isFailed(Result) ? nullptr : Ptr;
 }
