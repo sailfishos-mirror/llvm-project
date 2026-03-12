@@ -631,8 +631,8 @@ struct ArrayExpressionRecognizer {
   }
 };
 
-// Helper class to check if a given evaluate::Expr contains a subexpression
-// (not necessarily proper) that is an array expression.
+/// Helper class to check if a given evaluate::Expr contains a subexpression
+/// (not necessarily proper) that is an array expression.
 struct ArrayExpressionFinder
     : public evaluate::AnyTraverse<ArrayExpressionFinder> {
   using Base = evaluate::AnyTraverse<ArrayExpressionFinder>;
@@ -645,8 +645,8 @@ struct ArrayExpressionFinder
   }
 };
 
-// Helper class to check if any array expressions contained in the given
-// evaluate::Expr satisfy the criteria for being in "intervening code".
+/// Helper class to check if any array expressions contained in the given
+/// evaluate::Expr satisfy the criteria for being in "intervening code".
 struct ArrayExpressionChecker {
   template <typename T> bool Pre(const T &) { return true; }
   template <typename T> void Post(const T &) {}
@@ -673,6 +673,9 @@ static bool ContainsInvalidArrayExpression(
   return checker.rejected;
 }
 
+/// Checks if the given construct `x` satisfied OpenMP requirements for
+/// intervening-code. Excludes CYCLE/EXIT statements as well as constructs
+/// likely to result in a runtime loop, e.g. FORALL, WHERE, etc.
 bool IsValidInterveningCode(const parser::ExecutionPartConstruct &x) {
   static auto isScalar = [](const parser::Variable &variable) {
     if (auto expr{GetEvaluateExprFromTyped(variable.typedExpr)}) {
@@ -724,6 +727,11 @@ bool IsValidInterveningCode(const parser::ExecutionPartConstruct &x) {
   return true;
 }
 
+/// Checks if the given construct `x` preserves perfect nesting of a loop,
+/// when placed adjacent to the loop in the enclosing (parent) loop.
+/// CONTINUE statements are no-ops, and thus are considered transparent.
+/// Non-OpenMP compiler directives are also considered transparent to
+/// allow legacy applications to pass the semantic checks.
 bool IsTransparentInterveningCode(const parser::ExecutionPartConstruct &x) {
   // Tolerate compiler directives in perfect nests.
   return parser::Unwrap<parser::CompilerDirective>(x) ||
@@ -944,7 +952,7 @@ LoopSequence::LoopSequence(
     : version_(version), allowAllLoops_(allowAllLoops),
       entry_(std::move(entry)) {
   createChildrenFromRange(entry_->location);
-  calculateEverything();
+  precalculate();
 }
 
 std::unique_ptr<LoopSequence::Construct> LoopSequence::createConstructEntry(
@@ -985,7 +993,7 @@ void LoopSequence::createChildrenFromRange(
   }
 }
 
-void LoopSequence::calculateEverything() {
+void LoopSequence::precalculate() {
   // Calculate length before depths.
   length_ = calculateLength();
   depth_ = calculateDepths();

@@ -38,11 +38,11 @@ class Symbol;
 
 // Add this namespace to avoid potential conflicts
 namespace omp {
-using Fortran::parser::omp::ExecutionPartIterator;
-using Fortran::parser::omp::LoopNestIterator;
 using Fortran::parser::omp::BlockRange;
-using Fortran::parser::omp::LoopRange;
+using Fortran::parser::omp::ExecutionPartIterator;
 using Fortran::parser::omp::is_range_v;
+using Fortran::parser::omp::LoopNestIterator;
+using Fortran::parser::omp::LoopRange;
 
 template <typename T, typename U = std::remove_const_t<T>> U AsRvalue(T &t) {
   return U(t);
@@ -207,30 +207,30 @@ private:
       ExecutionPartIterator::IteratorType begin,
       ExecutionPartIterator::IteratorType end);
 
-  void calculateEverything();
+  /// Precalculate length and depth.
+  void precalculate();
 
   std::optional<int64_t> calculateLength() const;
   std::optional<int64_t> getNestedLength() const;
   Depth calculateDepths() const;
   Depth getNestedDepths() const;
 
-  // True if the sequence contains any code (besides transformable loops)
-  // that is not a valid intervening code.
+  /// True if the sequence contains any code (besides transformable loops)
+  /// that is not a valid intervening code.
   bool hasInvalidIC_{false};
-  // True if the sequence contains any code (besides transformable loops)
-  // that is not a valid transparent code.
+  /// True if the sequence contains any code (besides transformable loops)
+  /// that is not a valid transparent code.
   bool hasOpaqueIC_{false};
 
-  // Precalculated length of the sequence. Note that this is different from
-  // the number of children because a child may result in a sequence, for
-  // example a fuse with a reduced loop range. The length of that sequence
-  // adds to the length of the owning LoopSequence.
+  /// Precalculated length of the sequence. Note that this is different from
+  /// the number of children because a child may result in a sequence, for
+  /// example a fuse with a reduced loop range. The length of that sequence
+  /// adds to the length of the owning LoopSequence.
   std::optional<int64_t> length_;
-  // Precalculated depths. Only meaningful if the sequence is a nest.
+  /// Precalculated depths. Only meaningful if the sequence is a nest.
   Depth depth_;
 
   // The core structure of the class:
-  unsigned version_; // Needed for GetXyzWithReason
   bool allowAllLoops_;
   std::unique_ptr<Construct> entry_;
   std::vector<LoopSequence> children_;

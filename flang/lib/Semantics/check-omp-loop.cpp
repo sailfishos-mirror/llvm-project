@@ -30,6 +30,7 @@
 
 #include "llvm/Frontend/OpenMP/OMP.h"
 
+#include <cinttypes>
 #include <cstdint>
 #include <map>
 #include <optional>
@@ -297,7 +298,8 @@ void OmpStructureChecker::CheckNestedConstruct(
       auto assoc{llvm::omp::getDirectiveAssociation(beginSpec.DirName().v)};
       if (*numLoops > 1 && assoc == llvm::omp::Association::LoopNest) {
         context_.Say(beginSpec.DirName().source,
-            "This construct applies to a loop nest, but has a loop sequence of length %ld"_err_en_US,
+            "This construct applies to a loop nest, but has a loop sequence of "
+            "length %" PRId64 ""_err_en_US,
             *numLoops);
       }
     }
@@ -514,7 +516,9 @@ void OmpStructureChecker::CheckLooprangeBounds(
       if (auto loopCount{sequence.length()}) {
         if (*loopCount < *requiredCount) {
           context_.Say(clause->source,
-              "The specified loop range requires %ld loops, but the loop sequence has a length of %ld"_err_en_US,
+              "The specified loop range requires %" PRId64
+              " loops, but the loop sequence has a length of %" PRId64
+              ""_err_en_US,
               *requiredCount, *loopCount);
         }
       }
