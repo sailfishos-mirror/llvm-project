@@ -7571,8 +7571,7 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
       CmdArgs.push_back("-fexec-charset");
       CmdArgs.push_back(Args.MakeArgString(Value));
     } else {
-      D.Diag(diag::err_drv_unsupported_encoding_for_target)
-          << Value << Triple.getTriple();
+      D.Diag(diag::err_drv_unsupported_encoding) << Value;
     }
   } else {
     // Set the default fexec-charset as the system charset.
