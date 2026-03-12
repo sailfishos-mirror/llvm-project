@@ -3086,7 +3086,7 @@ void CodeGenFunction::EmitMultiVersionResolver(
     [[fallthrough]];
   default:
     assert(false &&
-           "Only implemented for x86, AArch64, RISC-V, and PowerPC targets");
+           "Only implemented for x86, AArch64, RISC-V, and PowerPC AIX");
   }
 }
 
@@ -3123,7 +3123,7 @@ void CodeGenFunction::EmitPPCAIXMultiVersionResolver(
       assert(&RO == Options.end() - 1 &&
              "Default or Generic case must be last");
       Builder.CreateRet(RO.Function);
-      break;
+      return;
     }
     // if.else_n:
     //   %is_version_n = __builtin_cpu_supports(version_n)
@@ -3155,13 +3155,7 @@ void CodeGenFunction::EmitPPCAIXMultiVersionResolver(
     Builder.CreateRet(RO.Function);
   }
 
-  // If no generic/default, emit an unreachable.
-  //  Builder.SetInsertPoint(CurBlock);
-  //  llvm::CallInst *TrapCall = EmitTrapCall(llvm::Intrinsic::trap);
-  //  TrapCall->setDoesNotReturn();
-  //  TrapCall->setDoesNotThrow();
-  //  Builder.CreateUnreachable();
-  //  Builder.ClearInsertionPoint();
+  llvm_unreachable("Default case missing");
 }
 
 void CodeGenFunction::EmitRISCVMultiVersionResolver(

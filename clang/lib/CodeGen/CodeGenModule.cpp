@@ -2176,7 +2176,7 @@ static std::string getMangledNameImpl(CodeGenModule &CGM, GlobalDecl GD,
     Out << CGM.getModuleNameHash();
   }
 
-  if (const auto *FD = dyn_cast<FunctionDecl>(ND)) {
+  if (const auto *FD = dyn_cast<FunctionDecl>(ND))
     if (FD->isMultiVersion() && !OmitMultiVersionMangling) {
       switch (FD->getMultiVersionKind()) {
       case MultiVersionKind::CPUDispatch:
@@ -2214,7 +2214,6 @@ static std::string getMangledNameImpl(CodeGenModule &CGM, GlobalDecl GD,
         llvm_unreachable("None multiversion type isn't valid here");
       }
     }
-  }
 
   // Make unique name for device side static file-scope variable for HIP.
   if (CGM.getContext().shouldExternalize(ND) &&
@@ -5145,6 +5144,8 @@ llvm::Constant *CodeGenModule::GetOrCreateMultiVersionResolver(GlobalDecl GD) {
         MangledName + ".resolver", ResolverType, GlobalDecl{},
         /*ForVTable=*/false);
 
+    // on AIX, the FMV is ignored on a declaration, and so we don't need the
+    // ifunc, which is only generated on FMV definitions, to be weak.
     auto Linkage = getTriple().isOSAIX() ? getFunctionLinkage(GD)
                                          : getMultiversionLinkage(*this, GD);
 
@@ -5169,10 +5170,7 @@ void CodeGenModule::setMultiVersionResolverAttributes(llvm::Function *Resolver,
                                                       GlobalDecl GD) {
   const NamedDecl *D = dyn_cast_or_null<NamedDecl>(GD.getDecl());
 
-  auto ResolverLinkage = getTriple().isOSAIX()
-                             ? llvm::GlobalValue::InternalLinkage
-                             : getMultiversionLinkage(*this, GD);
-  Resolver->setLinkage(ResolverLinkage);
+  Resolver->setLinkage(getMultiversionLinkage(*this, GD));
 
   // Function body has to be emitted before calling setGlobalVisibility
   // for Resolver to be considered as definition.

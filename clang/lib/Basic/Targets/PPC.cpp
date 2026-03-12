@@ -677,13 +677,6 @@ void PPCTargetInfo::setFeatureEnabled(llvm::StringMap<bool> &Features,
   }
 }
 
-bool PPCTargetInfo::isValidFeatureName(StringRef Name) const {
-  if (Name.empty())
-    return false;
-  // TODO: filter out unknown features
-  return true;
-}
-
 ParsedTargetAttr PPCTargetInfo::parseTargetAttr(StringRef Features) const {
   ParsedTargetAttr Ret;
   if (Features == "default")
