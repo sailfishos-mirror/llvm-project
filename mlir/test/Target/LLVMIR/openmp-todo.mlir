@@ -154,7 +154,7 @@ llvm.func @single_private(%x : !llvm.ptr) {
 llvm.func @target_allocate(%x : !llvm.ptr) {
   // expected-error@below {{not yet implemented: Unhandled clause allocate in omp.target operation}}
   // expected-error@below {{LLVM Translation failed for operation: omp.target}}
-  omp.target allocate(%x : !llvm.ptr -> %x : !llvm.ptr) {
+  omp.target kernel_type(generic) allocate(%x : !llvm.ptr -> %x : !llvm.ptr) {
     omp.terminator
   }
   llvm.return
@@ -182,7 +182,7 @@ atomic {
 llvm.func @target_in_reduction(%x : !llvm.ptr) {
   // expected-error@below {{not yet implemented: Unhandled clause in_reduction in omp.target operation}}
   // expected-error@below {{LLVM Translation failed for operation: omp.target}}
-  omp.target in_reduction(@add_f32 %x -> %prv : !llvm.ptr) {
+  omp.target kernel_type(generic) in_reduction(@add_f32 %x -> %prv : !llvm.ptr) {
     omp.terminator
   }
   llvm.return
