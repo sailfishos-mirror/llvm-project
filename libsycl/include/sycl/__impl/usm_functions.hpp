@@ -17,15 +17,16 @@
 
 _LIBSYCL_BEGIN_NAMESPACE_SYCL
 
-// SYCL 2020 4.8.3.2. Device allocation functions.
-
+/// \name  SYCL 2020 4.8.3.2. Device allocation functions.
+/// \brief Allocations in device memory are not accessible by the host.
+/// @{
 /// Allocates device USM.
 ///
-/// \param numBytes  allocation size that is specified in bytes.
-/// \param syclDevice device that is used for allocation.
-/// \param syclContext context that contains syclDevice or its parent device if
+/// \param numBytes  number of bytes to allocate.
+/// \param syclDevice device to use for the allocation.
+/// \param syclContext context containing syclDevice or its parent device if
 /// syclDevice is a subdevice.
-/// \param propList properties for the memory allocation.
+/// \param propList the list of properties for the allocation.
 /// \return a pointer to the newly allocated memory, which is allocated on
 /// syclDevice and which must eventually be deallocated with sycl::free in order
 /// to avoid a memory leak.
@@ -36,12 +37,11 @@ void *_LIBSYCL_EXPORT malloc_device(std::size_t numBytes,
 
 /// Allocates device USM.
 ///
-/// \param count  allocation size that is specified in number of elements of
-/// type T.
-/// \param syclDevice device that is used for allocation.
-/// \param syclContext context that contains syclDevice or its parent device if
+/// \param count number of elements of type T to allocate.
+/// \param syclDevice device to use for the allocation.
+/// \param syclContext context containing syclDevice or its parent device if
 /// syclDevice is a subdevice.
-/// \param propList properties for the memory allocation.
+/// \param propList the list of properties for the allocation.
 /// \return a pointer to the newly allocated memory, which is allocated on
 /// syclDevice and which must eventually be deallocated with sycl::free in order
 /// to avoid a memory leak.
@@ -57,9 +57,9 @@ T *malloc_device(std::size_t count, const device &syclDevice,
 
 /// Allocates device USM.
 ///
-/// \param numBytes  allocation size that is specified in bytes.
+/// \param numBytes  number of bytes to allocate.
 /// \param syclQueue queue that provides the device and context.
-/// \param propList properties for the memory allocation.
+/// \param propList the list of properties for the allocation.
 /// \return a pointer to the newly allocated memory, which is allocated on
 /// syclDevice and which must eventually be deallocated with sycl::free in order
 /// to avoid a memory leak.
@@ -69,10 +69,9 @@ void *_LIBSYCL_EXPORT malloc_device(std::size_t numBytes,
 
 /// Allocates device USM.
 ///
-/// \param count  allocation size that is specified in number of elements of
-/// type T.
+/// \param count number of elements of type T to allocate.
 /// \param syclQueue queue that provides the device and context.
-/// \param propList properties for the memory allocation.
+/// \param propList the list of properties for the allocation.
 /// \return a pointer to the newly allocated memory, which is allocated on
 /// syclDevice and which must eventually be deallocated with sycl::free in order
 /// to avoid a memory leak.
@@ -82,14 +81,16 @@ T *malloc_device(std::size_t count, const queue &syclQueue,
   return malloc_device<T>(count, syclQueue.get_device(),
                           syclQueue.get_context(), propList);
 }
+/// @}
 
-// SYCL 2020 4.8.3.3. Host allocation functions.
-
+/// \name SYCL 2020 4.8.3.3. Host allocation functions.
+/// \brief Allocations in host memory are accessible by a device.
+/// @{
 /// Allocates host USM.
 ///
-/// \param numBytes  allocation size that is specified in bytes.
+/// \param numBytes  number of bytes to allocate.
 /// \param syclContext context that should have access to the allocated memory.
-/// \param propList properties for the memory allocation.
+/// \param propList the list of properties for the allocation.
 /// \return a pointer to the newly allocated memory, which must eventually be
 /// deallocated with sycl::free in order to avoid a memory leak.
 void *_LIBSYCL_EXPORT malloc_host(std::size_t numBytes,
@@ -98,10 +99,9 @@ void *_LIBSYCL_EXPORT malloc_host(std::size_t numBytes,
 
 /// Allocates host USM.
 ///
-/// \param count  allocation size that is specified in number of elements of
-/// type T.
+/// \param count number of elements of type T to allocate.
 /// \param syclContext context that should have access to the allocated memory.
-/// \param propList properties for the memory allocation.
+/// \param propList the list of properties for the allocation.
 /// \return a pointer to the newly allocated memory, which must eventually be
 /// deallocated with sycl::free in order to avoid a memory leak.
 template <typename T>
@@ -115,9 +115,9 @@ T *malloc_host(std::size_t count, const context &syclContext,
 
 /// Allocates host USM.
 ///
-/// \param numBytes  allocation size that is specified in bytes.
+/// \param numBytes  number of bytes to allocate.
 /// \param syclQueue queue that provides the context.
-/// \param propList properties for the memory allocation.
+/// \param propList the list of properties for the allocation.
 /// \return a pointer to the newly allocated memory, which must eventually be
 /// deallocated with sycl::free in order to avoid a memory leak.
 void *_LIBSYCL_EXPORT malloc_host(std::size_t numBytes, const queue &syclQueue,
@@ -125,10 +125,9 @@ void *_LIBSYCL_EXPORT malloc_host(std::size_t numBytes, const queue &syclQueue,
 
 /// Allocates host USM.
 ///
-/// \param count  allocation size that is specified in number of elements of
-/// type T.
+/// \param count number of elements of type T to allocate.
 /// \param syclQueue queue that provides the context.
-/// \param propList properties for the memory allocation.
+/// \param propList the list of properties for the allocation.
 /// \return a pointer to the newly allocated memory, which must eventually be
 /// deallocated with sycl::free in order to avoid a memory leak.
 template <typename T>
@@ -136,16 +135,18 @@ T *malloc_host(std::size_t count, const queue &syclQueue,
                const property_list &propList = {}) {
   return malloc_host<T>(count, syclQueue.get_context(), propList);
 }
+/// @}
 
-// SYCL 2020 4.8.3.4. Shared allocation functions.
-
+/// \name SYCL 2020 4.8.3.4. Shared allocation functions.
+/// \brief Allocations in shared memory are accessible by both host and device.
+/// @{
 /// Allocates shared  USM.
 ///
-/// \param numBytes  allocation size that is specified in bytes.
-/// \param syclDevice device that is used for allocation.
-/// \param syclContext context that contains syclDevice or its parent device if
+/// \param numBytes  number of bytes to allocate.
+/// \param syclDevice device to use for the allocation.
+/// \param syclContext context containing syclDevice or its parent device if
 /// syclDevice is a subdevice.
-/// \param propList properties for the memory allocation.
+/// \param propList the list of properties for the allocation.
 /// \return a pointer to the newly allocated memory, which must eventually be
 /// deallocated with sycl::free in order to avoid a memory leak.
 void *_LIBSYCL_EXPORT malloc_shared(std::size_t numBytes,
@@ -155,12 +156,11 @@ void *_LIBSYCL_EXPORT malloc_shared(std::size_t numBytes,
 
 /// Allocates shared  USM.
 ///
-/// \param count  allocation size that is specified in number of elements of
-/// type T.
-/// \param syclDevice device that is used for allocation.
-/// \param syclContext context that contains syclDevice or its parent device if
+/// \param count number of elements of type T to allocate.
+/// \param syclDevice device to use for the allocation.
+/// \param syclContext context containing syclDevice or its parent device if
 /// syclDevice is a subdevice.
-/// \param propList properties for the memory allocation.
+/// \param propList the list of properties for the allocation.
 /// \return a pointer to the newly allocated memory, which must eventually be
 /// deallocated with sycl::free in order to avoid a memory leak.
 template <typename T>
@@ -175,9 +175,9 @@ T *malloc_shared(std::size_t count, const device &syclDevice,
 
 /// Allocates shared  USM.
 ///
-/// \param numBytes  allocation size that is specified in bytes.
+/// \param numBytes  number of bytes to allocate.
 /// \param syclQueue queue that provides the device and context.
-/// \param propList properties for the memory allocation.
+/// \param propList the list of properties for the allocation.
 /// \return a pointer to the newly allocated memory, which must eventually be
 /// deallocated with sycl::free in order to avoid a memory leak.
 void *_LIBSYCL_EXPORT malloc_shared(std::size_t numBytes,
@@ -186,10 +186,9 @@ void *_LIBSYCL_EXPORT malloc_shared(std::size_t numBytes,
 
 /// Allocates shared  USM.
 ///
-/// \param count  allocation size that is specified in number of elements of
-/// type T.
+/// \param count number of elements of type T to allocate.
 /// \param syclQueue queue that provides the device and context.
-/// \param propList properties for the memory allocation.
+/// \param propList the list of properties for the allocation.
 /// \return a pointer to the newly allocated memory, which must eventually be
 /// deallocated with sycl::free in order to avoid a memory leak.
 template <typename T>
@@ -198,18 +197,19 @@ T *malloc_shared(std::size_t count, const queue &syclQueue,
   return malloc_shared<T>(count, syclQueue.get_device(),
                           syclQueue.get_context(), propList);
 }
+/// @}
 
-// SYCL 2020 4.8.3.5. Parameterized allocation functions
-
+/// \name  SYCL 2020 4.8.3.5. Parameterized allocation functions.
+/// @{
 /// Allocates USM of type `kind`.
 ///
-/// \param numBytes  allocation size that is specified in bytes.
-/// \param syclDevice device that is used for allocation. The syclDevice
+/// \param numBytes  number of bytes to allocate.
+/// \param syclDevice device to use for the allocation. The syclDevice
 /// parameter is ignored if kind is usm::alloc::host.
-/// \param syclContext context that contains syclDevice or its parent device if
+/// \param syclContext context containing syclDevice or its parent device if
 /// syclDevice is a subdevice.
 /// \param kind type of memory to allocate.
-/// \param propList properties for the memory allocation.
+/// \param propList the list of properties for the allocation.
 /// \return a pointer to the newly allocated memory, which must eventually be
 /// deallocated with sycl::free in order to avoid a memory leak. If there are
 /// not enough resources to allocate the requested memory, these functions
@@ -220,14 +220,13 @@ void *_LIBSYCL_EXPORT malloc(std::size_t numBytes, const device &syclDevice,
 
 /// Allocates USM of type `kind`.
 ///
-/// \param count  allocation size that is specified in number of elements of
-/// type T.
-/// \param syclDevice device that is used for allocation. The syclDevice
+/// \param count number of elements of type T to allocate.
+/// \param syclDevice device to use for the allocation. The syclDevice
 /// parameter is ignored if kind is usm::alloc::host.
-/// \param syclContext context that contains syclDevice or its parent device if
+/// \param syclContext context containing syclDevice or its parent device if
 /// syclDevice is a subdevice.
 /// \param kind type of memory to allocate.
-/// \param propList properties for the memory allocation.
+/// \param propList the list of properties for the allocation.
 /// \return a pointer to the newly allocated memory, which must eventually be
 /// deallocated with sycl::free in order to avoid a memory leak. If there are
 /// not enough resources to allocate the requested memory, these functions
@@ -243,10 +242,10 @@ T *malloc(std::size_t count, const device &syclDevice,
 
 /// Allocates USM of type `kind`.
 ///
-/// \param numBytes  allocation size that is specified in bytes.
+/// \param numBytes  number of bytes to allocate.
 /// \param syclQueue queue that provides the device and context.
 /// \param kind type of memory to allocate.
-/// \param propList properties for the memory allocation.
+/// \param propList the list of properties for the allocation.
 /// \return a pointer to the newly allocated memory, which must eventually be
 /// deallocated with sycl::free in order to avoid a memory leak. If there are
 /// not enough resources to allocate the requested memory, these functions
@@ -257,11 +256,10 @@ void *_LIBSYCL_EXPORT malloc(std::size_t numBytes, const queue &syclQueue,
 
 /// Allocates USM of type `kind`.
 ///
-/// \param count  allocation size that is specified in number of elements of
-/// type T.
+/// \param count number of elements of type T to allocate.
 /// \param syclQueue queue that provides the device and context.
 /// \param kind type of memory to allocate.
-/// \param propList properties for the memory allocation.
+/// \param propList the list of properties for the allocation.
 /// \return a pointer to the newly allocated memory, which must eventually be
 /// deallocated with sycl::free in order to avoid a memory leak. If there are
 /// not enough resources to allocate the requested memory, these functions
@@ -272,14 +270,15 @@ T *malloc(std::size_t count, const queue &syclQueue, usm::alloc kind,
   return malloc<T>(count, syclQueue.get_device(), syclQueue.get_context(), kind,
                    propList);
 }
+/// @}
 
-// SYCL 2020 4.8.3.6. Memory deallocation functions
-
+/// \name  SYCL 2020 4.8.3.6. Memory deallocation functions.
+/// @{
 /// Deallocate USM of any kind.
 ///
 /// \param ptr pointer that satisfies the following preconditions: points to
 /// memory allocated against ctxt using one of the USM allocation routines, or
-/// is a null pointer, ptr has not previously been deallocated; there are no
+/// is a null pointer; ptr has not previously been deallocated; there are no
 /// in-progress or enqueued commands using the memory pointed to by ptr.
 /// \param ctxt context that is associated with ptr.
 void _LIBSYCL_EXPORT free(void *ptr, const context &ctxt);
@@ -290,10 +289,11 @@ void _LIBSYCL_EXPORT free(void *ptr, const context &ctxt);
 ///
 /// \param ptr pointer that satisfies the following preconditions: points to
 /// memory allocated against ctxt using one of the USM allocation routines, or
-/// is a null pointer, ptr has not previously been deallocated; there are no
+/// is a null pointer; ptr has not previously been deallocated; there are no
 /// in-progress or enqueued commands using the memory pointed to by ptr.
 /// \param q queue to determine the context associated with ptr.
 void _LIBSYCL_EXPORT free(void *ptr, const queue &q);
+/// @}
 
 _LIBSYCL_END_NAMESPACE_SYCL
 

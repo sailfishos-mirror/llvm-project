@@ -43,7 +43,7 @@ int main() {
 
   // The strictest (largest) fundamental alignment of any type is the alignment
   // of max_align_t. This is, however, smaller than the minimal alignment
-  // returned by the underlyging runtime as of now.
+  // returned by the underlying runtime as of now.
   constexpr size_t FAlign = alignof(std::max_align_t);
 
   auto CheckAll = [&](size_t Expected, auto Funcs,
