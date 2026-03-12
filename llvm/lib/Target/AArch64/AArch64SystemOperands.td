@@ -900,11 +900,11 @@ multiclass TLBI<string name, bit hasTLBIP, bits<3> op1, bits<4> crn, bits<4> crm
              bits<3> op2, bit needsreg = 1, bit optionalreg = 0,
              list<string> tlbirequires = []> {
   def : TLBIEntry<name, op1, crn, crm, op2, needsreg, optionalreg> {
-    let ExtraRequires = tlbirequires;
+    let Requires = tlbirequires;
   }
   def : TLBIEntry<!strconcat(name, "nXS"), op1, crn, crm, op2, needsreg, optionalreg> {
     let Encoding{7} = 1;
-    let ExtraRequires = tlbirequires # ["AArch64::FeatureXS"];
+    let ExtraRequires = ["AArch64::FeatureXS"];
   }
   if !eq(hasTLBIP, true) then {
     def : TLBIPEntry<name, op1, crn, crm, op2, needsreg, optionalreg> {
