@@ -310,7 +310,9 @@ void OmpStructureChecker::CheckNestedConstruct(
         if (auto requiredCount{GetRequiredCount(needFirst, needCount)}) {
           if (*requiredCount > 0 && *numLoops < *requiredCount) {
             auto &msg{context_.Say(beginSpec.DirName().source,
-                "This construct requires a sequence of %ld loops, but the loop sequence has a length of %ld"_err_en_US,
+                "This construct requires a sequence of %" PRId64
+                " loops, but the loop sequence has a length of %" PRId64
+                ""_err_en_US,
                 *requiredCount, *numLoops)};
             rangeReason.AttachTo(msg);
           }
@@ -332,12 +334,15 @@ void OmpStructureChecker::CheckNestedConstruct(
       if (*needDepth > *haveDepth) {
         if (needPerfect) {
           auto &msg{context_.Say(beginSpec.DirName().source,
-              "This construct requires a perfect nest of depth %ld, but the associated nest is a perfect nest of depth %ld"_err_en_US,
+              "This construct requires a perfect nest of depth %" PRId64
+              ", but the associated nest is a perfect nest of depth %" PRId64
+              ""_err_en_US,
               *needDepth, *haveDepth)};
           depthReason.AttachTo(msg);
         } else {
           auto &msg{context_.Say(beginSpec.DirName().source,
-              "This construct requires a nest of depth %ld, but the associated nest has a depth of %ld"_err_en_US,
+              "This construct requires a nest of depth %" PRId64
+              ", but the associated nest has a depth of %" PRId64 ""_err_en_US,
               *needDepth, *haveDepth)};
           depthReason.AttachTo(msg);
         }
