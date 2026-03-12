@@ -1,7 +1,7 @@
-# Determine the subdirectory relative to Clang's resource dir/sysroot where to
-# install target-specific libraries, to be found by Clang/Flang driver. This was
-# adapted from Compiler-RT's mechanism to find the path for
-# libclang_rt.builtins.a.
+# Determine the subdirectory relative to Clang's resource dir/installation
+# prefix where to install target-specific libraries, to be found by the
+# Clang/Flang driver. This was adapted from Compiler-RT's mechanism to find the
+# path for libclang_rt.builtins.a.
 #
 # Compiler-RT has two mechanisms for the path (simplified):
 #
@@ -9,19 +9,19 @@
 # * LLVM_ENABLE_PER_TARGET_RUNTIME_DIR=ON : lib/${triple}/libclang_rt.builtins.a
 #
 # LLVM_ENABLE_PER_TARGET_RUNTIME_DIR=ON is the newer scheme, but the old one is
-# currently still used for some platforms such as Windows. Clang looks for which
-# of the files exist before passing the path to the linker. Hence, the
-# directories have to match what Clang is looking for, which is done in
-# ToolChain::getArchSpecificLibPaths(..), ToolChain::getRuntimePath(),
+# currently still used by default for some platforms such as Windows. Clang
+# looks for which of the files exist before passing the path to the linker.
+# Hence, the directories have to match what Clang is looking for, which is done
+# in ToolChain::getArchSpecificLibPaths(..), ToolChain::getRuntimePath(),
 # ToolChain::getCompilerRTPath(), and ToolChain::getCompilerRT(..), not entirely
-# consistent between these functions, Compiler-RT's CMake code, and overrides
-# in different toolchains.
+# consistent between these functions, overrides in different toolchains, and
+# Compiler-RT's CMake code.
 #
-# For Fortran, Flang always assumes the library name libflang_rt.a without
-# architecture suffix. Hence, we always use the second scheme even as if
-# LLVM_ENABLE_PER_TARGET_RUNTIME_DIR=ON, even if it actually set to OFF. It as
-# added unconditionally to the library search path by
-# ToolChain::getArchSpecificLibPaths(...).
+# For simplicity, we always use the second scheme even as if
+# LLVM_ENABLE_PER_TARGET_RUNTIME_DIR=ON, even if it actually set to OFF.
+# The driver's lookup does not take the build-time
+# LLVM_ENABLE_PER_TARGET_RUNTIME_DIR setting into account anyway
+# and will always find its files using either scheme.
 function (get_toolchain_library_subdir outvar)
   set(outval "lib")
 
