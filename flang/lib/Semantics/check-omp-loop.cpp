@@ -312,11 +312,7 @@ void OmpStructureChecker::CheckNestedConstruct(
             auto &msg{context_.Say(beginSpec.DirName().source,
                 "This construct requires a sequence of %ld loops, but the loop sequence has a length of %ld"_err_en_US,
                 *requiredCount, *numLoops)};
-            if (rangeReason) {
-              parser::Messages reasons;
-              SayReason(reasons, rangeReason.text, rangeReason.source);
-              reasons.AttachTo(msg);
-            }
+            rangeReason.AttachTo(msg);
           }
         }
       }
@@ -338,20 +334,12 @@ void OmpStructureChecker::CheckNestedConstruct(
           auto &msg{context_.Say(beginSpec.DirName().source,
               "This construct requires a perfect nest of depth %ld, but the associated nest is a perfect nest of depth %ld"_err_en_US,
               *needDepth, *haveDepth)};
-          if (depthReason) {
-            parser::Messages reasons;
-            SayReason(reasons, depthReason.text, depthReason.source);
-            reasons.AttachTo(msg);
-          }
+          depthReason.AttachTo(msg);
         } else {
           auto &msg{context_.Say(beginSpec.DirName().source,
               "This construct requires a nest of depth %ld, but the associated nest has a depth of %ld"_err_en_US,
               *needDepth, *haveDepth)};
-          if (depthReason) {
-            parser::Messages reasons;
-            SayReason(reasons, depthReason.text, depthReason.source);
-            reasons.AttachTo(msg);
-          }
+          depthReason.AttachTo(msg);
         }
       }
     }
@@ -554,29 +542,6 @@ void OmpStructureChecker::CheckDistLinear(
       context_.Say(source,
           "Variable '%s' not allowed in LINEAR clause, only loop iterator can be specified in LINEAR clause of a construct combined with DISTRIBUTE"_err_en_US,
           root.name());
-    }
-  }
-}
-
-void OmpStructureChecker::CheckLooprangeBounds(
-    const parser::OpenMPLoopConstruct &x) {
-  unsigned version{context_.langOptions().OpenMPVersion};
-  if (auto *clause{parser::omp::FindClause(
-          x.BeginDir(), llvm::omp::Clause::OMPC_looprange)}) {
-    auto *lrClause{parser::Unwrap<parser::OmpLooprangeClause>(clause)};
-    auto first{GetIntValue(std::get<0>(lrClause->t))};
-    auto count{GetIntValue(std::get<1>(lrClause->t))};
-    if (auto requiredCount{GetRequiredCount(first, count)}) {
-      LoopSequence sequence(std::get<parser::Block>(x.t), version, true);
-      if (auto loopCount{sequence.length()}) {
-        if (*loopCount < *requiredCount) {
-          context_.Say(clause->source,
-              "The specified loop range requires %" PRId64
-              " loops, but the loop sequence has a length of %" PRId64
-              ""_err_en_US,
-              *requiredCount, *loopCount);
-        }
-      }
     }
   }
 }
