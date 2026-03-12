@@ -5830,8 +5830,6 @@ struct VPPartialReductionChain {
   /// This allows distinguishing between Sub and AddWithSub recurrences,
   /// when the ReductionBinOp is a Instruction::Sub.
   RecurKind RK;
-  /// The cost of the link in the reduction chain.
-  DenseMap<ElementCount, InstructionCost> PartialReductionCost;
 };
 
 static VPSingleDefRecipe *
@@ -6203,16 +6201,6 @@ getScaledReductions(VPReductionPHIRecipe *RedPhiR, VPCostContext &CostCtx,
     VPPartialReductionChain Link(
         {UpdateR, *ExtendedOp,
          static_cast<unsigned>(PHISize.getKnownScalarFactor(ExtSrcSize)), RK});
-    if (!LoopVectorizationPlanner::getDecisionAndClampRange(
-            [&](ElementCount VF) {
-              InstructionCost Cost =
-                  getPartialReductionLinkCost(CostCtx, Link, VF);
-              Link.PartialReductionCost[VF] = Cost;
-              return Cost.isValid();
-            },
-            Range))
-      return std::nullopt;
-
     Chain.push_back(Link);
     CurrentValue = PrevValue;
   }
@@ -6274,9 +6262,11 @@ void VPlanTransforms::createPartialReductions(VPlan &Plan,
     // chain using regular reductions.
     for (const VPPartialReductionChain &Link : Chain) {
       ExtendedReductionOperand ExtendedOp = Link.ExtendedOp;
-      assert(Link.PartialReductionCost.contains(VF) &&
-             "Expected cost to have been calculated for VF");
-      PartialCost += Link.PartialReductionCost.lookup(VF);
+      InstructionCost LinkCost = getPartialReductionLinkCost(CostCtx, Link, VF);
+      if (!LinkCost.isValid())
+        return false;
+
+      PartialCost += LinkCost;
       RegularCost += Link.ReductionBinOp->computeCost(VF, CostCtx);
       if (ExtendedOp.BinOp && ExtendedOp.BinOp != Link.ReductionBinOp)
         RegularCost += ExtendedOp.BinOp->computeCost(VF, CostCtx);
