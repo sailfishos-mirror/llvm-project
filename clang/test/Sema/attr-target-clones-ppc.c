@@ -117,9 +117,11 @@ void good_overload5(int) __attribute__((target_clones("cpu=pwr7", "default")));
 
 void good_isa_level(int) __attribute__((target_clones("default", "cpu=pwr7", "cpu=pwr8", "cpu=pwr9", "cpu=pwr10")));
 
-// expected-warning@+1 {{unsupported CPU 'bad-cpu' in the 'target_clones' attribute string; 'target_clones' attribute ignored}}
+// expected-warning@+1 {{unknown CPU 'bad-cpu' in the 'target_clones' attribute string; 'target_clones' attribute ignored}}
 void bad_cpu(int) __attribute__((target_clones("default", "cpu=bad-cpu")));
 
+// expected-warning@+1 {{unsupported CPU 'pwr3' in the 'target_clones' attribute string; 'target_clones' attribute ignored}}
+void bad_cpu(int) __attribute__((target_clones("default", "cpu=pwr3")));
 
 // expected-error@+1 {{'target_clones' multiversioning requires a default target}}
 void __attribute__((target_clones()))
