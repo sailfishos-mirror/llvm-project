@@ -30,6 +30,7 @@
 
 #include "llvm/Frontend/OpenMP/OMP.h"
 
+#include <cinttypes>
 #include <cstdint>
 #include <map>
 #include <optional>
@@ -301,7 +302,8 @@ void OmpStructureChecker::CheckNestedConstruct(
       auto assoc{llvm::omp::getDirectiveAssociation(beginSpec.DirName().v)};
       if (*numLoops > 1 && assoc == llvm::omp::Association::LoopNest) {
         context_.Say(beginSpec.DirName().source,
-            "This construct applies to a loop nest, but has a loop sequence of length %ld"_err_en_US,
+            "This construct applies to a loop nest, but has a loop sequence of "
+            "length %" PRId64 ""_err_en_US,
             *numLoops);
       }
       if (assoc == llvm::omp::Association::LoopSeq) {
@@ -552,6 +554,29 @@ void OmpStructureChecker::CheckDistLinear(
       context_.Say(source,
           "Variable '%s' not allowed in LINEAR clause, only loop iterator can be specified in LINEAR clause of a construct combined with DISTRIBUTE"_err_en_US,
           root.name());
+    }
+  }
+}
+
+void OmpStructureChecker::CheckLooprangeBounds(
+    const parser::OpenMPLoopConstruct &x) {
+  unsigned version{context_.langOptions().OpenMPVersion};
+  if (auto *clause{parser::omp::FindClause(
+          x.BeginDir(), llvm::omp::Clause::OMPC_looprange)}) {
+    auto *lrClause{parser::Unwrap<parser::OmpLooprangeClause>(clause)};
+    auto first{GetIntValue(std::get<0>(lrClause->t))};
+    auto count{GetIntValue(std::get<1>(lrClause->t))};
+    if (auto requiredCount{GetRequiredCount(first, count)}) {
+      LoopSequence sequence(std::get<parser::Block>(x.t), version, true);
+      if (auto loopCount{sequence.length()}) {
+        if (*loopCount < *requiredCount) {
+          context_.Say(clause->source,
+              "The specified loop range requires %" PRId64
+              " loops, but the loop sequence has a length of %" PRId64
+              ""_err_en_US,
+              *requiredCount, *loopCount);
+        }
+      }
     }
   }
 }
