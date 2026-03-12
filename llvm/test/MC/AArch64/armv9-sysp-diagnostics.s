@@ -1,7 +1,7 @@
-// +tbl-rmi required for RIPA*/RVA*
+// +d128 required for tlbip
 // +xs required for *NXS
 
-// RUN: not llvm-mc -triple aarch64 -mattr=+d128,+tlb-rmi,+xs -show-encoding %s -o - 2>&1 | FileCheck %s --check-prefix=ERRORS
+// RUN: not llvm-mc -triple aarch64 -mattr=+d128,+xs -show-encoding %s -o - 2>&1 | FileCheck %s --check-prefix=ERRORS
 
 // sysp #<op1>, <Cn>, <Cm>, #<op2>{, <Xt1>, <Xt2>}
 // registers with 128-bit formats (op0, op1, Cn, Cm, op2)
