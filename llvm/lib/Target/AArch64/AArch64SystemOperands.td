@@ -905,23 +905,16 @@ multiclass TLBI<string name, bit hasTLBIP, bits<3> op1, bits<4> crn, bits<4> crm
              bits<3> op2, bit needsreg = 1, bit optionalreg = 0> {
   // These TLBIP aliases accept either FEAT_D128 or FEAT_TLBID.
   defvar allowTLBID = !match(name, ".*E[12][IO]S.*");
-  defvar tlbipExtraRequires =
-      !if(allowTLBID, []<string>, ["AArch64::FeatureD128"]);
-
   def : TLBIEntry<name, op1, crn, crm, op2, needsreg, optionalreg>;
   def : TLBIEntry<!strconcat(name, "nXS"), op1, crn, crm, op2, needsreg, optionalreg> {
     let Encoding{7} = 1;
     let ExtraRequires = ["AArch64::FeatureXS"];
   }
   if !eq(hasTLBIP, true) then {
-    def : TLBIPEntry<name, op1, crn, crm, op2, needsreg, optionalreg,
-                     allowTLBID> {
-      let ExtraRequires = tlbipExtraRequires;
-    }
+    def : TLBIPEntry<name, op1, crn, crm, op2, needsreg, optionalreg, allowTLBID>;
     def : TLBIPEntry<!strconcat(name, "nXS"), op1, crn, crm, op2, needsreg,
                      optionalreg, allowTLBID> {
       let Encoding{7} = 1;
-      let ExtraRequires = tlbipExtraRequires;
     }
   }
 }
