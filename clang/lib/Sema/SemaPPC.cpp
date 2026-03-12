@@ -606,10 +606,13 @@ bool SemaPPC::checkTargetClonesAttr(const SmallVectorImpl<StringRef> &Params,
           Loc.getLocWithOffset(LHS.data() - Param.data());
 
       if (LHS.starts_with("cpu=")) {
-        if (!TargetInfo.isValidCPUName(LHS.drop_front(sizeof("cpu=") - 1)))
+        StringRef CPUStr = LHS.drop_front(sizeof("cpu=") - 1);
+        if (!TargetInfo.isValidCPUName(CPUStr))
           return Diag(CurLoc, diag::warn_unsupported_target_attribute)
-                 << Unsupported << CPU << LHS.drop_front(sizeof("cpu=") - 1)
-                 << TargetClones;
+                 << Unknown << CPU << CPUStr << TargetClones;
+        else if (!TargetInfo.validateCpuIs(CPUStr))
+          return Diag(CurLoc, diag::warn_unsupported_target_attribute)
+                 << Unsupported << CPU << CPUStr << TargetClones;
       } else if (LHS == "default") {
         HasDefault = true;
       } else {
