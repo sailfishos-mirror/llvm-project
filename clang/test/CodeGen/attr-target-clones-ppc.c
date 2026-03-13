@@ -116,19 +116,19 @@ foo_priority(int x) { return x & (x - 1); }
 // CHECK: define internal ptr @foo_priority.resolver()
 // CHECK-NEXT: entry
 //   if (__builtin_cpu_supports("arch_3_1")) return &foo_priority.cpu_pwr10;
-// CHECK-NEXT: %[[#L1:]] = load i32, {{.*}} ptr @_system_configuration, i32 0, i32 1)
+// CHECK-NEXT: %[[#L1:]] = load i32, ptr getelementptr inbounds nuw (i8, ptr @_system_configuration, {{i32|i64}} 4)
 // CHECK-NEXT: icmp uge i32 %[[#L1]], 262144
 // CHECK: ret ptr @foo_priority.cpu_pwr10
 //   if (__builtin_cpu_supports("arch_3_00")) return &foo_priority.cpu_pwr9;
-// CHECK: %[[#L2:]] = load i32, {{.*}} ptr @_system_configuration, i32 0, i32 1)
+// CHECK: %[[#L2:]] = load i32, ptr getelementptr inbounds nuw (i8, ptr @_system_configuration, {{i32|i64}} 4)
 // CHECK-NEXT: icmp uge i32 %[[#L2]], 131072
 // CHECK: ret ptr @foo_priority.cpu_pwr9
 //   if (__builtin_cpu_supports("arch_2_07")) return &foo_priority.cpu_pwr8;
-// CHECK: %[[#L3:]] = load i32, {{.*}} ptr @_system_configuration, i32 0, i32 1)
+// CHECK: %[[#L3:]] = load i32, ptr getelementptr inbounds nuw (i8, ptr @_system_configuration, {{i32|i64}} 4)
 // CHECK-NEXT: icmp uge i32 %[[#L3]], 65536
 // CHECK: ret ptr @foo_priority.cpu_pwr8
 //   if (__builtin_cpu_supports("arch_2_06")) return &foo_priority.cpu_pwr8;
-// CHECK: %[[#L4:]] = load i32, {{.*}} ptr @_system_configuration, i32 0, i32 1)
+// CHECK: %[[#L4:]] = load i32, ptr getelementptr inbounds nuw (i8, ptr @_system_configuration, {{i32|i64}} 4)
 // CHECK-NEXT: icmp uge i32 %[[#L4]], 32768
 // CHECK: ret ptr @foo_priority.cpu_pwr7
 // CHECK: ret ptr @foo_priority.default
