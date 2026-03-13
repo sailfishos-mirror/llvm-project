@@ -167,7 +167,7 @@ private:
   unsigned TotalCycles = 0;
   // InstructionFlavor mapping
   AMDGPU::InstructionFlavor Type;
-  // Idx mappuing
+  // Idx mapping
   unsigned Idx;
   // Whether or not instructions on this HardwareUnit may produce a window in
   // which instructions in other HardwareUnits can coexecute. For example, WMMA
@@ -197,19 +197,18 @@ public:
 
   bool contains(SUnit *SU) { return AllSUs.contains(SU); }
 
-  /// \returns trrue if there is a difference in priority between \p SU and \p
+  /// \returns true if there is a difference in priority between \p SU and \p
   /// Other. If so, \returns the SUnit with higher priority. This
-  /// method looks through the PrioritySUs to dtermine if one SU is more
+  /// method looks through the PrioritySUs to determine if one SU is more
   /// prioritized than the other. If neither are in the PrioritySUs list, then
   /// neither have priority over each other.
   SUnit *getHigherPriority(SUnit *SU, SUnit *Other) {
     for (auto *SUOrder : PrioritySUs) {
-      if (SUOrder == SU) {
+      if (SUOrder == SU)
         return SU;
-      }
-      if (SUOrder == Other) {
+
+      if (SUOrder == Other)
         return Other;
-      }
     }
     return nullptr;
   }
@@ -221,15 +220,15 @@ public:
     ProducesCoexecWindow = false;
   }
 
-  /// \returns the next SU in PriortySUs that is not ready. If \p LookDeep is
-  /// set, we will look beyond the PrioritySUs (if all the PrioritSUs are ready)
-  /// to AllSUs to attempt to find a target SU. When looking through AllSUs we
-  /// sort pick the target SU by minimal depth for top-down scheduling.
-  /// getNextTargetSU is useful for determining which SU on this HardwareUnit we
-  /// are trying to schedule - this info helps us determine which dependencies
-  /// to schedule. LookDeep is useful if the dependencies are long latency (e.g.
-  /// memory instructions). If we have many lkong latency dependencies, it is
-  /// beneficial to enable SUs multiple levels ahead.
+  /// \returns the next SU in PrioritySUs that is not ready. If \p LookDeep is
+  /// set, we will look beyond the PrioritySUs (if all the PrioritySUs are
+  /// ready) to AllSUs to attempt to find a target SU. When looking through
+  /// AllSUs we sort pick the target SU by minimal depth for top-down
+  /// scheduling. getNextTargetSU is useful for determining which SU on this
+  /// HardwareUnit we are trying to schedule - this info helps us determine
+  /// which dependencies to schedule. LookDeep is useful if the dependencies are
+  /// long latency (e.g. memory instructions). If we have many long latency
+  /// dependencies, it is beneficial to enable SUs multiple levels ahead.
   SUnit *getNextTargetSU(bool LookDeep = false);
   /// insert the \p SU into the AllSUs and account its \p BlockingCycles into
   /// the TotalCycles. This maintains the list of PrioritySUs.

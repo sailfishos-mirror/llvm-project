@@ -106,7 +106,7 @@ SUnit *HardwareUnitInfo::getNextTargetSU(bool LookDeep) {
 }
 
 void HardwareUnitInfo::insert(SUnit *SU, unsigned BlockingCycles) {
-  bool Inserted = AllSUs.insert(SU);
+  [[maybe_unused]] bool Inserted = AllSUs.insert(SU);
   TotalCycles += BlockingCycles;
 
   assert(Inserted);
@@ -177,18 +177,15 @@ CandidateHeuristics::getHWUIFromFlavor(InstructionFlavor Flavor) {
 }
 
 unsigned CandidateHeuristics::getHWUICyclesForInst(SUnit *SU) {
-  if (SchedModel && SchedModel->hasInstrSchedModel()) {
-    unsigned ReleaseAtCycle = 0;
-    const MCSchedClassDesc *SC = DAG->getSchedClass(SU);
-    for (TargetSchedModel::ProcResIter
-             PI = SchedModel->getWriteProcResBegin(SC),
-             PE = SchedModel->getWriteProcResEnd(SC);
-         PI != PE; ++PI) {
-      ReleaseAtCycle = std::max(ReleaseAtCycle, (unsigned)PI->ReleaseAtCycle);
-    }
-    return ReleaseAtCycle;
+  assert(SchedModel && SchedModel->hasInstrSchedModel());
+  unsigned ReleaseAtCycle = 0;
+  const MCSchedClassDesc *SC = DAG->getSchedClass(SU);
+  for (TargetSchedModel::ProcResIter PI = SchedModel->getWriteProcResBegin(SC),
+                                     PE = SchedModel->getWriteProcResEnd(SC);
+       PI != PE; ++PI) {
+    ReleaseAtCycle = std::max(ReleaseAtCycle, (unsigned)PI->ReleaseAtCycle);
   }
-  return -1;
+    return ReleaseAtCycle;
 }
 
 void CandidateHeuristics::schedNode(SUnit *SU) {
@@ -202,6 +199,7 @@ void CandidateHeuristics::initialize(ScheduleDAGMI *SchedDAG,
                                      const TargetRegisterInfo *TRI) {
   DAG = SchedDAG;
   SchedModel = TargetSchedModel;
+  assert(SchedModel && SchedModel->hasInstrSchedModel());
 
   SRI = static_cast<const SIRegisterInfo *>(TRI);
   SII = static_cast<const SIInstrInfo *>(DAG->TII);
