@@ -29,6 +29,7 @@
 #define LIBC_INLINE_ASM __asm__ __volatile__
 #define LIBC_UNUSED __attribute__((unused))
 
+// TODO: Remove the macro once Clang/LLVM bump their minimum compilers' version.
 // The reason for indirection is GCC is known to fail with constexpr qualified
 // functions that doesn't produce constant expression. This avoids it by using
 // LIBC_ENABLE_CONSTEXPR as a flag to control whether the function should be
