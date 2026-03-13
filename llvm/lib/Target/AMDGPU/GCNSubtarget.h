@@ -23,6 +23,8 @@
 #include "Utils/AMDGPUBaseInfo.h"
 #include "llvm/Support/ErrorHandling.h"
 
+#include <optional>
+
 #define GET_SUBTARGETINFO_HEADER
 #include "AMDGPUGenSubtargetInfo.inc"
 
@@ -856,13 +858,20 @@ public:
   /// if explicitly requested value cannot be converted to integer, violates
   /// subtarget's specifications, or does not meet number of waves per execution
   /// unit requirement.
-  unsigned getMaxNumVGPRs(const Function &F) const;
+  /// When \p TargetOccupancy is present, use it for both min and max waves
+  /// instead of getWavesPerEU(F).
+  unsigned
+  getMaxNumVGPRs(const Function &F,
+                 std::optional<unsigned> TargetOccupancy = std::nullopt) const;
 
   unsigned getMaxNumAGPRs(const Function &F) const { return getMaxNumVGPRs(F); }
 
   /// Return a pair of maximum numbers of VGPRs and AGPRs that meet the number
   /// of waves per execution unit required for the function \p MF.
-  std::pair<unsigned, unsigned> getMaxNumVectorRegs(const Function &F) const;
+  /// When \p TargetOccupancy is present, it is passed to getMaxNumVGPRs.
+  std::pair<unsigned, unsigned> getMaxNumVectorRegs(
+      const Function &F,
+      std::optional<unsigned> TargetOccupancy = std::nullopt) const;
 
   /// \returns Maximum number of VGPRs that meets number of waves per execution
   /// unit requirement for function \p MF, or number of VGPRs explicitly
