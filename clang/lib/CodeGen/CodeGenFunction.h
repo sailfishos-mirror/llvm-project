@@ -5579,6 +5579,8 @@ public:
                                        ArrayRef<FMVResolverOption> Options);
   void EmitRISCVMultiVersionResolver(llvm::Function *Resolver,
                                      ArrayRef<FMVResolverOption> Options);
+  void EmitPPCAIXMultiVersionResolver(llvm::Function *Resolver,
+                                     ArrayRef<FMVResolverOption> Options);
 
   Address EmitAddressOfPFPField(Address RecordPtr, const PFPField &Field);
   Address EmitAddressOfPFPField(Address RecordPtr, Address FieldPtr,
