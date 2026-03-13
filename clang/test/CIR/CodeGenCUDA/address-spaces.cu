@@ -3,20 +3,31 @@
 // RUN:   -mmlir -mlir-print-ir-before=cir-target-lowering %s -o %t.cir 2> %t-pre.cir
 // RUN: FileCheck --check-prefix=CIR-PRE --input-file=%t-pre.cir %s
 
+// TODO: Add CIR (post target lowering) and LLVM checks once NVPTX TargetLoweringInfo
+// is implemented.
+
+// RUN: %clang_cc1 -triple nvptx64-nvidia-cuda -x cuda \
+// RUN:   -fcuda-is-device -emit-llvm %s -o %t.ll
+// RUN: FileCheck --check-prefix=OGCG --input-file=%t.ll %s
+
 // Verifies CIR emits correct address spaces for CUDA globals.
 
 #include "Inputs/cuda.h"
 
 // CIR-PRE: cir.global external  lang_address_space(offload_global) @i = #cir.int<0> : !s32i
+// OGCG-DAG: @i = addrspace(1) externally_initialized global i32 0, align 4
 __device__ int i;
 
 // CIR-PRE: cir.global constant external  lang_address_space(offload_constant) @j = #cir.int<0> : !s32i
+// OGCG-DAG: @j = addrspace(4) externally_initialized constant i32 0, align 4
 __constant__ int j;
 
 // CIR-PRE: cir.global external  lang_address_space(offload_local) @k = #cir.poison : !s32i
+// OGCG-DAG: @k = addrspace(3) global i32 undef, align 4
 __shared__ int k;
 
 // CIR-PRE: cir.global external  lang_address_space(offload_local) @b = #cir.poison : !cir.float
+// OGCG-DAG: @b = addrspace(3) global float undef, align 4
 __shared__ float b;
 
 __device__ void foo() {
