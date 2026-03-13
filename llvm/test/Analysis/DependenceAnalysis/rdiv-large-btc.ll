@@ -31,7 +31,7 @@ define void @rdiv_large_btc(ptr %A) {
 ; CHECK-EXACT-RDIV-NEXT:  Src: store i8 0, ptr %gep.0, align 1 --> Dst: store i8 0, ptr %gep.0, align 1
 ; CHECK-EXACT-RDIV-NEXT:    da analyze - output [*]!
 ; CHECK-EXACT-RDIV-NEXT:  Src: store i8 0, ptr %gep.0, align 1 --> Dst: store i8 0, ptr %gep.1, align 1
-; CHECK-EXACT-RDIV-NEXT:    da analyze - none!
+; CHECK-EXACT-RDIV-NEXT:    da analyze - output [|<]!
 ; CHECK-EXACT-RDIV-NEXT:  Src: store i8 0, ptr %gep.1, align 1 --> Dst: store i8 0, ptr %gep.1, align 1
 ; CHECK-EXACT-RDIV-NEXT:    da analyze - output [*]!
 ;
