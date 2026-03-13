@@ -858,6 +858,9 @@ cir::FuncOp CIRGenVTables::maybeEmitThunk(GlobalDecl gd,
     thunkFn =
         cir::FuncOp::create(cgm.getBuilder(), thunk->getLoc(), name.str(),
                             thunkFnTy, cir::GlobalLinkageKind::ExternalLinkage);
+    mlir::NamedAttrList attrs;
+    thunkFn.setExtraAttrsAttr(cir::ExtraFuncAttributesAttr::get(
+        attrs.getDictionary(cgm.getBuilder().getContext())));
     cgm.setCIRFunctionAttributes(md, fnInfo, thunkFn, /*isThunk=*/false);
 
     if (!oldThunkFn->use_empty())

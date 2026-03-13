@@ -3418,6 +3418,11 @@ def CIR_FuncOp : CIR_Op<"func", [
     without a prototype and, consequently, may contain calls with invalid
     arguments and undefined behavior.
 
+    The `extra_attrs`, which is an aggregate of function-specific attributes is
+    required and mandatory to describle additional attributes that are not listed
+    above. Though mandatory, the prining of the attribute can be omitted if it is
+    empty.
+
     The `global_ctor` keyword indicates whether a function should execute before
     `main()` function, as specified by `__attribute__((constructor))`. An
     execution priority can also be specified `global_ctor(<priority>)`.
@@ -3473,6 +3478,7 @@ def CIR_FuncOp : CIR_Op<"func", [
       CIR_GlobalLinkageKind,
       "cir::GlobalLinkageKind::ExternalLinkage"
     >:$linkage,
+    CIR_ExtraFuncAttr:$extra_attrs,
     OptionalAttr<StrAttr>:$sym_visibility,
     UnitAttr:$comdat,
     OptionalAttr<DictArrayAttr>:$arg_attrs,

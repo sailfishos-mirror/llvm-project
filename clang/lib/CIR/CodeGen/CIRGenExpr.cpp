@@ -1975,6 +1975,9 @@ CIRGenCallee CIRGenFunction::emitDirectCallee(const GlobalDecl &gd) {
             &cgm.getMLIRContext(), cir::GlobalLinkageKind::InternalLinkage));
         clone.setSymVisibility("private");
         clone.setInlineKind(cir::InlineKind::AlwaysInline);
+        mlir::NamedAttrList attrs;
+        clone.setExtraAttrsAttr(cir::ExtraFuncAttributesAttr::get(
+            attrs.getDictionary(&cgm.getMLIRContext())));
       }
       return CIRGenCallee::forDirect(clone, gd);
     }

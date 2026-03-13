@@ -2356,11 +2356,7 @@ void CIRGenModule::setCIRFunctionAttributes(GlobalDecl globalDecl,
   cir::CallingConv callingConv;
   cir::SideEffect sideEffect;
 
-  // TODO(cir): The current list should be initialized with the extra function
-  // attributes, but we don't have those yet.  For now, the PAL is initialized
-  // with nothing.
-  assert(!cir::MissingFeatures::opFuncExtraAttrs());
-  // Initialize PAL with existing attributes to merge attributes.
+  // TODO(cir): Move all function attributes into extra_attrs.
   mlir::NamedAttrList pal{};
   std::vector<mlir::NamedAttrList> argAttrs(info.arguments().size());
   mlir::NamedAttrList retAttrs{};
@@ -2694,7 +2690,9 @@ CIRGenModule::createCIRFunction(mlir::Location loc, StringRef name,
     mlir::SymbolTable::setSymbolVisibility(
         func, mlir::SymbolTable::Visibility::Private);
 
-    assert(!cir::MissingFeatures::opFuncExtraAttrs());
+    // Initialize with empty dict of extra attributes.
+    func.setExtraAttrsAttr(cir::ExtraFuncAttributesAttr::get(
+        &getMLIRContext(), mlir::DictionaryAttr::get(&getMLIRContext())));
 
     // Mark C++ special member functions (Constructor, Destructor etc.)
     setCXXSpecialMemberAttr(func, funcDecl);

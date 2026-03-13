@@ -944,6 +944,28 @@ def CIR_VisibilityAttr : CIR_EnumAttr<CIR_VisibilityKind, "visibility"> {
 }
 
 //===----------------------------------------------------------------------===//
+// ExtraFuncAttr
+//===----------------------------------------------------------------------===//
+
+def CIR_ExtraFuncAttr : CIR_Attr<"ExtraFuncAttributes", "extra"> {
+  let summary = "Represents aggregated attributes for a function";
+  let description = [{
+    This is a wrapper of attribute dictionary that contains extra attributes of
+    a function.
+  }];
+
+  let parameters = (ins "mlir::DictionaryAttr":$elements);
+
+  let builders = [
+    AttrBuilderWithInferredContext<(ins "mlir::DictionaryAttr":$elements), [{
+      return $_get(elements.getContext(), elements);
+    }]>
+  ];
+
+  let assemblyFormat = [{ `(` $elements `)` }];
+}
+
+//===----------------------------------------------------------------------===//
 // GloblCtorAttr
 //===----------------------------------------------------------------------===//
 

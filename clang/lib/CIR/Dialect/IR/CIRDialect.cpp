@@ -2153,6 +2153,21 @@ ParseResult cir::FuncOp::parse(OpAsmParser &parser, OperationState &state) {
     hasAlias = true;
   }
 
+  // If extra func attributes are present, parse them.
+  NamedAttrList extraAttrs;
+  if (::mlir::succeeded(parser.parseOptionalKeyword("extra"))) {
+    if (parser.parseLParen().failed())
+      return failure();
+    if (parser.parseOptionalAttrDict(extraAttrs).failed())
+      return failure();
+    if (parser.parseRParen().failed())
+      return failure();
+  }
+  state.addAttribute(
+      getExtraAttrsAttrName(state.name),
+      cir::ExtraFuncAttributesAttr::get(
+          parser.getContext(), extraAttrs.getDictionary(parser.getContext())));
+
   mlir::StringAttr personalityNameAttr = getPersonalityAttrName(state.name);
   if (parser.parseOptionalKeyword("personality").succeeded()) {
     if (parser.parseLParen().failed())
@@ -2412,6 +2427,12 @@ void cir::FuncOp::print(OpAsmPrinter &p) {
 
   function_interface_impl::printFunctionAttributes(
       p, *this, cir::FuncOp::getAttributeNames());
+
+  if (!getExtraAttrs().getElements().empty()) {
+    p << " extra(";
+    p.printOptionalAttrDict(getExtraAttrs().getElements().getValue());
+    p << ')';
+  }
 
   // Print the body if this is not an external function.
   Region &body = getOperation()->getRegion(0);

@@ -75,7 +75,6 @@ struct MissingFeatures {
   static bool opFuncColdHotAttr() { return false; }
   static bool opFuncCPUAndFeaturesAttributes() { return false; }
   static bool opFuncExceptions() { return false; }
-  static bool opFuncExtraAttrs() { return false; }
   static bool opFuncMaybeHandleStaticInExternC() { return false; }
   static bool opFuncMinSizeAttr() { return false; }
   static bool opFuncMultipleReturnVals() { return false; }

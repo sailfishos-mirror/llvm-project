@@ -334,8 +334,9 @@ cir::FuncOp LoweringPreparePass::buildRuntimeFunction(
         cir::GlobalLinkageKindAttr::get(builder.getContext(), linkage));
     mlir::SymbolTable::setSymbolVisibility(
         f, mlir::SymbolTable::Visibility::Private);
-
-    assert(!cir::MissingFeatures::opFuncExtraAttrs());
+    mlir::NamedAttrList attrs;
+    f.setExtraAttrsAttr(cir::ExtraFuncAttributesAttr::get(
+        attrs.getDictionary(builder.getContext())));
   }
   return f;
 }

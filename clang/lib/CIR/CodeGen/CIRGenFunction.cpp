@@ -720,6 +720,9 @@ cir::FuncOp CIRGenFunction::generateCode(clang::GlobalDecl gd, cir::FuncOp fn,
       clone.setLinkage(cir::GlobalLinkageKind::InternalLinkage);
       clone.setSymVisibility("private");
       clone.setInlineKind(cir::InlineKind::AlwaysInline);
+      mlir::NamedAttrList attrs;
+      clone.setExtraAttrsAttr(cir::ExtraFuncAttributesAttr::get(
+          attrs.getDictionary(builder.getContext())));
     }
     fn.setLinkage(cir::GlobalLinkageKind::ExternalLinkage);
     fn.setSymVisibility("private");

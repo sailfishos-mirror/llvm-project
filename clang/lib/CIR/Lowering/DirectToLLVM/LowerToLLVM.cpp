@@ -1881,7 +1881,6 @@ static void lowerCallAttributes(cir::CIRCallOpInterface op,
         attr.getName() == CIRDialect::getNoReturnAttrName())
       continue;
 
-    assert(!cir::MissingFeatures::opFuncExtraAttrs());
     result.push_back(attr);
   }
 }
@@ -2386,7 +2385,18 @@ void CIRToLLVMFuncOpLowering::lowerFuncAttributes(
           attr.getName() == func.getResAttrsAttrName())))
       continue;
 
-    assert(!cir::MissingFeatures::opFuncExtraAttrs());
+    // Propagate extra function attributes to LLVM via amendOperation. Rename
+    // with "cir." prefix so CIRDialectLLVMIRTranslationInterface picks them up.
+    // Skip empty extra_attrs to avoid leaking CIR dialect attributes into the
+    // LLVM dialect output when there's nothing to translate.
+    if (attr.getName() == func.getExtraAttrsAttrName()) {
+      if (auto extraAttr =
+              mlir::dyn_cast<cir::ExtraFuncAttributesAttr>(attr.getValue());
+          extraAttr && extraAttr.getElements().empty())
+        continue;
+      std::string cirName = "cir." + func.getExtraAttrsAttrName().str();
+      attr.setName(mlir::StringAttr::get(getContext(), cirName));
+    }
     result.push_back(attr);
   }
 }

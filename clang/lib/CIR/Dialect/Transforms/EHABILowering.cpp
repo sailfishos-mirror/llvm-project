@@ -25,6 +25,7 @@
 
 #include "PassDetail.h"
 #include "mlir/IR/Builders.h"
+#include "clang/CIR/Dialect/IR/CIRAttrs.h"
 #include "clang/CIR/Dialect/IR/CIRDialect.h"
 #include "clang/CIR/Dialect/IR/CIROpsEnums.h"
 #include "clang/CIR/Dialect/IR/CIRTypes.h"
@@ -61,6 +62,9 @@ static cir::FuncOp getOrCreateRuntimeFuncDecl(mlir::ModuleOp mod,
   auto funcOp = cir::FuncOp::create(builder, loc, name, funcTy);
   funcOp.setLinkage(cir::GlobalLinkageKind::ExternalLinkage);
   funcOp.setPrivate();
+  mlir::NamedAttrList attrs;
+  funcOp.setExtraAttrsAttr(cir::ExtraFuncAttributesAttr::get(
+      attrs.getDictionary(builder.getContext())));
   return funcOp;
 }
 

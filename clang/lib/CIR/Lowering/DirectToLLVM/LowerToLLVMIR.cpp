@@ -68,7 +68,17 @@ private:
                      llvm::ArrayRef<llvm::Instruction *> instructions,
                      mlir::NamedAttribute attribute,
                      mlir::LLVM::ModuleTranslation &moduleTranslation) const {
-    // TODO(cir): Implement this
+    llvm::Function *llvmFunc = moduleTranslation.lookupFunction(func.getName());
+    if (auto extraAttr = mlir::dyn_cast<cir::ExtraFuncAttributesAttr>(
+            attribute.getValue())) {
+      for (mlir::NamedAttribute attr : extraAttr.getElements()) {
+        if (auto strAttr = mlir::dyn_cast<mlir::StringAttr>(attr.getValue())) {
+          llvmFunc->addFnAttr(attr.getName().str(), strAttr.getValue().str());
+        }
+      }
+    }
+    // Drop ammended CIR attribute from LLVM op.
+    func->removeAttr(attribute.getName());
   }
 
   // Translate CIR's module attributes to LLVM's module metadata
