@@ -3109,7 +3109,6 @@ void CodeGenFunction::EmitMultiVersionResolver(
 void CodeGenFunction::EmitPPCAIXMultiVersionResolver(
     llvm::Function *Resolver, ArrayRef<FMVResolverOption> Options) {
 
-  llvm::PointerType *PtrTy = Builder.getPtrTy();
   // entry:
   llvm::BasicBlock *CurBlock = createBasicBlock("entry", Resolver);
 
