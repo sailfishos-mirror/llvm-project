@@ -536,7 +536,8 @@ bool PPCTargetInfo::initFeatureMap(
   const llvm::Triple &TheTriple = getTriple();
 
   std::optional<llvm::StringMap<bool>> FeaturesOpt =
-      llvm::PPC::getPPCDefaultTargetFeatures(TheTriple, CPU);
+      llvm::PPC::getPPCDefaultTargetFeatures(TheTriple,
+                                             llvm::PPC::normalizeCPUName(CPU));
   if (FeaturesOpt)
     Features = FeaturesOpt.value();
 
