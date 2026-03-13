@@ -2,6 +2,7 @@
 #include "ABIInfo.h"
 #include "CIRGenFunction.h"
 #include "mlir/Dialect/Ptr/IR/MemorySpaceInterfaces.h"
+#include "clang/Basic/AddressSpaces.h"
 #include "clang/CIR/Dialect/IR/CIRAttrs.h"
 #include "clang/CIR/Dialect/IR/CIRDialect.h"
 
@@ -81,10 +82,8 @@ public:
 
     // Only promote to address space 4 if VarDecl has constant initialization.
     if (decl->getType().isConstantStorage(cgm.getASTContext(), false, false) &&
-        decl->hasConstantInitialization()) {
-      if (auto constAS = cgm.getTarget().getConstantAddressSpace())
-        return *constAS;
-    }
+        decl->hasConstantInitialization())
+      return LangAS::opencl_constant;
 
     return defaultGlobalAS;
   }
