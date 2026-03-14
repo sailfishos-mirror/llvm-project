@@ -1462,7 +1462,10 @@ ConstantLValueEmitter::VisitPredefinedExpr(const PredefinedExpr *e) {
 
 ConstantLValue
 ConstantLValueEmitter::VisitAddrLabelExpr(const AddrLabelExpr *e) {
-  cgm.errorNYI(e->getSourceRange(), "ConstantLValueEmitter: addr label expr");
+  // Address-of-label is not a compile-time constant in CIR (it's a
+  // BlockAddressOp value, not an attribute). Return null to fall through
+  // to the non-constant initialization path, which handles &&label via
+  // the scalar emitter's BlockAddressOp creation.
   return {};
 }
 

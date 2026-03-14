@@ -268,3 +268,31 @@ LABEL_D:
 // OGCG:   ret void
 // OGCG: indirectgoto:                                     ; No predecessors!
 // OGCG:   indirectbr ptr poison, [label %LABEL_D, label %LABEL_C, label %LABEL_B, label %LABEL_A]
+
+// Test: address-of-label in array initializer (constant lvalue context).
+// This previously hit an NYI in ConstantLValueEmitter.
+void F(int x) {
+  void *labels[] = {&&label_a, &&label_b};
+  goto *labels[x];
+label_a:
+  return;
+label_b:
+  return;
+}
+
+// CIR:  cir.func {{.*}} @F
+// CIR:    [[LABELS:%.*]] = cir.alloca !cir.array<!cir.ptr<!void> x 2>
+// CIR:    [[ADDR_A:%.*]] = cir.block_address <@F, "label_a"> : !cir.ptr<!void>
+// CIR:    [[ADDR_B:%.*]] = cir.block_address <@F, "label_b"> : !cir.ptr<!void>
+// CIR:    cir.indirect_br {{.*}} : !cir.ptr<!void>, [
+// CIR:    cir.label "label_a"
+// CIR:    cir.label "label_b"
+
+// LLVM: define dso_local void @F(i32 %0)
+// LLVM:   store ptr blockaddress(@F, %[[LABEL_A:.*]]), ptr %[[ELEM0:.*]], align 8
+// LLVM:   store ptr blockaddress(@F, %[[LABEL_B:.*]]), ptr %[[ELEM1:.*]], align 8
+// LLVM:   indirectbr ptr %{{.*}}, [label %[[LABEL_A]], label %[[LABEL_B]]]
+
+// OGCG: define dso_local void @F(i32 noundef %x)
+// OGCG:   call void @llvm.memcpy
+// OGCG:   indirectbr ptr %{{.*}}, [label %label_a, label %label_b]
