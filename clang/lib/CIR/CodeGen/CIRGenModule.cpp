@@ -1031,6 +1031,29 @@ void CIRGenModule::emitGlobalVarDefinition(const clang::VarDecl *vd,
   cir::GlobalLinkageKind linkage =
       getCIRLinkageVarDefinition(vd, /*IsConstant=*/false);
 
+  // CUDA B.2.1 "The __device__ qualifier declares a variable that resides on
+  // the device. [...]"
+  // CUDA B.2.2 "The __constant__ qualifier, optionally used together with
+  // __device__, declares a variable that: [...]
+  // Is accessible from all the threads within the grid and from the host
+  // through the runtime library (cudaGetSymbolAddress() / cudaGetSymbolSize()
+  // / cudaMemcpyToSymbol() / cudaMemcpyFromSymbol())."
+  if (langOpts.CUDA) {
+    if (langOpts.CUDAIsDevice) {
+      if (linkage != cir::GlobalLinkageKind::InternalLinkage &&
+          (vd->hasAttr<CUDADeviceAttr>() || vd->hasAttr<CUDAConstantAttr>() ||
+           vd->getType()->isCUDADeviceBuiltinSurfaceType() ||
+           vd->getType()->isCUDADeviceBuiltinTextureType())) {
+        gv->setAttr(cir::ExternallyInitializedAttrAttr::getMnemonic(),
+                    cir::ExternallyInitializedAttrAttr::get(&getMLIRContext()));
+      } else {
+        getCUDARuntime().internalizeDeviceSideVar(vd, linkage);
+      }
+    }
+
+    assert(!cir::MissingFeatures::offloadRegistration());
+  }
+
   // Set CIR linkage and DLL storage class.
   gv.setLinkage(linkage);
   // FIXME(cir): setLinkage should likely set MLIR's visibility automatically.

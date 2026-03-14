@@ -2507,6 +2507,12 @@ void CIRToLLVMGlobalOpLowering::setupRegionInitializedLLVMGlobalOp(
   mlir::SymbolRefAttr comdatAttr = getComdatAttr(op, rewriter);
 
   SmallVector<mlir::NamedAttribute> attributes;
+
+  if (auto extInit =
+          op->getAttr(cir::ExternallyInitializedAttrAttr::getMnemonic()))
+    attributes.push_back(rewriter.getNamedAttr("externally_initialized",
+                                               rewriter.getUnitAttr()));
+
   mlir::LLVM::GlobalOp newGlobalOp =
       rewriter.replaceOpWithNewOp<mlir::LLVM::GlobalOp>(
           op, llvmType, isConst, linkage, symbol, nullptr, alignment, addrSpace,
@@ -2567,6 +2573,10 @@ mlir::LogicalResult CIRToLLVMGlobalOpLowering::matchAndRewrite(
   const mlir::LLVM::Linkage linkage = convertLinkage(op.getLinkage());
   const StringRef symbol = op.getSymName();
   SmallVector<mlir::NamedAttribute> attributes;
+
+  if (op->getAttr(cir::ExternallyInitializedAttrAttr::getMnemonic()))
+    attributes.push_back(rewriter.getNamedAttr("externally_initialized",
+                                               rewriter.getUnitAttr()));
 
   if (init.has_value()) {
     if (mlir::isa<cir::FPAttr, cir::IntAttr, cir::BoolAttr>(init.value())) {

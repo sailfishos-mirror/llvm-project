@@ -1393,6 +1393,20 @@ class CIR_AST<string name, string prefix, list<Trait> traits = []>
   }];
 }
 
+def CIR_ExternallyInitializedAttr : CIR_Attr<
+  "ExternallyInitializedAttr", "cir.externally_initialized"
+> {
+  let summary = "The marked variable is externally initialized.";
+  let description =
+  [{
+    CUDA __device__ and __constant__ variables, along with surface and
+    textures, might be initialized by host, hence "externally initialized".
+    Therefore they must be emitted even if they are not referenced.
+
+    The attribute corresponds to the attribute on LLVM with the same name.
+  }];
+}
+
 def CIR_ASTVarDeclAttr : CIR_AST<"VarDecl", "var.decl", [
   ASTVarDeclInterface
 ]>;

@@ -47,6 +47,10 @@ public:
   virtual mlir::Operation *getKernelHandle(cir::FuncOp fn, GlobalDecl gd) = 0;
 
   virtual mlir::Operation *getKernelStub(mlir::Operation *handle) = 0;
+
+  /// Adjust linkage of shadow variables in host compilation.
+  virtual void internalizeDeviceSideVar(const VarDecl *vd,
+                                        cir::GlobalLinkageKind &linkage) = 0;
 };
 
 CIRGenCUDARuntime *createNVCUDARuntime(CIRGenModule &cgm);
