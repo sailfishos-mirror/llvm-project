@@ -700,7 +700,8 @@ static bool isSafeAndProfitableToSinkLoad(LoadInst *L) {
 Instruction *InstCombinerImpl::foldPHIArgLoadIntoPHI(PHINode &PN) {
   LoadInst *FirstLI = cast<LoadInst>(PN.getIncomingValue(0));
 
-  if (!canReplaceOperandWithVariable(FirstLI, 0))
+  // Can't forward swifterror through a phi.
+  if (FirstLI->getOperand(0)->isSwiftError())
     return nullptr;
 
   // FIXME: This is overconservative; this transform is allowed in some cases
@@ -739,7 +740,8 @@ Instruction *InstCombinerImpl::foldPHIArgLoadIntoPHI(PHINode &PN) {
         LI->getPointerAddressSpace() != LoadAddrSpace)
       return nullptr;
 
-    if (!canReplaceOperandWithVariable(LI, 0))
+    // Can't forward swifterror through a phi.
+    if (LI->getOperand(0)->isSwiftError())
       return nullptr;
 
     // We can't sink the load if the loaded value could be modified between
