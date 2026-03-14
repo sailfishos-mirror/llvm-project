@@ -1,3 +1,20 @@
+//===--- SemaLifetimeSafety.h - Sema support for lifetime safety =---------==//
+//
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
+//  This file defines the Sema-specific implementation for lifetime safety
+//  analysis. It provides diagnostic reporting and helper functions that bridge
+//  the lifetime safety analysis framework with Sema's diagnostic engine.
+//
+//===----------------------------------------------------------------------===//
+
+#ifndef LLVM_CLANG_LIB_SEMA_SEMALIFETIMESAFETY_H
+#define LLVM_CLANG_LIB_SEMA_SEMALIFETIMESAFETY_H
+
 #include "clang/Analysis/Analyses/LifetimeSafety/LifetimeSafety.h"
 #include "clang/Basic/DiagnosticSema.h"
 #include "clang/Lex/Lexer.h"
@@ -5,9 +22,8 @@
 
 namespace clang::lifetimes {
 
-static bool IsLifetimeSafetyDiagnosticEnabled(Sema &S, const Decl *D) {
+inline bool IsLifetimeSafetyDiagnosticEnabled(Sema &S, const Decl *D) {
   DiagnosticsEngine &Diags = S.getDiagnostics();
-
   return !Diags.isIgnored(diag::warn_lifetime_safety_use_after_scope,
                           D->getBeginLoc()) ||
          !Diags.isIgnored(diag::warn_lifetime_safety_use_after_scope_moved,
@@ -216,4 +232,7 @@ public:
 private:
   Sema &S;
 };
+
 } // namespace clang::lifetimes
+
+#endif // LLVM_CLANG_LIB_SEMA_SEMALIFETIMESAFETY_H
