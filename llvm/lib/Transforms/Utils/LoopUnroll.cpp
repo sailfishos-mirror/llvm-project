@@ -521,7 +521,7 @@ llvm::UnrollLoop(Loop *L, UnrollLoopOptions ULO, LoopInfo *LI,
   for (auto *ExitingBlock : ExitingBlocks) {
     // The folding code is not prepared to deal with non-branch instructions
     // right now.
-    auto *BI = dyn_cast<BranchInst>(ExitingBlock->getTerminator());
+    auto *BI = dyn_cast<CondBrInst>(ExitingBlock->getTerminator());
     if (!BI)
       continue;
 
@@ -572,12 +572,13 @@ llvm::UnrollLoop(Loop *L, UnrollLoopOptions ULO, LoopInfo *LI,
   // (2b) latch is conditional and is an exiting block
   // FIXME: The implementation can be extended to work with more complicated
   // cases, e.g. loops with multiple latches.
-  BranchInst *LatchBI = dyn_cast<BranchInst>(LatchBlock->getTerminator());
+  Instruction *LatchTerm = LatchBlock->getTerminator();
 
   // A conditional branch which exits the loop, which can be optimized to an
   // unconditional branch in the unrolled loop in some cases.
   bool LatchIsExiting = L->isLoopExiting(LatchBlock);
-  if (!LatchBI || (LatchBI->isConditional() && !LatchIsExiting)) {
+  if (!isa<UncondBrInst>(LatchTerm) &&
+      !(isa<CondBrInst>(LatchTerm) && LatchIsExiting)) {
     LLVM_DEBUG(
         dbgs() << "Can't unroll; a conditional latch must exit the loop");
     return LoopUnrollResult::Unmodified;
@@ -952,7 +953,7 @@ llvm::UnrollLoop(Loop *L, UnrollLoopOptions ULO, LoopInfo *LI,
 
   SmallVector<DominatorTree::UpdateType> DTUpdates;
   auto SetDest = [&](BasicBlock *Src, bool WillExit, bool ExitOnTrue) {
-    auto *Term = cast<BranchInst>(Src->getTerminator());
+    auto *Term = cast<CondBrInst>(Src->getTerminator());
     const unsigned Idx = ExitOnTrue ^ WillExit;
     BasicBlock *Dest = Term->getSuccessor(Idx);
     BasicBlock *DeadSucc = Term->getSuccessor(1-Idx);
@@ -961,7 +962,7 @@ llvm::UnrollLoop(Loop *L, UnrollLoopOptions ULO, LoopInfo *LI,
     DeadSucc->removePredecessor(Src, /* KeepOneInputPHIs */ true);
 
     // Replace the conditional branch with an unconditional one.
-    auto *BI = BranchInst::Create(Dest, Term->getIterator());
+    auto *BI = UncondBrInst::Create(Dest, Term->getIterator());
     BI->setDebugLoc(Term->getDebugLoc());
     Term->eraseFromParent();
 
@@ -1094,18 +1095,14 @@ llvm::UnrollLoop(Loop *L, UnrollLoopOptions ULO, LoopInfo *LI,
   CondLatchNexts.reserve(Latches.size());
 
   // Merge adjacent basic blocks, if possible.
-  for (unsigned I = 0, E = Latches.size(); I < E; ++I) {
+  for (auto [I, Latch] : enumerate(Latches)) {
     ++IterCounts.back();
-    BasicBlock *Latch = Latches[I];
-    BranchInst *Term = dyn_cast<BranchInst>(Latch->getTerminator());
-    assert((Term ||
+    assert((isa<UncondBrInst, CondBrInst>(Latch->getTerminator()) ||
             (CompletelyUnroll && !LatchIsExiting && Latch == Latches.back())) &&
            "Need a branch as terminator, except when fully unrolling with "
            "unconditional latch");
-    if (!Term)
-      continue;
-    if (Term->isUnconditional()) {
-      BasicBlock *Dest = Term->getSuccessor(0);
+    if (auto *Term = dyn_cast<UncondBrInst>(Latch->getTerminator())) {
+      BasicBlock *Dest = Term->getSuccessor();
       BasicBlock *Fold = Dest->getUniquePredecessor();
       if (MergeBlockIntoPredecessor(Dest, /*DTU=*/DTUToUse, LI,
                                     /*MSSAU=*/nullptr, /*MemDep=*/nullptr,
@@ -1115,10 +1112,10 @@ llvm::UnrollLoop(Loop *L, UnrollLoopOptions ULO, LoopInfo *LI,
         llvm::replace(Latches, Dest, Fold);
         llvm::erase(UnrolledLoopBlocks, Dest);
       }
-    } else {
+    } else if (isa<CondBrInst>(Latch->getTerminator())) {
       IterCounts.push_back(0);
       CondLatches.push_back(Latch);
-      CondLatchNexts.push_back(Headers[(I + 1) % E]);
+      CondLatchNexts.push_back(Headers[(I + 1) % Latches.size()]);
     }
   }
 
@@ -1292,6 +1289,15 @@ MDNode *llvm::GetUnrollMetadata(MDNode *LoopID, StringRef Name) {
     if (Name == S->getString())
       return MD;
   }
+  return nullptr;
+}
+
+// Returns the loop hint metadata node with the given name (for example,
+// "llvm.loop.unroll.count").  If no such metadata node exists, then nullptr is
+// returned.
+MDNode *llvm::getUnrollMetadataForLoop(const Loop *L, StringRef Name) {
+  if (MDNode *LoopID = L->getLoopID())
+    return GetUnrollMetadata(LoopID, Name);
   return nullptr;
 }
 
