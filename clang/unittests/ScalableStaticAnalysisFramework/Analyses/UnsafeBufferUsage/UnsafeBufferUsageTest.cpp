@@ -63,13 +63,13 @@ constexpr inline auto buildEntityPointerLevel =
 class UnsafeBufferUsageTest : public testing::Test {
 protected:
   TUSummary TUSum;
-  TUSummaryBuilder TUSummaryBuilder;
+  TUSummaryBuilder Builder;
   UnsafeBufferUsageTUSummaryExtractor Extractor;
   std::unique_ptr<ASTUnit> AST;
 
   UnsafeBufferUsageTest()
       : TUSum(BuildNamespace(BuildNamespaceKind::CompilationUnit, "Mock.cpp")),
-        TUSummaryBuilder(TUSum), Extractor(TUSummaryBuilder) {}
+        Builder(TUSum), Extractor(Builder) {}
 
   template <typename ContributorDecl = NamedDecl>
   std::unique_ptr<UnsafeBufferUsageEntitySummary>
@@ -81,6 +81,11 @@ protected:
         findDeclByName<ContributorDecl>(ContributorName, AST->getASTContext());
 
     if (!ContributorDefn)
+      return nullptr;
+
+    std::optional<EntityName> EN = getEntityName(ContributorDefn);
+
+    if (!EN)
       return nullptr;
 
     llvm::Error Error = llvm::ErrorSuccess();
