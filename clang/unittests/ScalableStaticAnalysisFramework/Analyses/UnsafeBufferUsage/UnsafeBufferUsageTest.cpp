@@ -67,7 +67,7 @@ protected:
 
   UnsafeBufferUsageTest()
       : TUSum(BuildNamespace(BuildNamespaceKind::CompilationUnit, "Mock.cpp")),
-        Builder(TUSum), Extractor(TUSummaryBuilder) {}
+        Builder(TUSum), Extractor(Builder) {}
 
   template <typename ContributorDecl = NamedDecl>
   std::unique_ptr<UnsafeBufferUsageEntitySummary>
