@@ -100,7 +100,6 @@ public:
   }
 
   bool empty() const { return UnsafeBuffers.empty(); }
-
 };
 } // namespace clang::ssaf
 
