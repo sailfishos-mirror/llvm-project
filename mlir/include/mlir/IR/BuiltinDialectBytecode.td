@@ -95,11 +95,26 @@ def CallSiteLoc : DialectAttribute<(attr
   LocationAttr:$caller
 )>;
 
+let cType = "FileLineColRange" in {
+def FileLineColRange : DialectAttribute<(attr
+  StringAttr:$filename,
+  WithBuilder<"$_args",
+    WithType<"SmallVector<uint64_t>",
+    WithParser<"succeeded(readFileLineColRangeLocs($_reader, $_var))",
+    WithPrinter<"writeFileLineColRangeLocs($_writer, $_name)">>>>:$rawLocData
+)> {
+  let cBuilder = "getFileLineColRange(context, filename, rawLocData)";
+  let printerPredicate = "!isStrictFileLineColLoc($_val)";
+}
+
 def FileLineColLoc : DialectAttribute<(attr
   StringAttr:$filename,
-  VarInt:$line,
-  VarInt:$column
-)>;
+  VarInt:$start_line,
+  VarInt:$start_column
+)> {
+  let printerPredicate = "isStrictFileLineColLoc($_val)";
+}
+}
 
 let cType = "FusedLoc",
     cBuilder = "cast<FusedLoc>(get<FusedLoc>(context, $_args))" in {
@@ -158,12 +173,13 @@ def DenseArrayAttr : DialectAttribute<(attr
 )>;
 
 def DenseElementsAttr : WithType<"DenseElementsAttr", Attribute>;
-def DenseIntOrFPElementsAttr : DialectAttribute<(attr
+def DenseTypedElementsAttr : DialectAttribute<(attr
   ShapedType:$type,
-  Blob:$rawData
-)> {
-  let cBuilder = "cast<$_resultType>($_resultType::getFromRawBuffer($_args))";
-}
+  WithBuilder<"$_args",
+    WithType<"SmallVector<char>",
+    WithParser<"succeeded(readDenseTypedElementsAttr($_reader, type, $_var))",
+    WithPrinter<"writeDenseTypedElementsAttr($_writer, $_name)">>>>:$rawData
+)>;
 
 def DenseStringElementsAttr : DialectAttribute<(attr
   ShapedType:$type,
@@ -280,6 +296,9 @@ def VectorType : DialectType<(type
   Type:$elementType
 )> {
   let printerPredicate = "!$_val.isScalable()";
+  // Use getChecked to produce a null type (and emit a diagnostic) instead of
+  // asserting when the element type does not implement VectorElementTypeInterface.
+  let cBuilder = "VectorType::getChecked([&]() { return reader.emitError(\"invalid vector type\"); }, shape, elementType)";
 }
 
 def VectorTypeWithScalableDims : DialectType<(type
@@ -289,7 +308,9 @@ def VectorTypeWithScalableDims : DialectType<(type
 )> {
   let printerPredicate = "$_val.isScalable()";
   // Note: order of serialization does not match order of builder.
-  let cBuilder = "get<$_resultType>(context, shape, elementType, scalableDims)";
+  // Use getChecked to produce a null type (and emit a diagnostic) instead of
+  // asserting when the element type does not implement VectorElementTypeInterface.
+  let cBuilder = "VectorType::getChecked([&]() { return reader.emitError(\"invalid vector type\"); }, shape, elementType, scalableDims)";
 }
 }
 
@@ -318,10 +339,11 @@ def BuiltinDialectAttributes : DialectAttributes<"Builtin"> {
     UnknownLoc,
     DenseResourceElementsAttr,
     DenseArrayAttr,
-    DenseIntOrFPElementsAttr,
+    DenseTypedElementsAttr,
     DenseStringElementsAttr,
     SparseElementsAttr,
-    DistinctAttr
+    DistinctAttr,
+    FileLineColRange,
   ];
 }
 

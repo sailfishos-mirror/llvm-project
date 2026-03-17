@@ -216,14 +216,17 @@ Value *PHITransAddr::translateSubExpr(Value *V, BasicBlock *CurBB,
     if (Value *V = simplifyGEPInst(GEP->getSourceElementType(), GEPOps[0],
                                    ArrayRef<Value *>(GEPOps).slice(1),
                                    GEP->getNoWrapFlags(), {DL, TLI, DT, AC})) {
-      for (unsigned i = 0, e = GEPOps.size(); i != e; ++i)
-        RemoveInstInputs(GEPOps[i], InstInputs);
+      for (Value *Op : GEPOps)
+        RemoveInstInputs(Op, InstInputs);
 
       return addAsInput(V);
     }
 
     // Scan to see if we have this GEP available.
     Value *APHIOp = GEPOps[0];
+    if (isa<ConstantData>(APHIOp))
+      return nullptr;
+
     for (User *U : APHIOp->users()) {
       if (GetElementPtrInst *GEPI = dyn_cast<GetElementPtrInst>(U))
         if (GEPI->getType() == GEP->getType() &&

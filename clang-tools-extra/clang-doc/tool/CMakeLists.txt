@@ -9,6 +9,7 @@ clang_target_link_libraries(clang-doc
   clangAST
   clangASTMatchers
   clangBasic
+  clangDocSupport
   clangFrontend
   clangTooling
   clangToolingCore
@@ -21,11 +22,28 @@ target_link_libraries(clang-doc
 
 set(assets
   index.js
+  mustache-index.js
   clang-doc-default-stylesheet.css
+  clang-doc-mustache.css
+  class-template.mustache
+  comment-template.mustache
+  enum-template.mustache
+  function-template.mustache
+  namespace-template.mustache
+  template.mustache
+  head-template.mustache
+  navbar-template.mustache
+  index-template.mustache
+  alias-template.mustache
+  md/all-files-template.mustache
+  md/class-template.mustache
+  md/comments-partial.mustache
+  md/index-template.mustache
+  md/namespace-template.mustache
 )
 
 set(asset_dir "${CMAKE_CURRENT_SOURCE_DIR}/../assets")
-set(resource_dir "${CMAKE_BINARY_DIR}/share/clang")
+set(resource_dir "${LLVM_RUNTIME_OUTPUT_INTDIR}/../share/clang-doc")
 set(out_files)
 
 function(copy_files_to_dst src_dir dst_dir file)
@@ -42,7 +60,7 @@ endfunction(copy_files_to_dst)
 
 foreach(f ${assets})
   install(FILES ${asset_dir}/${f}
-    DESTINATION "${CMAKE_INSTALL_DATADIR}/clang"
+    DESTINATION "${CMAKE_INSTALL_DATADIR}/clang-doc"
     COMPONENT clang-doc)
   copy_files_to_dst(${asset_dir} ${resource_dir} ${f})
 endforeach(f)

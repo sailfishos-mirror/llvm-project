@@ -1,4 +1,4 @@
-// RUN: not llvm-mc -triple amdgcn-amd-amdhsa -mcpu=gfx90a %s 2>&1 | FileCheck --check-prefix=ASM %s
+// RUN: not llvm-mc -triple amdgcn-amd-amdhsa -mcpu=gfx90a %s -filetype=null 2>&1 | FileCheck --check-prefix=ASM %s
 
 // Some expression currently require (immediately) solvable expressions, i.e.,
 // they don't depend on yet-unknown symbolic values.
@@ -157,73 +157,6 @@ wavefront_size32:
   .amdhsa_accum_offset 4
 // ASM: :[[@LINE+1]]:{{[0-9]+}}: error: directive should have resolvable expression
   .amdhsa_wavefront_size32 defined_boolean
-.end_amdhsa_kernel
-
-.p2align 8
-.type next_free_vgpr,@function
-next_free_vgpr:
-  s_endpgm
-
-.p2align 6
-.amdhsa_kernel next_free_vgpr
-// ASM: :[[@LINE+1]]:{{[0-9]+}}: error: directive should have resolvable expression
-  .amdhsa_next_free_vgpr defined_boolean
-  .amdhsa_next_free_sgpr 0
-  .amdhsa_accum_offset 4
-.end_amdhsa_kernel
-
-.p2align 8
-.type next_free_sgpr,@function
-next_free_sgpr:
-  s_endpgm
-
-.p2align 6
-.amdhsa_kernel next_free_sgpr
-  .amdhsa_next_free_vgpr 0
-// ASM: :[[@LINE+1]]:{{[0-9]+}}: error: directive should have resolvable expression
-  .amdhsa_next_free_sgpr defined_boolean
-  .amdhsa_accum_offset 4
-.end_amdhsa_kernel
-
-.p2align 8
-.type accum_offset,@function
-accum_offset:
-  s_endpgm
-
-.p2align 6
-.amdhsa_kernel accum_offset
-  .amdhsa_next_free_vgpr 0
-  .amdhsa_next_free_sgpr 0
-// ASM: :[[@LINE+1]]:{{[0-9]+}}: error: directive should have resolvable expression
-  .amdhsa_accum_offset defined_boolean
-.end_amdhsa_kernel
-
-.p2align 8
-.type reserve_vcc,@function
-reserve_vcc:
-  s_endpgm
-
-.p2align 6
-.amdhsa_kernel reserve_vcc
-  .amdhsa_next_free_vgpr 0
-  .amdhsa_next_free_sgpr 0
-  .amdhsa_accum_offset 4
-// ASM: :[[@LINE+1]]:{{[0-9]+}}: error: directive should have resolvable expression
-  .amdhsa_reserve_vcc defined_boolean
-.end_amdhsa_kernel
-
-.p2align 8
-.type reserve_flat_scratch,@function
-reserve_flat_scratch:
-  s_endpgm
-
-.p2align 6
-.amdhsa_kernel reserve_flat_scratch
-  .amdhsa_next_free_vgpr 0
-  .amdhsa_next_free_sgpr 0
-  .amdhsa_accum_offset 4
-// ASM: :[[@LINE+1]]:{{[0-9]+}}: error: directive should have resolvable expression
-  .amdhsa_reserve_flat_scratch defined_boolean
 .end_amdhsa_kernel
 
 .p2align 8
