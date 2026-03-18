@@ -6080,6 +6080,11 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
           << A->getOption().getName() << TripleStr;
   }
 
+  // Forward loadtime-comment vars option to cc1
+  if (Arg *A = Args.getLastArg(options::OPT_mloadtime_comment_vars_EQ)) {
+    A->render(Args, CmdArgs);
+  }
+
   // Prepare `-aux-target-cpu` and `-aux-target-feature` unless
   // `--gpu-use-aux-triple-only` is specified.
   if (!Args.getLastArg(options::OPT_gpu_use_aux_triple_only) &&

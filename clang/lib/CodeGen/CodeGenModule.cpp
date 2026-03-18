@@ -69,6 +69,7 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/Hash.h"
 #include "llvm/Support/TimeProfiler.h"
+#include "llvm/Support/raw_ostream.h"
 #include "llvm/TargetParser/AArch64TargetParser.h"
 #include "llvm/TargetParser/RISCVISAInfo.h"
 #include "llvm/TargetParser/Triple.h"
@@ -1633,6 +1634,9 @@ void CodeGenModule::Release() {
   EmitBackendOptionsMetadata(getCodeGenOpts());
 
   EmitLoadTimeComment();
+  
+  // Handle CLI load-time string variables
+  EmitLoadTimeCommentVars();
 
   // If there is device offloading code embed it in the host now.
   EmbedObject(&getModule(), CodeGenOpts, *getFileSystem(), getDiags());
@@ -4103,6 +4107,75 @@ void CodeGenModule::EmitLoadTimeComment() {
   if (LoadTimeComment) {
     auto *NMD = getModule().getOrInsertNamedMetadata("comment_string.loadtime");
     NMD->addOperand(LoadTimeComment);
+  }
+}
+
+bool CodeGenModule::isValidLoadTimeCommentVariable(const VarDecl *D) const {
+  // Must be a valid declaration and must have an initializer (the string)
+  if (!D || !D->hasInit())
+    return false;
+
+  QualType Ty = D->getType();
+
+  // 1. Handle Pointers (e.g., char *sccsid, const char *copyright)
+  if (const PointerType *PT = Ty->getAs<PointerType>()) {
+    if (PT->getPointeeType()->isAnyCharacterType())
+      return true;
+  }
+
+  // 2. Handle Arrays (e.g., char version[])
+  // We use ASTContext::getAsArrayType to safely unwrap constant arrays
+  if (const ArrayType *AT = getContext().getAsArrayType(Ty)) {
+    if (AT->getElementType()->isAnyCharacterType())
+      return true;
+  }
+
+  return false; // Reject ints, structs, etc.
+}
+
+void CodeGenModule::EmitLoadTimeCommentVars() {
+  // Handle CLI loadtime comment variables
+  if (!getTriple().isOSAIX())
+    return;
+
+  const auto &LoadTimeCommentVars = getCodeGenOpts().LoadTimeCommentVars;
+  if (LoadTimeCommentVars.empty())
+    return;
+
+  TranslationUnitDecl *TU = getContext().getTranslationUnitDecl();
+  // Iterate through ALL top-level declarations
+  for (auto *D : TU->decls()) {
+    if (VarDecl *VD = dyn_cast<VarDecl>(D)) {
+
+      // Check if the variable name is in our parsed list
+      if (!llvm::is_contained(LoadTimeCommentVars, VD->getName()))
+        continue;
+
+      if (!isValidLoadTimeCommentVariable(VD))
+        continue;
+
+      // Get or create the GlobalValue in the IR
+      llvm::Constant *Addr = GetAddrOfGlobalVar(VD);
+
+      // Strip pointer casts safely
+      if (auto *GV =
+              dyn_cast<llvm::GlobalVariable>(Addr->stripPointerCasts())) {
+
+        // Force Clang to emit the definition if it skipped it
+        if (GV->isDeclaration())
+          EmitGlobalDefinition(VD);
+
+        if (!GV->isDeclaration()) {
+          // Tag it for the backend and prevent GC
+          auto &C = getLLVMContext();
+          llvm::Metadata *Ops[] = {llvm::MDString::get(C, VD->getName())};
+          GV->setMetadata("copyright.variable", llvm::MDNode::get(C, Ops));
+
+          // Prevent Linker/Optimization GC
+          addUsedGlobal(GV);
+        }
+      }
+    }
   }
 }
 

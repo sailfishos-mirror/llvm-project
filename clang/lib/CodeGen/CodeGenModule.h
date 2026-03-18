@@ -2086,6 +2086,12 @@ private:
   /// be processed by the backend to include it in the generated executable.
   void EmitLoadTimeComment();
 
+  /// Helper method to check if a variable Decl is part of
+  /// LoadTimeCommentVars
+  bool isValidLoadTimeCommentVariable(const VarDecl *D) const;
+
+  void EmitLoadTimeCommentVars();
+
   /// Determine whether the definition can be emitted eagerly, or should be
   /// delayed until the end of the translation unit. This is relevant for
   /// definitions whose linkage can change, e.g. implicit function instantions

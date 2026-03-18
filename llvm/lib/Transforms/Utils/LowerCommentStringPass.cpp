@@ -81,68 +81,78 @@ PreservedAnalyses LowerCommentStringPass::run(Module &M,
 
   LLVMContext &Ctx = M.getContext();
 
+  // Collect all globals that need implicit refs, both string and variables
+  SmallVector<GlobalValue *, 4> CopyrightGlobals;
+
+  // 1. Process pragma comment copyright (string literal) Once per TU
   // Single-metadata: !comment_string.loadtime = !{!0}
   // Each operand node is expected to have one MDString operand.
   NamedMDNode *MD = M.getNamedMetadata("comment_string.loadtime");
-  if (!MD || MD->getNumOperands() == 0)
-    return PreservedAnalyses::all();
+  if (MD && MD->getNumOperands() > 0) {
+    MDNode *MdNode = MD->getOperand(0);
+    if (MdNode && MdNode->getNumOperands() > 0) {
+      auto *MdString = dyn_cast_or_null<MDString>(MdNode->getOperand(0));
+      if (MdString && !MdString->getString().empty()) {
+        StringRef Text = MdString->getString();
 
-  // At this point we are guarateed that one TU contains a single copyright
-  // metadata entry. Create TU-local string global for that metadata entry.
-  MDNode *MdNode = MD->getOperand(0);
-  if (!MdNode || MdNode->getNumOperands() == 0)
-    return PreservedAnalyses::all();
+        // Create the string global
+        Constant *StrInit =
+            ConstantDataArray::getString(Ctx, Text, /*AddNull*/ true);
+        auto *StrGV = new GlobalVariable(M, StrInit->getType(),
+                                         /*isConstant*/ true,
+                                         GlobalValue::InternalLinkage, StrInit,
+                                         "__loadtime_comment_str");
+        StrGV->setUnnamedAddr(GlobalValue::UnnamedAddr::Global);
+        StrGV->setAlignment(Align(1));
+        StrGV->setSection("__loadtime_comment");
 
-  auto *MdString = dyn_cast_or_null<MDString>(MdNode->getOperand(0));
-  if (!MdString)
-    return PreservedAnalyses::all();
+        // Add the string to llvm.used to prevent LLVM optimization/LTO passes
+        // from removing it
+        appendToUsed(M, {StrGV});
 
-  StringRef Text = MdString->getString();
-  if (Text.empty())
-    return PreservedAnalyses::all();
+        // Add to list of globals needing implicti refs
+        CopyrightGlobals.push_back(StrGV);
+      }
+    }
+    MD->eraseFromParent();
+  }  
 
-  // 1. Create a single NULL-terminated string global
-  Constant *StrInit = ConstantDataArray::getString(Ctx, Text, /*AddNull=*/true);
+  // 2. Process copyright variables - multiple allowed per TU
+  for (GlobalVariable &GV : M.globals()) {
+    if (GV.getMetadata("copyright.variable")) {
+      // Add to list of globals needing implcit refs
+      CopyrightGlobals.push_back(&GV);
+    }
+  }
 
-  // Internal, constant, TU-local--avoids duplicate symbol issues across TUs.
-  auto *StrGV = new GlobalVariable(M, StrInit->getType(),
-                                   /*isConstant=*/true,
-                                   GlobalValue::InternalLinkage, StrInit,
-                                   /*Name=*/"__loadtime_comment_str");
-  // Set unnamed_addr to allow the linker to merge identical strings
-  StrGV->setUnnamedAddr(GlobalValue::UnnamedAddr::Global);
-  StrGV->setAlignment(Align(1));
-  // Place in the "__loadtime_comment" section.
-  // The GV is constant, so we expect a read-only section.
-  StrGV->setSection("__loadtime_comment");
-
-  // 2. Add the string to llvm.used to prevent LLVM optimization/LTO passes from
-  // removing it.
-  appendToUsed(M, {StrGV});
-
-  // 3. Attach !implicit ref to every defined function
-  // Create a metadata node pointing to the copyright string:
-  //   !N = !{ptr @__loadtime_comment_str}
-  Metadata *Ops[] = {ConstantAsMetadata::get(StrGV)};
-  MDNode *ImplicitRefMD = MDNode::get(Ctx, Ops);
-
-  // Lambda to attach implicit.ref metadata to a function.
-  auto AddImplicitRef = [&](Function &F) {
+  // Lambda to attach implicit ref metadata to a function
+  auto AddImplicitRef = [&](Function &F, GlobalValue *GV) {
     if (F.isDeclaration())
       return;
-    // Attach the implicit.ref metadata to the function
-    F.setMetadata("implicit.ref", ImplicitRefMD);
-    LLVM_DEBUG(dbgs() << "[copyright] attached implicit.ref to function:  "
-                      << F.getName() << "\n");
+
+    // Create a new MDNode with exactly ONE operand (the global variable)
+    Metadata *Ops[] = {ConstantAsMetadata::get(GV)};
+    MDNode *NewMD = MDNode::get(Ctx, Ops);
+
+    // addMetadata allows multiple nodes of the same kind to be attached to a
+    // function. This correctly creates a list of single-operand MDNodes.
+    F.addMetadata(LLVMContext::MD_implicit_ref, *NewMD);
+
+    LLVM_DEBUG(dbgs() << "[copyright] attached implicit.ref to function: "
+                      << F.getName() << " for global: " << GV->getName()
+                      << "\n");
   };
 
-  // Process all functions in the module
-  for (Function &F : M)
-    AddImplicitRef(F);
+  // 3. Attach implicit ref to all functions for each copyright gglobal
+  if (!CopyrightGlobals.empty()) {
+    // Apply to all functions for all copyright globals
+    for (GlobalValue *GV : CopyrightGlobals) {
+      for (Function &F : M)
+        AddImplicitRef(F, GV);
+    }
+  }
 
-  // Cleanup the processed metadata.
-  MD->eraseFromParent();
-  LLVM_DEBUG(dbgs() << "[copyright] created string and anchor for module\n");
-
+  LLVM_DEBUG(dbgs() << "[copyright] processed " << CopyrightGlobals.size()
+                    << " copyright globals\n");
   return PreservedAnalyses::all();
 }
