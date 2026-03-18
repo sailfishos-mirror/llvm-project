@@ -565,11 +565,15 @@ GCNSubtarget::getMaxNumVGPRs(const Function &F,
   if (DynamicVGPRBlockSize == 0 && isDynamicVGPREnabled())
     DynamicVGPRBlockSize = getDynamicVGPRBlockSize();
 
-  std::pair<unsigned, unsigned> Waves;
-  if (TargetOccupancy)
-    Waves = {*TargetOccupancy, *TargetOccupancy};
-  else
-    Waves = getWavesPerEU(F);
+  std::pair<unsigned, unsigned> Waves = getWavesPerEU(F);
+  if (TargetOccupancy) {
+    if (*TargetOccupancy >= Waves.first && *TargetOccupancy <= Waves.second)
+      Waves = {*TargetOccupancy, *TargetOccupancy};
+    else if (*TargetOccupancy < Waves.first)
+      Waves = {Waves.first, Waves.first};
+    else
+      Waves = {Waves.second, Waves.second};
+  }
   return getBaseMaxNumVGPRs(
       F, {getMinNumVGPRs(Waves.second, DynamicVGPRBlockSize),
           getMaxNumVGPRs(Waves.first, DynamicVGPRBlockSize)});

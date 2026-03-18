@@ -859,7 +859,10 @@ public:
   /// subtarget's specifications, or does not meet number of waves per execution
   /// unit requirement.
   /// When \p TargetOccupancy is present, use it for both min and max waves
-  /// instead of getWavesPerEU(F).
+  /// if it lies within the function's wave range from getWavesPerEU(F)
+  /// (inclusive). Otherwise clamp \p TargetOccupancy to the nearest endpoint
+  /// of that range (below the minimum -> minimum waves; above the maximum ->
+  /// maximum waves).
   unsigned
   getMaxNumVGPRs(const Function &F,
                  std::optional<unsigned> TargetOccupancy = std::nullopt) const;
