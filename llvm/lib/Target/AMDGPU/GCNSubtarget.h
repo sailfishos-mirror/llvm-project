@@ -867,9 +867,10 @@ public:
   getMaxNumVGPRs(const Function &F,
                  std::optional<unsigned> TargetOccupancy = std::nullopt) const;
 
-  unsigned getMaxNumAGPRs(const Function &F) const { return getMaxNumVGPRs(F); }
-  unsigned getMaxNumAGPRs(unsigned WavesPerEU) const {
-    return AMDGPU::IsaInfo::getMaxNumAGPRs(this, WavesPerEU);
+  unsigned
+  getMaxNumAGPRs(const Function &F,
+                 std::optional<unsigned> TargetOccupancy = std::nullopt) const {
+    return getMaxNumVectorRegs(F, TargetOccupancy).second;
   }
 
   /// Return a pair of maximum numbers of VGPRs and AGPRs that meet the number

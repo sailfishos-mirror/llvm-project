@@ -134,8 +134,8 @@ void GCNSchedStrategy::initialize(ScheduleDAGMI *DAG) {
       RelaxedOcc ? MFI.getMinAllowedOccupancy() : MFI.getOccupancy();
   SGPRCriticalLimit =
       std::min(ST.getMaxNumSGPRs(TargetOccupancy, true), SGPRExcessLimit);
-  AGPRCriticalLimit =
-      std::min(ST.getMaxNumAGPRs(TargetOccupancy), AGPRExcessLimit);
+  AGPRCriticalLimit = std::min(
+      ST.getMaxNumAGPRs(MF->getFunction(), TargetOccupancy), AGPRExcessLimit);
 
   if (!KnownExcessRP) {
     VGPRCriticalLimit = std::min(
