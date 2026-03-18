@@ -1533,6 +1533,25 @@ unsigned getMaxNumVGPRs(const MCSubtargetInfo *STI, unsigned WavesPerEU,
   return std::min(MaxNumVGPRs, AddressableNumVGPRs);
 }
 
+unsigned getMaxNumAGPRs(const MCSubtargetInfo *STI, unsigned int WavesPerEU) {
+  if (!STI->getFeatureBits().test(FeatureMAIInsts))
+    return 0;
+
+  assert(WavesPerEU != 0);
+
+  unsigned MaxNumAGPRs =
+      alignDown(getTotalNumVGPRs(STI) / WavesPerEU,
+                getVGPRAllocGranule(STI, /*DynamicVGPRBlockSize=*/0));
+  unsigned AddressableNumAGPRs = getAddressableNumAGPRs(STI);
+  return std::min(MaxNumAGPRs, AddressableNumAGPRs);
+}
+
+unsigned getAddressableNumAGPRs(const MCSubtargetInfo *STI) {
+  // AGPRs share the addressable range with architectural VGPRs on current
+  // AMD GPUs.
+  return getAddressableNumArchVGPRs(STI);
+}
+
 unsigned getEncodedNumVGPRBlocks(const MCSubtargetInfo *STI, unsigned NumVGPRs,
                                  std::optional<bool> EnableWavefrontSize32) {
   return getGranulatedNumRegisterBlocks(

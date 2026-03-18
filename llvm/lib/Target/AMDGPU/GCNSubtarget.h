@@ -868,6 +868,9 @@ public:
                  std::optional<unsigned> TargetOccupancy = std::nullopt) const;
 
   unsigned getMaxNumAGPRs(const Function &F) const { return getMaxNumVGPRs(F); }
+  unsigned getMaxNumAGPRs(unsigned WavesPerEU) const {
+    return AMDGPU::IsaInfo::getMaxNumAGPRs(this, WavesPerEU);
+  }
 
   /// Return a pair of maximum numbers of VGPRs and AGPRs that meet the number
   /// of waves per execution unit required for the function \p MF.
