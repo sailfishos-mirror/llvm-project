@@ -26,17 +26,18 @@ set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
 list(INSERT CMAKE_MODULE_PATH 0
   "${CMAKE_CURRENT_SOURCE_DIR}/cmake"
-  "${CMAKE_CURRENT_SOURCE_DIR}/cmake/Modules"
+  "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules"
   "${LLVM_COMMON_CMAKE_UTILS}"
   "${LLVM_COMMON_CMAKE_UTILS}/Modules"
   "${CMAKE_CURRENT_SOURCE_DIR}/../llvm/cmake"
   "${CMAKE_CURRENT_SOURCE_DIR}/../llvm/cmake/modules"
 )
 
-# We order libraries to mirror roughly how they are layered, except that compiler-rt can depend
-# on libc++, so we put it after.
+# We order libraries to mirror roughly how they are layered, except that
+# compiler-rt can depend on libc++, so we put it after. Offload can depend on
+# flang-rt so we order it before.
 set(LLVM_DEFAULT_RUNTIMES "libc;libunwind;libcxxabi;libcxx;compiler-rt;libclc;openmp;offload")
-set(LLVM_SUPPORTED_RUNTIMES "${LLVM_DEFAULT_RUNTIMES};llvm-libgcc;flang-rt;libsycl;orc-rt")
+set(LLVM_SUPPORTED_RUNTIMES "libc;libunwind;libcxxabi;libcxx;compiler-rt;libclc;openmp;flang-rt;offload;llvm-libgcc;libsycl;orc-rt")
 set(LLVM_ENABLE_RUNTIMES "" CACHE STRING
   "Semicolon-separated list of runtimes to build, or \"all\" (${LLVM_DEFAULT_RUNTIMES}). Supported runtimes are ${LLVM_SUPPORTED_RUNTIMES}.")
 if(LLVM_ENABLE_RUNTIMES STREQUAL "all" )
@@ -87,11 +88,6 @@ include(CheckCCompilerFlag)
 include(CheckCXXCompilerFlag)
 include(GetToolchainDirs)
 include(ExtendPath)
-
-# Handle Fortran code. Sets RUNTIMES_FLANG_MODULES_ENABLED when a Fortran
-# toolchain is available and required by one or more of the
-# runtimes.
-include(config-runtimes-Fortran)
 
 # Determine whether we are in the runtimes/runtimes-bins directory of a
 # bootstrap build.
@@ -272,7 +268,12 @@ cmake_path(NORMAL_PATH RUNTIMES_OUTPUT_RESOURCE_LIB_DIR)
 cmake_path(NORMAL_PATH RUNTIMES_INSTALL_RESOURCE_LIB_PATH)
 
 
-fortran_output_and_install_paths()
+# Handle Fortran code. When a Fortran  toolchain is available and required by
+# one or more of the runtimes, enables CMake's Fortran support and sets
+# RUNTIMES_FLANG_MODULES_ENABLED.
+# Makes use of RUNTIMES_OUTPUT_RESOURCE_DIR, RUNTIMES_INSTALL_RESOURCE_PATH,
+# hence must be included their those variables are defined.
+include(config-Fortran)
 
 
 # For subprojects supporting offloading targets (offload, flang-rt, ..) specify
@@ -302,6 +303,8 @@ option(LLVM_INCLUDE_TESTS "Generate build targets for the runtimes unit tests." 
 option(LLVM_INCLUDE_DOCS "Generate build targets for the runtimes documentation." ON)
 option(LLVM_ENABLE_SPHINX "Use Sphinx to generate the runtimes documentation." OFF)
 option(RUNTIMES_EXECUTE_ONLY_CODE "Compile runtime libraries as execute-only." OFF)
+
+include(HandleDoxygen)
 
 if (RUNTIMES_EXECUTE_ONLY_CODE)
   # If a target doesn't support or recognise -mexecute-only, Clang will simply ignore the flag.
