@@ -93,6 +93,7 @@ set(LIBSYCL_SOURCES
     "detail/device_impl.cpp"
     "detail/global_objects.cpp"
     "detail/platform_impl.cpp"
+    "detail/program_manager.cpp"
     "detail/queue_impl.cpp"
     "detail/offload/offload_utils.cpp"
     "detail/offload/offload_topology.cpp"
