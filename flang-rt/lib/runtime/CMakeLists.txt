@@ -33,6 +33,7 @@ set(module_sources
 
   __cuda_device.f90
   cooperative_groups.f90
+  cuda_runtime_api.f90
   cudadevice.f90
 )
 
@@ -190,6 +191,7 @@ endif ()
 set_property(SOURCE
     __cuda_device.f90
     cooperative_groups.f90
+    cuda_runtime_api.f90
     cudadevice.f90
   APPEND PROPERTY
     COMPILE_OPTIONS --offload-host-only -xcuda
