@@ -22,6 +22,7 @@
 #include "llvm/Transforms/Utils.h"
 using namespace llvm;
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "lower-invoke"
 
 STATISTIC(NumInvokes, "Number of invokes replaced");

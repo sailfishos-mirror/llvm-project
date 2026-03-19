@@ -111,6 +111,7 @@ using namespace llvm;
 using namespace PatternMatch;
 using namespace SwitchCG;
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "isel"
 
 /// LimitFloatPrecision - Generate low-precision inline sequences for

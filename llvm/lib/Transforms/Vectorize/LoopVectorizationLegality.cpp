@@ -35,6 +35,7 @@ using namespace llvm;
 using namespace PatternMatch;
 
 #define LV_NAME "loop-vectorize"
+#undef DEBUG_TYPE
 #define DEBUG_TYPE LV_NAME
 
 static cl::opt<bool>

@@ -23,6 +23,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Casting.h"
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "pad-tiling-interface"
 
 using namespace mlir;

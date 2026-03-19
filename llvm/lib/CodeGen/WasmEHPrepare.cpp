@@ -91,6 +91,7 @@
 
 using namespace llvm;
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "wasm-eh-prepare"
 
 namespace {

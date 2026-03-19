@@ -40,3 +40,12 @@ add_llvm_component_library(LLVMSelectionDAG
   TargetParser
   TransformUtils
   )
+
+set_source_files_properties(
+  ScheduleDAGRRList.cpp
+  SelectionDAG.cpp
+  PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
+
+set_source_files_properties(
+  TargetLowering.cpp
+  PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)

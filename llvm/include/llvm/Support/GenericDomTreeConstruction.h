@@ -46,6 +46,7 @@
 #include <optional>
 #include <queue>
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "dom-tree-builder"
 
 namespace llvm {

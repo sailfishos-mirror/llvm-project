@@ -46,6 +46,7 @@ namespace xegpu {
 } // namespace xegpu
 } // namespace mlir
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "xegpu-subgroup-distribute"
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
 

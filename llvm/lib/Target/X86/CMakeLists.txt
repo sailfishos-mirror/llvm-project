@@ -130,3 +130,22 @@ add_subdirectory(Disassembler)
 add_subdirectory(MCA)
 add_subdirectory(MCTargetDesc)
 add_subdirectory(TargetInfo)
+
+set_source_files_properties(
+  X86FastTileConfig.cpp
+  X86FixupVectorConstants.cpp
+  X86ISelLowering.cpp
+  X86LoadValueInjectionRetHardening.cpp
+  X86LowerAMXIntrinsics.cpp
+  X86SpeculativeExecutionSideEffectSuppression.cpp
+  X86WinEHState.cpp
+  PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
+
+set_source_files_properties(
+  X86CompressEVEX.cpp
+  PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
+
+set_source_files_properties(
+  GISel/X86PreLegalizerCombiner.cpp
+  GISel/X86PostLegalizerCombiner.cpp
+  PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)

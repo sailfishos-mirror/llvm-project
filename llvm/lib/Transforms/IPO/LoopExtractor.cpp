@@ -28,6 +28,7 @@
 #include "llvm/Transforms/Utils/CodeExtractor.h"
 using namespace llvm;
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "loop-extract"
 
 STATISTIC(NumExtracted, "Number of loops extracted");

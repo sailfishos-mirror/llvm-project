@@ -37,3 +37,7 @@ add_mlir_dialect_library(MLIRArithTransforms
   MLIRValueBoundsOpInterface
   MLIRVectorDialect
   )
+
+set_source_files_properties(
+  BufferizableOpInterfaceImpl.cpp
+  PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)

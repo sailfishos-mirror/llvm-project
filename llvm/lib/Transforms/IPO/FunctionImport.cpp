@@ -55,6 +55,7 @@
 
 using namespace llvm;
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "function-import"
 
 STATISTIC(NumImportedFunctionsThinLink,

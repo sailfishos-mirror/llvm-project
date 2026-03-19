@@ -23,6 +23,7 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/TypeUtilities.h"
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "vector-contract-lowering"
 
 using namespace mlir;

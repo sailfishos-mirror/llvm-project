@@ -28,6 +28,7 @@
 using namespace llvm;
 using namespace llvm::objcarc;
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "objc-arc-ptr-state"
 
 //===----------------------------------------------------------------------===//

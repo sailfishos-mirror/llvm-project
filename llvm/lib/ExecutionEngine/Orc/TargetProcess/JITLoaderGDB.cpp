@@ -14,6 +14,7 @@
 #include <cstdint>
 #include <mutex>
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "orc"
 
 // First version as landed in August 2009

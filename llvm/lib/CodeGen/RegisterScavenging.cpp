@@ -43,6 +43,7 @@
 
 using namespace llvm;
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "reg-scavenging"
 
 STATISTIC(NumScavengedRegs, "Number of frame index regs scavenged");

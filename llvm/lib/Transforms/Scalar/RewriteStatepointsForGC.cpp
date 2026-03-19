@@ -73,6 +73,7 @@
 #include <utility>
 #include <vector>
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "rewrite-statepoints-for-gc"
 
 using namespace llvm;

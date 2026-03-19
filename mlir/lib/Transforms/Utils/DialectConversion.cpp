@@ -31,6 +31,7 @@
 using namespace mlir;
 using namespace mlir::detail;
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "dialect-conversion"
 
 /// A utility function to log a successful result for the given reason.

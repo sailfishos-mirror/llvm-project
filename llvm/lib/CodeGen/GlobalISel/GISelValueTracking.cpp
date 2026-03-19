@@ -39,6 +39,7 @@
 #include "llvm/Support/KnownFPClass.h"
 #include "llvm/Target/TargetMachine.h"
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "gisel-known-bits"
 
 using namespace llvm;

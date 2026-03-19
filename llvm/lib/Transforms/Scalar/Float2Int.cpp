@@ -25,6 +25,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include <deque>
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "float2int"
 
 using namespace llvm;

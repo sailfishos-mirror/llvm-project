@@ -68,6 +68,7 @@
 
 using namespace llvm;
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "machine-sink"
 
 static cl::opt<bool>

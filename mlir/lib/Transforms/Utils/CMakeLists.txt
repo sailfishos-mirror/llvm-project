@@ -24,3 +24,7 @@ add_mlir_library(MLIRTransformUtils
   MLIRSubsetOpInterface
   MLIRRewrite
   )
+
+set_source_files_properties(
+  GreedyPatternRewriteDriver.cpp
+  PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)

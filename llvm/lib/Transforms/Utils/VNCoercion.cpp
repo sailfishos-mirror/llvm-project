@@ -4,6 +4,7 @@
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/IntrinsicInst.h"
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "vncoerce"
 
 using namespace llvm;

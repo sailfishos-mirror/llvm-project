@@ -22,6 +22,7 @@
 using namespace mlir;
 using namespace mlir::affine;
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "decompose-affine-ops"
 
 /// Count the number of loops surrounding `operand` such that operand could be

@@ -28,6 +28,7 @@
 #include "llvm/ADT/GenericCycleInfo.h"
 #include "llvm/ADT/StringExtras.h"
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "generic-cycle-impl"
 
 namespace llvm {

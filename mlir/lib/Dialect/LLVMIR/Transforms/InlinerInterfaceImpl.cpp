@@ -24,6 +24,7 @@
 
 #include "llvm/Support/DebugLog.h"
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "llvm-inliner"
 
 using namespace mlir;

@@ -25,6 +25,7 @@
 #include "llvm/Target/TargetMachine.h"
 using namespace llvm;
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "reset-machine-function"
 
 STATISTIC(NumFunctionsReset, "Number of functions reset");

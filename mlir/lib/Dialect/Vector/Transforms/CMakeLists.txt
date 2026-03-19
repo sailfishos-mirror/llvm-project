@@ -55,3 +55,7 @@ add_mlir_dialect_library(MLIRVectorTransforms
   MLIRVectorInterfaces
   MLIRVectorUtils
   )
+
+set_source_files_properties(
+  VectorInsertExtractStridedSliceRewritePatterns.cpp
+  PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)

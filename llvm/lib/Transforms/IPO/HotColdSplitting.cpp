@@ -57,6 +57,7 @@
 #include <limits>
 #include <string>
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "hotcoldsplit"
 
 STATISTIC(NumColdRegionsFound, "Number of cold regions found.");

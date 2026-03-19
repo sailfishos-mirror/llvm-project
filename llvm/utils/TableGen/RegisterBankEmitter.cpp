@@ -23,6 +23,7 @@
 #include "llvm/TableGen/TGTimer.h"
 #include "llvm/TableGen/TableGenBackend.h"
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "register-bank-emitter"
 
 using namespace llvm;

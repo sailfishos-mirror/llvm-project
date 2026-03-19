@@ -33,3 +33,10 @@ mlir_target_link_libraries(MLIRIRTests PRIVATE MLIRIR)
 target_link_libraries(MLIRIRTests PRIVATE MLIRBytecodeWriter)
 target_link_libraries(MLIRIRTests PRIVATE MLIRTestDialect)
 target_link_libraries(MLIRIRTests PRIVATE MLIRRemarkStreamer)
+
+set_source_files_properties(
+  AffineMapTest.cpp
+  OpPropertiesTest.cpp
+  TypeAttrNamesTest.cpp
+  ValueTest.cpp
+  PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)

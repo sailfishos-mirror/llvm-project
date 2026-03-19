@@ -31,6 +31,7 @@ namespace affine {
 } // namespace affine
 } // namespace mlir
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "affine-parallel"
 
 using namespace mlir;

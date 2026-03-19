@@ -66,6 +66,7 @@
 #include <optional>
 #include <utility>
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "simple-loop-unswitch"
 
 using namespace llvm;

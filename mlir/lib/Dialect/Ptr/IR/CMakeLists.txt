@@ -37,3 +37,7 @@ add_mlir_dialect_library(
   MLIRViewLikeInterface
   MLIRPtrMemorySpaceInterfaces
 )
+
+set_source_files_properties(
+  PtrTypes.cpp
+  PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)

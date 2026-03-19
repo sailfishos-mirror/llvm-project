@@ -28,6 +28,7 @@
 
 using namespace llvm;
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "mem2reg"
 
 STATISTIC(NumPromoted, "Number of alloca's promoted");

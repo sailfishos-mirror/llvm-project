@@ -38,6 +38,7 @@
 #include <type_traits>
 #include <utility>
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "linalg-transforms"
 
 using namespace mlir;

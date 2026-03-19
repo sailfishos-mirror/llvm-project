@@ -59,6 +59,7 @@
 using namespace llvm;
 using namespace llvm::gi;
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "gicombiner-emitter"
 
 static cl::OptionCategory

@@ -136,6 +136,7 @@
 #include <utility>
 #include <vector>
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "infer-address-spaces"
 
 using namespace llvm;

@@ -31,6 +31,7 @@
 
 using namespace mlir;
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "scf-utils"
 
 SmallVector<scf::ForOp> mlir::replaceLoopNestWithNewYields(

@@ -46,6 +46,7 @@
 
 using namespace llvm;
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "ml-regalloc"
 
 // Generated header in release (AOT) mode

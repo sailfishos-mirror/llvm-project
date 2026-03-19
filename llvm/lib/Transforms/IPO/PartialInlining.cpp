@@ -60,6 +60,7 @@
 
 using namespace llvm;
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "partial-inlining"
 
 STATISTIC(NumPartialInlined,

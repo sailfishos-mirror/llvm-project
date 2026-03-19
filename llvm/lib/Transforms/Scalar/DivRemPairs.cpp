@@ -28,6 +28,7 @@
 using namespace llvm;
 using namespace llvm::PatternMatch;
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "div-rem-pairs"
 STATISTIC(NumPairs, "Number of div/rem pairs");
 STATISTIC(NumRecomposed, "Number of instructions recomposed");

@@ -39,4 +39,16 @@ add_llvm_component_library(LLVMProfileData
   TargetParser
   )
 
+# InstrProfReader.cpp and InstrProfWriter.cpp have ambiguous 'Summary' due
+# to namespace conflicts in unity builds.
+set_source_files_properties(
+  InstrProfReader.cpp
+  InstrProfWriter.cpp
+  SampleProf.cpp
+  PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
+
 add_subdirectory(Coverage)
+
+set_source_files_properties(
+  SampleProfReader.cpp
+  PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)

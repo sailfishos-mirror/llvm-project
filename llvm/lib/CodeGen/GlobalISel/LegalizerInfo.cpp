@@ -27,6 +27,7 @@
 using namespace llvm;
 using namespace LegalizeActions;
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "legalizer-info"
 
 cl::opt<bool> llvm::DisableGISelLegalityCheck(

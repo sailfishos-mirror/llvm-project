@@ -61,6 +61,7 @@
 #include <optional>
 #include <utility>
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "basicaa"
 
 using namespace llvm;

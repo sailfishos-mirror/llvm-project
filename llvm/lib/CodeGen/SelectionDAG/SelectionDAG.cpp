@@ -98,6 +98,7 @@ void SelectionDAG::DAGUpdateListener::NodeInserted(SDNode *) {}
 void SelectionDAG::DAGNodeDeletedListener::anchor() {}
 void SelectionDAG::DAGNodeInsertedListener::anchor() {}
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "selectiondag"
 
 static cl::opt<bool> EnableMemCpyDAGOpt("enable-memcpy-dag-opt",

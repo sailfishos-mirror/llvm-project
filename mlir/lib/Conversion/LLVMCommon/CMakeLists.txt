@@ -17,3 +17,8 @@ add_mlir_conversion_library(MLIRLLVMCommonConversion
   MLIRSupport
   MLIRTransforms
   )
+
+set_source_files_properties(
+  StructBuilder.cpp
+  TypeConverter.cpp
+  PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)

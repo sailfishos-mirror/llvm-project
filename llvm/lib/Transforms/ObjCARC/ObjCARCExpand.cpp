@@ -34,6 +34,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/ObjCARC.h"
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "objc-arc-expand"
 
 using namespace llvm;

@@ -66,6 +66,7 @@
 
 using namespace llvm;
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "twoaddressinstruction"
 
 STATISTIC(NumTwoAddressInstrs, "Number of two-address instructions");

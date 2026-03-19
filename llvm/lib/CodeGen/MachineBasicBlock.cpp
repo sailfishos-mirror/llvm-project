@@ -40,6 +40,7 @@
 #include <cmath>
 using namespace llvm;
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "codegen"
 
 static cl::opt<bool> PrintSlotIndexes(

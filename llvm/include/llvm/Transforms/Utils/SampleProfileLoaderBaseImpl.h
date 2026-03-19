@@ -53,6 +53,7 @@ namespace vfs {
 class FileSystem;
 } // namespace vfs
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "sample-profile-impl"
 
 namespace afdo_detail {

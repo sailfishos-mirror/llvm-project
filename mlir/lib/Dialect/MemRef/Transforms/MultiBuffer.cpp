@@ -26,6 +26,7 @@
 
 using namespace mlir;
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "memref-transforms"
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
 #define DBGSNL() (llvm::dbgs() << "\n")

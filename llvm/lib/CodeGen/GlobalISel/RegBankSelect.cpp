@@ -47,6 +47,7 @@
 #include <memory>
 #include <utility>
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "regbankselect"
 
 using namespace llvm;

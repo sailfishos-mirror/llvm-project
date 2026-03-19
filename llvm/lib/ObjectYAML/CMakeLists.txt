@@ -40,3 +40,9 @@ add_llvm_component_library(LLVMObjectYAML
   DebugInfoCodeView
   MC
   )
+
+set_source_files_properties(
+  CodeViewYAMLTypes.cpp
+  MinidumpEmitter.cpp
+  MinidumpYAML.cpp
+  PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)

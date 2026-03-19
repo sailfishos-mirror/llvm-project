@@ -44,3 +44,7 @@ add_llvm_component_library(LLVMInstrumentation
   TransformUtils
   ProfileData
   )
+
+set_source_files_properties(
+  HWAddressSanitizer.cpp
+  PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)

@@ -17,6 +17,7 @@
 
 // The "coro-suspend-crossing" flag is very noisy. There is another debug type,
 // "coro-frame", which results in leaner debug spew.
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "coro-suspend-crossing"
 
 namespace llvm {

@@ -26,3 +26,8 @@ mlir_target_link_libraries(MLIRTestTransformDialect PUBLIC
   MLIRTransformLoopExtension
   MLIRTransformPDLExtension
 )
+
+set_source_files_properties(
+  TestTransformDialectInterpreter.cpp
+  TestTransformStateExtension.cpp
+  PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)

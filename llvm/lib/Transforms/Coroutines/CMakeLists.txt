@@ -27,3 +27,8 @@ add_llvm_component_library(LLVMCoroutines
   TransformUtils
   TargetParser
   )
+
+set_source_files_properties(
+  CoroEarly.cpp
+  CoroElide.cpp
+  PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)

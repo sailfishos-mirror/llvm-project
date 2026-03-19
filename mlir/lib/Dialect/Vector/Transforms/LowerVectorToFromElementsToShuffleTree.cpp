@@ -31,6 +31,7 @@ namespace vector {
 } // namespace vector
 } // namespace mlir
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "lower-vector-to-from-elements-to-shuffle-tree"
 
 using namespace mlir;

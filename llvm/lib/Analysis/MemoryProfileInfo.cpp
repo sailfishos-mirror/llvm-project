@@ -20,6 +20,7 @@
 using namespace llvm;
 using namespace llvm::memprof;
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "memory-profile-info"
 
 namespace llvm {

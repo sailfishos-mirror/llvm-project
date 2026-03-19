@@ -21,6 +21,7 @@ namespace mlir {
 #include "mlir/Dialect/Async/Passes.h.inc"
 } // namespace mlir
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "async-ref-counting"
 
 using namespace mlir;

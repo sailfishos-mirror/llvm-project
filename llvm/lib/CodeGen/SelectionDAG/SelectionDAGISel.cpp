@@ -113,6 +113,7 @@
 
 using namespace llvm;
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "isel"
 #define ISEL_DUMP_DEBUG_TYPE DEBUG_TYPE "-dump"
 

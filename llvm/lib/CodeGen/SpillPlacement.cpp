@@ -42,6 +42,7 @@
 
 using namespace llvm;
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "spill-code-placement"
 
 char SpillPlacementWrapperLegacy::ID = 0;

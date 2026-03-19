@@ -84,6 +84,7 @@
 #include <cmath>
 using namespace llvm;
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "tailcallelim"
 
 STATISTIC(NumEliminated, "Number of tail calls removed");

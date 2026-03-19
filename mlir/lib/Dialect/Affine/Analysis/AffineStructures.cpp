@@ -23,6 +23,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include <optional>
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "affine-structures"
 
 using namespace mlir;

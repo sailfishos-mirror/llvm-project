@@ -25,6 +25,7 @@ namespace affine {
 } // namespace affine
 } // namespace mlir
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "affine-scalrep"
 
 using namespace mlir;

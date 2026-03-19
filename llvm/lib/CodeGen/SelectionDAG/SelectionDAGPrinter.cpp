@@ -20,6 +20,7 @@
 #include "llvm/Support/raw_ostream.h"
 using namespace llvm;
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "dag-printer"
 
 namespace llvm {

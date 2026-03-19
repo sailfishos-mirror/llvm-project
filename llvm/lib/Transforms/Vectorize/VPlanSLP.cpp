@@ -37,6 +37,7 @@
 
 using namespace llvm;
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "vplan-slp"
 
 // Number of levels to look ahead when re-ordering multi node operands.

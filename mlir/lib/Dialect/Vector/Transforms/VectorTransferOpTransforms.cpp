@@ -28,6 +28,7 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/DebugLog.h"
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "vector-transfer-opt"
 
 using namespace mlir;

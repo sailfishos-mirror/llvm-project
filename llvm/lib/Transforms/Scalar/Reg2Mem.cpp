@@ -33,6 +33,7 @@
 #include <list>
 using namespace llvm;
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "reg2mem"
 
 STATISTIC(NumRegsDemoted, "Number of registers demoted");

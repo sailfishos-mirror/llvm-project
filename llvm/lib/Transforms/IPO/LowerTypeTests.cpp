@@ -89,6 +89,7 @@
 using namespace llvm;
 using namespace lowertypetests;
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "lowertypetests"
 
 STATISTIC(ByteArraySizeBits, "Byte array size in bits");

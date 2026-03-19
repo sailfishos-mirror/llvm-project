@@ -75,6 +75,7 @@
 using namespace llvm;
 using namespace llvm::GVNExpression;
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "gvn-sink"
 
 STATISTIC(NumRemoved, "Number of instructions removed");

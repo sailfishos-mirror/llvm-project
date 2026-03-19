@@ -17,3 +17,7 @@ add_mlir_library(MLIRDebug
   MLIRObservers
 )
 
+
+set_source_files_properties(
+  DebuggerExecutionContextHook.cpp
+  PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)

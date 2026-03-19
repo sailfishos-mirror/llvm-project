@@ -83,3 +83,12 @@ add_llvm_target(SPIRVCodeGen
 add_subdirectory(MCTargetDesc)
 add_subdirectory(TargetInfo)
 add_subdirectory(Analysis)
+
+set_source_files_properties(
+  SPIRVBuiltins.cpp
+  SPIRVEmitIntrinsics.cpp
+  SPIRVModuleAnalysis.cpp
+  SPIRVPreLegalizerCombiner.cpp
+  SPIRVRegisterBankInfo.cpp
+  SPIRVRegisterInfo.cpp
+  PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)

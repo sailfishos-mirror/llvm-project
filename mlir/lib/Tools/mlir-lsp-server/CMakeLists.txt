@@ -17,3 +17,7 @@ add_mlir_library(MLIRLspServerLib
   MLIRLspServerSupportLib
   MLIRParser
   )
+
+set_source_files_properties(
+  MLIRServer.cpp
+  PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)

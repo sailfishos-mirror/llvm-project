@@ -23,6 +23,7 @@
 #include "llvm/Support/Regex.h"
 #include <memory>
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "dialect"
 
 using namespace mlir;

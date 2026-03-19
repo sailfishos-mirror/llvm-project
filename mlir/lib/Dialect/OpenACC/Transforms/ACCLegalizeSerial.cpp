@@ -41,6 +41,7 @@ namespace acc {
 } // namespace acc
 } // namespace mlir
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "acc-legalize-serial"
 
 namespace {

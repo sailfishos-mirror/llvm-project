@@ -19,6 +19,7 @@
 #include "llvm/Object/COFF.h"
 #include "llvm/Support/Endian.h"
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "dyld"
 
 namespace llvm {

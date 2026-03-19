@@ -37,6 +37,7 @@ LLVM_ABI cl::opt<double> ExpensiveRematWeight("regalloc-expensive-remat-weight",
                                               cl::init(1.0), cl::Hidden);
 } // end namespace llvm
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "regalloc-score"
 
 RegAllocScore &RegAllocScore::operator+=(const RegAllocScore &Other) {

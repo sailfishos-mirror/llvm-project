@@ -105,3 +105,8 @@ target_link_libraries(LLVMOrcJIT
   LLVMBitWriter
   LLVMPasses
   )
+
+set_source_files_properties(
+  ELFNixPlatform.cpp
+  RTDyldObjectLinkingLayer.cpp
+  PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)

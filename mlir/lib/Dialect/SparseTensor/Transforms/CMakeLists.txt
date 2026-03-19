@@ -53,3 +53,8 @@ add_mlir_dialect_library(MLIRSparseTensorTransforms
   MLIRTransforms
   MLIRVectorDialect
 )
+
+set_source_files_properties(
+  SparseTensorConversion.cpp
+  Sparsification.cpp
+  PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)

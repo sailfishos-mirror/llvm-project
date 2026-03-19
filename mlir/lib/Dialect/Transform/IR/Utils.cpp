@@ -15,6 +15,7 @@
 
 using namespace mlir;
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "transform-dialect-utils"
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE << "]: ")
 

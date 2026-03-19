@@ -42,6 +42,7 @@
 
 using namespace mlir;
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "vector-narrow-type-emulation"
 
 using VectorValue = TypedValue<VectorType>;

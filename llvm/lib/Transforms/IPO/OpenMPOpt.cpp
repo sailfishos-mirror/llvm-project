@@ -64,6 +64,7 @@
 using namespace llvm;
 using namespace omp;
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "openmp-opt"
 
 static cl::opt<bool> DisableOpenMPOptimizations(

@@ -31,6 +31,7 @@
 #include "llvm/Target/TargetMachine.h"
 using namespace llvm;
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "instr-emitter"
 
 /// MinRCSize - Smallest register class we allow when constraining virtual

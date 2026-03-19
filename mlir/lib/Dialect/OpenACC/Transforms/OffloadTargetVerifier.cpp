@@ -66,6 +66,7 @@ namespace acc {
 } // namespace acc
 } // namespace mlir
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "offload-target-verifier"
 
 using namespace mlir;

@@ -27,3 +27,7 @@ add_llvm_component_library(LLVMARMDesc
   ADD_TO_COMPONENT
   ARM
   )
+
+set_source_files_properties(
+  ARMELFObjectWriter.cpp
+  PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)

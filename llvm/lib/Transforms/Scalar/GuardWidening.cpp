@@ -63,6 +63,7 @@
 
 using namespace llvm;
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "guard-widening"
 
 STATISTIC(GuardsEliminated, "Number of eliminated guards");

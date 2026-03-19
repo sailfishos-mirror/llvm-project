@@ -25,6 +25,7 @@
 #include <numeric>
 #include <optional>
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "affine-loop-analysis"
 
 using namespace mlir;

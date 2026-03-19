@@ -15,6 +15,7 @@
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Interfaces/ValueBoundsOpInterface.h"
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "linalg-padding"
 
 using namespace mlir;

@@ -24,6 +24,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include <numeric>
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "vector-shape-cast-lowering"
 
 using namespace mlir;

@@ -68,6 +68,7 @@
 
 using namespace llvm;
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "loop-fusion"
 
 STATISTIC(FuseCounter, "Loops fused");

@@ -50,3 +50,7 @@ add_subdirectory(MCTargetDesc)
 add_subdirectory(TargetInfo)
 add_subdirectory(AsmParser)
 add_subdirectory(Disassembler)
+
+set_source_files_properties(
+  MSP430MCInstLower.cpp
+  PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)

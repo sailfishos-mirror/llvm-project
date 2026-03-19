@@ -48,6 +48,7 @@
 
 using namespace llvm;
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "branch-prob"
 
 static cl::opt<bool> PrintBranchProb(

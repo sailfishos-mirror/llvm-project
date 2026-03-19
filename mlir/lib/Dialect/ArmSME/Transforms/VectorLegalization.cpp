@@ -28,6 +28,7 @@
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "arm-sme-vector-legalization"
 
 namespace mlir::arm_sme {

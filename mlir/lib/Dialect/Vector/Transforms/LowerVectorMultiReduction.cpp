@@ -26,6 +26,7 @@ namespace vector {
 } // namespace vector
 } // namespace mlir
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "vector-multi-reduction"
 
 using namespace mlir;

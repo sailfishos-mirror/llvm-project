@@ -22,6 +22,7 @@
 #include "llvm/Support/DebugLog.h"
 #include "llvm/Support/InterleavedRange.h"
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "affine-min-max"
 
 using namespace mlir;

@@ -38,6 +38,7 @@
 #include <numeric>
 #include <optional>
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "globalisel-utils"
 
 using namespace llvm;

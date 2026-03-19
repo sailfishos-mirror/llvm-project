@@ -85,6 +85,7 @@ using namespace llvm::gvn;
 using namespace llvm::VNCoercion;
 using namespace PatternMatch;
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "gvn"
 
 STATISTIC(NumGVNInstr, "Number of instructions deleted");

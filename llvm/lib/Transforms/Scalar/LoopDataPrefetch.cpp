@@ -30,6 +30,7 @@
 #include "llvm/Transforms/Utils.h"
 #include "llvm/Transforms/Utils/ScalarEvolutionExpander.h"
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "loop-data-prefetch"
 
 using namespace llvm;

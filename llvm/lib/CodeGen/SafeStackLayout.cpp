@@ -18,6 +18,7 @@
 using namespace llvm;
 using namespace llvm::safestack;
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "safestacklayout"
 
 static cl::opt<bool> ClLayout("safe-stack-layout",

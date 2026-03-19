@@ -104,3 +104,7 @@ add_subdirectory(AsmParser)
 add_subdirectory(Disassembler)
 add_subdirectory(MCTargetDesc)
 add_subdirectory(TargetInfo)
+
+set_source_files_properties(
+  HexagonOptimizeSZextends.cpp
+  PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)

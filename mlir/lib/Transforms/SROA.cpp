@@ -19,6 +19,7 @@ namespace mlir {
 #include "mlir/Transforms/Passes.h.inc"
 } // namespace mlir
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "sroa"
 
 using namespace mlir;

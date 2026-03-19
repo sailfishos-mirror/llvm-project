@@ -43,6 +43,7 @@
 #include "llvm/Target/TargetMachine.h"
 using namespace llvm;
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "post-RA-sched"
 
 STATISTIC(NumNoops, "Number of noops inserted");

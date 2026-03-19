@@ -33,6 +33,7 @@
 #include "llvm/Support/Alignment.h"
 #include "llvm/Support/ErrorHandling.h"
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "machine-stable-hash"
 
 using namespace llvm;

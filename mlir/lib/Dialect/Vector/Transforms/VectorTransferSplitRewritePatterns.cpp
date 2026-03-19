@@ -28,6 +28,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVectorExtras.h"
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "vector-transfer-split"
 
 using namespace mlir;

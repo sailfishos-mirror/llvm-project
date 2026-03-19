@@ -19,3 +19,7 @@ add_llvm_component_library(LLVMMIRParser
   Support
   Target
   )
+
+set_source_files_properties(
+  MIParser.cpp
+  PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)

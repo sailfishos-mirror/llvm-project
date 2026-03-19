@@ -91,6 +91,7 @@ namespace llvm {
 class LPMUpdater;
 } // namespace llvm
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "licm"
 
 STATISTIC(NumCreatedBlocks, "Number of blocks created");

@@ -24,6 +24,7 @@
 using namespace mlir;
 using namespace mlir::dataflow;
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "dense-analysis"
 
 //===----------------------------------------------------------------------===//

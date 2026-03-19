@@ -19,6 +19,7 @@
 #include "llvm/Support/DebugLog.h"
 #include <cassert>
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "constant-propagation"
 
 using namespace mlir;

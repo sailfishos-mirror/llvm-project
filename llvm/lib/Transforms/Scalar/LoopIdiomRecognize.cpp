@@ -95,6 +95,7 @@
 using namespace llvm;
 using namespace SCEVPatternMatch;
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "loop-idiom"
 
 STATISTIC(NumMemSet, "Number of memset's formed from loop stores");

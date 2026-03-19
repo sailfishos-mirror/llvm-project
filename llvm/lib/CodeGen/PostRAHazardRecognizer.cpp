@@ -37,6 +37,7 @@
 #include "llvm/Pass.h"
 using namespace llvm;
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "post-RA-hazard-rec"
 
 STATISTIC(NumNoops, "Number of noops inserted");

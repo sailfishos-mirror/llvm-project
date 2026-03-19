@@ -150,6 +150,7 @@
 
 using namespace llvm;
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "windows-secure-hot-patch"
 
 // A file containing list of mangled function names to mark for hot patching.

@@ -17,6 +17,7 @@
 
 using namespace mlir;
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "typeid"
 
 //===----------------------------------------------------------------------===//

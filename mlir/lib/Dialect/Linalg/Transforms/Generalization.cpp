@@ -25,6 +25,7 @@ namespace mlir {
 #include "mlir/Dialect/Linalg/Passes.h.inc"
 } // namespace mlir
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "linalg-generalization"
 
 using namespace mlir;

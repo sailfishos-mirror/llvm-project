@@ -36,6 +36,7 @@
 #include <optional>
 #include <utility>
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "int-range-analysis"
 
 using namespace mlir;

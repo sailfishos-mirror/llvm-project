@@ -30,6 +30,7 @@
 #include "llvm/Support/Debug.h"
 #include <optional>
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "tile-using-interface"
 
 using namespace mlir;

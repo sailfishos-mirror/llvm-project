@@ -25,3 +25,8 @@ add_mlir_conversion_library(MLIRShapeToStandard
   MLIRSCFDialect
   MLIRTransforms
   )
+
+set_source_files_properties(
+  ShapeToStandard.cpp
+  ConvertShapeConstraints.cpp
+  PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)

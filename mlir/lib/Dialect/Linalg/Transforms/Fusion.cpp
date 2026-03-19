@@ -24,6 +24,7 @@
 #include "llvm/ADT/SmallVectorExtras.h"
 #include "llvm/Support/Debug.h"
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "linalg-fusion"
 
 using namespace mlir;

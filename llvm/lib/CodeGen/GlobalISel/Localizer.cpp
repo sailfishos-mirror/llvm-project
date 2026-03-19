@@ -20,6 +20,7 @@
 #include "llvm/InitializePasses.h"
 #include "llvm/Support/Debug.h"
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "localizer"
 
 using namespace llvm;

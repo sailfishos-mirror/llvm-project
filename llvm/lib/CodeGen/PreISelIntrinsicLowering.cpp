@@ -45,6 +45,7 @@
 
 using namespace llvm;
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "pre-isel-intrinsic-lowering"
 
 /// Threshold to leave statically sized memory intrinsic calls. Calls of known

@@ -25,6 +25,7 @@
 #include <limits>
 #include <optional>
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "memref-to-spirv-pattern"
 
 using namespace mlir;

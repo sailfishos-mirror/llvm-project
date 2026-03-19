@@ -135,6 +135,7 @@ using namespace llvm;
 using namespace PatternMatch;
 using namespace SCEVPatternMatch;
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "scalar-evolution"
 
 STATISTIC(NumExitCountsComputed,

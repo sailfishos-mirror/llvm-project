@@ -48,3 +48,32 @@ add_llvm_component_library(LLVMVectorize
   TransformUtils
   SandboxIR
   )
+
+set_source_files_properties(
+  VPlan.cpp
+  PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
+
+set_source_files_properties(
+  LoopVectorize.cpp VPlanAnalysis.cpp
+  PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
+
+set_source_files_properties(
+  VPlanConstruction.cpp
+  PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
+
+set_source_files_properties(
+  VPlanPredicator.cpp
+  VPlanRecipes.cpp
+  PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
+
+set_source_files_properties(
+  VPlanTransforms.cpp
+  PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
+
+set_source_files_properties(
+  VPlanUnroll.cpp
+  PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
+
+set_source_files_properties(VPlanVerifier.cpp PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
+
+set_source_files_properties(VPlanUtils.cpp PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)

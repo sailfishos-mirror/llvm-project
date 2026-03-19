@@ -25,6 +25,7 @@
 
 using namespace llvm;
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "moduleutils"
 
 static void appendToGlobalArray(StringRef ArrayName, Module &M, Function *F,

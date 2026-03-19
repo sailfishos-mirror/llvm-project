@@ -299,3 +299,23 @@ add_subdirectory(SelectionDAG)
 add_subdirectory(AsmPrinter)
 add_subdirectory(MIRParser)
 add_subdirectory(GlobalISel)
+
+set_source_files_properties(
+  LiveIntervalCalc.cpp
+  MLRegAllocPriorityAdvisor.cpp
+  MachineOutliner.cpp
+  PostRASchedulerList.cpp
+  RegAllocPriorityAdvisor.cpp
+  PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
+
+set_source_files_properties(
+  MLRegAllocEvictAdvisor.cpp
+  PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
+
+set_source_files_properties(
+  ModuloSchedule.cpp
+  PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
+
+set_source_files_properties(
+  PatchableFunction.cpp
+  PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)

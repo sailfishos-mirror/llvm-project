@@ -16,6 +16,7 @@
 #include "llvm/Config/llvm-config.h"
 #include "llvm/Support/Debug.h"
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "registerbank"
 
 using namespace llvm;

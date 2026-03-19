@@ -53,6 +53,7 @@
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/raw_ostream.h"
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "uniformity"
 
 namespace llvm {

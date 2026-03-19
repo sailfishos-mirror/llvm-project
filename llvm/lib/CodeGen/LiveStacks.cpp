@@ -18,6 +18,7 @@
 #include "llvm/IR/Function.h"
 using namespace llvm;
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "livestacks"
 
 char LiveStacksWrapperLegacy::ID = 0;

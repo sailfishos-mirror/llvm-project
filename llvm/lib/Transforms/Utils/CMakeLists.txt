@@ -108,3 +108,11 @@ add_llvm_component_library(LLVMTransformUtils
   Support
   TargetParser
   )
+
+set_source_files_properties(
+  LowerGlobalDtors.cpp
+  PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
+
+set_source_files_properties(
+  LowerInvoke.cpp
+  PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)

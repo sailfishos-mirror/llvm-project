@@ -16,6 +16,7 @@
 #include "llvm/IR/PatternMatch.h"
 #include "llvm/Support/DebugCounter.h"
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "assume-queries"
 
 using namespace llvm;

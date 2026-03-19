@@ -27,6 +27,7 @@
 #include <optional>
 using namespace llvm;
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "loop-rotate"
 
 static cl::opt<unsigned> DefaultRotationThreshold(

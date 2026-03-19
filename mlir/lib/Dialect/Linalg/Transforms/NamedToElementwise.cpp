@@ -23,6 +23,7 @@
 using namespace mlir;
 using namespace mlir::linalg;
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "linalg-named-to-elementwise"
 
 namespace {

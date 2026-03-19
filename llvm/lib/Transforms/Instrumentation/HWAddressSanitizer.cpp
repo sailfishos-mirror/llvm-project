@@ -68,6 +68,7 @@
 
 using namespace llvm;
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "hwasan"
 
 const char kHwasanModuleCtorName[] = "hwasan.module_ctor";

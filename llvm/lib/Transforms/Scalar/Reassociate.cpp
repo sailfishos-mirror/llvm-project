@@ -65,6 +65,7 @@ using namespace llvm;
 using namespace reassociate;
 using namespace PatternMatch;
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "reassociate"
 
 STATISTIC(NumChanged, "Number of insts reassociated");

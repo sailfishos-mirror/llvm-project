@@ -17,3 +17,8 @@ add_llvm_component_library(LLVMSPIRVDesc
   ADD_TO_COMPONENT
   SPIRV
   )
+
+set_source_files_properties(
+  SPIRVBaseInfo.cpp
+  SPIRVMCCodeEmitter.cpp
+  PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)

@@ -21,6 +21,7 @@
 using namespace llvm;
 using namespace llvm::ore;
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "annotation-remarks"
 #define REMARK_PASS DEBUG_TYPE
 

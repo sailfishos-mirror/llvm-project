@@ -18,6 +18,7 @@
 #include "mlir/IR/PatternMatch.h"
 #include "llvm/ADT/SmallVectorExtras.h"
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "vector-interleave-lowering"
 
 using namespace mlir;

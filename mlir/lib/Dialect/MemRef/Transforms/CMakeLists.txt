@@ -44,3 +44,7 @@ add_mlir_dialect_library(MLIRMemRefTransforms
   MLIRVectorDialect
 )
 
+
+set_source_files_properties(
+  EmulateNarrowType.cpp
+  PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)

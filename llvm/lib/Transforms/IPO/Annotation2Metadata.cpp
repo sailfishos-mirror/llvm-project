@@ -20,6 +20,7 @@
 
 using namespace llvm;
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "annotation2metadata"
 
 static bool convertAnnotation2Metadata(Module &M) {

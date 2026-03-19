@@ -26,6 +26,7 @@ namespace mlir {
 #include "mlir/Dialect/Linalg/Passes.h.inc"
 } // namespace mlir
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "linalg-specialization"
 
 #define REPLACE_BINARY_OP(NEWOP, OPERANDS_SWAP)                                \

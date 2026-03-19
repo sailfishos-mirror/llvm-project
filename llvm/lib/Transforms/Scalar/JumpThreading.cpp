@@ -78,6 +78,7 @@
 using namespace llvm;
 using namespace jumpthreading;
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "jump-threading"
 
 STATISTIC(NumThreads, "Number of jumps threaded");

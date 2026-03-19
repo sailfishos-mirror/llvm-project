@@ -25,6 +25,7 @@
 /// The RemoveRedundantDebugValues pass removes redundant DBG_VALUEs that
 /// appear in MIR after the register allocator.
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "removeredundantdebugvalues"
 
 using namespace llvm;

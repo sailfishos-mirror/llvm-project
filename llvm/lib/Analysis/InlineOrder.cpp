@@ -20,6 +20,7 @@
 
 using namespace llvm;
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "inline-order"
 
 enum class InlinePriorityMode : int { Size, Cost, CostBenefit, ML };

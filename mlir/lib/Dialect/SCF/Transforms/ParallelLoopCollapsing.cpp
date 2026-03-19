@@ -19,6 +19,7 @@ namespace mlir {
 #include "mlir/Dialect/SCF/Transforms/Passes.h.inc"
 } // namespace mlir
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "parallel-loop-collapsing"
 
 using namespace mlir;

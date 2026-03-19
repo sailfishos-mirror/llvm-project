@@ -17,6 +17,7 @@
 #include "llvm/InitializePasses.h"
 #include "llvm/Support/ErrorHandling.h"
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "dxil-metadata-analysis"
 
 using namespace llvm;

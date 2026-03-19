@@ -8,3 +8,7 @@ add_mlir_library(MLIRPDLLCodeGen
   MLIRPDLDialect
   MLIRSupport
   )
+
+set_source_files_properties(
+  MLIRGen.cpp
+  PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)

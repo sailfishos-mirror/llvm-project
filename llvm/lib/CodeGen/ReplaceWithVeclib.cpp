@@ -32,6 +32,7 @@
 
 using namespace llvm;
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "replace-with-veclib"
 
 STATISTIC(NumCallsReplaced,

@@ -88,6 +88,7 @@
 
 using namespace llvm;
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "shrink-wrap"
 
 STATISTIC(NumFunc, "Number of functions");

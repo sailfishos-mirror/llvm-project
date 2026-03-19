@@ -125,6 +125,7 @@ using namespace llvm::GVNExpression;
 using namespace llvm::VNCoercion;
 using namespace llvm::PatternMatch;
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "newgvn"
 
 STATISTIC(NumGVNInstrDeleted, "Number of instructions deleted");

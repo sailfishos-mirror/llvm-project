@@ -50,6 +50,7 @@
 using namespace llvm;
 using namespace llvm::PatternMatch;
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "loop-utils"
 
 static const char *LLVMLoopDisableNonforced = "llvm.loop.disable_nonforced";

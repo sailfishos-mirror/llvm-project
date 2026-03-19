@@ -100,6 +100,7 @@ using namespace llvm;
 using RegSubRegPair = TargetInstrInfo::RegSubRegPair;
 using RegSubRegPairAndIdx = TargetInstrInfo::RegSubRegPairAndIdx;
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "peephole-opt"
 
 // Optimize Extensions

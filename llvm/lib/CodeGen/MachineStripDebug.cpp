@@ -18,6 +18,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Transforms/Utils/Debugify.h"
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "mir-strip-debug"
 
 using namespace llvm;

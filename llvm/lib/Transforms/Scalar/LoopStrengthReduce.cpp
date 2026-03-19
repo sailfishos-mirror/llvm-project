@@ -129,6 +129,7 @@
 using namespace llvm;
 using namespace SCEVPatternMatch;
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "loop-reduce"
 
 /// MaxIVUsers is an arbitrary threshold that provides an early opportunity for

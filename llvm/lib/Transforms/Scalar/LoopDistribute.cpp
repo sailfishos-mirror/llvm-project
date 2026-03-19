@@ -69,6 +69,7 @@
 using namespace llvm;
 
 #define LDIST_NAME "loop-distribute"
+#undef DEBUG_TYPE
 #define DEBUG_TYPE LDIST_NAME
 
 /// @{

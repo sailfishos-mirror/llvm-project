@@ -17,6 +17,7 @@
 
 using namespace llvm;
 
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "loweratomic"
 
 bool llvm::lowerAtomicCmpXchgInst(AtomicCmpXchgInst *CXI) {
