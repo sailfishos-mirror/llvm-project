@@ -489,9 +489,8 @@
 ; INLINER-NEXT: amdgpu-lower-intrinsics
 ; INLINER-NEXT: cgscc(function(lower-switch
 ; INLINER-NEXT: lower-invoke
-; INLINER-NEXT: unreachableblockelim))
-; INLINER-NEXT: require<amdgpu-argument-usage>
-; INLINER-NEXT: cgscc(function(flatten-cfg
+; INLINER-NEXT: unreachableblockelim
+; INLINER-NEXT: flatten-cfg
 ; INLINER-NEXT: sink
 ; INLINER-NEXT: amdgpu-late-codegenprepare
 ; INLINER-NEXT: amdgpu-unify-divergent-exit-nodes

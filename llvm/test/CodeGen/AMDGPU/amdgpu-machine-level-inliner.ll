@@ -556,6 +556,7 @@ define amdgpu_cs void @dont_inline_non_wwf(i32 %input, ptr addrspace(1) %output)
 ; CHECK:       ; %bb.0:
 ; CHECK-NEXT:    s_mov_b32 s1, regular_function@abs32@hi
 ; CHECK-NEXT:    s_mov_b32 s0, regular_function@abs32@lo
+; CHECK-NEXT:    s_mov_b64 s[8:9], 0
 ; CHECK-NEXT:    s_mov_b32 s32, 0
 ; CHECK-NEXT:    s_swappc_b64 s[30:31], s[0:1]
 ; CHECK-NEXT:    global_store_b32 v[1:2], v0, off
@@ -566,9 +567,10 @@ define amdgpu_cs void @dont_inline_non_wwf(i32 %input, ptr addrspace(1) %output)
 ; NPM-NEXT: {{  $}}
 ; NPM-NEXT:   renamable $sgpr1 = S_MOV_B32 target-flags(amdgpu-abs32-hi) @regular_function
 ; NPM-NEXT:   renamable $sgpr0 = S_MOV_B32 target-flags(amdgpu-abs32-lo) @regular_function
+; NPM-NEXT:   $sgpr8_sgpr9 = S_MOV_B64 0
 ; NPM-NEXT:   $sgpr32 = S_MOV_B32 0
 ; NPM-NEXT:   $vgpr41, $vgpr40 = V_DUAL_MOV_B32_e32_X_MOV_B32_e32_gfx12 killed $vgpr2, killed $vgpr1, implicit $exec, implicit $exec, implicit $exec, implicit $exec, implicit $exec
-; NPM-NEXT:   dead $sgpr30_sgpr31 = SI_CALL killed renamable $sgpr0_sgpr1, @regular_function, csr_amdgpu, implicit killed $vgpr0, implicit-def $vgpr0
+; NPM-NEXT:   dead $sgpr30_sgpr31 = SI_CALL killed renamable $sgpr0_sgpr1, @regular_function, csr_amdgpu, implicit undef $sgpr4_sgpr5, implicit undef $sgpr6_sgpr7, implicit killed $sgpr8_sgpr9, implicit undef $sgpr10_sgpr11, implicit undef $sgpr12, implicit undef $sgpr13, implicit undef $sgpr14, implicit undef $sgpr15, implicit undef $vgpr31, implicit killed $vgpr0, implicit-def $vgpr0
 ; NPM-NEXT:   GLOBAL_STORE_DWORD killed renamable $vgpr40_vgpr41, killed renamable $vgpr0, 0, 0, implicit $exec :: (store (s32) into %ir.output, addrspace 1)
 ; NPM-NEXT:   S_ENDPGM 0
   %result = call i32 @regular_function(i32 %input)

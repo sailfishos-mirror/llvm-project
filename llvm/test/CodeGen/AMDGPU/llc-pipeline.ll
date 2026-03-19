@@ -1459,7 +1459,6 @@
 ; INLINER-NEXT:External Alias Analysis
 ; INLINER-NEXT:Type-Based Alias Analysis
 ; INLINER-NEXT:Scoped NoAlias Alias Analysis
-; INLINER-NEXT:Argument Register Usage Information Storage
 ; INLINER-NEXT:Create Garbage Collector Module Metadata
 ; INLINER-NEXT:Machine Branch Probability Analysis
 ; INLINER-NEXT:Register Usage Information Storage
@@ -1563,6 +1562,9 @@
 ; INLINER-NEXT:      Dominator Tree Construction
 ; INLINER-NEXT:      AMDGPU Lower Kernel Arguments
 ; INLINER-NEXT:      Natural Loop Information
+; INLINER-NEXT:      Post-Dominator Tree Construction
+; INLINER-NEXT:      Branch Probability Analysis
+; INLINER-NEXT:      Block Frequency Analysis
 ; INLINER-NEXT:      CodeGen Prepare
 ; INLINER-NEXT:      Dominator Tree Construction
 ; INLINER-NEXT:      Basic Alias Analysis (stateless AA impl)
