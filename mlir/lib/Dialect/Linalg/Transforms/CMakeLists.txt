@@ -88,6 +88,7 @@ add_mlir_dialect_library(MLIRLinalgTransforms
   MLIRVectorToSCF
 )
 
+# Anonymous namespace pattern rewriter struct redefinitions.
 set_source_files_properties(
   DecomposeLinalgOps.cpp
   PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)

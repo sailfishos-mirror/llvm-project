@@ -109,6 +109,7 @@ set_source_files_properties(
   X86MnemonicTables.cpp
   PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
 
+# Static DFA state tables and code generation helper conflicts.
 set_source_files_properties(
   DFAPacketizerEmitter.cpp
   InstrInfoEmitter.cpp

@@ -45,6 +45,7 @@ add_llvm_component_library(LLVMInstrumentation
   ProfileData
   )
 
+# Static instrumentation functions and 'using namespace' cause ambiguity.
 set_source_files_properties(
   HWAddressSanitizer.cpp
   PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)

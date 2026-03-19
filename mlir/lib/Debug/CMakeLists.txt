@@ -18,6 +18,7 @@ add_mlir_library(MLIRDebug
 )
 
 
+# Static hook registration and context handling code conflicts.
 set_source_files_properties(
   DebuggerExecutionContextHook.cpp
   PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)

@@ -27,6 +27,7 @@ mlir_target_link_libraries(MLIRTestTransformDialect PUBLIC
   MLIRTransformPDLExtension
 )
 
+# Conflicting static test interpreter definitions.
 set_source_files_properties(
   TestTransformDialectInterpreter.cpp
   TestTransformStateExtension.cpp

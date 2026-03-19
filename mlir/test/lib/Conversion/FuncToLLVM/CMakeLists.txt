@@ -22,6 +22,7 @@ target_include_directories(MLIRTestFuncToLLVM
   ${CMAKE_CURRENT_BINARY_DIR}/../../Dialect/Test
   )
 
+# Static test pass and conversion pattern conflicts.
 set_source_files_properties(
   TestConvertFuncOp.cpp
   PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)

@@ -41,11 +41,14 @@ add_llvm_component_library(LLVMSelectionDAG
   TransformUtils
   )
 
+# STATISTIC variable redefinitions (NumBacktracks, NumUnfolds, etc.)
+# and static function conflicts.
 set_source_files_properties(
   ScheduleDAGRRList.cpp
   SelectionDAG.cpp
   PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
 
+# Large template instantiation code and static helper conflicts.
 set_source_files_properties(
   TargetLowering.cpp
   PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)

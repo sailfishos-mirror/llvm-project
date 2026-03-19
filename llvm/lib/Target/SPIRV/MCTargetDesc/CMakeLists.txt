@@ -18,6 +18,7 @@ add_llvm_component_library(LLVMSPIRVDesc
   SPIRV
   )
 
+# Static encoding tables and helper function redefinitions.
 set_source_files_properties(
   SPIRVBaseInfo.cpp
   SPIRVMCCodeEmitter.cpp

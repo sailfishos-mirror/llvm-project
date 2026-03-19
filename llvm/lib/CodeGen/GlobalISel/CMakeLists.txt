@@ -48,6 +48,7 @@ add_llvm_component_library(LLVMGlobalISel
   TransformUtils
   )
 
+# Conflicting static helper functions and STATISTIC variables.
 set_source_files_properties(
   IRTranslator.cpp
   LegacyLegalizerInfo.cpp

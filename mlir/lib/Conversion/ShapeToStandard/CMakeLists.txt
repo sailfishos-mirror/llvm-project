@@ -26,6 +26,7 @@ add_mlir_conversion_library(MLIRShapeToStandard
   MLIRTransforms
   )
 
+# Conflicting pattern rewriters and helper function redefinitions.
 set_source_files_properties(
   ShapeToStandard.cpp
   ConvertShapeConstraints.cpp

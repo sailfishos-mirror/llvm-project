@@ -18,6 +18,7 @@ add_mlir_conversion_library(MLIRLLVMCommonConversion
   MLIRTransforms
   )
 
+# 'using namespace mlir' causes Type and other core type ambiguity.
 set_source_files_properties(
   StructBuilder.cpp
   TypeConverter.cpp

@@ -34,6 +34,7 @@ target_link_libraries(MLIRIRTests PRIVATE MLIRBytecodeWriter)
 target_link_libraries(MLIRIRTests PRIVATE MLIRTestDialect)
 target_link_libraries(MLIRIRTests PRIVATE MLIRRemarkStreamer)
 
+# Static test helper function redefinitions across unit tests.
 set_source_files_properties(
   AffineMapTest.cpp
   OpPropertiesTest.cpp

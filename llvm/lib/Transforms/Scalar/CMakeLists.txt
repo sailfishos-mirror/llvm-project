@@ -101,6 +101,7 @@ add_llvm_component_library(LLVMScalarOpts
   TransformUtils
   )
 
+# STATISTIC variables and static analysis function redefinitions.
 set_source_files_properties(
   BDCE.cpp
   ConstraintElimination.cpp

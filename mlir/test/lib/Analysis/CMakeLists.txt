@@ -38,6 +38,7 @@ target_include_directories(MLIRTestAnalysis
   ${CMAKE_CURRENT_BINARY_DIR}/../Dialect/Test
   )
 
+# Static test infrastructure redefinitions across analysis test files.
 set_source_files_properties(
   TestMemRefDependenceCheck.cpp
   TestSlice.cpp

@@ -45,6 +45,7 @@ target_include_directories(MLIRTestIR
   ${CMAKE_CURRENT_BINARY_DIR}/../Dialect/Test
   )
 
+# Static dominance analysis test infrastructure conflicts.
 set_source_files_properties(
   TestDominance.cpp
   PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
@@ -62,6 +63,7 @@ set_source_files_properties(
   TestVisitorsGeneric.cpp
   PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
 
+# Static interface testing utility conflicts.
 set_source_files_properties(
   TestInterfaces.cpp
   PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)

@@ -84,6 +84,7 @@ add_subdirectory(MCTargetDesc)
 add_subdirectory(TargetInfo)
 add_subdirectory(Analysis)
 
+# Conflicting intrinsic handling and static functions across SPIRV files.
 set_source_files_properties(
   SPIRVBuiltins.cpp
   SPIRVEmitIntrinsics.cpp

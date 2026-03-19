@@ -76,6 +76,7 @@ target_link_libraries(LLVMJITLink
   LLVMTargetParser
 )
 
+# Anonymous namespace function redefinitions (buildTables_ELF_x86*).
 set_source_files_properties(
   ELF_x86.cpp
   ELF_x86_64.cpp

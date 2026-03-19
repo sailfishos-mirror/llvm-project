@@ -56,6 +56,7 @@ add_mlir_dialect_library(MLIRVectorTransforms
   MLIRVectorUtils
   )
 
+# Anonymous namespace rewrite pattern redefinitions.
 set_source_files_properties(
   VectorInsertExtractStridedSliceRewritePatterns.cpp
   PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)

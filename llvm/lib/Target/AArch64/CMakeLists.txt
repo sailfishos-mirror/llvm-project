@@ -130,11 +130,13 @@ add_subdirectory(MCTargetDesc)
 add_subdirectory(TargetInfo)
 add_subdirectory(Utils)
 
+# Anonymous namespace classes and static function conflicts.
 set_source_files_properties(
   AArch64AdvSIMDScalarPass.cpp
   SVEIntrinsicOpts.cpp
   PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
 
+# Large ISel lowering file with extensive static helper conflicts.
 set_source_files_properties(
   AArch64ISelLowering.cpp
   PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)

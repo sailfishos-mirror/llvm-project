@@ -28,6 +28,7 @@ add_llvm_component_library(LLVMARMDesc
   ARM
   )
 
+# Static ELF relocation helper functions conflict in unity builds.
 set_source_files_properties(
   ARMELFObjectWriter.cpp
   PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)

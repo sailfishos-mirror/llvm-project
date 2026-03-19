@@ -19,6 +19,7 @@ mlir_target_link_libraries(MLIRSCFTestPasses PUBLIC
   MLIRTransformUtils
   )
 
+# Static loop unrolling test pattern conflicts.
 set_source_files_properties(
   TestParallelLoopUnrolling.cpp
   PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)

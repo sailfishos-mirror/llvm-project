@@ -49,31 +49,17 @@ add_llvm_component_library(LLVMVectorize
   SandboxIR
   )
 
+# VPlan files define conflicting STATISTIC variables, anonymous namespace
+# classes, and static pattern matching functions in unity builds.
 set_source_files_properties(
+  LoopVectorize.cpp
   VPlan.cpp
-  PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
-
-set_source_files_properties(
-  LoopVectorize.cpp VPlanAnalysis.cpp
-  PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
-
-set_source_files_properties(
+  VPlanAnalysis.cpp
   VPlanConstruction.cpp
-  PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
-
-set_source_files_properties(
   VPlanPredicator.cpp
   VPlanRecipes.cpp
-  PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
-
-set_source_files_properties(
   VPlanTransforms.cpp
-  PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
-
-set_source_files_properties(
   VPlanUnroll.cpp
+  VPlanUtils.cpp
+  VPlanVerifier.cpp
   PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
-
-set_source_files_properties(VPlanVerifier.cpp PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
-
-set_source_files_properties(VPlanUtils.cpp PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)

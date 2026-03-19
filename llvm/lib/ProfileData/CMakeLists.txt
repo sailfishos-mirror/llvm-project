@@ -49,6 +49,7 @@ set_source_files_properties(
 
 add_subdirectory(Coverage)
 
+# 'using namespace sampleprof' causes ambiguity with other files.
 set_source_files_properties(
   SampleProfReader.cpp
   PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
