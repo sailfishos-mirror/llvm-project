@@ -477,7 +477,7 @@ define amdgpu_cs void @inline_wwf_that_realigns_stack(i32 %y) {
 ; NPM-NEXT: {{  $}}
 ; NPM-NEXT: bb.1 (%ir-block.<ir-block badref>):
 ; NPM-NEXT:   successors: %bb.2(0x80000000)
-; NPM-NEXT:   liveins: $sgpr1, $sgpr2, $sgpr33, $sgpr34, $vgpr0, $vgpr1
+; NPM-NEXT:   liveins: $sgpr1, $sgpr2, $vgpr0, $vgpr1
 ; NPM-NEXT: {{  $}}
 ; NPM-NEXT:   $sgpr1 = S_MOV_B32 killed $sgpr33
 ; NPM-NEXT:   $sgpr33 = frame-setup S_ADD_I32 $sgpr32, 1023, implicit-def $scc
