@@ -79,7 +79,6 @@
 using namespace llvm;
 using namespace llvm::PatternMatch;
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "loop-flatten"
 
 STATISTIC(NumFlattened, "Number of loops flattened");

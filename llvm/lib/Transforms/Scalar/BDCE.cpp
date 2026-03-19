@@ -31,7 +31,6 @@
 using namespace llvm;
 using namespace PatternMatch;
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "bdce"
 
 STATISTIC(NumRemoved, "Number of instructions removed (unused)");

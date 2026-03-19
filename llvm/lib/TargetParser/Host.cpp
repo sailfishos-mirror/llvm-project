@@ -60,7 +60,6 @@
 #endif
 #endif
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "host-detection"
 
 //===----------------------------------------------------------------------===//

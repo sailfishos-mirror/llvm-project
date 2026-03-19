@@ -22,7 +22,6 @@
 #include "llvm/TableGen/Error.h"
 #include "llvm/TableGen/Record.h"
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "mlir-tblgen-pattern"
 
 using namespace mlir;

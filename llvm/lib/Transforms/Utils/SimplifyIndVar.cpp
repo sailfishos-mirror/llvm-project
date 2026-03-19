@@ -31,7 +31,6 @@
 using namespace llvm;
 using namespace llvm::PatternMatch;
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "indvars"
 
 STATISTIC(NumElimIdentity, "Number of IV identities eliminated");

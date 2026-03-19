@@ -22,7 +22,6 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/DebugLog.h"
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "strided-metadata-range-analysis"
 
 using namespace mlir;

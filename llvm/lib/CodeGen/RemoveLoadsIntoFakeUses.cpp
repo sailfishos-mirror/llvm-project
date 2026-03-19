@@ -38,7 +38,6 @@
 
 using namespace llvm;
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "remove-loads-into-fake-uses"
 
 STATISTIC(NumLoadsDeleted, "Number of dead load instructions deleted");

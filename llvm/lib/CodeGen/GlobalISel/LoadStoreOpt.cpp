@@ -37,7 +37,6 @@
 #include "llvm/Support/ErrorHandling.h"
 #include <algorithm>
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "loadstore-opt"
 
 using namespace llvm;

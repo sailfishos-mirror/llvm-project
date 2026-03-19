@@ -32,7 +32,6 @@ namespace llvm {
 extern cl::opt<bool> ProfcheckDisableMetadataFixes;
 } // namespace llvm
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "partially-inline-libcalls"
 
 DEBUG_COUNTER(PILCounter, "partially-inline-libcalls-transform",

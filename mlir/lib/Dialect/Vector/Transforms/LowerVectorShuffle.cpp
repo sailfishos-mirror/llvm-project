@@ -16,7 +16,6 @@
 #include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
 #include "mlir/IR/PatternMatch.h"
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "vector-shuffle-lowering"
 
 using namespace mlir;

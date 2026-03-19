@@ -70,7 +70,6 @@
 using namespace llvm;
 using namespace PatternMatch;
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "callsite-splitting"
 
 STATISTIC(NumCallSiteSplit, "Number of call-site split");

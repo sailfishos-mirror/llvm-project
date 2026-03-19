@@ -41,7 +41,6 @@
 #include <queue>
 #include <set>
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "vector-combine"
 #include "llvm/Transforms/Utils/InstructionWorklist.h"
 

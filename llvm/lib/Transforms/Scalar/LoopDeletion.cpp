@@ -31,7 +31,6 @@
 
 using namespace llvm;
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "loop-delete"
 
 STATISTIC(NumDeleted, "Number of loops deleted");

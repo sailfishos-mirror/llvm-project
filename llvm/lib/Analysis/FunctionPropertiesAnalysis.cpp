@@ -27,7 +27,6 @@
 
 using namespace llvm;
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "func-properties-stats"
 
 #define FUNCTION_PROPERTY(Name, Description) STATISTIC(Num##Name, Description);

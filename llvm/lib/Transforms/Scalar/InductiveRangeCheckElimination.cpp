@@ -126,7 +126,6 @@ static cl::opt<bool>
     PrintScaledBoundaryRangeChecks("irce-print-scaled-boundary-range-checks",
                                    cl::Hidden, cl::init(false));
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "irce"
 
 namespace {

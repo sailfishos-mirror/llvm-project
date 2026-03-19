@@ -80,7 +80,6 @@
 
 using namespace llvm;
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "argpromotion"
 
 STATISTIC(NumArgumentsPromoted, "Number of pointer arguments promoted");

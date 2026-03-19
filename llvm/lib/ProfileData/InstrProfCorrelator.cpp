@@ -20,7 +20,6 @@
 #include "llvm/Support/WithColor.h"
 #include <optional>
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "correlator"
 
 using namespace llvm;

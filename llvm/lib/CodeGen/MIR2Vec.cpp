@@ -25,7 +25,6 @@
 using namespace llvm;
 using namespace mir2vec;
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "mir2vec"
 
 STATISTIC(MIRVocabMissCounter,

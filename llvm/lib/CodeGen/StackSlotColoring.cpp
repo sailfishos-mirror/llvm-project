@@ -47,7 +47,6 @@
 
 using namespace llvm;
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "stack-slot-coloring"
 
 static cl::opt<bool>

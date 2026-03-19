@@ -27,7 +27,6 @@ namespace xegpu {
 } // namespace xegpu
 } // namespace mlir
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "xegpu-unroll"
 
 using namespace mlir;

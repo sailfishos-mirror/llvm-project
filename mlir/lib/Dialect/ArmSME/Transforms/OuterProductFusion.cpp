@@ -19,7 +19,6 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "llvm/ADT/TypeSwitch.h"
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "arm-sme-outerproduct-fusion"
 
 namespace mlir::arm_sme {

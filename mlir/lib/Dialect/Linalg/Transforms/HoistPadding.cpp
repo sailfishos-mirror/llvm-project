@@ -31,7 +31,6 @@
 
 using llvm::dbgs;
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "hoist-padding"
 
 #define DBGS() (dbgs() << '[' << DEBUG_TYPE << "] ")

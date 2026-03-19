@@ -23,7 +23,6 @@
 #include <unordered_set>
 
 using namespace llvm;
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "sample-profile-inference"
 
 namespace {

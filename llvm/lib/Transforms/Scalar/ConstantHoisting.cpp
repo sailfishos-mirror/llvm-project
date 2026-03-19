@@ -70,7 +70,6 @@
 using namespace llvm;
 using namespace consthoist;
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "consthoist"
 
 STATISTIC(NumConstantsHoisted, "Number of constants hoisted");

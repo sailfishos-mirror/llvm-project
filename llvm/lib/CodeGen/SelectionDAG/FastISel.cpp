@@ -110,7 +110,6 @@
 using namespace llvm;
 using namespace PatternMatch;
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "isel"
 
 STATISTIC(NumFastIselSuccessIndependent, "Number of insts selected by "

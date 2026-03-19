@@ -76,7 +76,6 @@
 
 using namespace llvm;
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "block-placement"
 
 STATISTIC(NumCondBranches, "Number of conditional branches");

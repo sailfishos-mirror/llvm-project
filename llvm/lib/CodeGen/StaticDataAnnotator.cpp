@@ -36,7 +36,6 @@
 #include "llvm/InitializePasses.h"
 #include "llvm/Pass.h"
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "static-data-annotator"
 
 using namespace llvm;

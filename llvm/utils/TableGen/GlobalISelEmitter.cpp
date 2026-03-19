@@ -55,7 +55,6 @@ using namespace llvm::gi;
 
 using action_iterator = RuleMatcher::action_iterator;
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "gisel-emitter"
 
 STATISTIC(NumPatternTotal, "Total number of patterns");

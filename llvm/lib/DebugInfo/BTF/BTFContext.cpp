@@ -14,7 +14,6 @@
 
 #include "llvm/DebugInfo/BTF/BTFContext.h"
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "debug-info-btf-context"
 
 using namespace llvm;

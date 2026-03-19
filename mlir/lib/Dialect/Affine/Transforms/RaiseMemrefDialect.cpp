@@ -31,7 +31,6 @@ namespace affine {
 } // namespace affine
 } // namespace mlir
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "raise-memref-to-affine"
 
 using namespace mlir;

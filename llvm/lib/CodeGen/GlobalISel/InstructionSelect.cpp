@@ -35,7 +35,6 @@
 #include "llvm/Support/DebugCounter.h"
 #include "llvm/Target/TargetMachine.h"
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "instruction-select"
 
 using namespace llvm;

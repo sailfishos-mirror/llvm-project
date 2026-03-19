@@ -54,7 +54,6 @@
 using namespace llvm;
 using namespace llvm::memprof;
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "memprof-context-disambiguation"
 
 STATISTIC(FunctionClonesAnalysis,

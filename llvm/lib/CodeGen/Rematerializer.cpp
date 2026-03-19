@@ -25,7 +25,6 @@
 #include "llvm/CodeGen/TargetRegisterInfo.h"
 #include "llvm/Support/Debug.h"
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "rematerializer"
 
 using namespace llvm;

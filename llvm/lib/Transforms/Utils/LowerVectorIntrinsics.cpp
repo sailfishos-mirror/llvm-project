@@ -9,7 +9,6 @@
 #include "llvm/Transforms/Utils/LowerVectorIntrinsics.h"
 #include "llvm/IR/IRBuilder.h"
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "lower-vector-intrinsics"
 
 using namespace llvm;

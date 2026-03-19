@@ -32,7 +32,6 @@
 #include "llvm/Transforms/Utils/Local.h"
 using namespace llvm;
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "sjlj-eh-prepare"
 
 STATISTIC(NumInvokes, "Number of invokes replaced");

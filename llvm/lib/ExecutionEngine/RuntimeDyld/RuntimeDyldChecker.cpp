@@ -25,7 +25,6 @@
 #include <memory>
 #include <utility>
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "rtdyld"
 
 using namespace llvm;

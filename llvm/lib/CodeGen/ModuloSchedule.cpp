@@ -20,7 +20,6 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/raw_ostream.h"
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "pipeliner"
 using namespace llvm;
 

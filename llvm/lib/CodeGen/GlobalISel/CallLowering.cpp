@@ -25,7 +25,6 @@
 #include "llvm/IR/Module.h"
 #include "llvm/Target/TargetMachine.h"
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "call-lowering"
 
 using namespace llvm;

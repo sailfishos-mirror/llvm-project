@@ -10,7 +10,6 @@
 #include "llvm/Analysis/IVUsers.h"
 using namespace llvm;
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "iv-users"
 
 PreservedAnalyses IVUsersPrinterPass::run(Loop &L, LoopAnalysisManager &AM,

@@ -17,7 +17,6 @@
 #include "llvm/CodeGen/MachineOperand.h"
 #include "llvm/CodeGen/MachineRegisterInfo.h"
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "gi-match-table-executor"
 
 using namespace llvm;

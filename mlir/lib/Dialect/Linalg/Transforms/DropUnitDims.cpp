@@ -36,7 +36,6 @@ namespace mlir {
 #include "mlir/Dialect/Linalg/Passes.h.inc"
 } // namespace mlir
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "linalg-drop-unit-dims"
 
 using namespace mlir;

@@ -48,7 +48,6 @@
 
 using namespace llvm;
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "scalarizer"
 
 static BasicBlock::iterator skipPastPhiNodesAndDbg(BasicBlock::iterator Itr) {

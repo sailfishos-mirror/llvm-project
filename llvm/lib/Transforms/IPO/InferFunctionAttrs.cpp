@@ -14,7 +14,6 @@
 #include "llvm/Transforms/Utils/Local.h"
 using namespace llvm;
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "inferattrs"
 
 static bool inferAllPrototypeAttributes(

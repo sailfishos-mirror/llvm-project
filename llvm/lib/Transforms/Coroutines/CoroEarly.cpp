@@ -16,7 +16,6 @@
 
 using namespace llvm;
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "coro-early"
 
 namespace {

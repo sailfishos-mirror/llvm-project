@@ -22,7 +22,6 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/TypeUtilities.h"
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "vector-broadcast-lowering"
 
 using namespace mlir;

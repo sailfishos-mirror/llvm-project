@@ -48,7 +48,6 @@
 
 using namespace llvm;
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "memory-builtins"
 
 static cl::opt<unsigned> ObjectSizeOffsetVisitorMaxVisitInstructions(

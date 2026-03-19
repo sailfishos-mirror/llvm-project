@@ -48,7 +48,6 @@
 #include "llvm/Transforms/Utils/LoopUtils.h"
 using namespace llvm;
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "loopsink"
 
 STATISTIC(NumLoopSunk, "Number of instructions sunk into loop");

@@ -62,7 +62,6 @@
 using namespace llvm;
 
 #define LLE_OPTION "loop-load-elim"
-#undef DEBUG_TYPE
 #define DEBUG_TYPE LLE_OPTION
 
 static cl::opt<unsigned> CheckPerElim(

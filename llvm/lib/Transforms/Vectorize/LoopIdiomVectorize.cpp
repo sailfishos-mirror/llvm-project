@@ -80,7 +80,6 @@
 using namespace llvm;
 using namespace PatternMatch;
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "loop-idiom-vectorize"
 
 static cl::opt<bool> DisableAll("disable-loop-idiom-vectorize-all", cl::Hidden,

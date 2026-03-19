@@ -106,7 +106,6 @@ struct CGSCCUpdateResult;
 class Module;
 
 // Allow debug logging in this inline function.
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "cgscc"
 
 /// Extern template declaration for the analysis set for this IR unit.

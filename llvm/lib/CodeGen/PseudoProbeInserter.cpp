@@ -23,7 +23,6 @@
 #include "llvm/InitializePasses.h"
 #include "llvm/ProfileData/SampleProf.h"
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "pseudo-probe-inserter"
 
 using namespace llvm;

@@ -39,7 +39,6 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Target/TargetMachine.h"
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "type-promotion"
 #define PASS_NAME "Type Promotion"
 

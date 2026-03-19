@@ -35,7 +35,6 @@
 
 using namespace llvm;
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "loop-instsimplify"
 
 STATISTIC(NumSimplified, "Number of redundant instructions simplified");

@@ -18,7 +18,6 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Pass/Pass.h"
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "test-loop-fusion"
 
 using namespace mlir;

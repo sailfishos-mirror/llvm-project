@@ -91,7 +91,6 @@ namespace acc {
 } // namespace acc
 } // namespace mlir
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "offload-livein-value-canonicalization"
 
 using namespace mlir;

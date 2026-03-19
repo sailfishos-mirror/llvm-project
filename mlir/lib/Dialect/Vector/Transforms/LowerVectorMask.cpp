@@ -19,7 +19,6 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "lower-vector-mask"
 
 namespace mlir {

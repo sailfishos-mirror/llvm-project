@@ -55,7 +55,6 @@
 using namespace llvm;
 using namespace PatternMatch;
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "lower-matrix-intrinsics"
 
 STATISTIC(FlattenedMatrices, "Number of matrix flattenings");

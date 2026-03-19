@@ -76,7 +76,6 @@
 
 using namespace llvm;
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "gvn-hoist"
 
 STATISTIC(NumHoisted, "Number of instructions hoisted");

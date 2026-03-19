@@ -23,7 +23,6 @@
 using namespace llvm;
 using namespace sampleprof;
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "sample-context-tracker"
 
 namespace llvm {

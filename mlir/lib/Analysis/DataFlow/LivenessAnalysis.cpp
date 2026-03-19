@@ -20,7 +20,6 @@
 #include <mlir/Interfaces/SideEffectInterfaces.h>
 #include <mlir/Support/LLVM.h>
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "liveness-analysis"
 
 using namespace mlir;

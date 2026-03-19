@@ -81,7 +81,6 @@
 #include <vector>
 using namespace llvm;
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "compress-inst-emitter"
 
 namespace {

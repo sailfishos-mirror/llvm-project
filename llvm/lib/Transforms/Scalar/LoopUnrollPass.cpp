@@ -70,7 +70,6 @@
 
 using namespace llvm;
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "loop-unroll"
 
 cl::opt<bool> llvm::ForgetSCEVInLoopUnroll(

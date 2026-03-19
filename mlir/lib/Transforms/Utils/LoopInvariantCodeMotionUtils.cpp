@@ -22,7 +22,6 @@
 #include "llvm/Support/DebugLog.h"
 #include <queue>
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "licm"
 
 using namespace mlir;

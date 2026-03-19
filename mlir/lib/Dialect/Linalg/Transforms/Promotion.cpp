@@ -34,7 +34,6 @@ using namespace mlir::scf;
 
 using llvm::MapVector;
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "linalg-promotion"
 
 /// Alloc a new buffer of `size` * `width` i8; where `width` is given by the

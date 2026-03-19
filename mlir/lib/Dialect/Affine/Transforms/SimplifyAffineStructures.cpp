@@ -26,7 +26,6 @@ namespace affine {
 } // namespace affine
 } // namespace mlir
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "simplify-affine-structure"
 
 using namespace mlir;

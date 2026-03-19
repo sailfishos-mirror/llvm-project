@@ -19,7 +19,6 @@
 #include "llvm/Transforms/Utils/LoopSimplify.h"
 #include "llvm/Transforms/Utils/ScalarEvolutionExpander.h"
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "loop-bound-split"
 
 using namespace llvm;

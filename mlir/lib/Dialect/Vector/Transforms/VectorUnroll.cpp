@@ -21,7 +21,6 @@
 #include "llvm/Support/InterleavedRange.h"
 #include <optional>
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "vector-unroll"
 
 using namespace mlir;

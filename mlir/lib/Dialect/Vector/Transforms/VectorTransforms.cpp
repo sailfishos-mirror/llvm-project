@@ -36,7 +36,6 @@
 #include <functional>
 #include <optional>
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "vector-to-vector"
 
 using namespace mlir;

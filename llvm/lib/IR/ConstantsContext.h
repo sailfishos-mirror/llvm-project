@@ -37,7 +37,6 @@
 #include <cstdint>
 #include <utility>
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "ir"
 
 namespace llvm {

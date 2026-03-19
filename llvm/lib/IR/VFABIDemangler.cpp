@@ -18,7 +18,6 @@
 
 using namespace llvm;
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "vfabi-demangler"
 
 /// Utilities for the Vector Function ABI name parser.

@@ -22,7 +22,6 @@
 #include "mlir/Support/LLVM.h"
 #include "llvm/ADT/ScopeExit.h"
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "linalg-interchange"
 
 using namespace mlir;

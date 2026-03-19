@@ -33,7 +33,6 @@
 #include "llvm/Transforms/IPO.h"
 using namespace llvm;
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "internalize"
 
 STATISTIC(NumAliases, "Number of aliases internalized");

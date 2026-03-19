@@ -21,7 +21,6 @@
 
 using namespace llvm;
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "ssaupdaterbulk"
 
 /// Helper function for finding a block which should have a value for the given

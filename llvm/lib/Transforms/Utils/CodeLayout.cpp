@@ -50,7 +50,6 @@
 using namespace llvm;
 using namespace llvm::codelayout;
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "code-layout"
 
 namespace llvm {

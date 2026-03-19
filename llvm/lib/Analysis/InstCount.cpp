@@ -19,7 +19,6 @@
 #include "llvm/Support/raw_ostream.h"
 using namespace llvm;
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "instcount"
 
 STATISTIC(TotalInsts, "Number of instructions (of all types)");

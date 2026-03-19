@@ -47,7 +47,6 @@
 
 using namespace llvm;
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "correlated-value-propagation"
 
 STATISTIC(NumPhis,      "Number of phis propagated");

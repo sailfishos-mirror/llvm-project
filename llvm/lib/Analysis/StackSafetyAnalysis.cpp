@@ -34,7 +34,6 @@
 
 using namespace llvm;
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "stack-safety"
 
 STATISTIC(NumAllocaStackSafe, "Number of safe allocas");

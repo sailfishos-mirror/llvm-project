@@ -83,7 +83,6 @@
 using namespace llvm;
 using namespace SymbolRewriter;
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "symbol-rewriter"
 
 static cl::list<std::string> RewriteMapFiles("rewrite-map-file",

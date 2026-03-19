@@ -29,7 +29,6 @@
 #include "llvm/ADT/SmallVectorExtras.h"
 #include <optional>
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "affine-utils"
 
 using namespace mlir;

@@ -25,7 +25,6 @@
 #include "llvm/Support/raw_ostream.h"
 using namespace llvm;
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "pre-RA-sched"
 
 STATISTIC(NumUnfolds,    "Number of nodes unfolded");

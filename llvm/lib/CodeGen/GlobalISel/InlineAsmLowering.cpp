@@ -19,7 +19,6 @@
 #include "llvm/CodeGen/TargetLowering.h"
 #include "llvm/IR/Module.h"
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "inline-asm-lowering"
 
 using namespace llvm;

@@ -24,7 +24,6 @@ namespace memref {
 } // namespace memref
 } // namespace mlir
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "normalize-memrefs"
 
 using namespace mlir;

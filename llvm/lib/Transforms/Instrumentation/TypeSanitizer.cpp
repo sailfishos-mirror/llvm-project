@@ -42,7 +42,6 @@
 
 using namespace llvm;
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "tysan"
 
 static const char *const kTysanModuleCtorName = "tysan.module_ctor";

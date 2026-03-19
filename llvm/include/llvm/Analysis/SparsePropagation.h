@@ -20,7 +20,6 @@
 #include "llvm/Support/Debug.h"
 #include <set>
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "sparseprop"
 
 namespace llvm {

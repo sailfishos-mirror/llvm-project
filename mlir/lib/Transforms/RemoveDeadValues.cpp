@@ -60,7 +60,6 @@
 #include <optional>
 #include <vector>
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "remove-dead-values"
 
 namespace mlir {

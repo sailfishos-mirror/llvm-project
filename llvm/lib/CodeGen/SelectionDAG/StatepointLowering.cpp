@@ -53,7 +53,6 @@
 
 using namespace llvm;
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "statepoint-lowering"
 
 STATISTIC(NumSlotsAllocatedForStatepoints,

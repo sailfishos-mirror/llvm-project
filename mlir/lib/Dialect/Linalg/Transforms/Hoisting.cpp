@@ -27,7 +27,6 @@
 
 using llvm::dbgs;
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "linalg-hoisting"
 
 #define DBGS() (dbgs() << '[' << DEBUG_TYPE << "] ")

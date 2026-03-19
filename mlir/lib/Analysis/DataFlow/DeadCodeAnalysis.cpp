@@ -29,7 +29,6 @@
 #include <cassert>
 #include <optional>
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "dead-code-analysis"
 
 using namespace mlir;

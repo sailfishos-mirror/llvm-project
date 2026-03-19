@@ -52,7 +52,6 @@
 using namespace llvm;
 using namespace llvm::PatternMatch;
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "instsimplify"
 
 enum { RecursionLimit = 3 };

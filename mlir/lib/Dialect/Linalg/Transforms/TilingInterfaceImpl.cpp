@@ -28,7 +28,6 @@
 #include "llvm/Support/Debug.h"
 #include <optional>
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "linalg-tiling-interface-impl"
 
 using namespace mlir;

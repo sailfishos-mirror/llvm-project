@@ -194,7 +194,6 @@ namespace acc {
 } // namespace acc
 } // namespace mlir
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "acc-implicit-declare"
 
 using namespace mlir;

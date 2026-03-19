@@ -45,7 +45,6 @@ using namespace llvm::VPlanPatternMatch;
 using VectorParts = SmallVector<Value *, 2>;
 
 #define LV_NAME "loop-vectorize"
-#undef DEBUG_TYPE
 #define DEBUG_TYPE LV_NAME
 
 bool VPRecipeBase::mayWriteToMemory() const {

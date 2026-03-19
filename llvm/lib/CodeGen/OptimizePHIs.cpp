@@ -26,7 +26,6 @@
 
 using namespace llvm;
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "opt-phis"
 
 STATISTIC(NumPHICycles, "Number of PHI cycles replaced");

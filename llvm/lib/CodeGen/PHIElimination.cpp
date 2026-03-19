@@ -50,7 +50,6 @@
 
 using namespace llvm;
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "phi-node-elimination"
 
 static cl::opt<bool>

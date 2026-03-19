@@ -20,7 +20,6 @@
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 #include "llvm/Support/DebugLog.h"
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "optimize-allocation-liveness"
 
 namespace mlir {

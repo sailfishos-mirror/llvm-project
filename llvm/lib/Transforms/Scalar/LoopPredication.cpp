@@ -202,7 +202,6 @@
 #include "llvm/Transforms/Utils/ScalarEvolutionExpander.h"
 #include <optional>
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "loop-predication"
 
 STATISTIC(TotalConsidered, "Number of guards considered");

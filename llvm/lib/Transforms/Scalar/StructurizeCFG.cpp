@@ -54,7 +54,6 @@
 using namespace llvm;
 using namespace llvm::PatternMatch;
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "structurizecfg"
 
 // The name for newly created blocks.

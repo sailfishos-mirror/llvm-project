@@ -21,7 +21,6 @@
 
 using namespace llvm;
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "coro-elide"
 
 STATISTIC(NumOfCoroElided, "The # of coroutine get elided.");

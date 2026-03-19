@@ -62,7 +62,6 @@
 
 using namespace llvm;
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "memcpyopt"
 
 static cl::opt<bool> EnableMemCpyOptWithoutLibcalls(

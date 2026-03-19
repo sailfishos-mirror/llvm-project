@@ -48,7 +48,6 @@
 using namespace llvm;
 using namespace sampleprof;
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "samplepgo-reader"
 
 // This internal option specifies if the profile uses FS discriminators.

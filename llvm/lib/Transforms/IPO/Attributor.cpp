@@ -62,7 +62,6 @@
 
 using namespace llvm;
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "attributor"
 #define VERBOSE_DEBUG_TYPE DEBUG_TYPE "-verbose"
 

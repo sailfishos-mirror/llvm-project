@@ -17,7 +17,6 @@
 
 using namespace llvm;
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "transform-warning"
 
 /// Emit warnings for forced (i.e. user-defined) loop transformations which have

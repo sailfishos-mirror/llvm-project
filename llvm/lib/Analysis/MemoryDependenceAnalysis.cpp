@@ -54,7 +54,6 @@
 
 using namespace llvm;
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "memdep"
 
 STATISTIC(NumCacheNonLocal, "Number of fully cached non-local responses");

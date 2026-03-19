@@ -36,7 +36,6 @@
 #undef LC_RPATH
 #endif // __APPLE__
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "orc-scanner"
 
 namespace llvm::orc {

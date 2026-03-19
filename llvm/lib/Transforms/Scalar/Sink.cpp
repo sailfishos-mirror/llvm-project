@@ -22,7 +22,6 @@
 #include "llvm/Transforms/Scalar.h"
 using namespace llvm;
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "sink"
 
 STATISTIC(NumSunk, "Number of instructions sunk");

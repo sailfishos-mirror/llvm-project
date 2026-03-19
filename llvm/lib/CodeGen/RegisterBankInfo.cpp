@@ -26,7 +26,6 @@
 
 #include <algorithm> // For std::max.
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "registerbankinfo"
 
 using namespace llvm;

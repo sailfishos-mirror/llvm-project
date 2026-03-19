@@ -36,7 +36,6 @@
 using namespace llvm;
 using namespace llvm::PatternMatch;
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "lower-is-constant-intrinsic"
 
 STATISTIC(IsConstantIntrinsicsHandled,

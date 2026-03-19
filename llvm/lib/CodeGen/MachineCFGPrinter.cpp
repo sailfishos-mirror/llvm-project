@@ -22,7 +22,6 @@
 
 using namespace llvm;
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "dot-machine-cfg"
 
 static cl::opt<std::string>

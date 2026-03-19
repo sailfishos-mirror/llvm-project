@@ -24,7 +24,6 @@
 #include "llvm/CodeGen/MachineOptimizationRemarkEmitter.h"
 #include "llvm/Support/Debug.h"
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "gi-combiner"
 
 using namespace llvm;

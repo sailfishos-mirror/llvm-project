@@ -40,7 +40,6 @@
 #include <optional>
 using namespace llvm;
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "clone-function"
 
 STATISTIC(RemappedAtomMax, "Highest global NextAtomGroup (after mapping)");

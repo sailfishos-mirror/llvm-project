@@ -24,7 +24,6 @@
 using namespace llvm;
 using namespace sampleprof;
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "sample-profile-matcher"
 
 STATISTIC(NumDirectProfileMatch,

@@ -40,7 +40,6 @@
 
 using namespace llvm;
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "win-eh-prepare"
 
 static cl::opt<bool> DisableDemotion(

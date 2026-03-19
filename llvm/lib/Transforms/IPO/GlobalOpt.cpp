@@ -72,7 +72,6 @@
 
 using namespace llvm;
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "globalopt"
 
 STATISTIC(NumMarked    , "Number of globals marked constant");

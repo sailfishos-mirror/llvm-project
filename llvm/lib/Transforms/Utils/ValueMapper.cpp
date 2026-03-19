@@ -45,7 +45,6 @@
 
 using namespace llvm;
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "value-mapper"
 
 // Out of line method to get vtable etc for class.

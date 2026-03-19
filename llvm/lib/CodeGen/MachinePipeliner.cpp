@@ -98,7 +98,6 @@
 
 using namespace llvm;
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "pipeliner"
 
 STATISTIC(NumTrytoPipeline, "Number of loops that we attempt to pipeline");

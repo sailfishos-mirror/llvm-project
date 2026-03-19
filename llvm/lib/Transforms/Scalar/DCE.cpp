@@ -30,7 +30,6 @@
 #include "llvm/Transforms/Utils/Local.h"
 using namespace llvm;
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "dce"
 
 STATISTIC(DCEEliminated, "Number of insts removed");

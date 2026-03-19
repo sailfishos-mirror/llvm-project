@@ -38,7 +38,6 @@ using namespace mlir::affine;
 using namespace mlir::linalg;
 using namespace mlir::scf;
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "linalg-tiling"
 
 std::tuple<SmallVector<Range, 4>, LoopIndexToRangeIndexMap>

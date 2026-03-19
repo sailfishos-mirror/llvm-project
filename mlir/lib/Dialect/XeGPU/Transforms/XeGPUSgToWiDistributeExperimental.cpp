@@ -39,7 +39,6 @@ namespace xegpu {
 
 using namespace mlir;
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "xegpu-sg-to-wi-distribute-experimental"
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
 

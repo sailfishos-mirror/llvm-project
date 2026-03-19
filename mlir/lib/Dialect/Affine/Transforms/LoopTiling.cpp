@@ -34,7 +34,6 @@ namespace affine {
 using namespace mlir;
 using namespace mlir::affine;
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "affine-loop-tile"
 
 namespace {

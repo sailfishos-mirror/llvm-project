@@ -41,7 +41,6 @@
 
 using namespace llvm;
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "scalarize-masked-mem-intrin"
 
 namespace {

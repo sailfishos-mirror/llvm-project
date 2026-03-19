@@ -22,7 +22,6 @@
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/TypeSwitch.h"
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "loop-vectorize"
 
 using namespace llvm;

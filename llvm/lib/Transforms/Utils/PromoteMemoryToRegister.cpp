@@ -56,7 +56,6 @@
 
 using namespace llvm;
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "mem2reg"
 
 STATISTIC(NumLocalPromoted, "Number of alloca's promoted within one block");

@@ -71,7 +71,6 @@
 
 using namespace llvm;
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "place-safepoints"
 
 STATISTIC(NumEntrySafepoints, "Number of entry safepoints inserted");

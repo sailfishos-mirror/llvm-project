@@ -36,7 +36,6 @@
 #include <utility>
 #include <vector>
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "llvm-profdata"
 
 using namespace llvm;

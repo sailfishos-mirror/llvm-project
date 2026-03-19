@@ -34,7 +34,6 @@
 
 using namespace llvm;
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "static-data-splitter"
 
 STATISTIC(NumHotJumpTables, "Number of hot jump tables seen.");

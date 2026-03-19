@@ -18,7 +18,6 @@
 #include "mlir/Pass/Pass.h"
 #include "llvm/Support/Debug.h"
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "test-memref-dependence-check"
 
 using namespace mlir;

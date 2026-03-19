@@ -97,7 +97,6 @@ namespace acc {
 } // namespace acc
 } // namespace mlir
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "acc-specialize-for-host"
 
 using namespace mlir;

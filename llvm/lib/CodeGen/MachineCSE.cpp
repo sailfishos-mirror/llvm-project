@@ -48,7 +48,6 @@
 
 using namespace llvm;
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "machine-cse"
 
 STATISTIC(NumCoalesces, "Number of copies coalesced");

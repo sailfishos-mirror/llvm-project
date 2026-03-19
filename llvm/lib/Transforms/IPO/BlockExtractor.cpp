@@ -26,7 +26,6 @@
 
 using namespace llvm;
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "block-extractor"
 
 STATISTIC(NumExtracted, "Number of basic blocks extracted");

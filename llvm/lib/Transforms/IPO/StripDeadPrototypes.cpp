@@ -19,7 +19,6 @@
 
 using namespace llvm;
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "strip-dead-prototypes"
 
 STATISTIC(NumDeadPrototypes, "Number of dead prototypes removed");

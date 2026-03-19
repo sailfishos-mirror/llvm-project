@@ -52,7 +52,6 @@
 
 using namespace llvm;
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "stack-protector"
 
 STATISTIC(NumFunProtected, "Number of functions protected");

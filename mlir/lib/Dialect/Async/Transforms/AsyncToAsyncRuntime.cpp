@@ -38,7 +38,6 @@ namespace mlir {
 using namespace mlir;
 using namespace mlir::async;
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "async-to-async-runtime"
 // Prefix for functions outlined from `async.execute` op regions.
 static constexpr const char kAsyncFnPrefix[] = "async_execute_fn";

@@ -24,7 +24,6 @@
 #include "llvm/Support/raw_ostream.h"
 using namespace llvm;
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "legalize-types"
 
 /// GetFPLibCall - Return the right libcall for the given floating point type.

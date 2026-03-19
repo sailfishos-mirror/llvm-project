@@ -18,7 +18,6 @@
 #include "llvm/Support/raw_ostream.h"
 using namespace llvm;
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "isel-opt"
 
 /// ContractNodes - Turn multiple matcher node patterns like 'MoveChild+Record'

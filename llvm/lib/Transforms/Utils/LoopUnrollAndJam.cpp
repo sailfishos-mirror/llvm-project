@@ -57,7 +57,6 @@
 
 using namespace llvm;
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "loop-unroll-and-jam"
 
 STATISTIC(NumUnrolledAndJammed, "Number of loops unroll and jammed");

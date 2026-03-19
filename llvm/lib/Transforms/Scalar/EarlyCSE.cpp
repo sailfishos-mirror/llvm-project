@@ -60,7 +60,6 @@
 using namespace llvm;
 using namespace llvm::PatternMatch;
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "early-cse"
 
 STATISTIC(NumSimplify, "Number of instructions simplified or DCE'd");

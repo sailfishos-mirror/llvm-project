@@ -21,7 +21,6 @@
 #include <cassert>
 #include <cstdint>
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "scev-division"
 
 namespace llvm {

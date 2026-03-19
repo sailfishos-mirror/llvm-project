@@ -12,7 +12,6 @@
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/IR/PatternMatch.h"
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "linalg-transpose-matmul"
 
 using namespace mlir;

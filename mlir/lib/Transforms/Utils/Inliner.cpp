@@ -23,7 +23,6 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/DebugLog.h"
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "inlining"
 
 using namespace mlir;

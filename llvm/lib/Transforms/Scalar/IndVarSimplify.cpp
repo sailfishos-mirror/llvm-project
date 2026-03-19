@@ -81,7 +81,6 @@ using namespace llvm;
 using namespace PatternMatch;
 using namespace SCEVPatternMatch;
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "indvars"
 
 STATISTIC(NumWidened     , "Number of indvars widened");

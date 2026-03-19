@@ -90,7 +90,6 @@
 #include <utility>
 #include <vector>
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "irtranslator"
 
 using namespace llvm;

@@ -20,7 +20,6 @@
 #include "mlir/Interfaces/InferTypeOpInterface.h"
 #include "llvm/Support/InterleavedRange.h"
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "reify-result-shapes"
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE << "]: ")
 

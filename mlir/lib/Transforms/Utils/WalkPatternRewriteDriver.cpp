@@ -23,7 +23,6 @@
 #include "llvm/Support/DebugLog.h"
 #include "llvm/Support/ErrorHandling.h"
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "walk-rewriter"
 
 namespace mlir {

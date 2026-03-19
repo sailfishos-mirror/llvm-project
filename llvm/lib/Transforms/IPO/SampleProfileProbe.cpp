@@ -34,7 +34,6 @@
 #include <vector>
 
 using namespace llvm;
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "pseudo-probe"
 
 STATISTIC(ArtificialDbgLine,

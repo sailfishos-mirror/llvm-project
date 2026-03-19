@@ -87,7 +87,6 @@
 
 using namespace llvm;
 
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "loop-versioning-licm"
 
 static const char *LICMVersioningMetaData = "llvm.loop.licm_versioning.disable";
