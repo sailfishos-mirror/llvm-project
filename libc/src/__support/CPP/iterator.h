@@ -29,10 +29,6 @@ template <typename T> struct iterator_traits<T *> {
   using value_type = T;
 };
 
-template <typename T> struct iterator_traits<const T *> {
-  using iterator_category = random_access_iterator_tag;
-};
-
 template <typename Iter> class reverse_iterator {
   Iter current;
 
