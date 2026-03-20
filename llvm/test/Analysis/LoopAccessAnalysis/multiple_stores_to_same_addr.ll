@@ -6,8 +6,13 @@
 define void @waw_no_mask(ptr %p, i64 %stride, i64 %n) {
 ; CHECK-LABEL: 'waw_no_mask'
 ; CHECK-NEXT:    header:
-; CHECK-NEXT:      Memory dependences are safe
+; CHECK-NEXT:      Report: unsafe dependent memory operations in loop. Use #pragma clang loop distribute(enable) to allow loop distribution to attempt to isolate the offending operations into a separate loop
+; CHECK-NEXT:  Unsafe indirect dependence.
 ; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:        IndirectUnsafe:
+; CHECK-NEXT:            store i64 %iv, ptr %gep, align 4 ->
+; CHECK-NEXT:            store i64 %iv.next, ptr %gep, align 4
+; CHECK-EMPTY:
 ; CHECK-NEXT:      Run-time memory checks:
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-EMPTY:
@@ -40,8 +45,13 @@ exit:
 define void @waw_mask(ptr %p, i64 %stride, i64 %n, i64 %n0, i64 %n1) {
 ; CHECK-LABEL: 'waw_mask'
 ; CHECK-NEXT:    header:
-; CHECK-NEXT:      Memory dependences are safe
+; CHECK-NEXT:      Report: unsafe dependent memory operations in loop. Use #pragma clang loop distribute(enable) to allow loop distribution to attempt to isolate the offending operations into a separate loop
+; CHECK-NEXT:  Unsafe indirect dependence.
 ; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:        IndirectUnsafe:
+; CHECK-NEXT:            store i64 %iv, ptr %gep, align 4 ->
+; CHECK-NEXT:            store i64 %iv.next, ptr %gep, align 4
+; CHECK-EMPTY:
 ; CHECK-NEXT:      Run-time memory checks:
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-EMPTY:
@@ -87,8 +97,13 @@ exit:
 define void @waw_no_mask_unknown_stride(ptr %p, i64 %stride, i64 %n) {
 ; CHECK-LABEL: 'waw_no_mask_unknown_stride'
 ; CHECK-NEXT:    header:
-; CHECK-NEXT:      Memory dependences are safe
+; CHECK-NEXT:      Report: unsafe dependent memory operations in loop. Use #pragma clang loop distribute(enable) to allow loop distribution to attempt to isolate the offending operations into a separate loop
+; CHECK-NEXT:  Unsafe indirect dependence.
 ; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:        IndirectUnsafe:
+; CHECK-NEXT:            store i64 %iv, ptr %gep, align 4 ->
+; CHECK-NEXT:            store i64 %iv.next, ptr %gep, align 4
+; CHECK-EMPTY:
 ; CHECK-NEXT:      Run-time memory checks:
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-EMPTY:
@@ -121,8 +136,13 @@ exit:
 define void @waw_mask_unknown_stride(ptr %p, i64 %stride, i64 %n0, i64 %n1) {
 ; CHECK-LABEL: 'waw_mask_unknown_stride'
 ; CHECK-NEXT:    header:
-; CHECK-NEXT:      Memory dependences are safe
+; CHECK-NEXT:      Report: unsafe dependent memory operations in loop. Use #pragma clang loop distribute(enable) to allow loop distribution to attempt to isolate the offending operations into a separate loop
+; CHECK-NEXT:  Unsafe indirect dependence.
 ; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:        IndirectUnsafe:
+; CHECK-NEXT:            store i64 %iv, ptr %gep, align 4 ->
+; CHECK-NEXT:            store i64 %iv.next, ptr %gep, align 4
+; CHECK-EMPTY:
 ; CHECK-NEXT:      Run-time memory checks:
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-EMPTY:
@@ -168,8 +188,13 @@ exit:
 define void @no_cross_iter_dependency(ptr %p, i8 %a, i64 %n, i64 %n0, i64 %n1) {
 ; CHECK-LABEL: 'no_cross_iter_dependency'
 ; CHECK-NEXT:    header:
-; CHECK-NEXT:      Memory dependences are safe
+; CHECK-NEXT:      Report: unsafe dependent memory operations in loop. Use #pragma clang loop distribute(enable) to allow loop distribution to attempt to isolate the offending operations into a separate loop
+; CHECK-NEXT:  Unsafe indirect dependence.
 ; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:        IndirectUnsafe:
+; CHECK-NEXT:            store i64 %iv, ptr %gep, align 4 ->
+; CHECK-NEXT:            store i64 %iv.next, ptr %gep, align 4
+; CHECK-EMPTY:
 ; CHECK-NEXT:      Run-time memory checks:
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-EMPTY:
@@ -219,6 +244,10 @@ define void @const_stride(ptr %p, i64 %n, i64 %n0, i64 %n1) {
 ; CHECK-NEXT:    header:
 ; CHECK-NEXT:      Memory dependences are safe
 ; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:        Forward:
+; CHECK-NEXT:            store i64 %iv, ptr %gep, align 4 ->
+; CHECK-NEXT:            store i64 %iv.next, ptr %gep, align 4
+; CHECK-EMPTY:
 ; CHECK-NEXT:      Run-time memory checks:
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-EMPTY:
@@ -295,8 +324,13 @@ exit:
 define void @indirect_no_mask(ptr noalias %p, i64 %n) {
 ; CHECK-LABEL: 'indirect_no_mask'
 ; CHECK-NEXT:    header:
-; CHECK-NEXT:      Memory dependences are safe
+; CHECK-NEXT:      Report: unsafe dependent memory operations in loop. Use #pragma clang loop distribute(enable) to allow loop distribution to attempt to isolate the offending operations into a separate loop
+; CHECK-NEXT:  Unsafe indirect dependence.
 ; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:        IndirectUnsafe:
+; CHECK-NEXT:            store i64 %iv, ptr %gep, align 4 ->
+; CHECK-NEXT:            store i64 %iv.next, ptr %gep, align 4
+; CHECK-EMPTY:
 ; CHECK-NEXT:      Run-time memory checks:
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-EMPTY:
@@ -328,8 +362,13 @@ exit:
 define void @indirect_mask(ptr noalias %p, i64 %n, i64 %n0, i64 %n1) {
 ; CHECK-LABEL: 'indirect_mask'
 ; CHECK-NEXT:    header:
-; CHECK-NEXT:      Memory dependences are safe
+; CHECK-NEXT:      Report: unsafe dependent memory operations in loop. Use #pragma clang loop distribute(enable) to allow loop distribution to attempt to isolate the offending operations into a separate loop
+; CHECK-NEXT:  Unsafe indirect dependence.
 ; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:        IndirectUnsafe:
+; CHECK-NEXT:            store i64 %iv, ptr %gep, align 4 ->
+; CHECK-NEXT:            store i64 %iv.next, ptr %gep, align 4
+; CHECK-EMPTY:
 ; CHECK-NEXT:      Run-time memory checks:
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-EMPTY:
