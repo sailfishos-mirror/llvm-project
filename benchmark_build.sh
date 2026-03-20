@@ -1,9 +1,10 @@
-#!/usr/bin/env bash
+#!/usr/bin/env zsh
 set -euo pipefail
 
 ITERATIONS=2
 TOOLS=("mlir-opt" "clang" "opt")
 BUILD_DIR=build
+TIMEFMT='%*U %*S %*E %M'
 
 print_stats() {
     local label="$1"
@@ -48,34 +49,6 @@ print_stats() {
     '
 }
 
-# Parse time output (e.g. "real 0m1.234s") into seconds.
-parse_time() {
-    local line="$1"
-    local mins secs
-    mins=$(echo "$line" | sed -E 's/.*[[:space:]]([0-9]+)m([0-9.]+)s/\1/')
-    secs=$(echo "$line" | sed -E 's/.*[[:space:]]([0-9]+)m([0-9.]+)s/\2/')
-    echo "$mins * 60 + $secs" | bc
-}
-
-# Parse max RSS from /usr/bin/time output and convert to GB.
-# macOS `time -l`: bytes;  GNU `time -v`: KB.
-parse_maxrss_gb() {
-    local output="$1"
-    if echo "$output" | grep -q "maximum resident set size"; then
-        # macOS: value in bytes
-        local bytes
-        bytes=$(echo "$output" | grep "maximum resident set size" | awk '{print $1}')
-        echo "scale=4; $bytes / 1073741824" | bc
-    elif echo "$output" | grep -q "Maximum resident set size"; then
-        # GNU time: value in KB
-        local kb
-        kb=$(echo "$output" | grep "Maximum resident set size" | awk '{print $NF}')
-        echo "scale=4; $kb / 1048576" | bc
-    else
-        echo "0"
-    fi
-}
-
 for build_type in Release Debug; do
 for unity_mode in off on; do
     if [ "$unity_mode" = "off" ]; then
@@ -86,7 +59,7 @@ for unity_mode in off on; do
         label_suffix="$build_type, with unity"
     fi
 
-    declare -A all_real all_user all_sys all_mem
+    typeset -A all_real all_user all_sys all_mem
     for tool in "${TOOLS[@]}"; do
         all_real[$tool]=""
         all_user[$tool]=""
@@ -104,12 +77,13 @@ for unity_mode in off on; do
             $unity_flag > /dev/null
 
         for tool in "${TOOLS[@]}"; do
-            time_output=$( { /usr/bin/time -l ninja -C "$BUILD_DIR" "$tool" > /dev/null; } 2>&1 )
+            # TIMEFMT='%*U %*S %*E %M' outputs: user_s sys_s real_s maxrss_kb
+            time_output=$( { time ninja -C "$BUILD_DIR" "$tool" > /dev/null } 2>&1 )
 
-            real=$(parse_time "$(echo "$time_output" | grep real)")
-            user=$(parse_time "$(echo "$time_output" | grep user)")
-            sys=$(parse_time "$(echo "$time_output" | grep sys)")
-            mem=$(parse_maxrss_gb "$time_output")
+            user=$(echo "$time_output" | awk '{print $1}')
+            sys=$(echo "$time_output" | awk '{print $2}')
+            real=$(echo "$time_output" | awk '{print $3}')
+            mem=$(echo "$time_output" | awk '{printf "%.4f", $4 / 1048576}')
 
             all_real[$tool]+="$real "
             all_user[$tool]+="$user "
@@ -129,13 +103,13 @@ for unity_mode in off on; do
     echo "# Results: $label_suffix"
     echo "############################################"
     for tool in "${TOOLS[@]}"; do
-        read -ra vals <<< "${all_real[$tool]}"
+        read -rA vals <<< "${all_real[$tool]}"
         print_stats "$tool real ($label_suffix)" "s" "${vals[@]}"
-        read -ra vals <<< "${all_user[$tool]}"
+        read -rA vals <<< "${all_user[$tool]}"
         print_stats "$tool user ($label_suffix)" "s" "${vals[@]}"
-        read -ra vals <<< "${all_sys[$tool]}"
+        read -rA vals <<< "${all_sys[$tool]}"
         print_stats "$tool sys ($label_suffix)" "s" "${vals[@]}"
-        read -ra vals <<< "${all_mem[$tool]}"
+        read -rA vals <<< "${all_mem[$tool]}"
         print_stats "$tool maxrss ($label_suffix)" "GB" "${vals[@]}"
     done
 done
