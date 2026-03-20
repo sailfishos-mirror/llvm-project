@@ -758,11 +758,10 @@ public:
     LIBC_ASSERT(end == hashes.size());
 
     auto max_bucket_size = bucket_len_cnt.size() - 1;
-    auto const expected_bucket_size = slots_ / buckets_;
     //  "Part {part}: Bucket size {max_bucket_size} is too much "
     //  "larger than the expected size of {expected_bucket_size}."
     LIBC_ASSERT(static_cast<double>(max_bucket_size) <=
-                (20. * expected_bucket_size));
+                (20. * slots_ / buckets_));
     auto acc = 0;
     for (int i = static_cast<int>(max_bucket_size); i > -1; i--) {
       auto tmp = bucket_len_cnt[i];

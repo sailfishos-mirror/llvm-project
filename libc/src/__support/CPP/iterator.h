@@ -117,7 +117,7 @@ LIBC_INLINE constexpr auto distance(It first, It last, input_iterator_tag) {
 
 } // namespace cpp_internal
 
-template <typename It> auto distance(It first, It last) {
+template <typename It> LIBC_INLINE constexpr auto distance(It first, It last) {
   return cpp_internal::distance(
       first, last, typename iterator_traits<It>::iterator_category{});
 }
