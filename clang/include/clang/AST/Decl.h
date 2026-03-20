@@ -138,9 +138,7 @@ public:
   using redeclarable_base::redecls_begin;
   using redeclarable_base::redecls_end;
 
-  ASTContext &getASTContext() const {
-    return const_cast<ASTContext &>(Ctx);
-  }
+  ASTContext &getASTContext() const { return const_cast<ASTContext &>(Ctx); }
 
   NamespaceDecl *getAnonymousNamespace() const { return AnonymousNamespace; }
   void setAnonymousNamespace(NamespaceDecl *D);
