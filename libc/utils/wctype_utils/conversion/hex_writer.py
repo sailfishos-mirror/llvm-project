@@ -102,5 +102,4 @@ namespace LIBC_NAMESPACE_DECL {'{'}
         file.write("};")
 
         file.write("\n\n} // namespace LIBC_NAMESPACE_DECL\n\n")
-        file.write(
-            f"#endif // LLVM_LIBC_SRC___SUPPORT_WCTYPE_{data_var_name[:-5]}_H\n")
+        file.write(f"#endif // LLVM_LIBC_SRC___SUPPORT_WCTYPE_{data_var_name[:-5]}_H\n")
