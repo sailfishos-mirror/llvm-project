@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ITERATIONS=10
+ITERATIONS=2
 TOOLS=("mlir-opt" "clang" "opt")
 BUILD_DIR=build
 
