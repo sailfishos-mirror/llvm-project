@@ -24,6 +24,7 @@
 #include "src/__support/OSUtil/io.h"
 #include "src/__support/math/ceil.h"
 #include "src/__support/math/log.h"
+#include "src/__support/uint128.h"
 
 #undef LIBC_ENABLE_CONSTEXPR
 
@@ -52,7 +53,7 @@ public:
     auto s = wrapping_add(seed, WY_CONST_0);
     seed = s;
     auto const t =
-        static_cast<__uint128_t>(s) * static_cast<__uint128_t>(s ^ WY_CONST_1);
+        static_cast<UInt128>(s) * static_cast<UInt128>(s ^ WY_CONST_1);
     return static_cast<uint64_t>(t) ^ static_cast<uint64_t>(t >> 64);
   }
 
@@ -725,8 +726,7 @@ public:
         cpp::max(PtrhashConfig<n_>::SLOTS_PER_PART, static_cast<size_t>(1));
     uint64_t m = cpp::numeric_limits<uint64_t>::max() / d + 1;
     auto lowbits = m * (hx ^ hp);
-    return (static_cast<__uint128_t>(lowbits) * static_cast<__uint128_t>(d)) >>
-           64;
+    return (static_cast<UInt128>(lowbits) * static_cast<UInt128>(d)) >> 64;
   }
 
   LIBC_INLINE constexpr cpp::tuple<cpp::array<uint32_t, buckets_ + 1>,
@@ -779,14 +779,14 @@ public:
   }
 
   LIBC_INLINE constexpr size_t part(uint64_t hx) const {
-    return (static_cast<__uint128_t>(PtrhashConfig<n_>::PARTS) *
-            static_cast<__uint128_t>(hx)) >>
+    return (static_cast<UInt128>(PtrhashConfig<n_>::PARTS) *
+            static_cast<UInt128>(hx)) >>
            64;
   }
 
   LIBC_INLINE constexpr size_t bucket(uint64_t hx) const {
-    return (static_cast<__uint128_t>(PtrhashConfig<n_>::BUCKETS_TOTAL) *
-            static_cast<__uint128_t>(hx)) >>
+    return (static_cast<UInt128>(PtrhashConfig<n_>::BUCKETS_TOTAL) *
+            static_cast<UInt128>(hx)) >>
            64;
   }
 };

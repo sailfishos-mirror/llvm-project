@@ -16,6 +16,7 @@ add_header_library(
     libc.src.__support.OSUtil.osutil
     libc.src.__support.math.ceil
     libc.src.__support.math.log
+    libc.src.__support.uint128
 )
 
 add_header_library(
