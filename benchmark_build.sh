@@ -47,6 +47,16 @@ print_stats() {
     '
 }
 
+# Parse the output of `time` (real/user/sys lines) into seconds.
+# Handles both "0m1.234s" and "1m2.345s" formats.
+parse_time() {
+    local line="$1"
+    local mins secs
+    mins=$(echo "$line" | sed -E 's/.*[[:space:]]([0-9]+)m([0-9.]+)s/\1/')
+    secs=$(echo "$line" | sed -E 's/.*[[:space:]]([0-9]+)m([0-9.]+)s/\2/')
+    echo "$mins * 60 + $secs" | bc
+}
+
 for build_type in Release Debug; do
 for unity_mode in off on; do
     if [ "$unity_mode" = "off" ]; then
@@ -57,9 +67,11 @@ for unity_mode in off on; do
         label_suffix="$build_type, with unity"
     fi
 
-    declare -A all_times
+    declare -A all_real all_user all_sys
     for tool in "${TOOLS[@]}"; do
-        all_times[$tool]=""
+        all_real[$tool]=""
+        all_user[$tool]=""
+        all_sys[$tool]=""
     done
 
     for i in $(seq 1 $ITERATIONS); do
@@ -72,13 +84,16 @@ for unity_mode in off on; do
             $unity_flag > /dev/null
 
         for tool in "${TOOLS[@]}"; do
-            start=$(date +%s.%N)
-            ninja -C "$BUILD_DIR" "$tool" > /dev/null
-            end=$(date +%s.%N)
+            time_output=$( { time ninja -C "$BUILD_DIR" "$tool" > /dev/null; } 2>&1 )
 
-            elapsed=$(echo "$end - $start" | bc)
-            all_times[$tool]+="$elapsed "
-            echo ">>> $tool took ${elapsed}s"
+            real=$(parse_time "$(echo "$time_output" | grep real)")
+            user=$(parse_time "$(echo "$time_output" | grep user)")
+            sys=$(parse_time "$(echo "$time_output" | grep sys)")
+
+            all_real[$tool]+="$real "
+            all_user[$tool]+="$user "
+            all_sys[$tool]+="$sys "
+            echo ">>> $tool  real=${real}s  user=${user}s  sys=${sys}s"
 
             # Clean build artifacts but keep the configured build dir
             ninja -C "$BUILD_DIR" clean > /dev/null
@@ -92,8 +107,12 @@ for unity_mode in off on; do
     echo "# Results: $label_suffix"
     echo "############################################"
     for tool in "${TOOLS[@]}"; do
-        read -ra times <<< "${all_times[$tool]}"
-        print_stats "$tool ($label_suffix)" "${times[@]}"
+        read -ra times <<< "${all_real[$tool]}"
+        print_stats "$tool real ($label_suffix)" "${times[@]}"
+        read -ra times <<< "${all_user[$tool]}"
+        print_stats "$tool user ($label_suffix)" "${times[@]}"
+        read -ra times <<< "${all_sys[$tool]}"
+        print_stats "$tool sys ($label_suffix)" "${times[@]}"
     done
 done
 done
