@@ -454,6 +454,28 @@ static bool checkCodegenOptions(const CodeGenOptions &CGOpts,
   return false;
 }
 
+static std::set<StringRef>
+accumulateFeaturesAsWritten(const std::vector<std::string> &FeaturesAsWritten) {
+  std::set<StringRef> Out;
+  for (StringRef Name : FeaturesAsWritten) {
+    if (Name.size() < 2)
+      continue;
+    StringRef Feature = Name.substr(1);
+    if (Name[0] == '+') {
+      Out.emplace(Name);
+      std::string Inverse = (std::string("-") + Feature).str();
+      if (auto It = Out.find(Inverse); It != Out.end())
+        Out.erase(It);
+    } else if (Name[0] == '-') {
+      Out.emplace(Name);
+      std::string Inverse = (std::string("+") + Feature).str();
+      if (auto It = Out.find(Inverse); It != Out.end())
+        Out.erase(It);
+    }
+  }
+  return Out;
+}
+
 /// Compare the given set of target options against an existing set of
 /// target options.
 ///
@@ -489,30 +511,10 @@ static bool checkTargetOptions(const TargetOptions &TargetOpts,
 #undef CHECK_TARGET_OPT
 
   // Compare feature sets.
-  std::set<StringRef> ExistingFeatures;
-  std::set<StringRef> ReadFeatures;
-
-  for (StringRef Name : ExistingTargetOpts.FeaturesAsWritten) {
-    if (Name.size() < 2)
-      continue;
-    StringRef Feature = Name.substr(1);
-    if (Name[0] == '+')
-      ExistingFeatures.emplace(Feature);
-    else if (Name[0] == '-')
-      if (auto It = ExistingFeatures.find(Feature);
-          It != ExistingFeatures.end())
-        ExistingFeatures.erase(Feature);
-  }
-  for (StringRef Name : TargetOpts.FeaturesAsWritten) {
-    if (Name.size() < 2)
-      continue;
-    StringRef Feature = Name.substr(1);
-    if (Name[0] == '+')
-      ReadFeatures.emplace(Feature);
-    else if (Name[0] == '-')
-      if (auto It = ReadFeatures.find(Feature); It != ReadFeatures.end())
-        ReadFeatures.erase(Feature);
-  }
+  std::set<StringRef> ExistingFeatures =
+      accumulateFeaturesAsWritten(ExistingTargetOpts.FeaturesAsWritten);
+  std::set<StringRef> ReadFeatures =
+      accumulateFeaturesAsWritten(TargetOpts.FeaturesAsWritten);
 
   // We compute the set difference in both directions explicitly so that we can
   // diagnose the differences differently.
@@ -532,12 +534,10 @@ static bool checkTargetOptions(const TargetOptions &TargetOpts,
   if (Diags) {
     for (StringRef Feature : UnmatchedReadFeatures)
       Diags->Report(diag::err_ast_file_targetopt_feature_mismatch)
-          << /* is-existing-feature */ false << ModuleFilename
-          << (std::string("+") + Feature.str());
+          << /* is-existing-feature */ false << ModuleFilename << Feature;
     for (StringRef Feature : UnmatchedExistingFeatures)
       Diags->Report(diag::err_ast_file_targetopt_feature_mismatch)
-          << /* is-existing-feature */ true << ModuleFilename
-          << (std::string("+") + Feature.str());
+          << /* is-existing-feature */ true << ModuleFilename << Feature;
   }
 
   return !UnmatchedReadFeatures.empty() || !UnmatchedExistingFeatures.empty();

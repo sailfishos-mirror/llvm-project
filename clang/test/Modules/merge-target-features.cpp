@@ -100,7 +100,7 @@
 // RUN:   | FileCheck --allow-empty --check-prefix=DOUBLE %s
 // DOUBLE-NOT: error:
 //
-// RUN: %clang_cc1 -fmodules -x c++ -fmodules-cache-path=%t \
+// RUN: not %clang_cc1 -fmodules -x c++ -fmodules-cache-path=%t \
 // RUN:   -iquote Inputs/merge-target-features \
 // RUN:   -fno-implicit-modules \
 // RUN:   -fmodule-map-file-home-is-cwd \
@@ -110,7 +110,8 @@
 // RUN:   -target-cpu i386 \
 // RUN:   -fsyntax-only merge-target-features.cpp 2>&1 \
 // RUN:   | FileCheck --allow-empty --check-prefix=PLUSMINUS %s
-// PLUSMINUS-NOT: error:
+// PLUSMINUS: error: precompiled file '{{.*}}foo-plusminus.pcm' was compiled with the target feature '-sse2' but the current translation unit is not
+// PLUSMINUS: error: {{.*}} configuration mismatch
 //
 // RUN: %clang_cc1 -fmodules -x c++ -fmodules-cache-path=%t \
 // RUN:   -iquote Inputs/merge-target-features \
