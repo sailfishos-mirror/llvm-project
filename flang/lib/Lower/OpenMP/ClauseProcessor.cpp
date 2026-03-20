@@ -1564,6 +1564,9 @@ bool ClauseProcessor::processLinear(mlir::omp::LinearClauseOps &result,
       }
     }
 
+    fir::FirOpBuilder &firOpBuilder = converter.getFirOpBuilder();
+    mlir::Location currentLocation = converter.getCurrentLocation();
+
     for (const omp::Object &object : objects) {
       semantics::Symbol *sym = object.sym();
       const mlir::Value variable = converter.getSymbolAddress(*sym);
@@ -1571,20 +1574,17 @@ bool ClauseProcessor::processLinear(mlir::omp::LinearClauseOps &result,
       mlir::Type ty = converter.genType(*sym);
       typeAttrs.push_back(mlir::TypeAttr::get(ty));
 
+      mlir::Value stepOperand;
       if (auto &mod =
               std::get<std::optional<omp::clause::Linear::StepComplexModifier>>(
                   clause.t)) {
-        mlir::Value operand =
+        stepOperand =
             fir::getBase(converter.genExprValue(toEvExpr(*mod), stmtCtx));
-        result.linearStepVars.append(objects.size(), operand);
       } else {
         // If nothing is present, add the default step of 1.
-        fir::FirOpBuilder &firOpBuilder = converter.getFirOpBuilder();
-        mlir::Location currentLocation = converter.getCurrentLocation();
         mlir::Type integerTy = ty.isInteger() ? ty : firOpBuilder.getI32Type();
-        mlir::Value operand =
+        stepOperand =
             firOpBuilder.createIntegerConstant(currentLocation, integerTy, 1);
-        result.linearStepVars.append(objects.size(), operand);
       }
 
       // Determine the linear modifier:
@@ -1612,6 +1612,49 @@ bool ClauseProcessor::processLinear(mlir::omp::LinearClauseOps &result,
       else if (semaCtx.langOptions().OpenMPVersion >= 52)
         linearMod = isDeclareSimd ? getDeclareSimdDefaultMod(*sym)
                                   : mlir::omp::LinearModifier::val;
+
+      // For declare simd, rescale constant linear steps from source-level
+      // element counts to byte strides for parameters that will use Linear
+      // or LinearRef ABI kind. This matches Clang's rescaling behavior in
+      // CGOpenMPRuntime.cpp. Val and UVal kinds are not rescaled because
+      // they describe value changes, not pointer strides.
+      if (isDeclareSimd) {
+        bool isRefLike = false;
+        const auto &ultimate = sym->GetUltimate();
+        if (semantics::IsPointer(ultimate))
+          isRefLike = true;
+        else if (const auto *obj =
+                     ultimate
+                         .detailsIf<Fortran::semantics::ObjectEntityDetails>())
+          if (obj->isDummy() && !semantics::IsValue(ultimate))
+            isRefLike = true;
+
+        // Rescale for ref modifier or no modifier on a reference-like param.
+        // val and uval are not rescaled.
+        bool needsRescale =
+            isRefLike &&
+            (!linearMod || *linearMod == mlir::omp::LinearModifier::ref);
+        if (needsRescale) {
+          mlir::Type elemTy = fir::getFortranElementType(ty);
+          if (elemTy.isIntOrFloat()) {
+            unsigned elemSizeBytes = elemTy.getIntOrFloatBitWidth() / 8;
+            if (elemSizeBytes > 1) {
+              // Only rescale constant strides.
+              if (auto cstOp =
+                      stepOperand.getDefiningOp<mlir::arith::ConstantOp>()) {
+                if (auto intAttr =
+                        mlir::dyn_cast<mlir::IntegerAttr>(cstOp.getValue())) {
+                  int64_t rescaled = intAttr.getInt() * elemSizeBytes;
+                  stepOperand = firOpBuilder.createIntegerConstant(
+                      currentLocation, stepOperand.getType(), rescaled);
+                }
+              }
+            }
+          }
+        }
+      }
+
+      result.linearStepVars.push_back(stepOperand);
 
       if (linearMod)
         linearModAttrs.push_back(mlir::omp::LinearModifierAttr::get(
