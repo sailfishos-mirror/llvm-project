@@ -22,9 +22,7 @@ namespace cpp {
 struct input_iterator_tag {};
 struct random_access_iterator_tag : input_iterator_tag {};
 
-template <typename It> struct iterator_traits {
-  using iterator_category = typename It::iterator_category;
-};
+template <typename T> struct iterator_traits;
 template <typename T> struct iterator_traits<T *> {
   using reference = T &;
   using iterator_category = random_access_iterator_tag;
