@@ -464,7 +464,7 @@ public:
             cpp::min(target_pilots_begin + buckets_, pilots_end);
         auto part = shard * parts_per_shard_ + part_in_shard;
 
-        auto _cnt = this->build_part(
+        auto total_evictions = this->build_part(
             part,
             cpp::span<uint64_t>(hashes).subspan(part_starts[part_in_shard],
                                                 part_starts[part_in_shard + 1] -
@@ -473,7 +473,7 @@ public:
                 const_cast<uint8_t *>(pilots.data() + target_pilots_begin),
                 target_pilots_end - target_pilots_begin),
             taken[taken_idx]);
-        if (!_cnt) {
+        if (!total_evictions) {
           return false;
         }
       }
