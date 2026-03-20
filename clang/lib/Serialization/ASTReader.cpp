@@ -489,13 +489,30 @@ static bool checkTargetOptions(const TargetOptions &TargetOpts,
 #undef CHECK_TARGET_OPT
 
   // Compare feature sets.
-  SmallVector<StringRef, 4> ExistingFeatures(
-                                             ExistingTargetOpts.FeaturesAsWritten.begin(),
-                                             ExistingTargetOpts.FeaturesAsWritten.end());
-  SmallVector<StringRef, 4> ReadFeatures(TargetOpts.FeaturesAsWritten.begin(),
-                                         TargetOpts.FeaturesAsWritten.end());
-  llvm::sort(ExistingFeatures);
-  llvm::sort(ReadFeatures);
+  std::set<StringRef> ExistingFeatures;
+  std::set<StringRef> ReadFeatures;
+
+  for (StringRef Name : ExistingTargetOpts.FeaturesAsWritten) {
+    if (Name.size() < 2)
+      continue;
+    StringRef Feature = Name.substr(1);
+    if (Name[0] == '+')
+      ExistingFeatures.emplace(Feature);
+    else if (Name[0] == '-')
+      if (auto It = ExistingFeatures.find(Feature);
+          It != ExistingFeatures.end())
+        ExistingFeatures.erase(Feature);
+  }
+  for (StringRef Name : TargetOpts.FeaturesAsWritten) {
+    if (Name.size() < 2)
+      continue;
+    StringRef Feature = Name.substr(1);
+    if (Name[0] == '+')
+      ReadFeatures.emplace(Feature);
+    else if (Name[0] == '-')
+      if (auto It = ReadFeatures.find(Feature); It != ReadFeatures.end())
+        ReadFeatures.erase(Feature);
+  }
 
   // We compute the set difference in both directions explicitly so that we can
   // diagnose the differences differently.
@@ -515,10 +532,12 @@ static bool checkTargetOptions(const TargetOptions &TargetOpts,
   if (Diags) {
     for (StringRef Feature : UnmatchedReadFeatures)
       Diags->Report(diag::err_ast_file_targetopt_feature_mismatch)
-          << /* is-existing-feature */ false << ModuleFilename << Feature;
+          << /* is-existing-feature */ false << ModuleFilename
+          << (std::string("+") + Feature.str());
     for (StringRef Feature : UnmatchedExistingFeatures)
       Diags->Report(diag::err_ast_file_targetopt_feature_mismatch)
-          << /* is-existing-feature */ true << ModuleFilename << Feature;
+          << /* is-existing-feature */ true << ModuleFilename
+          << (std::string("+") + Feature.str());
   }
 
   return !UnmatchedReadFeatures.empty() || !UnmatchedExistingFeatures.empty();
