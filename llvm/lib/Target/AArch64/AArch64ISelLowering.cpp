@@ -3470,6 +3470,12 @@ void AArch64TargetLowering::fixupPtrauthDiscriminator(
         IntDisc = DiscMI->getOperand(1).getImm();
       }
       break;
+    case AArch64::COPY:
+      if (DiscMI->getOperand(1).getReg() == AArch64::XZR) {
+        AddrDisc = AArch64::NoRegister;
+        IntDisc = 0;
+      }
+      break;
     }
   }
 
