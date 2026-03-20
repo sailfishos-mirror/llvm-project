@@ -21,11 +21,17 @@
 ///
 /// NOTE: Statistics *must* be declared as global variables.
 ///
+/// LOCAL_STATISTIC provides thread-local counters that are incremented
+/// alongside their corresponding global statistic. They can be independently
+/// reset and queried per-thread. Intended for counting statistics
+/// per-pass/per-function.
+///
 //===----------------------------------------------------------------------===//
 
 #ifndef LLVM_ADT_STATISTIC_H
 #define LLVM_ADT_STATISTIC_H
 
+#include "llvm/ADT/StringRef.h"
 #include "llvm/Config/llvm-config.h"
 #include "llvm/Support/Compiler.h"
 #include <atomic>
@@ -45,9 +51,10 @@ namespace llvm {
 
 class raw_ostream;
 class raw_fd_ostream;
-class StringRef;
 
 class TrackingStatistic {
+  friend class LocalTrackingStatistic;
+
 public:
   const char *const DebugType;
   const char *const Name;
@@ -129,6 +136,63 @@ protected:
   LLVM_ABI void RegisterStatistic();
 };
 
+class LocalTrackingStatistic {
+public:
+  TrackingStatistic *GlobalStat;
+  uint64_t Value = 0;
+  bool Initialized = false;
+
+  LocalTrackingStatistic(TrackingStatistic &Statistic)
+      : GlobalStat(&Statistic) {}
+
+  const char *getDebugType() const { return GlobalStat->DebugType; }
+  const char *getName() const { return GlobalStat->Name; }
+  const char *getDesc() const { return GlobalStat->Desc; }
+
+  uint64_t getValue() const { return Value; }
+
+  // Allow use of this class as the value itself.
+  operator uint64_t() const { return Value; }
+
+  const LocalTrackingStatistic &operator++() {
+    init();
+    ++*GlobalStat;
+    ++Value;
+    return *this;
+  }
+
+  uint64_t operator++(int) {
+    init();
+    ++*GlobalStat;
+    return Value++;
+  }
+
+  const LocalTrackingStatistic &operator+=(const uint64_t &V) {
+    init();
+    *GlobalStat += V;
+    Value += V;
+    return *this;
+  }
+
+  // Delete other operators offered by TrackingStatistic. These can't be
+  // transparently passed through to the global statistic in most cases.
+  void updateMax(uint64_t V) = delete;
+  const LocalTrackingStatistic &operator=(uint64_t Val) = delete;
+  const LocalTrackingStatistic &operator--() = delete;
+  uint64_t operator--(int) = delete;
+  const LocalTrackingStatistic &operator-=(const uint64_t &V) = delete;
+
+protected:
+  void init() {
+    if (Initialized)
+      return;
+    Value = 0;
+    RegisterStatistic();
+  }
+
+  LLVM_ABI void RegisterStatistic();
+};
+
 class NoopStatistic {
 public:
   constexpr NoopStatistic(const char * /*DebugType*/, const char * /*Name*/,
@@ -156,21 +220,47 @@ public:
   void updateMax(uint64_t V) {}
 };
 
+struct StatisticVal {
+  StringRef DebugType;
+  StringRef Name;
+  uint64_t Value;
+
+  StatisticVal(StringRef DebugType, StringRef Name, uint64_t Value)
+      : DebugType(DebugType), Name(Name), Value(Value) {}
+};
+
 #if LLVM_ENABLE_STATS
-using Statistic = TrackingStatistic;
+using GlobalStatistic = TrackingStatistic;
+using LocalStatistic = LocalTrackingStatistic;
 #else
-using Statistic = NoopStatistic;
+using GlobalStatistic = NoopStatistic;
+using LocalStatistic = NoopStatistic;
+#endif
+using Statistic = GlobalStatistic;
+
+#if LLVM_ENABLE_STATS
+#define GLOBAL_STATISTIC(VARNAME, DESC)                                        \
+  static llvm::GlobalStatistic VARNAME = {DEBUG_TYPE, #VARNAME, DESC}
+
+#define LOCAL_STATISTIC(VARNAME, DESC)                                         \
+  static llvm::GlobalStatistic VARNAME##_Global = {DEBUG_TYPE, #VARNAME,       \
+                                                   DESC};                      \
+  static thread_local llvm::LocalStatistic VARNAME = {VARNAME##_Global}
+#else
+#define GLOBAL_STATISTIC(VARNAME, DESC)                                        \
+  static llvm::GlobalStatistic VARNAME                                         \
+      [[maybe_unused]] = {DEBUG_TYPE, #VARNAME, DESC}
+
+#define LOCAL_STATISTIC(VARNAME, DESC)                                         \
+  static llvm::GlobalStatistic VARNAME##_Global = {DEBUG_TYPE, #VARNAME,       \
+                                                   DESC};                      \
+  static thread_local llvm::LocalStatistic VARNAME                             \
+      [[maybe_unused]] = {VARNAME##_Global}
 #endif
 
 // STATISTIC - A macro to make definition of statistics really simple.  This
 // automatically passes the DEBUG_TYPE of the file into the statistic.
-#if LLVM_ENABLE_STATS
-#define STATISTIC(VARNAME, DESC)                                               \
-  static llvm::Statistic VARNAME = {DEBUG_TYPE, #VARNAME, DESC}
-#else
-#define STATISTIC(VARNAME, DESC)                                               \
-  static llvm::Statistic VARNAME [[maybe_unused]] = {DEBUG_TYPE, #VARNAME, DESC}
-#endif
+#define STATISTIC(VARNAME, DESC) GLOBAL_STATISTIC(VARNAME, DESC)
 
 // ALWAYS_ENABLED_STATISTIC - A macro to define a statistic like STATISTIC but
 // it is enabled even if LLVM_ENABLE_STATS is off.
@@ -207,6 +297,12 @@ LLVM_ABI void PrintStatisticsJSON(raw_ostream &OS);
 /// completes.
 LLVM_ABI std::vector<std::pair<StringRef, uint64_t>> GetStatistics();
 
+/// Get the local statistics. Returns statistics collected on the current thread
+/// since the last call to ResetLocalStatistics(). Results are sorted by debug
+/// type, then by name. Local statistics also increment their corresponding
+/// global statistic.
+LLVM_ABI std::vector<StatisticVal> GetLocalStatistics();
+
 /// Reset the statistics. This can be used to zero and de-register the
 /// statistics in order to measure a compilation.
 ///
@@ -221,6 +317,10 @@ LLVM_ABI std::vector<std::pair<StringRef, uint64_t>> GetStatistics();
 /// this function is called and that only one compilation executes until calling
 /// GetStatistics().
 LLVM_ABI void ResetStatistics();
+
+/// Reset the local statistics. This zeros and de-registers all local
+/// statistics on the current thread without affecting global statistics.
+LLVM_ABI void ResetLocalStatistics();
 
 } // end namespace llvm
 

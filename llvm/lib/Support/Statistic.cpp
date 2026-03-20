@@ -58,6 +58,18 @@ void llvm::initStatisticOptions() {
 }
 
 namespace {
+
+/// Comparator for sorting statistics by debugtype,name,description.
+template <typename T> struct StatisticCmp {
+  bool operator()(const T *LHS, const T *RHS) const {
+    if (int Cmp = std::strcmp(LHS->getDebugType(), RHS->getDebugType()))
+      return Cmp < 0;
+    if (int Cmp = std::strcmp(LHS->getName(), RHS->getName()))
+      return Cmp < 0;
+    return std::strcmp(LHS->getDesc(), RHS->getDesc()) < 0;
+  }
+};
+
 /// This class is used in a ManagedStatic so that it is created on demand (when
 /// the first statistic is bumped) and destroyed only when llvm_shutdown is
 /// called. We print statistics from the destructor.
@@ -71,7 +83,8 @@ class StatisticInfo {
   friend void llvm::PrintStatisticsJSON(raw_ostream &OS);
 
   /// Sort statistics by debugtype,name,description.
-  void sort();
+  void sort() { llvm::stable_sort(Stats, StatisticCmp<TrackingStatistic>()); }
+
 public:
   using const_iterator = std::vector<TrackingStatistic *>::const_iterator;
 
@@ -88,10 +101,34 @@ public:
 
   void reset();
 };
+
+class LocalStatisticInfo {
+  std::vector<LocalTrackingStatistic *> Stats;
+
+public:
+  using const_iterator = decltype(Stats)::const_iterator;
+
+  void addStatistic(LocalTrackingStatistic *S) { Stats.push_back(S); }
+
+  /// Sort statistics by debugtype,name,description.
+  void sort() {
+    llvm::stable_sort(Stats, StatisticCmp<LocalTrackingStatistic>());
+  }
+
+  const_iterator begin() const { return Stats.begin(); }
+  const_iterator end() const { return Stats.end(); }
+
+  void reset() {
+    for (auto *Stat : Stats)
+      Stat->Initialized = false;
+    Stats.clear();
+  }
+};
 } // end anonymous namespace
 
 static ManagedStatic<StatisticInfo> StatInfo;
-static ManagedStatic<sys::SmartMutex<true> > StatLock;
+static ManagedStatic<sys::SmartMutex<true>> StatLock;
+static thread_local LocalStatisticInfo LocalStatInfo;
 
 /// RegisterStatistic - The first time a statistic is bumped, this method is
 /// called.
@@ -119,6 +156,13 @@ void TrackingStatistic::RegisterStatistic() {
   }
 }
 
+void LocalTrackingStatistic::RegisterStatistic() {
+  assert(!Initialized);
+  if (AreStatisticsEnabled())
+    LocalStatInfo.addStatistic(this);
+  Initialized = true;
+}
+
 StatisticInfo::StatisticInfo() {
   // Ensure that necessary timer global objects are created first so they are
   // destructed after us.
@@ -137,19 +181,6 @@ void llvm::EnableStatistics(bool DoPrintOnExit) {
 }
 
 bool llvm::AreStatisticsEnabled() { return Enabled || EnableStats; }
-
-void StatisticInfo::sort() {
-  llvm::stable_sort(
-      Stats, [](const TrackingStatistic *LHS, const TrackingStatistic *RHS) {
-        if (int Cmp = std::strcmp(LHS->getDebugType(), RHS->getDebugType()))
-          return Cmp < 0;
-
-        if (int Cmp = std::strcmp(LHS->getName(), RHS->getName()))
-          return Cmp < 0;
-
-        return std::strcmp(LHS->getDesc(), RHS->getDesc()) < 0;
-      });
-}
 
 void StatisticInfo::reset() {
   sys::SmartScopedLock<true> Writer(*StatLock);
@@ -263,6 +294,18 @@ std::vector<std::pair<StringRef, uint64_t>> llvm::GetStatistics() {
   return ReturnStats;
 }
 
+std::vector<StatisticVal> llvm::GetLocalStatistics() {
+  std::vector<StatisticVal> ReturnStats;
+  LocalStatInfo.sort();
+  for (const auto &Stat : LocalStatInfo)
+    ReturnStats.emplace_back(Stat->getDebugType(), Stat->getName(),
+                             Stat->getValue());
+  return ReturnStats;
+}
+
 void llvm::ResetStatistics() {
+  LocalStatInfo.reset();
   StatInfo->reset();
 }
+
+void llvm::ResetLocalStatistics() { LocalStatInfo.reset(); }
