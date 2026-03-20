@@ -1350,6 +1350,56 @@ void fir::CallOp::build(mlir::OpBuilder &builder, mlir::OperationState &result,
   result.addTypes(results);
 }
 
+void fir::CallOp::setCalleeFromCallable(mlir::CallInterfaceCallable callee) {
+  if (auto symbolRef = llvm::dyn_cast<mlir::SymbolRefAttr>(callee)) {
+    // Handling a direct call.
+    bool wasIndirect = llvm::isa<mlir::Value>(getCallableForCallee());
+    (*this)->setAttr(getCalleeAttrName(), symbolRef);
+    // If it was indirect before, the operand list and associated attributes
+    // needs to be fixed up.
+    if (wasIndirect) {
+      assert(getNumOperands() > 0 && "indirect call must have callee operand");
+      (*this)->eraseOperand(0);
+      // Fix arg_attrs to remove the first (callee) operand if needed.
+      if (auto argAttrs = getArgAttrsAttr()) {
+        // Since we already removed the first operand, check that number
+        // of attributes is one more than number of operands.
+        assert(argAttrs.size() == getNumOperands() + 1 &&
+               "arg_attrs must be one-per-operand");
+        llvm::SmallVector<mlir::Attribute> newAttrs(argAttrs.begin() + 1,
+                                                    argAttrs.end());
+        if (newAttrs.empty())
+          (*this)->removeAttr(getArgAttrsAttrName());
+        else
+          (*this)->setAttr(getArgAttrsAttrName(),
+                           mlir::ArrayAttr::get(getContext(), newAttrs));
+      }
+    }
+    return;
+  }
+  // The provided callee makes this an indirect call now.
+  bool wasIndirect = llvm::isa<mlir::Value>(getCallableForCallee());
+  (*this)->removeAttr(getCalleeAttrNameStr());
+  mlir::Value calleeVal = llvm::cast<mlir::Value>(callee);
+  if (wasIndirect) {
+    setOperand(0, calleeVal);
+  } else {
+    (*this)->insertOperands(0, calleeVal);
+    // Make arg_attrs consistent in size with operands by adding an empty dict
+    // for the callee.
+    if (auto argAttrs = getArgAttrsAttr()) {
+      assert(argAttrs.size() == getNumOperands() - 1 &&
+             "arg_attrs must be one-per-operand");
+      llvm::SmallVector<mlir::Attribute> newAttrs;
+      newAttrs.reserve(1 + argAttrs.size());
+      newAttrs.push_back(mlir::DictionaryAttr::get(getContext(), {}));
+      newAttrs.append(argAttrs.begin(), argAttrs.end());
+      (*this)->setAttr(getArgAttrsAttrName(),
+                       mlir::ArrayAttr::get(getContext(), newAttrs));
+    }
+  }
+}
+
 //===----------------------------------------------------------------------===//
 // CharConvertOp
 //===----------------------------------------------------------------------===//
@@ -5306,9 +5356,17 @@ bool fir::DeclareOp::canUsesBeRemoved(
     const mlir::DataLayout &dataLayout) {
   if (!isLegalTypeForValueDeclare(fir::unwrapRefType(getType())))
     return false;
-  // Forward uses to the users of the fir.declare.
-  for (mlir::OpOperand &use : getResult().getUses())
+  // MLIR's mem2reg computes defining blocks only from direct users of
+  // the slot pointer. Stores through fir.declare are not direct users,
+  // so they are not registered as defining blocks. This causes missing
+  // phi nodes at join points (e.g., loop headers). Restrict promotion
+  // to the single-block case where no phi nodes are needed.
+  mlir::Block *declBlock = getOperation()->getBlock();
+  for (mlir::OpOperand &use : getResult().getUses()) {
+    if (use.getOwner()->getBlock() != declBlock)
+      return false;
     newBlockingUses.push_back(&use);
+  }
   return true;
 }
 
