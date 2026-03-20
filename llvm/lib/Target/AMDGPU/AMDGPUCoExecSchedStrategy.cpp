@@ -54,7 +54,7 @@ InstructionFlavor llvm::AMDGPU::classifyFlavor(const MachineInstr &MI,
   // Check for specific opcodes first.
   if (Opc == AMDGPU::ATOMIC_FENCE || Opc == AMDGPU::S_WAIT_ASYNCCNT ||
       Opc == AMDGPU::S_WAIT_TENSORCNT || Opc == AMDGPU::S_BARRIER_WAIT ||
-      Opc == AMDGPU::S_BARRIER_SIGNAL_IMM)
+      Opc == AMDGPU::S_BARRIER_SIGNAL_IMM || SII.isWaitcnt(Opc))
     return InstructionFlavor::Fence;
 
   if (SII.isLDSDMA(MI))
@@ -428,16 +428,16 @@ unsigned CandidateHeuristics::getStructuralStallCycles(SchedBoundary &Zone,
 bool CandidateHeuristics::tryEffectiveStall(
     GenericSchedulerBase::SchedCandidate &TryCand,
     GenericSchedulerBase::SchedCandidate &Cand, SchedBoundary &Zone) {
-  auto getBufferFullStalls =
-      [this, &Zone](GenericSchedulerBase::SchedCandidate &SchedCand) -> unsigned {
-    SUnit *SU = SchedCand.SU;
+  // Only implemented for top-down scheduling currently.
+  if (!Zone.isTop())
+    return false;
+
+  auto getBufferFullStalls = [this, &Zone](SUnit *SU) -> unsigned {
     InstructionFlavor Flavor = classifyFlavor(*SU->getInstr(), *SII);
     HardwareUnitInfo *HWUI = getHWUIFromFlavor(Flavor);
     if (!HWUI || HWUI->getBufferSize() <= 1)
       return 0;
 
-    // getBufferAvailableCycle assumes top-down scheduling.
-    assert(Zone.isTop());
     unsigned CurrCycle = Zone.getCurrCycle();
     unsigned BufferReadyCycle = HWUI->getBufferAvailableCycle(CurrCycle);
     if (BufferReadyCycle <= CurrCycle)
@@ -446,91 +446,109 @@ bool CandidateHeuristics::tryEffectiveStall(
     return BufferReadyCycle - CurrCycle;
   };
 
-  // Treat structural, latency, buffer-full, and carried-latency stalls as a
-  // single scheduling cost for the current cycle.
+  unsigned CurrCycle = Zone.getCurrCycle();
+
+  auto getFenceStalls = [this, &CurrCycle, &Zone](SUnit *SU) -> unsigned {
+    InstructionFlavor Flavor = classifyFlavor(*SU->getInstr(), *SII);
+
+    bool IsTop = Zone.isTop();
+    if ((Flavor != InstructionFlavor::Fence && IsTop) ||
+        (Flavor != InstructionFlavor::DS && !IsTop))
+      return 0;
+
+    HardwareUnitInfo *ConsumerHWUI = getHWUIFromFlavor(Flavor);
+    HardwareUnitInfo *ProducerHWUI = getHWUIFromFlavor(
+        IsTop ? InstructionFlavor::DS : InstructionFlavor::Fence);
+
+    SUnit *LastProducer = ProducerHWUI->getLastScheduledSU();
+    if (!LastProducer)
+      return 0;
+
+    SUnit *LastConsumer = ConsumerHWUI->getLastScheduledSU();
+    unsigned LastConsumerCycle = LastConsumer ? LastConsumer->TopReadyCycle : 0;
+    unsigned LastProducerCycle = LastProducer->TopReadyCycle;
+
+    if (LastProducerCycle < LastConsumerCycle)
+      return 0;
+
+    // Latency comes from DS regardless of bottom-up / top-down.
+    unsigned FenceStallFinish =
+        LastProducerCycle + getHWUICyclesForSU(IsTop ? LastProducer : SU);
+    return FenceStallFinish <= CurrCycle ? 0 : FenceStallFinish - CurrCycle;
+  };
+
+  // Treat stalls as a single scheduling cost for the current cycle.
   struct StallCosts {
     unsigned Ready = 0;
     unsigned Structural = 0;
     unsigned Latency = 0;
-    unsigned BufferFull = 0;
     unsigned Carried = 0;
-<<<<<<< HEAD
-    unsigned Effective = 0;
-=======
     unsigned Buffer = 0;
+    unsigned Fence = 0;
+    unsigned Effective = 0;
   };
 
-  auto getBufferFullStalls = [this, &Zone](SUnit *SU) -> unsigned {
-    InstructionFlavor Flavor = classifyFlavor(
-        *SU->getInstr(), *static_cast<const SIInstrInfo *>(DAG->TII));
-    HardwareUnitInfo *HWUI = getHWUIFromFlavor(Flavor);
-
-    if (HWUI->getBufferSize() <= 1)
-      return 0;
-
-    // getBufferAvailableCycle assumes top-down scheduling.
-    assert(Zone.isTop());
-    unsigned CurrCycle = Zone.getCurrCycle();
-    unsigned BufferReadyCycle = HWUI->getBufferAvailableCycle(CurrCycle);
-    if (BufferReadyCycle <= CurrCycle)
-      return 0;
-
-    return BufferReadyCycle - CurrCycle;
->>>>>>> 457531de1f0a (Merge conflict)
-  };
-
-  unsigned CurrCycle = Zone.getCurrCycle();
-  auto GetStallCosts = [&](GenericSchedulerBase::SchedCandidate &SchedCand) {
-    SUnit *SU = SchedCand.SU;
+  auto GetStallCosts = [&](SUnit *SU) {
     unsigned ReadyCycle = Zone.isTop() ? SU->TopReadyCycle : SU->BotReadyCycle;
     StallCosts Costs;
     Costs.Ready = ReadyCycle > CurrCycle ? ReadyCycle - CurrCycle : 0;
     Costs.Structural = getStructuralStallCycles(Zone, SU);
     Costs.Latency = Zone.getLatencyStallCycles(SU);
-    Costs.BufferFull = getBufferFullStalls(SchedCand);
     unsigned CarriedLatency = CarriedLatencies.lookup_or(SU->getInstr(), 0);
-<<<<<<< HEAD
     Costs.Carried =
         CarriedLatency > CurrCycle ? CarriedLatency - CurrCycle : 0;
-    Costs.Effective =
-        std::max({Costs.Ready, Costs.Structural, Costs.Latency,
-                  Costs.BufferFull, Costs.Carried});
-=======
-    Costs.Carried = CarriedLatency > CurrCycle ? CarriedLatency - CurrCycle : 0;
     Costs.Buffer = getBufferFullStalls(SU);
-
+    Costs.Fence = getFenceStalls(SU);
     Costs.Effective = std::max({Costs.Ready, Costs.Structural, Costs.Latency,
-                                Costs.Carried, Costs.Buffer});
->>>>>>> 457531de1f0a (Merge conflict)
+                                Costs.Carried, Costs.Buffer, Costs.Fence});
     return Costs;
   };
 
-  StallCosts TryCosts = GetStallCosts(TryCand);
-  StallCosts CandCosts = GetStallCosts(Cand);
+  StallCosts TryCosts = GetStallCosts(TryCand.SU);
+  StallCosts CandCosts = GetStallCosts(Cand.SU);
 
   LLVM_DEBUG(if (TryCosts.Effective || CandCosts.Effective) {
     dbgs() << "Effective stalls: try=" << TryCosts.Effective
            << " (ready=" << TryCosts.Ready << ", struct=" << TryCosts.Structural
-<<<<<<< HEAD
-           << ", lat=" << TryCosts.Latency << ", buf=" << TryCosts.BufferFull
-           << ", carried=" << TryCosts.Carried
+           << ", lat=" << TryCosts.Latency << ", carried=" << TryCosts.Carried
+           << ", buffer=" << TryCosts.Buffer << ", fence=" << TryCosts.Fence
            << ") cand=" << CandCosts.Effective
            << " (ready=" << CandCosts.Ready
            << ", struct=" << CandCosts.Structural
-           << ", lat=" << CandCosts.Latency << ", buf=" << CandCosts.BufferFull
-           << ", carried=" << CandCosts.Carried << ")\n";
-=======
-           << ", lat=" << TryCosts.Latency << ", carried=" << TryCosts.Carried
-           << ", buffer=" << TryCosts.Buffer << ") cand=" << CandCosts.Effective
-           << " (ready=" << CandCosts.Ready
-           << ", struct=" << CandCosts.Structural
            << ", lat=" << CandCosts.Latency << ", carried=" << CandCosts.Carried
-           << ", buffer=" << CandCosts.Buffer << ")\n";
->>>>>>> 457531de1f0a (Merge conflict)
+           << ", buffer=" << CandCosts.Buffer << ", fence=" << CandCosts.Fence
+           << ")\n";
   });
 
   return tryLess(TryCosts.Effective, CandCosts.Effective, TryCand, Cand,
                  AMDGPUCoExecSchedStrategy::Stall);
+}
+
+bool CandidateHeuristics::tryMemoryPipeline(
+    GenericSchedulerBase::SchedCandidate &TryCand,
+    GenericSchedulerBase::SchedCandidate &Cand) {
+
+  InstructionFlavor TryFlavor = classifyFlavor(*TryCand.SU->getInstr(), *SII);
+
+  InstructionFlavor CandFlavor = classifyFlavor(*Cand.SU->getInstr(), *SII);
+
+  bool TryIsMemoryPipeline = TryFlavor == InstructionFlavor::DMA ||
+                             TryFlavor == InstructionFlavor::Fence;
+  bool CandIsMemoryPipeline = CandFlavor == InstructionFlavor::DMA ||
+                              CandFlavor == InstructionFlavor::Fence;
+
+  if (TryIsMemoryPipeline == CandIsMemoryPipeline)
+    return false;
+
+  if (CandIsMemoryPipeline) {
+    if (Cand.Reason > GenericSchedulerBase::RegCritical)
+      Cand.Reason = GenericSchedulerBase::RegCritical;
+
+    return true;
+  }
+
+  TryCand.Reason = GenericSchedulerBase::RegCritical;
+  return true;
 }
 
 bool CandidateHeuristics::tryCriticalResourceDependency(
@@ -872,8 +890,15 @@ bool AMDGPUCoExecSchedStrategy::tryCandidateCoexec(SchedCandidate &Cand,
   if (SameBoundary) {
     // Compare candidates by the stall they would introduce if
     // scheduled in the current cycle.
-    if (Heurs.tryEffectiveStall(Cand, TryCand, *Zone))
+    if (Heurs.tryEffectiveStall(TryCand, Cand, *Zone)) {
+      LastAMDGPUReason = AMDGPUSchedReason::Stall;
       return TryCand.Reason != NoCand;
+    }
+
+    if (Heurs.tryMemoryPipeline(TryCand, Cand)) {
+      LastAMDGPUReason = AMDGPUSchedReason::MemoryPipeline;
+      return TryCand.Reason != NoCand;
+    }
 
     Heurs.sortHWUIResources();
     if (Heurs.tryCriticalResource(TryCand, Cand, Zone)) {
@@ -918,12 +943,6 @@ bool AMDGPUCoExecSchedStrategy::tryCandidateCoexec(SchedCandidate &Cand,
     return TryCand.Reason != NoCand;
 
   if (SameBoundary) {
-    // Avoid serializing long latency dependence chains.
-    // For acyclic path limited loops, latency was already checked above.
-    if (!RegionPolicy.DisableLatencyHeuristic && TryCand.Policy.ReduceLatency &&
-        !Rem.IsAcyclicLatencyLimited && tryLatency(TryCand, Cand, *Zone))
-      return TryCand.Reason != NoCand;
-
     // Fall through to original instruction order.
     if ((Zone->isTop() && TryCand.SU->NodeNum < Cand.SU->NodeNum) ||
         (!Zone->isTop() && TryCand.SU->NodeNum > Cand.SU->NodeNum)) {
