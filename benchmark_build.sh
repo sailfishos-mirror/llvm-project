@@ -7,16 +7,17 @@ BUILD_DIR=build
 
 print_stats() {
     local label="$1"
-    shift
-    local times=("$@")
+    local unit="$2"
+    shift 2
+    local vals=("$@")
 
     echo ""
     echo "========== $label =========="
-    printf "Times: "
-    printf "%s " "${times[@]}"
+    printf "Values: "
+    printf "%s " "${vals[@]}"
     echo ""
 
-    printf "%s\n" "${times[@]}" | awk '
+    printf "%s\n" "${vals[@]}" | awk -v unit="$unit" '
     {
         vals[NR] = $1
         sum += $1
@@ -39,22 +40,40 @@ print_stats() {
             median = (vals[n/2] + vals[n/2 + 1]) / 2
 
         printf "N:      %d\n", n
-        printf "Mean:   %.2fs\n", mean
-        printf "Median: %.2fs\n", median
-        printf "Var:    %.2f\n", var
-        printf "StdDev: %.2fs\n", sqrt(var)
+        printf "Mean:   %.2f%s\n", mean, unit
+        printf "Median: %.2f%s\n", median, unit
+        printf "Var:    %.4f\n", var
+        printf "StdDev: %.2f%s\n", sqrt(var), unit
     }
     '
 }
 
-# Parse the output of `time` (real/user/sys lines) into seconds.
-# Handles both "0m1.234s" and "1m2.345s" formats.
+# Parse time output (e.g. "real 0m1.234s") into seconds.
 parse_time() {
     local line="$1"
     local mins secs
     mins=$(echo "$line" | sed -E 's/.*[[:space:]]([0-9]+)m([0-9.]+)s/\1/')
     secs=$(echo "$line" | sed -E 's/.*[[:space:]]([0-9]+)m([0-9.]+)s/\2/')
     echo "$mins * 60 + $secs" | bc
+}
+
+# Parse max RSS from /usr/bin/time output and convert to GB.
+# macOS `time -l`: bytes;  GNU `time -v`: KB.
+parse_maxrss_gb() {
+    local output="$1"
+    if echo "$output" | grep -q "maximum resident set size"; then
+        # macOS: value in bytes
+        local bytes
+        bytes=$(echo "$output" | grep "maximum resident set size" | awk '{print $1}')
+        echo "scale=4; $bytes / 1073741824" | bc
+    elif echo "$output" | grep -q "Maximum resident set size"; then
+        # GNU time: value in KB
+        local kb
+        kb=$(echo "$output" | grep "Maximum resident set size" | awk '{print $NF}')
+        echo "scale=4; $kb / 1048576" | bc
+    else
+        echo "0"
+    fi
 }
 
 for build_type in Release Debug; do
@@ -67,11 +86,12 @@ for unity_mode in off on; do
         label_suffix="$build_type, with unity"
     fi
 
-    declare -A all_real all_user all_sys
+    declare -A all_real all_user all_sys all_mem
     for tool in "${TOOLS[@]}"; do
         all_real[$tool]=""
         all_user[$tool]=""
         all_sys[$tool]=""
+        all_mem[$tool]=""
     done
 
     for i in $(seq 1 $ITERATIONS); do
@@ -84,16 +104,18 @@ for unity_mode in off on; do
             $unity_flag > /dev/null
 
         for tool in "${TOOLS[@]}"; do
-            time_output=$( { time ninja -C "$BUILD_DIR" "$tool" > /dev/null; } 2>&1 )
+            time_output=$( { /usr/bin/time -l ninja -C "$BUILD_DIR" "$tool" > /dev/null; } 2>&1 )
 
             real=$(parse_time "$(echo "$time_output" | grep real)")
             user=$(parse_time "$(echo "$time_output" | grep user)")
             sys=$(parse_time "$(echo "$time_output" | grep sys)")
+            mem=$(parse_maxrss_gb "$time_output")
 
             all_real[$tool]+="$real "
             all_user[$tool]+="$user "
             all_sys[$tool]+="$sys "
-            echo ">>> $tool  real=${real}s  user=${user}s  sys=${sys}s"
+            all_mem[$tool]+="$mem "
+            echo ">>> $tool  real=${real}s  user=${user}s  sys=${sys}s  maxrss=${mem}GB"
 
             # Clean build artifacts but keep the configured build dir
             ninja -C "$BUILD_DIR" clean > /dev/null
@@ -107,12 +129,14 @@ for unity_mode in off on; do
     echo "# Results: $label_suffix"
     echo "############################################"
     for tool in "${TOOLS[@]}"; do
-        read -ra times <<< "${all_real[$tool]}"
-        print_stats "$tool real ($label_suffix)" "${times[@]}"
-        read -ra times <<< "${all_user[$tool]}"
-        print_stats "$tool user ($label_suffix)" "${times[@]}"
-        read -ra times <<< "${all_sys[$tool]}"
-        print_stats "$tool sys ($label_suffix)" "${times[@]}"
+        read -ra vals <<< "${all_real[$tool]}"
+        print_stats "$tool real ($label_suffix)" "s" "${vals[@]}"
+        read -ra vals <<< "${all_user[$tool]}"
+        print_stats "$tool user ($label_suffix)" "s" "${vals[@]}"
+        read -ra vals <<< "${all_sys[$tool]}"
+        print_stats "$tool sys ($label_suffix)" "s" "${vals[@]}"
+        read -ra vals <<< "${all_mem[$tool]}"
+        print_stats "$tool maxrss ($label_suffix)" "GB" "${vals[@]}"
     done
 done
 done
