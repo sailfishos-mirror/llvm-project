@@ -71,7 +71,8 @@ def main() -> None:
     write_wctype_classification_data(
         llvm_project_root_path=argv[1], unicode_data_folder_path=argv[2]
     )
-    print(f"wctype conversion data is written to {argv[1]}/libc/src/__support/wctype/")
+    print(
+        f"wctype conversion data is written to {argv[1]}/libc/src/__support/wctype/")
 
 
 if __name__ == "__main__":
