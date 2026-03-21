@@ -140,6 +140,8 @@ config.substitutions.append(("%isysroot", " ".join(isysroot_flag)))
 if config.default_sysroot:
     config.available_features.add("default_sysroot")
 
+host_triple = config.host_triple.split("-")
+config.available_features.add(f'{host_triple[0]}-host')
 
 flang_exe = lit.util.which("flang", config.flang_llvm_tools_dir)
 if not flang_exe:
@@ -187,7 +189,7 @@ if config.flang_test_enable_openmp or openmp_mod_path:
     config.available_features.add("openmp_runtime")
 
     # Search path for omp_lib.h with LLVM_ENABLE_RUNTIMES=openmp
-    # FIXME: openmp should write this file into the resource directory
+    # FIXME: In a bootstrpping build, openmp should write this file into a shared directory
     flang_extra_search_args += [
         "-I",
         f"{config.flang_obj_root}/../../runtimes/runtimes-bins/openmp/runtime/src",

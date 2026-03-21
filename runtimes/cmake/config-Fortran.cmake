@@ -207,16 +207,6 @@ function (flang_module_target tgtname)
       "$<$<COMPILE_LANGUAGE:Fortran>:SHELL:-Xflang;SHELL:-fno-reformat>"
     )
 
-  # `flang --target=nvptx64` fails when not specifying `-march`, even when only
-  # emitting .mod files. Ensure that we pass `-march`.
-  if (LLVM_RUNTIMES_TARGET MATCHES "^nvptx")
-    foreach (_arch IN LISTS RUNTIMES_DEVICE_ARCHITECTURES)
-      target_compile_options(${tgtname} PRIVATE
-        "$<$<COMPILE_LANGUAGE:Fortran>:-march=${_arch}>"
-      )
-    endforeach()
-  endif ()
-
   if (ARG_PUBLIC)
     set_target_properties(${tgtname}
       PROPERTIES
