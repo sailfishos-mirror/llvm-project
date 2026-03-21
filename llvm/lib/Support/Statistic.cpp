@@ -24,6 +24,7 @@
 
 #include "DebugOptions.h"
 
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Compiler.h"
@@ -102,8 +103,10 @@ public:
   void reset();
 };
 
-class LocalStatisticInfo {
-  std::vector<LocalTrackingStatistic *> Stats;
+} // end anonymous namespace
+
+class llvm::LocalStatisticInfo {
+  SmallVector<LocalTrackingStatistic *> Stats;
 
 public:
   using const_iterator = decltype(Stats)::const_iterator;
@@ -124,11 +127,10 @@ public:
     Stats.clear();
   }
 };
-} // end anonymous namespace
 
 static ManagedStatic<StatisticInfo> StatInfo;
 static ManagedStatic<sys::SmartMutex<true>> StatLock;
-static thread_local LocalStatisticInfo LocalStatInfo;
+thread_local LocalStatisticInfo *llvm::LocalStatInfo = nullptr;
 
 /// RegisterStatistic - The first time a statistic is bumped, this method is
 /// called.
@@ -157,9 +159,8 @@ void TrackingStatistic::RegisterStatistic() {
 }
 
 void LocalTrackingStatistic::RegisterStatistic() {
-  assert(!Initialized);
-  if (AreStatisticsEnabled())
-    LocalStatInfo.addStatistic(this);
+  assert(!Initialized && LocalStatInfo);
+  LocalStatInfo->addStatistic(this);
   Initialized = true;
 }
 
@@ -296,16 +297,36 @@ std::vector<std::pair<StringRef, uint64_t>> llvm::GetStatistics() {
 
 std::vector<StatisticVal> llvm::GetLocalStatistics() {
   std::vector<StatisticVal> ReturnStats;
-  LocalStatInfo.sort();
-  for (const auto &Stat : LocalStatInfo)
+  if (!LocalStatInfo)
+    return ReturnStats;
+  LocalStatInfo->sort();
+  for (const auto &Stat : *LocalStatInfo)
     ReturnStats.emplace_back(Stat->getDebugType(), Stat->getName(),
                              Stat->getValue());
   return ReturnStats;
 }
 
 void llvm::ResetStatistics() {
-  LocalStatInfo.reset();
+  ResetLocalStatistics();
   StatInfo->reset();
 }
 
-void llvm::ResetLocalStatistics() { LocalStatInfo.reset(); }
+void llvm::EnableLocalStatistics() {
+  if (LocalStatInfo || !AreStatisticsEnabled())
+    return;
+  LocalStatInfo = new LocalStatisticInfo();
+}
+
+void llvm::ShutdownLocalStatistics() {
+  if (!LocalStatInfo)
+    return;
+  LocalStatInfo->reset();
+  delete LocalStatInfo;
+  LocalStatInfo = nullptr;
+}
+
+void llvm::ResetLocalStatistics() {
+  if (!LocalStatInfo)
+    return;
+  LocalStatInfo->reset();
+}

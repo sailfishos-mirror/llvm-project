@@ -49,6 +49,13 @@
 
 namespace llvm {
 
+class LocalStatisticInfo;
+
+/// Pointer to the thread-local local statistics storage. Non-null when local
+/// statistics are enabled on the current thread. Set by
+/// EnableLocalStatistics(), cleared by ShutdownLocalStatistics().
+LLVM_ABI extern thread_local LocalStatisticInfo *LocalStatInfo;
+
 class raw_ostream;
 class raw_fd_ostream;
 
@@ -142,7 +149,7 @@ public:
   uint64_t Value = 0;
   bool Initialized = false;
 
-  LocalTrackingStatistic(TrackingStatistic &Statistic)
+  constexpr LocalTrackingStatistic(TrackingStatistic &Statistic)
       : GlobalStat(&Statistic) {}
 
   const char *getDebugType() const { return GlobalStat->DebugType; }
@@ -184,7 +191,7 @@ public:
 
 protected:
   void init() {
-    if (Initialized)
+    if (!LocalStatInfo || Initialized)
       return;
     Value = 0;
     RegisterStatistic();
@@ -296,6 +303,13 @@ LLVM_ABI void PrintStatisticsJSON(raw_ostream &OS);
 /// read. However, it will prevent new statistics from registering until it
 /// completes.
 LLVM_ABI std::vector<std::pair<StringRef, uint64_t>> GetStatistics();
+
+/// Enable local statistics collection on the current thread. Call
+/// ShutdownLocalStatistics() to clean up.
+LLVM_ABI void EnableLocalStatistics();
+
+/// Shut down local statistics on the current thread, freeing resources.
+LLVM_ABI void ShutdownLocalStatistics();
 
 /// Get the local statistics. Returns statistics collected on the current thread
 /// since the last call to ResetLocalStatistics(). Results are sorted by debug

@@ -182,10 +182,25 @@ findLocalStat(const std::vector<StatisticVal> &Stats, StringRef Name) {
 TEST(StatisticTest, LocalStatistics) {
   EnableStatistics();
   ResetStatistics();
-  ResetLocalStatistics();
 
 #if LLVM_ENABLE_STATS
-  // Verify empty after reset.
+  // Increment a local counter before enabling local stats. This should
+  // still update the global stat but not be tracked locally.
+  LocalCounter++;
+  {
+    auto Global = GetStatistics();
+    auto GS = findStat(Global, "LocalCounter");
+    ASSERT_TRUE(GS.has_value());
+    EXPECT_EQ(GS->second, 1u);
+  }
+  {
+    auto Local = GetLocalStatistics();
+    EXPECT_TRUE(Local.empty());
+  }
+
+  // Now enable local stats and verify the pre-enable increment isn't tracked.
+  EnableLocalStatistics();
+
   {
     auto Local = GetLocalStatistics();
     EXPECT_TRUE(Local.empty());
@@ -222,7 +237,7 @@ TEST(StatisticTest, LocalStatistics) {
     auto GS2 = findStat(Global, "LocalCounter2");
 
     ASSERT_TRUE(GS1.has_value());
-    EXPECT_EQ(GS1->second, 2u);
+    EXPECT_EQ(GS1->second, 3u);
 
     ASSERT_TRUE(GS2.has_value());
     EXPECT_EQ(GS2->second, 1u);
@@ -240,7 +255,7 @@ TEST(StatisticTest, LocalStatistics) {
     auto Global = GetStatistics();
     auto GS1 = findStat(Global, "LocalCounter");
     ASSERT_TRUE(GS1.has_value());
-    EXPECT_EQ(GS1->second, 2u);
+    EXPECT_EQ(GS1->second, 3u);
   }
 
   // Verify local stats work again after reset.
@@ -267,7 +282,7 @@ TEST(StatisticTest, LocalStatistics) {
     auto GS2 = findStat(Global, "LocalCounter2");
 
     ASSERT_TRUE(GS1.has_value());
-    EXPECT_EQ(GS1->second, 3u);
+    EXPECT_EQ(GS1->second, 4u);
 
     ASSERT_TRUE(GS2.has_value());
     EXPECT_EQ(GS2->second, 6u);
@@ -296,11 +311,13 @@ TEST(StatisticTest, LocalStatistics) {
     EXPECT_EQ(Local[2].Value, 10u);
   }
 #else
+  EnableLocalStatistics();
   LocalCounter++;
   LocalCounter2++;
   auto Local = GetLocalStatistics();
   EXPECT_TRUE(Local.empty());
 #endif
+  ShutdownLocalStatistics();
 }
 
 } // end anonymous namespace
