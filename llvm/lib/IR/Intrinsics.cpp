@@ -837,6 +837,17 @@ bool Intrinsic::hasConstrainedFPRoundingModeOperand(Intrinsic::ID QID) {
   }
 }
 
+bool Intrinsic::isFPOperation(ID IID) {
+  switch (IID) {
+#define FUNCTION(NAME, ROUND_MODE, DAGN) case Intrinsic::NAME:
+#include "llvm/IR/FloatingPointOps.def"
+#undef INSTRUCTION
+    return true;
+  default:
+    return false;
+  }
+}
+
 using DeferredIntrinsicMatchPair =
     std::pair<Type *, ArrayRef<Intrinsic::IITDescriptor>>;
 

@@ -1195,6 +1195,9 @@ public:
     return nullptr;
   }
 
+  /// Get memory effects specific to floating-point operations.
+  std::optional<MemoryEffects> getFloatingPointMemoryEffects() const;
+
   static bool classof(const Instruction *I) {
     return I->getOpcode() == Instruction::Call ||
            I->getOpcode() == Instruction::Invoke ||
