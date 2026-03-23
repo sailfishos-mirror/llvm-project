@@ -335,10 +335,10 @@ unsigned GCNHazardRecognizer::PreEmitNoops(MachineInstr *MI) {
 }
 
 unsigned GCNHazardRecognizer::getHazardWaitStates(MachineInstr *MI) const {
-  return const_cast<GCNHazardRecognizer *>(this)->PreEmitNoopsCommon(MI);
+  return this->PreEmitNoopsCommon(MI);
 }
 
-unsigned GCNHazardRecognizer::PreEmitNoopsCommon(MachineInstr *MI) {
+unsigned GCNHazardRecognizer::PreEmitNoopsCommon(MachineInstr *MI) const {
   if (MI->isBundle())
     return 0;
 
@@ -620,7 +620,7 @@ getWaitStatesSince(GCNHazardRecognizer::IsHazardFn IsHazard,
 }
 
 int GCNHazardRecognizer::getWaitStatesSince(
-    IsHazardFn IsHazard, int Limit, GetNumWaitStatesFn GetNumWaitStates) {
+    IsHazardFn IsHazard, int Limit, GetNumWaitStatesFn GetNumWaitStates) const {
   if (IsHazardRecognizerMode) {
     auto IsExpiredFn = [Limit](const MachineInstr &, int WaitStates) {
       return WaitStates >= Limit;
@@ -646,13 +646,14 @@ int GCNHazardRecognizer::getWaitStatesSince(
   return std::numeric_limits<int>::max();
 }
 
-int GCNHazardRecognizer::getWaitStatesSince(IsHazardFn IsHazard, int Limit) {
+int GCNHazardRecognizer::getWaitStatesSince(IsHazardFn IsHazard,
+                                            int Limit) const {
   return getWaitStatesSince(IsHazard, Limit, SIInstrInfo::getNumWaitStates);
 }
 
 int GCNHazardRecognizer::getWaitStatesSinceDef(unsigned Reg,
                                                IsHazardFn IsHazardDef,
-                                               int Limit) {
+                                               int Limit) const {
   const SIRegisterInfo *TRI = ST.getRegisterInfo();
 
   auto IsHazardFn = [IsHazardDef, TRI, Reg](const MachineInstr &MI) {
@@ -663,7 +664,7 @@ int GCNHazardRecognizer::getWaitStatesSinceDef(unsigned Reg,
 }
 
 int GCNHazardRecognizer::getWaitStatesSinceSetReg(IsHazardFn IsHazard,
-                                                  int Limit) {
+                                                  int Limit) const {
   auto IsHazardFn = [IsHazard](const MachineInstr &MI) {
     return isSSetReg(MI.getOpcode()) && IsHazard(MI);
   };
@@ -690,7 +691,7 @@ static void addRegsToSet(const SIRegisterInfo &TRI,
   }
 }
 
-void GCNHazardRecognizer::addClauseInst(const MachineInstr &MI) {
+void GCNHazardRecognizer::addClauseInst(const MachineInstr &MI) const {
   addRegsToSet(TRI, MI.operands(), ClauseDefs, ClauseUses);
 }
 
@@ -702,7 +703,7 @@ static bool breaksVMEMSoftClause(MachineInstr *MI) {
   return !SIInstrInfo::isVMEM(*MI);
 }
 
-int GCNHazardRecognizer::checkSoftClauseHazards(MachineInstr *MEM) {
+int GCNHazardRecognizer::checkSoftClauseHazards(MachineInstr *MEM) const {
   // SMEM soft clause are only present on VI+, and only matter if xnack is
   // enabled.
   if (!ST.isXNACKEnabled())
@@ -750,7 +751,7 @@ int GCNHazardRecognizer::checkSoftClauseHazards(MachineInstr *MEM) {
   return ClauseDefs.anyCommon(ClauseUses) ? 1 : 0;
 }
 
-int GCNHazardRecognizer::checkSMRDHazards(MachineInstr *SMRD) {
+int GCNHazardRecognizer::checkSMRDHazards(MachineInstr *SMRD) const {
   int WaitStatesNeeded = 0;
 
   WaitStatesNeeded = checkSoftClauseHazards(SMRD);
@@ -798,7 +799,7 @@ int GCNHazardRecognizer::checkSMRDHazards(MachineInstr *SMRD) {
   return WaitStatesNeeded;
 }
 
-int GCNHazardRecognizer::checkVMEMHazards(MachineInstr* VMEM) {
+int GCNHazardRecognizer::checkVMEMHazards(MachineInstr *VMEM) const {
   if (!ST.hasVMEMReadSGPRVALUDefHazard())
     return 0;
 
@@ -822,7 +823,7 @@ int GCNHazardRecognizer::checkVMEMHazards(MachineInstr* VMEM) {
   return WaitStatesNeeded;
 }
 
-int GCNHazardRecognizer::checkDPPHazards(MachineInstr *DPP) {
+int GCNHazardRecognizer::checkDPPHazards(MachineInstr *DPP) const {
   const SIRegisterInfo *TRI = ST.getRegisterInfo();
   const SIInstrInfo *TII = ST.getInstrInfo();
 
@@ -853,7 +854,7 @@ int GCNHazardRecognizer::checkDPPHazards(MachineInstr *DPP) {
   return WaitStatesNeeded;
 }
 
-int GCNHazardRecognizer::checkDivFMasHazards(MachineInstr *DivFMas) {
+int GCNHazardRecognizer::checkDivFMasHazards(MachineInstr *DivFMas) const {
   const SIInstrInfo *TII = ST.getInstrInfo();
 
   // v_div_fmas requires 4 wait states after a write to vcc from a VALU
@@ -868,7 +869,7 @@ int GCNHazardRecognizer::checkDivFMasHazards(MachineInstr *DivFMas) {
   return DivFMasWaitStates - WaitStatesNeeded;
 }
 
-int GCNHazardRecognizer::checkGetRegHazards(MachineInstr *GetRegInstr) {
+int GCNHazardRecognizer::checkGetRegHazards(MachineInstr *GetRegInstr) const {
   const SIInstrInfo *TII = ST.getInstrInfo();
   unsigned GetRegHWReg = getHWReg(TII, *GetRegInstr);
 
@@ -881,7 +882,7 @@ int GCNHazardRecognizer::checkGetRegHazards(MachineInstr *GetRegInstr) {
   return GetRegWaitStates - WaitStatesNeeded;
 }
 
-int GCNHazardRecognizer::checkSetRegHazards(MachineInstr *SetRegInstr) {
+int GCNHazardRecognizer::checkSetRegHazards(MachineInstr *SetRegInstr) const {
   const SIInstrInfo *TII = ST.getInstrInfo();
   unsigned HWReg = getHWReg(TII, *SetRegInstr);
 
@@ -893,7 +894,7 @@ int GCNHazardRecognizer::checkSetRegHazards(MachineInstr *SetRegInstr) {
   return SetRegWaitStates - WaitStatesNeeded;
 }
 
-int GCNHazardRecognizer::createsVALUHazard(const MachineInstr &MI) {
+int GCNHazardRecognizer::createsVALUHazard(const MachineInstr &MI) const {
   if (!MI.mayStore())
     return -1;
 
@@ -945,9 +946,8 @@ int GCNHazardRecognizer::createsVALUHazard(const MachineInstr &MI) {
   return -1;
 }
 
-int
-GCNHazardRecognizer::checkVALUHazardsHelper(const MachineOperand &Def,
-                                            const MachineRegisterInfo &MRI) {
+int GCNHazardRecognizer::checkVALUHazardsHelper(
+    const MachineOperand &Def, const MachineRegisterInfo &MRI) const {
   // Helper to check for the hazard where VMEM instructions that store more than
   // 8 bytes can have there store data over written by the next instruction.
   const SIRegisterInfo *TRI = ST.getRegisterInfo();
@@ -1045,7 +1045,7 @@ static bool consumesDstSelForwardingOperand(const MachineInstr *VALU,
   return false;
 }
 
-int GCNHazardRecognizer::checkVALUHazards(MachineInstr *VALU) {
+int GCNHazardRecognizer::checkVALUHazards(MachineInstr *VALU) const {
   int WaitStatesNeeded = 0;
 
   if (ST.hasTransForwardingHazard() && !SIInstrInfo::isTRANS(*VALU)) {
@@ -1174,7 +1174,7 @@ int GCNHazardRecognizer::checkVALUHazards(MachineInstr *VALU) {
   return WaitStatesNeeded;
 }
 
-int GCNHazardRecognizer::checkInlineAsmHazards(MachineInstr *IA) {
+int GCNHazardRecognizer::checkInlineAsmHazards(MachineInstr *IA) const {
   // This checks for hazards associated with inline asm statements.
   // Since inline asms can contain just about anything, we use this
   // to call/leverage other check*Hazard routines. Note that
@@ -1235,7 +1235,7 @@ int GCNHazardRecognizer::checkInlineAsmHazards(MachineInstr *IA) {
   return WaitStatesNeeded;
 }
 
-int GCNHazardRecognizer::checkRWLaneHazards(MachineInstr *RWLane) {
+int GCNHazardRecognizer::checkRWLaneHazards(MachineInstr *RWLane) const {
   const SIInstrInfo *TII = ST.getInstrInfo();
   const SIRegisterInfo *TRI = ST.getRegisterInfo();
   const MachineRegisterInfo &MRI = MF.getRegInfo();
@@ -1255,7 +1255,7 @@ int GCNHazardRecognizer::checkRWLaneHazards(MachineInstr *RWLane) {
   return RWLaneWaitStates - WaitStatesSince;
 }
 
-int GCNHazardRecognizer::checkRFEHazards(MachineInstr *RFE) {
+int GCNHazardRecognizer::checkRFEHazards(MachineInstr *RFE) const {
   if (!ST.hasRFEHazards())
     return 0;
 
@@ -1270,7 +1270,7 @@ int GCNHazardRecognizer::checkRFEHazards(MachineInstr *RFE) {
   return RFEWaitStates - WaitStatesNeeded;
 }
 
-int GCNHazardRecognizer::checkReadM0Hazards(MachineInstr *MI) {
+int GCNHazardRecognizer::checkReadM0Hazards(MachineInstr *MI) const {
   const SIInstrInfo *TII = ST.getInstrInfo();
   const int ReadM0WaitStates = 1;
   auto IsHazardFn = [TII](const MachineInstr &MI) { return TII->isSALU(MI); };
@@ -2043,8 +2043,8 @@ bool GCNHazardRecognizer::fixWMMAHazards(MachineInstr *MI) {
 }
 
 static bool isCoexecutableVALUInst(const MachineInstr &MI) {
-  return SIInstrInfo::isVALU(MI) && !SIInstrInfo::isTRANS(MI) &&
-         !SIInstrInfo::isWMMA(MI) && !SIInstrInfo::isSWMMAC(MI); // What else?
+  return SIInstrInfo::isVALU(MI) && !SIInstrInfo::isWMMA(MI) &&
+         !SIInstrInfo::isSWMMAC(MI) && !SIInstrInfo::isLDSDMA(MI);
 }
 
 static bool IsWMMAHazardInstInCategory(const MachineInstr &MI,
@@ -2088,7 +2088,7 @@ static bool IsWMMAHazardInstInCategory(const MachineInstr &MI,
   return false;
 }
 
-int GCNHazardRecognizer::checkWMMACoexecutionHazards(MachineInstr *MI) {
+int GCNHazardRecognizer::checkWMMACoexecutionHazards(MachineInstr *MI) const {
   if (!ST.hasGFX1250Insts())
     return 0;
 
@@ -2410,7 +2410,7 @@ bool GCNHazardRecognizer::fixShift64HighRegBug(MachineInstr *MI) {
   return true;
 }
 
-int GCNHazardRecognizer::checkNSAtoVMEMHazard(MachineInstr *MI) {
+int GCNHazardRecognizer::checkNSAtoVMEMHazard(MachineInstr *MI) const {
   int NSAtoVMEMWaitStates = 1;
 
   if (!ST.hasNSAtoVMEMBug())
@@ -2435,7 +2435,8 @@ int GCNHazardRecognizer::checkNSAtoVMEMHazard(MachineInstr *MI) {
   return NSAtoVMEMWaitStates - getWaitStatesSince(IsHazardFn, 1);
 }
 
-int GCNHazardRecognizer::checkFPAtomicToDenormModeHazard(MachineInstr *MI) {
+int GCNHazardRecognizer::checkFPAtomicToDenormModeHazard(
+    MachineInstr *MI) const {
   int FPAtomicToDenormModeWaitStates = 3;
 
   if (!ST.hasFPAtomicToDenormModeHazard())
@@ -2462,13 +2463,13 @@ int GCNHazardRecognizer::checkFPAtomicToDenormModeHazard(MachineInstr *MI) {
          ::getWaitStatesSince(IsHazardFn, MI, IsExpiredFn);
 }
 
-int GCNHazardRecognizer::checkMAIHazards(MachineInstr *MI) {
+int GCNHazardRecognizer::checkMAIHazards(MachineInstr *MI) const {
   assert(SIInstrInfo::isMAI(*MI));
 
   return ST.hasGFX90AInsts() ? checkMAIHazards90A(MI) : checkMAIHazards908(MI);
 }
 
-int GCNHazardRecognizer::checkMFMAPadding(MachineInstr *MI) {
+int GCNHazardRecognizer::checkMFMAPadding(MachineInstr *MI) const {
   // Early exit if no padding is requested.
   if (MFMAPaddingRatio == 0)
     return 0;
@@ -2498,7 +2499,7 @@ int GCNHazardRecognizer::checkMFMAPadding(MachineInstr *MI) {
   return std::max(0, NeighborMFMAPaddingNeeded);
 }
 
-int GCNHazardRecognizer::checkMAIHazards908(MachineInstr *MI) {
+int GCNHazardRecognizer::checkMAIHazards908(MachineInstr *MI) const {
   int WaitStatesNeeded = 0;
   unsigned Opc = MI->getOpcode();
 
@@ -2712,7 +2713,7 @@ static int GFX940_XDL_N_PassWritesVGPROverlappedSrcABWaitStates(int NumPasses,
   return NumPasses + 3 + (NumPasses != 2 && IsGFX950);
 }
 
-int GCNHazardRecognizer::checkMAIHazards90A(MachineInstr *MI) {
+int GCNHazardRecognizer::checkMAIHazards90A(MachineInstr *MI) const {
   int WaitStatesNeeded = 0;
   unsigned Opc = MI->getOpcode();
 
@@ -2917,7 +2918,7 @@ int GCNHazardRecognizer::checkMAIHazards90A(MachineInstr *MI) {
   return WaitStatesNeeded;
 }
 
-int GCNHazardRecognizer::checkMAILdStHazards(MachineInstr *MI) {
+int GCNHazardRecognizer::checkMAILdStHazards(MachineInstr *MI) const {
   // On gfx90a+ relevant hazards are checked in checkMAIVALUHazards()
   if (!ST.hasMAIInsts() || ST.hasGFX90AInsts())
     return 0;
@@ -2964,7 +2965,7 @@ int GCNHazardRecognizer::checkMAILdStHazards(MachineInstr *MI) {
   return WaitStatesNeeded;
 }
 
-int GCNHazardRecognizer::checkPermlaneHazards(MachineInstr *MI) {
+int GCNHazardRecognizer::checkPermlaneHazards(MachineInstr *MI) const {
   assert(!ST.hasVcmpxPermlaneHazard() &&
          "this is a different vcmpx+permlane hazard");
   const SIRegisterInfo *TRI = ST.getRegisterInfo();
@@ -3040,7 +3041,7 @@ static int GFX940_SMFMA_N_PassWriteVgprVALUMemExpReadWaitStates(int NumPasses) {
   return NumPasses + 2;
 }
 
-int GCNHazardRecognizer::checkMAIVALUHazards(MachineInstr *MI) {
+int GCNHazardRecognizer::checkMAIVALUHazards(MachineInstr *MI) const {
   if (!ST.hasGFX90AInsts())
     return 0;
 
@@ -3337,7 +3338,7 @@ int GCNHazardRecognizer::checkMAIVALUHazards(MachineInstr *MI) {
   return WaitStatesNeeded;
 }
 
-bool GCNHazardRecognizer::ShouldPreferAnother(SUnit *SU) {
+bool GCNHazardRecognizer::ShouldPreferAnother(SUnit *SU) const {
   if (!SU->isInstr())
     return false;
 
