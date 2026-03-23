@@ -6,78 +6,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#define LIBC_ENABLE_CONSTEXPR 1
-
-// TODO(bassiounix): Cleanup include headers once constexpr refactor is done.
-#include "shared/math/ceil.h"
-#include "shared/math/ceilbf16.h"
-#include "shared/math/ceilf.h"
-#include "shared/math/ceilf128.h"
-#include "shared/math/ceilf16.h"
-#include "shared/math/ceill.h"
-#include "shared/math/log.h"
-
-#ifdef LIBC_HAS_CONSTANT_EVALUATION
-
-//===----------------------------------------------------------------------===//
-//                       Double Tests
-//===----------------------------------------------------------------------===//
-
-static_assert(0x0p+0 == LIBC_NAMESPACE::shared::ceil(0.0));
-static_assert(0x0p+0 == LIBC_NAMESPACE::shared::log(1.0));
-
-//===----------------------------------------------------------------------===//
-//                       Float Tests
-//===----------------------------------------------------------------------===//
-
-static_assert(0x0p+0f == LIBC_NAMESPACE::shared::ceilf(0.0f));
-
-//===----------------------------------------------------------------------===//
-//                       Float16 Tests
-//===----------------------------------------------------------------------===//
-
-#ifdef LIBC_TYPES_HAS_FLOAT16
-
-static_assert(0x0p+0f16 == LIBC_NAMESPACE::shared::ceilf16(0.0f16));
-
-#endif // LIBC_TYPES_HAS_FLOAT16
-
-//===----------------------------------------------------------------------===//
-//                       Long Double Tests
-//===----------------------------------------------------------------------===//
-
-// TODO(issue#185232): Mark as constexpr once the refactor is done.
-#if 0 // Temporarily disable long double tests
-
-static_assert(0x0p+0L == LIBC_NAMESPACE::shared::ceill(0.0L));
-
-#endif
-
-//===----------------------------------------------------------------------===//
-//                       Float128 Tests
-//===----------------------------------------------------------------------===//
-
-#ifdef LIBC_TYPES_HAS_FLOAT128
-
-static_assert(float128(0x0p+0) ==
-              LIBC_NAMESPACE::shared::ceilf128(float128(0.0)));
-
-#endif // LIBC_TYPES_HAS_FLOAT128
-
-//===----------------------------------------------------------------------===//
-//                       BFloat16 Tests
-//===----------------------------------------------------------------------===//
-
-static_assert(bfloat16(0x0p+0) ==
-              LIBC_NAMESPACE::shared::ceilbf16(bfloat16(0.0)));
-
-//===----------------------------------------------------------------------===//
-//===----------------------------------------------------------------------===//
-
-#endif // LIBC_HAS_CONSTANT_EVALUATION
-
-#undef LIBC_ENABLE_CONSTEXPR
-
 #include "shared/math.h"
 #include "test/UnitTest/FPMatcher.h"
 #include "test/UnitTest/Test.h"
@@ -191,6 +119,7 @@ TEST(LlvmLibcSharedMathTest, AllFloat16) {
                                                        &canonicalizef16_x));
   EXPECT_FP_EQ(0x0p+0f16, canonicalizef16_cx);
 
+  EXPECT_FP_EQ(0x0p+0f16, LIBC_NAMESPACE::shared::ceilf16(0.0f16));
   EXPECT_FP_EQ(0x0p+0f16, LIBC_NAMESPACE::shared::fdimf16(0.0f16, 0.0f16));
   EXPECT_FP_EQ(0x0p+0f16, LIBC_NAMESPACE::shared::floorf16(0.0f16));
   EXPECT_FP_EQ(0x0p+0f16, LIBC_NAMESPACE::shared::fmaxf16(0.0f16, 0.0f16));
@@ -282,6 +211,7 @@ TEST(LlvmLibcSharedMathTest, AllFloat) {
 
   EXPECT_FP_EQ(bfloat16(0.0), LIBC_NAMESPACE::shared::bf16mulf(0.0f, 0.0f));
   EXPECT_FP_EQ(bfloat16(0.0), LIBC_NAMESPACE::shared::bf16subf(0.0f, 0.0f));
+  EXPECT_FP_EQ(0x0p+0f, LIBC_NAMESPACE::shared::ceilf(0.0f));
   EXPECT_FP_EQ(0x0p+0f, LIBC_NAMESPACE::shared::fdimf(0.0f, 0.0f));
   EXPECT_FP_EQ(0x0p+0f, LIBC_NAMESPACE::shared::floorf(0.0f));
   EXPECT_FP_EQ(0x0p+0f, LIBC_NAMESPACE::shared::fmaxf(0.0f, 0.0f));
@@ -324,6 +254,7 @@ TEST(LlvmLibcSharedMathTest, AllDouble) {
   EXPECT_FP_EQ(0x0p+0f, LIBC_NAMESPACE::shared::ffma(0.0, 0.0, 0.0));
   EXPECT_FP_EQ(0.0, LIBC_NAMESPACE::shared::hypot(0.0, 0.0));
   EXPECT_FP_EQ(0x0p+0, LIBC_NAMESPACE::shared::fsqrt(0.0));
+  EXPECT_FP_EQ(0x0p+0, LIBC_NAMESPACE::shared::log(1.0));
   EXPECT_FP_EQ(0x0p+0, LIBC_NAMESPACE::shared::log10(1.0));
   EXPECT_FP_EQ(0x0p+0, LIBC_NAMESPACE::shared::log1p(0.0));
   EXPECT_FP_EQ(0x0p+0, LIBC_NAMESPACE::shared::log2(1.0));
@@ -345,6 +276,7 @@ TEST(LlvmLibcSharedMathTest, AllDouble) {
 
   EXPECT_FP_EQ(bfloat16(0.0), LIBC_NAMESPACE::shared::bf16mul(0.0, 0.0));
   EXPECT_FP_EQ(bfloat16(0.0), LIBC_NAMESPACE::shared::bf16sub(0.0, 0.0));
+  EXPECT_FP_EQ(0x0p+0, LIBC_NAMESPACE::shared::ceil(0.0));
   EXPECT_FP_EQ(0.0, LIBC_NAMESPACE::shared::fadd(0.0, 0.0));
   EXPECT_FP_EQ(0.0, LIBC_NAMESPACE::shared::fdim(0.0, 0.0));
   EXPECT_FP_EQ(0.0, LIBC_NAMESPACE::shared::floor(0.0));
@@ -507,6 +439,7 @@ TEST(LlvmLibcSharedMathTest, AllBFloat16) {
   EXPECT_FP_EQ(bfloat16(5.0), LIBC_NAMESPACE::shared::bf16addl(2L, 3L));
   EXPECT_FP_EQ(bfloat16(10.0),
                LIBC_NAMESPACE::shared::bf16fmaf(2.0f, 3.0f, 4.0f));
+  EXPECT_FP_EQ(bfloat16(0.0), LIBC_NAMESPACE::shared::ceilbf16(bfloat16(0.0)));
   EXPECT_FP_EQ(bfloat16(0.0), LIBC_NAMESPACE::shared::floorbf16(bfloat16(0.0)));
   EXPECT_FP_EQ(bfloat16(0.0),
                LIBC_NAMESPACE::shared::fdimbf16(bfloat16(0.0), bfloat16(0.0)));
