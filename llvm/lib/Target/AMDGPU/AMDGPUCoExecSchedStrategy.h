@@ -84,7 +84,7 @@ private:
   AMDGPU::InstructionFlavor Type;
   // Whether or not instructions on this HardwareUnit may produce a window in
   // which instructions in other HardwareUnits can coexecute. For example, WMMA
-  // MFMA instructions may take multiple cycles, which may be overlapped with
+  // / MFMA instructions may take multiple cycles, which may be overlapped with
   // instructions on other HardwareUnits
   bool ProducesCoexecWindow = false;
   /// How many instructions can be held simultaneously for this HardwareUnit.
@@ -150,6 +150,7 @@ public:
   void reset() {
     AllSUs.clear();
     PrioritySUs.clear();
+    ScheduledSUs.clear();
     TotalCycles = 0;
     Type = AMDGPU::InstructionFlavor::Other;
     ProducesCoexecWindow = false;
