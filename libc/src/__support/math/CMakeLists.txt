@@ -63,6 +63,8 @@ add_header_library(
     libc.src.__support.FPUtil.fp_bits
     libc.src.__support.FPUtil.multiply_add
     libc.src.__support.FPUtil.polyeval
+    libc.src.__support.macros.attributes
+    libc.src.__support.macros.optimization
 )
 
 add_header_library(
@@ -3085,6 +3087,17 @@ add_header_library(
     sqrt.h
   DEPENDS
     libc.src.__support.FPUtil.sqrt
+)
+
+add_header_library(
+  sqrtbf16
+  HDRS
+    sqrtbf16.h
+  DEPENDS
+    libc.src.__support.FPUtil.bfloat16
+    libc.src.__support.FPUtil.sqrt
+    libc.src.__support.common
+    libc.src.__support.macros.config
 )
 
 add_header_library(
