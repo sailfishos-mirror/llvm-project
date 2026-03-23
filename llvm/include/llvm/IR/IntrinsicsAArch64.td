@@ -2812,17 +2812,10 @@ def int_aarch64_sve_luti4_lane_x2 : DefaultAttrsIntrinsic<[llvm_anyvector_ty],
                                     llvm_nxv16i8_ty,
                                     llvm_i32_ty],
                                     [IntrNoMem, ImmArg<ArgIndex<3>>, IntrSpeculatable]>;
-def int_aarch64_sve_luti6_lane_x2_i16
-    : DefaultAttrsIntrinsic<[llvm_nxv8i16_ty],
-                            [llvm_nxv8i16_ty,
-                             llvm_nxv8i16_ty,
-                             llvm_nxv16i8_ty,
-                             llvm_i32_ty],
-                            [IntrNoMem, ImmArg<ArgIndex<3>>, IntrSpeculatable]>;
-def int_aarch64_sve_luti6_lane_x2_f16
-    : DefaultAttrsIntrinsic<[llvm_nxv8f16_ty],
-                            [llvm_nxv8f16_ty,
-                             llvm_nxv8f16_ty,
+def int_aarch64_sve_luti6_lane_x2
+    : DefaultAttrsIntrinsic<[llvm_anyvector_ty],
+                            [LLVMMatchType<0>,
+                             LLVMMatchType<0>,
                              llvm_nxv16i8_ty,
                              llvm_i32_ty],
                             [IntrNoMem, ImmArg<ArgIndex<3>>, IntrSpeculatable]>;
@@ -4328,4 +4321,3 @@ let TargetPrefix = "aarch64" in {
   def int_aarch64_sve_pmlal_pair_x2 : DefaultAttrsIntrinsic<[llvm_nxv2i64_ty, llvm_nxv2i64_ty],
       [llvm_nxv2i64_ty, llvm_nxv2i64_ty, llvm_nxv2i64_ty, llvm_nxv2i64_ty], [IntrNoMem]>;
 }
-
