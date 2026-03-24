@@ -6768,6 +6768,7 @@ bool CombinerHelper::matchCombineFSubFpExtFMulToFMadOrFMA(
   Register LHSReg = MI.getOperand(1).getReg();
   Register RHSReg = MI.getOperand(2).getReg();
   LLT DstTy = MRI.getType(MI.getOperand(0).getReg());
+  const auto &TLI = *MI.getMF()->getSubtarget().getTargetLowering();
 
   unsigned PreferredFusedOpcode =
       HasFMAD ? TargetOpcode::G_FMAD : TargetOpcode::G_FMA;
@@ -6776,7 +6777,9 @@ bool CombinerHelper::matchCombineFSubFpExtFMulToFMadOrFMA(
   // fold (fsub (fpext (fmul x, y)), z) -> (fma (fpext x), (fpext y), (fneg z))
   if (mi_match(LHSReg, MRI, m_GFPExt(m_MInstr(FMulMI))) &&
       isContractableFMul(*FMulMI, AllowFusionGlobally) &&
-      (Aggressive || MRI.hasOneNonDBGUse(LHSReg))) {
+      (Aggressive || MRI.hasOneNonDBGUse(LHSReg)) &&
+      TLI.isFPExtFoldable(MI, PreferredFusedOpcode, DstTy,
+                          MRI.getType(FMulMI->getOperand(0).getReg()))) {
     MatchInfo = [=, &MI](MachineIRBuilder &B) {
       Register FpExtX =
           B.buildFPExt(DstTy, FMulMI->getOperand(1).getReg()).getReg(0);
@@ -6792,7 +6795,9 @@ bool CombinerHelper::matchCombineFSubFpExtFMulToFMadOrFMA(
   // fold (fsub x, (fpext (fmul y, z))) -> (fma (fneg (fpext y)), (fpext z), x)
   if (mi_match(RHSReg, MRI, m_GFPExt(m_MInstr(FMulMI))) &&
       isContractableFMul(*FMulMI, AllowFusionGlobally) &&
-      (Aggressive || MRI.hasOneNonDBGUse(RHSReg))) {
+      (Aggressive || MRI.hasOneNonDBGUse(RHSReg)) &&
+      TLI.isFPExtFoldable(MI, PreferredFusedOpcode, DstTy,
+                          MRI.getType(FMulMI->getOperand(0).getReg()))) {
     MatchInfo = [=, &MI](MachineIRBuilder &B) {
       Register FpExtY =
           B.buildFPExt(DstTy, FMulMI->getOperand(1).getReg()).getReg(0);
