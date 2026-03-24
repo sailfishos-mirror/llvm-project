@@ -205,7 +205,8 @@ CandidateHeuristics::getHWUIFromFlavor(InstructionFlavor Flavor) {
   return nullptr;
 }
 
-unsigned CandidateHeuristics::getMaxBlockingCycles(const MCSchedClassDesc *SC, const MachineInstr *MI) {
+unsigned CandidateHeuristics::getMaxBlockingCycles(const MCSchedClassDesc *SC,
+                                                   const MachineInstr *MI) {
   // Loads and stores are not pipelined
   if (MI->mayLoadOrStore())
     return SchedModel->computeInstrLatency(MI, false);
@@ -222,7 +223,6 @@ unsigned CandidateHeuristics::getMaxBlockingCycles(const MCSchedClassDesc *SC, c
 unsigned CandidateHeuristics::getHWUICyclesForSU(SUnit *SU) {
   assert(SchedModel && SchedModel->hasInstrSchedModel());
   return getMaxBlockingCycles(DAG->getSchedClass(SU), SU->getInstr());
-
 }
 
 unsigned CandidateHeuristics::getHWUICyclesForMI(MachineInstr *MI) {
@@ -403,7 +403,8 @@ unsigned CandidateHeuristics::getStructuralStallCycles(SchedBoundary &Zone,
   }
 
   // Query HazardRecognizer for sequence-dependent hazard penalties.
-  if (!DAG->hasVRegLiveness() && Zone.HazardRec && Zone.HazardRec->isEnabled()) {
+  if (!DAG->hasVRegLiveness() && Zone.HazardRec &&
+      Zone.HazardRec->isEnabled()) {
     auto *HR = static_cast<GCNHazardRecognizer *>(Zone.HazardRec);
     Stall = std::max(Stall, HR->getHazardWaitStates(MI));
   }
