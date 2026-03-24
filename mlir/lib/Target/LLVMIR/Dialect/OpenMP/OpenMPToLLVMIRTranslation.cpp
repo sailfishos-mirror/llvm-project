@@ -2651,7 +2651,7 @@ buildAffinityData(mlir::omp::TaskOp &taskOp, llvm::IRBuilderBase &builder,
   auto allocateAffinityList = [&](llvm::Value *count) -> llvm::Value * {
     llvm::IRBuilderBase::InsertPointGuard guard(builder);
     if (llvm::isa<llvm::Constant>(count) || llvm::isa<llvm::Argument>(count))
-      builder.restoreIP(findAllocaInsertPoint(builder, moduleTranslation));
+      builder.restoreIP(findAllocInsertPoints(builder, moduleTranslation));
     return builder.CreateAlloca(kmpTaskAffinityInfoTy, count,
                                 "omp.affinity_list");
   };
