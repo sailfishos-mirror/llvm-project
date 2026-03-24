@@ -18,14 +18,14 @@
 _LIBSYCL_BEGIN_NAMESPACE_SYCL
 
 namespace detail {
-/// The class is impl counterpart for sycl::kernel_id which represent a kernel
-/// identificator.
+/// The class is the implementation counterpart for sycl::kernel_id, which
+/// represents a kernel identificator.
 class KernelIdImpl {
 public:
-  KernelIdImpl(std::string_view Name) : MName(std::move(Name)) {}
+  KernelIdImpl(std::string_view Name) : MName(Name) {}
   KernelIdImpl() {}
-  /// \return a null-terminated string representing the name of kernel this id
-  /// stands for.
+  /// \return a null-terminated string representing the name of the kernel this
+  /// id stands for.
   const char *get_name() { return MName.data(); }
 
 private:
@@ -55,8 +55,8 @@ public:
     return !(lhs == rhs);
   }
 
-  /// \returns a null-terminated string which contains the kernel name.
-  const char *get_name() const noexcept;
+  /// \returns a null-terminated string that contains the kernel name.
+  const char *get_name() const noexcept { return impl->get_name(); }
 
 private:
   kernel_id(const char *Name);

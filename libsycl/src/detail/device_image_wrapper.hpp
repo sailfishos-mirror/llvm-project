@@ -16,9 +16,9 @@
 _LIBSYCL_BEGIN_NAMESPACE_SYCL
 namespace detail {
 
-/// A wrapper of __sycl_tgt_device_image structure.
+/// A wrapper of __sycl_tgt_device_image structure to help with its fields
+/// parsing, iteration over data and data transformation.
 class DeviceImageWrapper {
-public:
 public:
   DeviceImageWrapper(const __sycl_tgt_device_image &Bin) : MBin(&Bin) {}
   // Explicitly delete copy constructor/operator= to avoid unintentional copies.
@@ -28,12 +28,13 @@ public:
   DeviceImageWrapper(DeviceImageWrapper &&) = default;
   DeviceImageWrapper &operator=(DeviceImageWrapper &&) = default;
 
-  ~DeviceImageWrapper() {}
+  ~DeviceImageWrapper() = default;
 
-  /// \return reference to corresponsing raw __sycl_tgt_device_image object.
+  /// \return a reference to the corresponding raw __sycl_tgt_device_image
+  /// object.
   const __sycl_tgt_device_image &getRawData() const { return *get(); }
 
-  /// \return size of corresponding device image data in bytes.
+  /// \return the size of the corresponding device image data in bytes.
   size_t getSize() const {
     return static_cast<size_t>(MBin->ImageEnd - MBin->ImageStart);
   }
