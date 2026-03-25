@@ -726,7 +726,8 @@ public:
         cpp::max(PtrhashConfig<n_>::SLOTS_PER_PART, static_cast<size_t>(1));
     uint64_t m = cpp::numeric_limits<uint64_t>::max() / d + 1;
     auto lowbits = m * (hx ^ hp);
-    return (static_cast<UInt128>(lowbits) * static_cast<UInt128>(d)) >> 64;
+    return static_cast<size_t>(
+        (static_cast<UInt128>(lowbits) * static_cast<UInt128>(d)) >> 64);
   }
 
   LIBC_INLINE constexpr cpp::tuple<cpp::array<uint32_t, buckets_ + 1>,
@@ -778,15 +779,16 @@ public:
   }
 
   LIBC_INLINE constexpr size_t part(uint64_t hx) const {
-    return (static_cast<UInt128>(PtrhashConfig<n_>::PARTS) *
-            static_cast<UInt128>(hx)) >>
-           64;
+    return static_cast<size_t>((static_cast<UInt128>(PtrhashConfig<n_>::PARTS) *
+                                static_cast<UInt128>(hx)) >>
+                               64);
   }
 
   LIBC_INLINE constexpr size_t bucket(uint64_t hx) const {
-    return (static_cast<UInt128>(PtrhashConfig<n_>::BUCKETS_TOTAL) *
-            static_cast<UInt128>(hx)) >>
-           64;
+    return static_cast<size_t>(
+        (static_cast<UInt128>(PtrhashConfig<n_>::BUCKETS_TOTAL) *
+         static_cast<UInt128>(hx)) >>
+        64);
   }
 };
 
