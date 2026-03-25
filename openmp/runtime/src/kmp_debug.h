@@ -76,6 +76,7 @@ extern int kmp_c_debug;
 extern int kmp_d_debug;
 extern int kmp_e_debug;
 extern int kmp_f_debug;
+extern int kmp_g_debug;
 extern int kmp_diag;
 
 #define KA_TRACE(d, x)                                                         \
@@ -100,6 +101,10 @@ extern int kmp_diag;
   }
 #define KF_TRACE(d, x)                                                         \
   if (kmp_f_debug >= d) {                                                      \
+    __kmp_debug_printf x;                                                      \
+  }
+#define KG_TRACE(d, x)                                                         \
+  if (kmp_g_debug >= d) {                                                      \
     __kmp_debug_printf x;                                                      \
   }
 #define K_DIAG(d, x)                                                           \
@@ -151,6 +156,13 @@ extern int kmp_diag;
     (x);                                                                       \
     __kmp_enable(ks);                                                          \
   }
+#define KG_DUMP(d, x)                                                          \
+  if (kmp_g_debug >= d) {                                                      \
+    int ks;                                                                    \
+    __kmp_disable(&ks);                                                        \
+    (x);                                                                       \
+    __kmp_enable(ks);                                                          \
+  }
 
 #else
 
@@ -160,6 +172,7 @@ extern int kmp_diag;
 #define KD_TRACE(d, x) /* nothing to do */
 #define KE_TRACE(d, x) /* nothing to do */
 #define KF_TRACE(d, x) /* nothing to do */
+#define KG_TRACE(d, x) /* nothing to do */
 #define K_DIAG(d, x)                                                           \
   {} /* nothing to do */
 
@@ -169,6 +182,7 @@ extern int kmp_diag;
 #define KD_DUMP(d, x) /* nothing to do */
 #define KE_DUMP(d, x) /* nothing to do */
 #define KF_DUMP(d, x) /* nothing to do */
+#define KG_DUMP(d, x) /* nothing to do */
 
 #endif // KMP_DEBUG
 
