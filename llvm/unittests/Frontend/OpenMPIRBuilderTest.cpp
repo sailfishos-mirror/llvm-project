@@ -6760,7 +6760,7 @@ TEST_F(OpenMPIRBuilderTest, TargetRegionDevice) {
   EXPECT_EQ(Value1->getNextNode(), TargetStore);
 
   auto *TargetExitBlockBr = TargetStore->getNextNode();
-  EXPECT_TRUE(isa<BranchInst>(TargetExitBlockBr));
+  EXPECT_TRUE(isa<UncondBrInst>(TargetExitBlockBr));
 
   auto *TargetExitBlock = TargetExitBlockBr->getSuccessor(0);
   EXPECT_EQ(TargetExitBlock->getName(), "target.exit");
@@ -7160,7 +7160,7 @@ TEST_F(OpenMPIRBuilderTest, ConstantAllocaRaise) {
   EXPECT_EQ(Load2->getNextNode(), TargetStore);
 
   auto *TargetExitBlockBr = TargetStore->getNextNode();
-  EXPECT_TRUE(isa<BranchInst>(TargetExitBlockBr));
+  EXPECT_TRUE(isa<UncondBrInst>(TargetExitBlockBr));
 
   auto *TargetExitBlock = TargetExitBlockBr->getSuccessor(0);
   EXPECT_EQ(TargetExitBlock->getName(), "target.exit");
