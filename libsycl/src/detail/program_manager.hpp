@@ -15,6 +15,8 @@
 #include <detail/device_image_wrapper.hpp>
 #include <detail/kernel_id.hpp>
 
+#include <OffloadAPI.h>
+
 #include <mutex>
 #include <unordered_map>
 
@@ -38,6 +40,30 @@ _LIBSYCL_BEGIN_NAMESPACE_SYCL
 namespace detail {
 
 class DeviceImpl;
+
+/// A wrapper of liboffload program handle to manage its lifetime.
+class ProgramWrapper {
+public:
+  /// Constructs ProgramWrapper by creating liboffload program with the provided
+  /// arguments.
+  ///
+  /// \param Device is a device to use for program creation.
+  /// \param DevImage is a device image (wrapped __sycl_tgt_device_image) to use
+  /// for program creation.
+  /// \throw sycl::exception with sycl::errc::runtime when failed to create
+  /// program.
+  ProgramWrapper(ol_device_handle_t Device, DeviceImageWrapper &DevImage);
+
+  /// Releases the corresponding liboffload program handle by calling
+  /// olDestroyProgram.
+  ~ProgramWrapper();
+
+  /// \return the corresponding liboffload program handle.
+  ol_program_handle_t getHandle() { return MProgram; }
+
+private:
+  ol_program_handle_t MProgram{};
+};
 
 /// A class to manage programs and kernels.
 class ProgramManager {
@@ -63,6 +89,16 @@ public:
   /// data passed to addImages.
   void removeImages(__sycl_tgt_bin_desc *FatbinDesc);
 
+  /// Creates liboffload kernel that is ready for execution.
+  /// Thread-safe.
+  /// \param KernelName a null-terminated string representing a name of kernel
+  /// to be created.
+  /// \param Device a device for which this kernel must be compiled.
+  /// \return liboffload kernel handle that is ready to be passed to kernel
+  /// execution methods.
+  ol_symbol_handle_t getOrCreateKernel(const char *KernelName,
+                                       DeviceImpl &Device);
+
 private:
   ProgramManager() = default;
   ~ProgramManager() = default;
@@ -74,12 +110,42 @@ private:
   /// \param KernelName a null-terminated string representing the name of the
   /// kernel to obtain a device image for.
   /// \param KernelID a kernel id matching KernelName.
-  /// \param DeviceImpl a device with which device image must be compatible.
+  /// \param Device a device with which device image must be compatible.
   /// \throw sycl::exception with sycl::errc::runtime if the device image
   /// validation failed in liboffload or if no compatible image was found.
   DeviceImageWrapper *getDeviceImage(std::string_view KernelName,
                                      const kernel_id &KernelID,
                                      DeviceImpl &Device);
+
+  /// Searches for or creates a program.
+  /// This call must be protected with mutex since it updates MPrograms and
+  /// MProgramWrappers collections.
+  /// \param Device a device that program must be created with.
+  /// \param DevImage a device image to get or create program with.
+  /// \return liboffload program for the requested configuration.
+  ol_program_handle_t getOrCreateProgram(DeviceImpl &Device,
+                                         DeviceImageWrapper *DevImage);
+
+  /// Creates kernel from program.
+  /// This call must be protected with mutex since it updates MKernels
+  /// collection.
+  /// \param Program a program to create kernel with.
+  /// \param KernelID an id of kernel to create.
+  /// \param KernelName a null-terminated string representing the name of kernel
+  /// to create.
+  /// \param Device a device that kernel must be created with.
+  /// \return liboffload kernel for the requested configuration.
+  ol_symbol_handle_t createKernel(ol_program_handle_t Program,
+                                  const kernel_id &KernelID,
+                                  const char *KernelName, DeviceImpl &Device);
+
+  /// Searches for kernel.
+  /// This call must be protected with mutex since it reads MKernels collection.
+  /// \param KernelID an id of kernel to look for.
+  /// \param Device a device that kernel must be created with.
+  /// \return liboffload kernel for the requested configuration or nullptr if
+  /// such kernel is not found.
+  ol_symbol_handle_t getKernel(const kernel_id &KernelID, DeviceImpl &Device);
 
   // Filled by addImages(...).
   std::unordered_map<std::string_view, kernel_id> MKernelNameToID;
@@ -88,7 +154,26 @@ private:
   std::unordered_map<const __sycl_tgt_device_image *,
                      std::unique_ptr<DeviceImageWrapper>>
       MDeviceImageWrappers;
+  // All data collections, created from data in __sycl_register_lib, must be
+  // protected with this mutex. Protects data that can be modified only by
+  // modules load/unload.
   std::mutex MImageCollectionMutex;
+
+  // Filled by getOrCreateKernel and everything it calls inside.
+  std::unordered_map<
+      DeviceImageWrapper *,
+      std::unordered_map<ol_device_handle_t, ol_program_handle_t>>
+      MPrograms;
+  std::unordered_multimap<kernel_id,
+                          std::pair<ol_device_handle_t, ol_symbol_handle_t>>
+      MKernels;
+
+  // Controls lifetime of programs.
+  std::unordered_map<ol_program_handle_t, std::unique_ptr<ProgramWrapper>>
+      MProgramWrappers;
+  // All data collections, used and modified by kernel submissions, must be
+  // protected with this mutex.
+  std::mutex MKernelCollectionsMutex;
 };
 
 } // namespace detail
