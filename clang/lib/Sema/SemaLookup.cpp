@@ -2232,7 +2232,7 @@ static void DiagnoseMemoryScopeConflict(Sema &S, LookupResult &R) {
 /// Try to create a builtin __memory_scope typedef or enumerator.
 /// Returns true if a declaration was added to R.
 static bool TryCreateMemoryScopeEnum(Sema &S, LookupResult &R,
-                                        const IdentifierInfo &II) {
+                                     const IdentifierInfo &II) {
   // Don't create builtins during redeclaration lookup - this would conflict
   // with user declarations of the same name
   if (R.isForRedeclaration())
