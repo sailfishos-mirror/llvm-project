@@ -9,6 +9,7 @@
 #include "clang/ScalableStaticAnalysisFramework/Analyses/UnsafeBufferUsage/UnsafeBufferUsage.h"
 #include "clang/AST/DynamicRecursiveASTVisitor.h"
 #include "clang/Frontend/ASTUnit.h"
+#include "clang/ScalableStaticAnalysisFramework/Analyses/EntityPointerLevel.h"
 #include "clang/ScalableStaticAnalysisFramework/Analyses/UnsafeBufferUsage/UnsafeBufferUsageExtractor.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/ASTEntityMapping.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/Model/EntityId.h"
@@ -56,9 +57,6 @@ const SomeDecl *findDeclByName(StringRef Name, ASTContext &Ctx) {
 const FunctionDecl *findFnByName(StringRef Name, ASTContext &Ctx) {
   return findDeclByName<FunctionDecl>(Name, Ctx);
 }
-
-constexpr inline auto buildEntityPointerLevel =
-    UnsafeBufferUsageTUSummaryExtractor::buildEntityPointerLevel;
 
 class UnsafeBufferUsageTest : public testing::Test {
 protected:

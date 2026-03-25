@@ -3,8 +3,9 @@ set(LLVM_LINK_COMPONENTS
   )
 
 add_clang_library(clangScalableStaticAnalysisFrameworkAnalyses
+  EntityPointerLevel.cpp
   UnsafeBufferUsage/UnsafeBufferUsage.cpp
-  UnsafeBufferUsage/UnsafeBufferUsageExtractor.cpp  
+  UnsafeBufferUsage/UnsafeBufferUsageExtractor.cpp
 
   LINK_LIBS
   clangAST
