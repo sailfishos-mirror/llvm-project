@@ -326,6 +326,12 @@ OMPClause::child_range OMPNowaitClause::used_children() {
   return children();
 }
 
+OMPClause::child_range OMPReplayableClause::used_children() {
+  if (Condition)
+    return child_range(&Condition, &Condition + 1);
+  return children();
+}
+
 OMPClause::child_range OMPGrainsizeClause::used_children() {
   if (Stmt **C = getAddrOfExprAsWritten(getPreInitStmt()))
     return child_range(C, C + 1);
@@ -2176,6 +2182,15 @@ void OMPClausePrinter::VisitOMPNowaitClause(OMPNowaitClause *Node) {
   }
 }
 
+void OMPClausePrinter::VisitOMPReplayableClause(OMPReplayableClause *Node) {
+  OS << "replayable";
+  if (auto *Cond = Node->getCondition()) {
+    OS << "(";
+    Cond->printPretty(OS, nullptr, Policy, 0);
+    OS << ")";
+  }
+}
+
 void OMPClausePrinter::VisitOMPUntiedClause(OMPUntiedClause *) {
   OS << "untied";
 }
@@ -2353,7 +2368,7 @@ void OMPClausePrinter::VisitOMPGrainsizeClause(OMPGrainsizeClause *Node) {
 }
 
 void OMPClausePrinter::VisitOMPGraphIdClause(OMPGraphIdClause *Node) {
-  OS << "graphId";
+  OS << "graph_id";
   if (Expr *E = Node->getCondition()) {
     OS << "(";
     E->printPretty(OS, nullptr, Policy, 0);
@@ -2362,7 +2377,7 @@ void OMPClausePrinter::VisitOMPGraphIdClause(OMPGraphIdClause *Node) {
 }
 
 void OMPClausePrinter::VisitOMPGraphResetClause(OMPGraphResetClause *Node) {
-  OS << "graphReset";
+  OS << "graph_reset";
   if (Expr *E = Node->getCondition()) {
     OS << "(";
     E->printPretty(OS, nullptr, Policy, 0);

@@ -2408,6 +2408,10 @@ void OMPClauseEnqueue::VisitOMPNowaitClause(const OMPNowaitClause *C) {
   Visitor->AddStmt(C->getCondition());
 }
 
+void OMPClauseEnqueue::VisitOMPReplayableClause(const OMPReplayableClause *C) {
+  Visitor->AddStmt(C->getCondition());
+}
+
 void OMPClauseEnqueue::VisitOMPUntiedClause(const OMPUntiedClause *) {}
 
 void OMPClauseEnqueue::VisitOMPMergeableClause(const OMPMergeableClause *) {}
