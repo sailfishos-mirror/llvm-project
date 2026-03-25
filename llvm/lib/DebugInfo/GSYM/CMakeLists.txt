@@ -31,8 +31,3 @@ add_llvm_component_library(LLVMDebugInfoGSYM
   TargetParser
   DebugInfoDWARF
   )
-
-# FunctionInfo.cpp defines an enum value 'InlineInfo' that conflicts with
-# the struct InlineInfo in InlineInfo.cpp in unity builds.
-set_source_files_properties(FunctionInfo.cpp InlineInfo.cpp
-  PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)

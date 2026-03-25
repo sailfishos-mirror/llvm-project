@@ -65,8 +65,3 @@ add_flang_library(FIRBuilder
   ${dialect_libs}
   ${extension_libs}
 )
-
-# Execute.cpp defines a static 'isAbsent' that conflicts with another
-# definition when merged in a unity TU.
-set_source_files_properties(Runtime/Execute.cpp
-  PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)

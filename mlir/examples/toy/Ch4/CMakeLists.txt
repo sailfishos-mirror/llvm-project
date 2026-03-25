@@ -30,7 +30,6 @@ add_toy_chapter(toyc-ch4
 
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 include_directories(${CMAKE_CURRENT_BINARY_DIR}/include/)
-
 target_link_libraries(toyc-ch4
   PRIVATE
     MLIRAnalysis

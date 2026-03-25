@@ -53,9 +53,3 @@ add_mlir_dialect_library(MLIRSparseTensorTransforms
   MLIRTransforms
   MLIRVectorDialect
 )
-
-# Conflicting sparse tensor analysis and lowering pattern definitions.
-set_source_files_properties(
-  SparseTensorConversion.cpp
-  Sparsification.cpp
-  PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)

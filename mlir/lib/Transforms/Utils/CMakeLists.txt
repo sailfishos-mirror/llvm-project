@@ -24,8 +24,3 @@ add_mlir_library(MLIRTransformUtils
   MLIRSubsetOpInterface
   MLIRRewrite
   )
-
-# Anonymous namespace debugging infrastructure and static helper conflicts.
-set_source_files_properties(
-  GreedyPatternRewriteDriver.cpp
-  PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)

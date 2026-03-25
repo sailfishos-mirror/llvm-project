@@ -5,14 +5,6 @@ set(LLVM_LINK_COMPONENTS
   )
 add_subdirectory(support)
 
-# Representation.cpp and YAMLGenerator.cpp have conflicting static declarations
-# and CommentKind ambiguity when combined in unity builds.
-set_source_files_properties(
-  Representation.cpp
-  YAMLGenerator.cpp
-  PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON
-)
-
 add_clang_library(clangDoc STATIC
   BitcodeReader.cpp
   BitcodeWriter.cpp

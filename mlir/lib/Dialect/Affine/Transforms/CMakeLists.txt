@@ -46,8 +46,3 @@ add_mlir_dialect_library(MLIRAffineTransforms
   MLIRVectorUtils
   )
 
-
-# Anonymous namespace struct redefinitions (LowerDelinearizeIndexOps, etc.).
-set_source_files_properties(
-  AffineExpandIndexOpsAsAffine.cpp
-  PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
