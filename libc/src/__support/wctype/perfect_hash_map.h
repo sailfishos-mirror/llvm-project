@@ -827,8 +827,8 @@ LIBC_INLINE constexpr auto init_hasher(size_t seed, PilotsTypeV pilots,
 template <size_t Capacity, class Hasher> class PerfectHashMap {
 public:
   struct Entry {
-    wint_t key : 21;
-    wint_t value : 21;
+    wint_t key;
+    wint_t value;
     LIBC_INLINE constexpr Entry() = default;
     LIBC_INLINE constexpr Entry(wint_t key, wint_t value)
         : key(key), value(value) {}
