@@ -42,6 +42,7 @@ TEST(SummaryExtractorRegistryTest, EnumeratingRegistryEntries) {
                              "MockSummaryExtractor1",
                              "MockSummaryExtractor2",
                              "NoOpExtractor",
+                             "UnsafeBufferUsageTUSummaryExtractor",
                          }));
 }
 

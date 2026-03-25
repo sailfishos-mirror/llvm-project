@@ -39,12 +39,12 @@ public:
   bool empty() const { return UnsafeBuffers.empty(); }
 
   static llvm::json::Object
-  jsonSerializeFn(const EntitySummary &ES,
-                  JSONFormat::EntityIdToJSONFn EntityId2JSON);
+  summaryToJSON(const EntitySummary &ES,
+                JSONFormat::EntityIdToJSONFn EntityId2JSON);
 
   static llvm::Expected<std::unique_ptr<EntitySummary>>
-  jsonDeserializeFn(const llvm::json::Object &Data, EntityIdTable &,
-                    JSONFormat::EntityIdFromJSONFn EntityIdFromJSON);
+  summaryFromJSON(const llvm::json::Object &Data, EntityIdTable &,
+                  JSONFormat::EntityIdFromJSONFn EntityIdFromJSON);
 
   static SummaryName summaryName() { return SummaryName{"UnsafeBufferUsage"}; }
 };
@@ -53,8 +53,8 @@ struct UnsafeBufferUsageJSONFormatInfo : JSONFormat::FormatInfo {
   UnsafeBufferUsageJSONFormatInfo()
       : JSONFormat::FormatInfo(
             UnsafeBufferUsageEntitySummary::summaryName(),
-            UnsafeBufferUsageEntitySummary::jsonSerializeFn,
-            UnsafeBufferUsageEntitySummary::jsonDeserializeFn) {}
+            UnsafeBufferUsageEntitySummary::summaryToJSON,
+            UnsafeBufferUsageEntitySummary::summaryFromJSON) {}
 };
 } // namespace clang::ssaf
 

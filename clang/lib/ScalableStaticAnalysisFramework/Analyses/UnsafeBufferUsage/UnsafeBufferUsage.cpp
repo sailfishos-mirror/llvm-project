@@ -6,21 +6,14 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "clang/ScalableStaticAnalysisFramework/Analyses/UnsafeBufferUsage/UnsafeBufferUsage.h"
+#include "clang/ScalableStaticAnalysisFramework/Analyses/UnsafeBufferUsage.h"
+#include "SSAFAnalysesCommon.h"
 #include "clang/ScalableStaticAnalysisFramework/Analyses/EntityPointerLevel.h"
 #include "clang/ScalableStaticAnalysisFramework/SSAFForceLinker.h" // IWYU pragma: keep
+#include "llvm/Support/JSON.h"
 
 namespace {
 constexpr const char *const UnsafeBuffersKey = "UnsafeBuffers";
-template <typename... Ts>
-static inline llvm::Error makeErrorSawButExpected(const llvm::json::Value &Saw,
-                                                  llvm::StringRef Expected,
-                                                  const Ts &...ExpectedArgs) {
-  return llvm::createStringError(
-      ("saw %s but expected " + Expected).str().c_str(),
-      llvm::formatv("{0:2}", Saw).str().data(), Expected.data(),
-      ExpectedArgs...);
-}
 } // namespace
 
 namespace clang::ssaf {
@@ -29,7 +22,7 @@ using Array = llvm::json::Array;
 using Value = llvm::json::Value;
 
 // Writes the summary into an array of EntityPointerLevels:
-llvm::json::Object UnsafeBufferUsageEntitySummary::jsonSerializeFn(
+llvm::json::Object UnsafeBufferUsageEntitySummary::summaryToJSON(
     const EntitySummary &ES, JSONFormat::EntityIdToJSONFn EntityId2JSON) {
   Array UnsafeBuffersData;
 
@@ -44,8 +37,8 @@ llvm::json::Object UnsafeBufferUsageEntitySummary::jsonSerializeFn(
 }
 
 llvm::Expected<std::unique_ptr<EntitySummary>>
-UnsafeBufferUsageEntitySummary::jsonDeserializeFn(
-    const llvm::json::Object &Data, EntityIdTable &,
+UnsafeBufferUsageEntitySummary::summaryFromJSON(
+    const Object &Data, EntityIdTable &,
     JSONFormat::EntityIdFromJSONFn EntityIdFromJSON) {
   const Value *UnsafeBuffersData = Data.get(UnsafeBuffersKey);
 

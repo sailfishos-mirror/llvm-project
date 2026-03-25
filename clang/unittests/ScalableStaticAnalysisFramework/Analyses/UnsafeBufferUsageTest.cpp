@@ -6,11 +6,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "clang/ScalableStaticAnalysisFramework/Analyses/UnsafeBufferUsage/UnsafeBufferUsage.h"
+#include "clang/ScalableStaticAnalysisFramework/Analyses/UnsafeBufferUsage.h"
 #include "clang/AST/DynamicRecursiveASTVisitor.h"
 #include "clang/Frontend/ASTUnit.h"
-#include "clang/ScalableStaticAnalysisFramework/Analyses/EntityPointerLevel.h"
-#include "clang/ScalableStaticAnalysisFramework/Analyses/UnsafeBufferUsage/UnsafeBufferUsageExtractor.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/ASTEntityMapping.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/Model/EntityId.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/Model/EntityName.h"
@@ -21,13 +19,31 @@
 #include "llvm/Testing/Support/Error.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include <memory>
 
 using namespace clang;
 using namespace ssaf;
 using testing::UnorderedElementsAre;
 
-namespace {
+namespace clang::ssaf {
+// Proxy functions
+class UnsafeBufferUsageTUSummaryExtractor;
 
+extern Expected<std::unique_ptr<UnsafeBufferUsageEntitySummary>>
+extractEntitySummary(UnsafeBufferUsageTUSummaryExtractor &Extractor,
+                     const NamedDecl *Contributor, ASTContext &Ctx);
+
+extern UnsafeBufferUsageTUSummaryExtractor *
+createUnsafeBufferUsageTUSummaryExtractor(TUSummaryBuilder &Builder);
+
+extern void destroyUnsafeBufferUsageTUSummaryExtractor(
+    UnsafeBufferUsageTUSummaryExtractor *Extractor);
+
+extern EntityId addEntity(UnsafeBufferUsageTUSummaryExtractor &Extractor,
+                          const EntityName &EN);
+} // namespace clang::ssaf
+
+namespace {
 template <typename SomeDecl = NamedDecl>
 const SomeDecl *findDeclByName(StringRef Name, ASTContext &Ctx) {
   class NamedDeclFinder : public DynamicRecursiveASTVisitor {
@@ -62,12 +78,17 @@ class UnsafeBufferUsageTest : public testing::Test {
 protected:
   TUSummary TUSum;
   TUSummaryBuilder Builder;
-  UnsafeBufferUsageTUSummaryExtractor Extractor;
+  UnsafeBufferUsageTUSummaryExtractor *Extractor;
   std::unique_ptr<ASTUnit> AST;
 
   UnsafeBufferUsageTest()
       : TUSum(BuildNamespace(BuildNamespaceKind::CompilationUnit, "Mock.cpp")),
-        Builder(TUSum), Extractor(Builder) {}
+        Builder(TUSum),
+        Extractor(createUnsafeBufferUsageTUSummaryExtractor(Builder)) {}
+
+  ~UnsafeBufferUsageTest() {
+    destroyUnsafeBufferUsageTUSummaryExtractor(Extractor);
+  }
 
   template <typename ContributorDecl = NamedDecl>
   std::unique_ptr<UnsafeBufferUsageEntitySummary>
@@ -75,7 +96,7 @@ protected:
     AST = tooling::buildASTFromCodeWithArgs(
         Code, {"-Wno-unused-value", "-Wno-int-to-pointer-cast"});
 
-    const auto *ContributorDefn =
+    auto *ContributorDefn =
         findDeclByName<ContributorDecl>(ContributorName, AST->getASTContext());
 
     if (!ContributorDefn)
@@ -86,28 +107,28 @@ protected:
     if (!EN)
       return nullptr;
 
-    llvm::Error Error = llvm::ErrorSuccess();
-    auto Sum = Extractor.extractEntitySummary(ContributorDefn,
-                                              AST->getASTContext(), Error);
+    auto Sum =
+        extractEntitySummary(*Extractor, ContributorDefn, AST->getASTContext());
 
-    if (Error) {
-      llvm::consumeError(std::move(Error));
+    if (!Sum) {
+      llvm::consumeError(Sum.takeError());
       return nullptr;
     }
-    return Sum;
+    assert(*Sum);
+    return std::move(*Sum);
   }
 
   std::optional<EntityId> getEntityId(StringRef Name) {
     if (const auto *D = findDeclByName(Name, AST->getASTContext()))
       if (auto EntityName = getEntityName(D))
-        return Extractor.addEntity(*EntityName);
+        return addEntity(*Extractor, *EntityName);
     return std::nullopt;
   }
 
   std::optional<EntityId> getEntityIdForReturn(StringRef FunName) {
     if (const auto *D = findFnByName(FunName, AST->getASTContext()))
       if (auto EntityName = getEntityNameForReturn(D))
-        return Extractor.addEntity(*EntityName);
+        return addEntity(*Extractor, *EntityName);
     return std::nullopt;
   }
 
@@ -147,8 +168,8 @@ getSubsetOf(const EntityPointerLevelSet &Set, EntityId Entity) {
 }
 
 TEST_F(UnsafeBufferUsageTest, EntityPointerLevelComparison) {
-  EntityId E1 = Extractor.addEntity({"c:@F@foo", "", {}});
-  EntityId E2 = Extractor.addEntity({"c:@F@bar", "", {}});
+  EntityId E1 = addEntity(*Extractor, {"c:@F@foo", "", {}});
+  EntityId E2 = addEntity(*Extractor, {"c:@F@bar", "", {}});
 
   auto P1 = buildEntityPointerLevel(E1, 2);
   auto P2 = buildEntityPointerLevel(E1, 2);
@@ -166,9 +187,9 @@ TEST_F(UnsafeBufferUsageTest, EntityPointerLevelComparison) {
 }
 
 TEST_F(UnsafeBufferUsageTest, UnsafeBufferUsageEntityPointerLevelSetTest) {
-  EntityId E1 = Extractor.addEntity({"c:@F@foo", "", {}});
-  EntityId E2 = Extractor.addEntity({"c:@F@bar", "", {}});
-  EntityId E3 = Extractor.addEntity({"c:@F@baz", "", {}});
+  EntityId E1 = addEntity(*Extractor, {"c:@F@foo", "", {}});
+  EntityId E2 = addEntity(*Extractor, {"c:@F@bar", "", {}});
+  EntityId E3 = addEntity(*Extractor, {"c:@F@baz", "", {}});
 
   auto P1 = buildEntityPointerLevel(E1, 1);
   auto P2 = buildEntityPointerLevel(E1, 2);
@@ -260,7 +281,7 @@ TEST_F(UnsafeBufferUsageTest, UnsafeBufferUsageSerializeTest) {
   using Value = llvm::json::Value;
   std::map<EntityId, uint64_t> DummyTable{{*getEntityId("p"), 42},
                                           {*getEntityId("q"), 108}};
-  Object JData = UnsafeBufferUsageEntitySummary::jsonSerializeFn(
+  Object JData = UnsafeBufferUsageEntitySummary::summaryToJSON(
       *Sum, [&DummyTable](EntityId Id) {
         return Object{{"@", Value(DummyTable[Id])}};
       });
@@ -296,7 +317,7 @@ TEST_F(UnsafeBufferUsageTest, UnsafeBufferUsageDeserializeTest) {
   ASSERT_NE(ParsedJSON->getAsObject(), nullptr);
 
   EntityIdTable Ignored;
-  auto ParsedSum = UnsafeBufferUsageEntitySummary::jsonDeserializeFn(
+  auto ParsedSum = UnsafeBufferUsageEntitySummary::summaryFromJSON(
       *ParsedJSON->getAsObject(), Ignored,
       [&DummyTable](const Object &O) -> Expected<EntityId> {
         return DummyTable.at(O.getInteger("@").value());

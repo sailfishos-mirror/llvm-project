@@ -29,4 +29,9 @@ extern volatile int UnsafeBufferUsageSSAFJSONFormatAnchorSource;
 [[maybe_unused]] static int UnsafeBufferUsageSSAFJSONFormatAnchorDestination =
     UnsafeBufferUsageSSAFJSONFormatAnchorSource;
 
+extern volatile int UnsafeBufferUsageTUSummaryExtractorAnchorSource;
+[[maybe_unused]] static int
+    UnsafeBufferUsageTUSummaryExtractorAnchorDestination =
+        UnsafeBufferUsageSSAFJSONFormatAnchorSource;
+
 #endif // LLVM_CLANG_SCALABLESTATICANALYSISFRAMEWORK_SSAFBUILTINFORCELINKER_H

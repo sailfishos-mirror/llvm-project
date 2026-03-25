@@ -5,47 +5,14 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
+
 #include "clang/ScalableStaticAnalysisFramework/Analyses/EntityPointerLevel.h"
+#include "SSAFAnalysesCommon.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclCXX.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/ASTEntityMapping.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/Model/EntityName.h"
 #include <optional>
-
-namespace {
-using namespace clang;
-template <typename NodeTy, typename... Ts>
-static inline llvm::Error strErrAtNode(ASTContext &Ctx, const NodeTy &N,
-                                       StringRef Fmt, const Ts &...Args) {
-  std::string LocStr = N.getBeginLoc().printToString(Ctx.getSourceManager());
-  llvm::SmallVector<char> FmtData;
-
-  (Fmt + " at %s").toStringRef(FmtData);
-  return llvm::createStringError(FmtData.data(), Args..., LocStr.c_str());
-}
-
-static inline llvm::Error entityNameErrFor(ASTContext &Ctx,
-                                           const NamedDecl &D) {
-  return strErrAtNode(Ctx, D, "failed to create entity name for %s",
-                      D.getNameAsString().data());
-}
-
-template <typename DeclOrExpr>
-static bool hasPtrOrArrType(const DeclOrExpr &E) {
-  return llvm::isa<PointerType>(E.getType().getCanonicalType()) ||
-         llvm::isa<ArrayType>(E.getType().getCanonicalType());
-}
-
-template <typename... Ts>
-static inline llvm::Error makeErrorSawButExpected(const llvm::json::Value &Saw,
-                                                  llvm::StringRef Expected,
-                                                  const Ts &...ExpectedArgs) {
-  return llvm::createStringError(
-      ("saw %s but expected " + Expected).str().c_str(),
-      llvm::formatv("{0:2}", Saw).str().data(), Expected.data(),
-      ExpectedArgs...);
-}
-} // namespace
 
 namespace clang::ssaf {
 // Translate a pointer type expression 'E' to a (set of) EntityPointerLevel(s)

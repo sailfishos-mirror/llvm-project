@@ -1,5 +1,5 @@
 add_distinct_clang_unittest(ClangScalableAnalysisTests
-  Analyses/UnsafeBufferUsage/UnsafeBufferUsageTest.cpp
+  Analyses/UnsafeBufferUsageTest.cpp
   ASTEntityMappingTest.cpp
   BuildNamespaceTest.cpp
   EntityIdTableTest.cpp
