@@ -454,7 +454,29 @@ bool CandidateHeuristics::tryEffectiveStall(
     unsigned Latency = 0;
     unsigned BufferFull = 0;
     unsigned Carried = 0;
+<<<<<<< HEAD
     unsigned Effective = 0;
+=======
+    unsigned Buffer = 0;
+  };
+
+  auto getBufferFullStalls = [this, &Zone](SUnit *SU) -> unsigned {
+    InstructionFlavor Flavor = classifyFlavor(
+        *SU->getInstr(), *static_cast<const SIInstrInfo *>(DAG->TII));
+    HardwareUnitInfo *HWUI = getHWUIFromFlavor(Flavor);
+
+    if (HWUI->getBufferSize() <= 1)
+      return 0;
+
+    // getBufferAvailableCycle assumes top-down scheduling.
+    assert(Zone.isTop());
+    unsigned CurrCycle = Zone.getCurrCycle();
+    unsigned BufferReadyCycle = HWUI->getBufferAvailableCycle(CurrCycle);
+    if (BufferReadyCycle <= CurrCycle)
+      return 0;
+
+    return BufferReadyCycle - CurrCycle;
+>>>>>>> 457531de1f0a (Merge conflict)
   };
 
   unsigned CurrCycle = Zone.getCurrCycle();
@@ -467,11 +489,19 @@ bool CandidateHeuristics::tryEffectiveStall(
     Costs.Latency = Zone.getLatencyStallCycles(SU);
     Costs.BufferFull = getBufferFullStalls(SchedCand);
     unsigned CarriedLatency = CarriedLatencies.lookup_or(SU->getInstr(), 0);
+<<<<<<< HEAD
     Costs.Carried =
         CarriedLatency > CurrCycle ? CarriedLatency - CurrCycle : 0;
     Costs.Effective =
         std::max({Costs.Ready, Costs.Structural, Costs.Latency,
                   Costs.BufferFull, Costs.Carried});
+=======
+    Costs.Carried = CarriedLatency > CurrCycle ? CarriedLatency - CurrCycle : 0;
+    Costs.Buffer = getBufferFullStalls(SU);
+
+    Costs.Effective = std::max({Costs.Ready, Costs.Structural, Costs.Latency,
+                                Costs.Carried, Costs.Buffer});
+>>>>>>> 457531de1f0a (Merge conflict)
     return Costs;
   };
 
@@ -481,6 +511,7 @@ bool CandidateHeuristics::tryEffectiveStall(
   LLVM_DEBUG(if (TryCosts.Effective || CandCosts.Effective) {
     dbgs() << "Effective stalls: try=" << TryCosts.Effective
            << " (ready=" << TryCosts.Ready << ", struct=" << TryCosts.Structural
+<<<<<<< HEAD
            << ", lat=" << TryCosts.Latency << ", buf=" << TryCosts.BufferFull
            << ", carried=" << TryCosts.Carried
            << ") cand=" << CandCosts.Effective
@@ -488,6 +519,14 @@ bool CandidateHeuristics::tryEffectiveStall(
            << ", struct=" << CandCosts.Structural
            << ", lat=" << CandCosts.Latency << ", buf=" << CandCosts.BufferFull
            << ", carried=" << CandCosts.Carried << ")\n";
+=======
+           << ", lat=" << TryCosts.Latency << ", carried=" << TryCosts.Carried
+           << ", buffer=" << TryCosts.Buffer << ") cand=" << CandCosts.Effective
+           << " (ready=" << CandCosts.Ready
+           << ", struct=" << CandCosts.Structural
+           << ", lat=" << CandCosts.Latency << ", carried=" << CandCosts.Carried
+           << ", buffer=" << CandCosts.Buffer << ")\n";
+>>>>>>> 457531de1f0a (Merge conflict)
   });
 
   return tryLess(TryCosts.Effective, CandCosts.Effective, TryCand, Cand,
