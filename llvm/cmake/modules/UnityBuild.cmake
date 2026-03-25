@@ -90,7 +90,7 @@ if(TARGET modularize)
     PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
 endif()
 
-if(TARGET clang-tidy)
+if(TARGET ClangTidyTests)
   # From clang-tools-extra/unittests/clang-tidy/CMakeLists.txt (target: clang-tidy)
   # These files define symbols that clash in unity builds:
   # - ClangTidyOptionsTest.cpp and ClangTidyDiagnosticConsumerTest.cpp both
@@ -101,7 +101,7 @@ if(TARGET clang-tidy)
     ${LLVM_REPO_DIR}/clang-tools-extra/unittests/clang-tidy/ClangTidyOptionsTest.cpp
     ${LLVM_REPO_DIR}/clang-tools-extra/unittests/clang-tidy/NamespaceAliaserTest.cpp
     ${LLVM_REPO_DIR}/clang-tools-extra/unittests/clang-tidy/UsingInserterTest.cpp
-    TARGET_DIRECTORY clang-tidy
+    TARGET_DIRECTORY ClangTidyTests
     PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
 endif()
 
