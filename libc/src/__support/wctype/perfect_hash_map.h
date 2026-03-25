@@ -34,13 +34,13 @@ namespace ptrhash {
 
 LIBC_INLINE_VAR constexpr size_t SHARDS = 1;
 
-class Fastrand {
+class FastRand {
 public:
   // This seed value is very important for different inputs. Bad values are
   // known to cause compilation errors and/or incorrect computations in some
   // cases. Defaulted to 0xEF6F79ED30BA75A in the original implementation, but
   // this is not sufficient. 0x64a727ea04c46a32 is another viable seed.
-  LIBC_INLINE constexpr Fastrand() : seed(0xeec13c9f1362aa74) {}
+  LIBC_INLINE constexpr FastRand() : seed(0xeec13c9f1362aa74) {}
 
   LIBC_INLINE constexpr uint8_t gen_byte() {
     return static_cast<uint8_t>(this->gen());
@@ -530,7 +530,7 @@ public:
          BUCKET_IDX_NONE, BUCKET_IDX_NONE, BUCKET_IDX_NONE, BUCKET_IDX_NONE}};
     size_t total_evictions = 0;
 
-    auto rng = Fastrand();
+    auto rng = FastRand();
 
     for (size_t iter_num = 0; iter_num < bucket_order.size(); iter_num++) {
       auto const &new_b = bucket_order[iter_num];
