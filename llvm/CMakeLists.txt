@@ -7,6 +7,11 @@ set(LLVM_COMMON_CMAKE_UTILS ${CMAKE_CURRENT_SOURCE_DIR}/../cmake)
 include(${LLVM_COMMON_CMAKE_UTILS}/Modules/CMakePolicy.cmake
   NO_POLICY_SCOPE)
 
+option(LLVM_UNITY_BUILD "UNITY_BUILD for LLVM" OFF)
+if(LLVM_UNITY_BUILD)
+  set(CMAKE_UNITY_BUILD ON)
+endif()
+
 # Builds with custom install names and installation rpath setups may not work
 # in the build tree. Allow these cases to use CMake's default build tree
 # behavior by setting `LLVM_NO_INSTALL_NAME_DIR_FOR_BUILD_TREE` to do this.
@@ -1553,30 +1558,32 @@ if (XCODE)
   endforeach()
 endif()
 
-set(LLVM_SRC_DIR "${CMAKE_SOURCE_DIR}")
-set(LLVM_REPO_DIR "${LLVM_SRC_DIR}/..")
+if(LLVM_UNITY_BUILD)
+  set(LLVM_SRC_DIR "${CMAKE_SOURCE_DIR}")
+  set(LLVM_REPO_DIR "${LLVM_SRC_DIR}/..")
 
-include(UnityBuild)
+  include(UnityBuild)
 
-function (_get_all_cmake_targets out_var current_dir)
-  get_property(targets DIRECTORY ${current_dir} PROPERTY BUILDSYSTEM_TARGETS)
-  get_property(subdirs DIRECTORY ${current_dir} PROPERTY SUBDIRECTORIES)
-  foreach(subdir ${subdirs})
-    _get_all_cmake_targets(subdir_targets ${subdir})
-    list(APPEND targets ${subdir_targets})
+  function (_get_all_cmake_targets out_var current_dir)
+    get_property(targets DIRECTORY ${current_dir} PROPERTY BUILDSYSTEM_TARGETS)
+    get_property(subdirs DIRECTORY ${current_dir} PROPERTY SUBDIRECTORIES)
+    foreach(subdir ${subdirs})
+      _get_all_cmake_targets(subdir_targets ${subdir})
+      list(APPEND targets ${subdir_targets})
+    endforeach()
+    set(${out_var} ${targets} PARENT_SCOPE)
+  endfunction()
+
+  # Run at end of top-level CMakeLists
+  _get_all_cmake_targets(all_targets ${CMAKE_CURRENT_LIST_DIR})
+
+  foreach(target ${all_targets})
+    set(after [[
+    #undef DEBUG_TYPE
+    #undef DBGS
+    ]])
+    set_target_properties(${target} PROPERTIES
+      UNITY_BUILD_CODE_AFTER_INCLUDE "${after}"
+    )
   endforeach()
-  set(${out_var} ${targets} PARENT_SCOPE)
-endfunction()
-
-# Run at end of top-level CMakeLists
-_get_all_cmake_targets(all_targets ${CMAKE_CURRENT_LIST_DIR})
-
-foreach(target ${all_targets})
-  set(after [[
-  #undef DEBUG_TYPE
-  #undef DBGS
-  ]])
-  set_target_properties(${target} PROPERTIES
-    UNITY_BUILD_CODE_AFTER_INCLUDE "${after}"
-  )
-endforeach()
+endif()
