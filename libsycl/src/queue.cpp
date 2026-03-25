@@ -33,6 +33,25 @@ device queue::get_device() const {
 
 bool queue::is_in_order() const { return impl->isInOrder(); }
 
+event queue::getLastEvent() {
+  return detail::createSyclObjFromImpl<event>(impl->getLastEvent());
+}
+
+void queue::setKernelParameters(const std::vector<event> &Events,
+                                const detail::UnifiedRangeView &Range) {
+  std::vector<detail::EventImplPtr> DepEventImplRefs;
+  DepEventImplRefs.reserve(Events.size());
+  for (const auto &Event : Events) {
+    DepEventImplRefs.push_back(detail::getSyclObjImpl(Event));
+  }
+  return impl->setKernelParameters(std::move(DepEventImplRefs), Range);
+}
+
+void queue::submitKernelImpl(const char *KernelName,
+                             detail::ArgCollection &TypelessArgs) {
+  impl->submitKernelImpl(KernelName, TypelessArgs);
+}
+
 void queue::wait() { return impl->wait(); }
 
 _LIBSYCL_END_NAMESPACE_SYCL
