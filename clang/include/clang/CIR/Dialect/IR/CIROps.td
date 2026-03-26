@@ -3586,9 +3586,14 @@ def CIR_OptionalPriorityAttr : OptionalAttr<
   >
 >;
 
-// TODO(CIR): CallingConv is a placeholder here so we can use it in
-// infrastructure calls, but it currently has no values.
-def CIR_CallingConv : CIR_I32EnumAttr<"CallingConv", "calling convention", []>;
+def CIR_CallingConv : CIR_I32EnumAttr<"CallingConv", "calling convention", [
+  I32EnumAttrCase<"C", 1, "c">,
+  I32EnumAttrCase<"SpirKernel", 2, "spir_kernel">,
+  I32EnumAttrCase<"SpirFunction", 3, "spir_function">,
+  I32EnumAttrCase<"OpenCLKernel", 4, "opencl_kernel">,
+  I32EnumAttrCase<"PTXKernel", 5, "ptx_kernel">,
+  I32EnumAttrCase<"AMDGPUKernel", 6, "amdgpu_kernel">
+]>;
 
 def CIR_FuncOp : CIR_Op<"func", [
   AutomaticAllocationScope, CallableOpInterface, FunctionOpInterface,
