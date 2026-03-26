@@ -204,11 +204,10 @@ set_property(SOURCE
 # Import changes from flang_rt.quadmath
 set(f128_sources "")
 if (TARGET FortranFloat128MathILib)
-  get_target_property(_propval
+  get_target_property(f128_sources
     FortranFloat128MathILib INTERFACE_SOURCES
     )
-  if (_propval)
-    set(f128_sources "${_propval}")
+  if (f128_sources)
     # The interface may define special macros for Float128Math files,
     # so we need to propagate them.
     get_target_property(f128_defs
@@ -225,6 +224,9 @@ if (TARGET FortranFloat128MathILib)
       APPEND PROPERTY INCLUDE_DIRECTORIES
       ${f128_include_dirs}
       )
+  else ()
+    # Change `f128_sources-NOTFOUND` to "no additional sources"
+    set(f128_sources "")
   endif ()
 endif ()
 
@@ -274,17 +276,10 @@ if (NOT WIN32)
   enable_cuda_compilation(flang_rt.runtime "${supported_sources}")
 
   # Select a default runtime, which is used for unit and regression tests.
-  if (FLANG_RT_INCLUDE_TESTS)
+  if (TARGET flang_rt.runtime.default)
     get_target_property(default_target flang_rt.runtime.default ALIASED_TARGET)
     add_library(flang_rt.runtime.unittest ALIAS "${default_target}")
   endif ()
-
-  # Select a target that compiles the sources to build the public module files.
-  get_target_property(compile_target flang_rt.runtime.compile ALIASED_TARGET)
-  flang_module_target(flang_rt.intrinsics.obj PUBLIC)
-  flang_module_target(${compile_target} PUBLIC)
-  add_dependencies(${compile_target} flang_rt.intrinsics)
-  add_dependencies(flang-rt-mod flang_rt.intrinsics ${compile_target})
 else()
   # Target for building all versions of the runtime
   add_custom_target(flang_rt.runtime)
