@@ -5,6 +5,46 @@
         {
           "entity_id": 2,
           "entity_summary": {
+            "PointerAssignments": [
+              [
+                [
+                  {
+                    "@": 0
+                  },
+                  2
+                ],
+                [
+                  {
+                    "@": 1
+                  },
+                  1
+                ]
+              ],
+              [
+                [
+                  {
+                    "@": 2
+                  },
+                  1
+                ],
+                [
+                  {
+                    "@": 0
+                  },
+                  1
+                ]
+              ]
+            ]
+          }
+        }
+      ],
+      "summary_name": "PointerAssignments"
+    },
+    {
+      "summary_data": [
+        {
+          "entity_id": 2,
+          "entity_summary": {
             "UnsafeBuffers": [
               [
                 {

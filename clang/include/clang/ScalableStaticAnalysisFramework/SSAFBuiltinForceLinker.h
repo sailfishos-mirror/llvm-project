@@ -25,13 +25,30 @@ extern volatile int SSAFJSONFormatAnchorSource;
 [[maybe_unused]] static int SSAFJSONFormatAnchorDestination =
     SSAFJSONFormatAnchorSource;
 
+// This anchor is used to force the linker to link the UnsafeBufferUsage
+// JSONFormat registration:
 extern volatile int UnsafeBufferUsageSSAFJSONFormatAnchorSource;
 [[maybe_unused]] static int UnsafeBufferUsageSSAFJSONFormatAnchorDestination =
     UnsafeBufferUsageSSAFJSONFormatAnchorSource;
 
+// This anchor is used to force the linker to link the UnsafeBufferUsage
+// JSONFormat registration:
 extern volatile int UnsafeBufferUsageTUSummaryExtractorAnchorSource;
 [[maybe_unused]] static int
     UnsafeBufferUsageTUSummaryExtractorAnchorDestination =
-        UnsafeBufferUsageSSAFJSONFormatAnchorSource;
+        UnsafeBufferUsageTUSummaryExtractorAnchorSource;
+
+// This anchor is used to force the linker to link the PointerAssignments
+// JSONFormat registration:
+extern volatile int PointerAssignmentsSSAFJSONFormatAnchorSource;
+[[maybe_unused]] static int PointerAssignmentsSSAFJSONFormatAnchorDestination =
+    PointerAssignmentsSSAFJSONFormatAnchorSource;
+
+// This anchor is used to force the linker to link the PointerAssignments
+// TUSummaryExtractor registration.
+extern volatile int PointerAssignmentsTUSummaryExtractorAnchorSource;
+[[maybe_unused]] static int
+    PointerAssignmentsTUSummaryExtractorAnchorDestination =
+        PointerAssignmentsTUSummaryExtractorAnchorSource;
 
 #endif // LLVM_CLANG_SCALABLESTATICANALYSISFRAMEWORK_SSAFBUILTINFORCELINKER_H

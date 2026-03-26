@@ -12,6 +12,8 @@
 #include "clang/AST/DeclCXX.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/ASTEntityMapping.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/Model/EntityName.h"
+#include "llvm/ADT/STLExtras.h"
+#include <functional>
 #include <optional>
 
 namespace clang::ssaf {
@@ -238,17 +240,24 @@ translateEntityPointerLevel(const Expr *E, ASTContext &Ctx,
 }
 
 /// Create an EntityPointerLevel from a ValueDecl of a pointer type.
-Expected<EntityPointerLevel>
+Expected<EntityPointerLevelSet>
 creatEntityPointerLevel(const NamedDecl *D, ASTContext &Ctx,
                         std::function<EntityId(EntityName EN)> AddEntity,
                         bool IsFunRet) {
   EntityPointerLevelTranslator Translator(AddEntity, Ctx);
+  auto EPL = Translator.translate(D, IsFunRet);
 
-  return Translator.translate(D, IsFunRet);
+  if (!EPL)
+    return EPL.takeError();
+  return EntityPointerLevelSet{*EPL};
 }
 
-EntityPointerLevel incrementPointerLevel(const EntityPointerLevel &E) {
-  return EntityPointerLevelTranslator::incrementPointerLevel(E);
+EntityPointerLevelSet incrementPointerLevel(const EntityPointerLevelSet &EPLs) {
+  EntityPointerLevelSet Result;
+
+  for (auto &E : EPLs)
+    Result.insert(EntityPointerLevelTranslator::incrementPointerLevel(E));
+  return Result;
 }
 
 // Writes an EntityPointerLevel as

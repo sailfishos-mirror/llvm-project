@@ -101,24 +101,24 @@ llvm::Expected<EntityPointerLevelSet>
 translateEntityPointerLevel(const Expr *E, ASTContext &Ctx,
                             std::function<EntityId(EntityName EN)> AddEntity);
 
-/// Create an EntityPointerLevel (EPL) from a NamedDecl of a pointer/array type.
+/// Create EntityPointerLevel(s) (EPLs) from a NamedDecl of a pointer/array type.
 ///
-/// \param E the pointer expression to be translated
+/// \param ND the pointer type Decl to be translated
 /// \param Ctx the AST context of `E`
 /// \param AddEntity the callback provided by the caller to convert EntityNames
 /// to EntityIds.
-/// \param IsFunRet true iff the created EPL is associated with the return type
-/// of a function entity.
-llvm::Expected<EntityPointerLevel>
+/// \param IsFunRet true iff the created EPL(s) is associated with the return
+/// type of a function entity.
+llvm::Expected<EntityPointerLevelSet>
 creatEntityPointerLevel(const NamedDecl *ND, ASTContext &Ctx,
                         std::function<EntityId(EntityName EN)> AddEntity,
                         bool IsFunRet = false);
 
-/// Creates a new EntityPointerLevel (EPL) from `E` by incrementing `E`'s
-/// pointer level.
-/// \return the EPL that is associated with the pointee (or array element) type
-/// of `E`'s associated pointer/array tyoe of the same entity.
-EntityPointerLevel incrementPointerLevel(const EntityPointerLevel &E);
+/// Creates new EntityPointerLevel(s) (EPLs) from the provided
+/// one(s) by incrementing their pointer levels.
+/// \return the EPL(s) that is associated with the pointee (or array element)
+/// type of `E`'s associated pointer/array tyoe of the same entity.
+EntityPointerLevelSet incrementPointerLevel(const EntityPointerLevelSet &E);
 
 llvm::json::Value
 entityPointerLevelToJSON(const EntityPointerLevel &EPL,

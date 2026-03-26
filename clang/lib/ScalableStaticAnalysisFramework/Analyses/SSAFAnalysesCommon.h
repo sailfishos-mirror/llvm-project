@@ -14,6 +14,7 @@
 
 #include "clang/AST/Decl.h"
 #include "clang/AST/ParentMapContext.h"
+#include "clang/AST/TypeBase.h"
 #include "clang/Basic/SourceLocation.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Twine.h"
@@ -56,8 +57,7 @@ static inline llvm::Error makeErrorSawButExpected(const llvm::json::Value &Saw,
       ExpectedArgs...);
 }
 
-template <typename DeclOrExpr>
-static bool hasPtrOrArrType(const DeclOrExpr &E) {
+template <typename TypedObj> static bool hasPtrOrArrType(const TypedObj &E) {
   return llvm::isa<PointerType>(E.getType().getCanonicalType()) ||
          llvm::isa<ArrayType>(E.getType().getCanonicalType());
 }
@@ -144,3 +144,4 @@ public:
 };
 } // namespace
 #endif // LLVM_CLANG_SCALABLESTATICANALYSISFRAMEWORK_ANALYSES_SSAFANALYSESCOMMON_H
+
