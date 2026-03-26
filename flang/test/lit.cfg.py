@@ -141,7 +141,7 @@ if config.default_sysroot:
     config.available_features.add("default_sysroot")
 
 host_triple = config.host_triple.split("-")
-config.available_features.add(f'{host_triple[0]}-host')
+config.available_features.add(f"{host_triple[0]}-host")
 
 flang_exe = lit.util.which("flang", config.flang_llvm_tools_dir)
 if not flang_exe:

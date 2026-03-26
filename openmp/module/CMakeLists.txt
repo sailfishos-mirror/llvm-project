@@ -7,13 +7,11 @@
 #//===----------------------------------------------------------------------===//
 
 # Build the module files if a Fortran compiler is available.
-# Only LLVM_ENABLE_RUNTIMES=openmp is supported, LLVM_ENABLE_PROJECTS=openmp
-# has been deprecated.
 
 configure_file(omp_lib.F90.var "{CMAKE_CURRENT_BINARY_DIR}/omp_lib.F90" @ONLY)
 configure_file(omp_lib.h.var "${CMAKE_CURRENT_BINARY_DIR}/../runtime/src/omp_lib.h" @ONLY)
 
-# One compilation step creates both omp_lib.mod and omp_lib_kinds.mod. Only
+# One compilation step creates both, omp_lib.mod and omp_lib_kinds.mod. Only
 # these files are used, the object file itself can be discarded.
 # FIXME: Adding it to libomp.so would allow implementing Fortran API in Fortran
 add_library(libomp-mod OBJECT

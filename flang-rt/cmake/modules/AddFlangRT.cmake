@@ -204,11 +204,14 @@ function (add_flangrt_library name)
     endif ()
   endif ()
 
-  if (build_object)
-    add_library(${name}.compile ALIAS "${name_object}")
-  else ()
-    add_library(${name}.compile ALIAS "${default_target}")
-  endif ()
+  # An alias for the target that compiles the sources. When building a shared
+  # and static library at the same time, the sources are compiled in an object
+  # library, so there can be only one.
+  # Can be used to introspect and change the real target's properties, like:
+  #
+  # get_target_property(compile_target ${name}.compile ALIASED_TARGET)
+  # target_sources(${compile_target} more_sources.c)
+  add_library(${name}.compile ALIAS "${srctargets}")
 
   foreach (tgtname IN LISTS libtargets)
     if (NOT WIN32)
@@ -239,13 +242,15 @@ function (add_flangrt_library name)
     # Minimum required C++ version for Flang-RT, even if CMAKE_CXX_STANDARD is defined to something else.
     target_compile_features(${tgtname} PRIVATE cxx_std_17)
 
-    target_compile_options(${tgtname} PRIVATE
-      # Always enable preprocessor regardless of file extension
-      "$<$<COMPILE_LANGUAGE:Fortran>:-cpp>"
+    if (CMAKE_Fortran_COMPILER_ID MATCHES "LLVM")
+      target_compile_options(${tgtname} PRIVATE
+        # Always enable preprocessor regardless of file extension
+        "$<$<COMPILE_LANGUAGE:Fortran>:-cpp>"
 
-      # Missing type descriptors are expected for intrinsic modules
-      "$<$<COMPILE_LANGUAGE:Fortran>:SHELL:-mmlir;SHELL:-ignore-missing-type-desc>"
-    )
+        # Missing type descriptors are expected for intrinsic modules
+        "$<$<COMPILE_LANGUAGE:Fortran>:SHELL:-mmlir;SHELL:-ignore-missing-type-desc>"
+      )
+    endif ()
 
     # When building the flang runtime if LTO is enabled the archive file
     # contains LLVM IR rather than object code. Currently flang is not

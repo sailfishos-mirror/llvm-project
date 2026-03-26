@@ -241,9 +241,7 @@ endif ()
 
 
 # check-flang depends on flang-rt-mod to build intrinsic modules
-if (NOT TARGET flang-rt-mod)
-  add_custom_target(flang-rt-mod)
-endif ()
+add_custom_target(flang-rt-mod)
 
 if (NOT WIN32)
   # CMake ignores intrinsic USE dependencies
@@ -261,9 +259,7 @@ if (NOT WIN32)
   # Without it, CMake/Ninja seem to think that the modules of
   # flang_rt.intrinsics.obj can be built concurrently to those in
   # flang_rt.runtime.
-  add_custom_target(flang_rt.intrinsics
-    COMMENT "Intrinsic module dependency barrier"
-  )
+  add_custom_target(flang_rt.intrinsics)
   add_dependencies(flang_rt.intrinsics flang_rt.intrinsics.obj)
 
   add_flangrt_library(flang_rt.runtime STATIC SHARED
@@ -276,10 +272,17 @@ if (NOT WIN32)
   enable_cuda_compilation(flang_rt.runtime "${supported_sources}")
 
   # Select a default runtime, which is used for unit and regression tests.
-  if (TARGET flang_rt.runtime.default)
+  if (FLANG_RT_INCLUDE_TESTS)
     get_target_property(default_target flang_rt.runtime.default ALIASED_TARGET)
     add_library(flang_rt.runtime.unittest ALIAS "${default_target}")
   endif ()
+
+  # Select a target that compiles the sources to build the public module files.
+  get_target_property(compile_target flang_rt.runtime.compile ALIASED_TARGET)
+  flang_module_target(flang_rt.intrinsics.obj PUBLIC)
+  flang_module_target(${compile_target} PUBLIC)
+  add_dependencies(${compile_target} flang_rt.intrinsics)
+  add_dependencies(flang-rt-mod flang_rt.intrinsics ${compile_target})
 else()
   # Target for building all versions of the runtime
   add_custom_target(flang_rt.runtime)
@@ -293,7 +296,6 @@ else()
     )
     add_custom_target(${name}.intrinsics
       COMMAND echo "${name} Dependency barrier"
-      COMMENT "Intrinsic module dependency barrier"
     )
     add_dependencies(${name}.intrinsics ${name}.intrinsics.obj)
 

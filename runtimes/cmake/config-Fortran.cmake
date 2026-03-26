@@ -199,13 +199,16 @@ function (flang_module_target tgtname)
   endif ()
 
   target_compile_options(${tgtname} PRIVATE
-      # Let non-public modules find the public module files
-      "$<$<COMPILE_LANGUAGE:Fortran>:-fintrinsic-modules-path=${RUNTIMES_OUTPUT_RESOURCE_MOD_DIR}>"
-
+    # Let non-public modules find the public module files
+    "$<$<COMPILE_LANGUAGE:Fortran>:-fintrinsic-modules-path=${RUNTIMES_OUTPUT_RESOURCE_MOD_DIR}>"
+  )
+  if (CMAKE_Fortran_COMPILER_ID MATCHES "LLVM")
+    target_compile_options(${tgtname} PRIVATE
       # Flang bug workaround: Reformating of cooked token buffer causes
       # identifier to be split between lines
       "$<$<COMPILE_LANGUAGE:Fortran>:SHELL:-Xflang;SHELL:-fno-reformat>"
     )
+  endif ()
 
   if (ARG_PUBLIC)
     set_target_properties(${tgtname}
