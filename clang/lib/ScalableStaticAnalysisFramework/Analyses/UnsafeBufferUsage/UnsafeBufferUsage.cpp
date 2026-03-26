@@ -8,6 +8,7 @@
 
 #include "clang/ScalableStaticAnalysisFramework/Analyses/UnsafeBufferUsage/UnsafeBufferUsage.h"
 #include "clang/ScalableStaticAnalysisFramework/SSAFForceLinker.h" // IWYU pragma: keep
+#include "llvm/Support/Error.h"
 
 namespace {
 constexpr const char *const UnsafeBuffersKey = "UnsafeBuffers";
@@ -46,11 +47,10 @@ UnsafeBufferUsageEntitySummary::jsonDeserializeFn(
     const llvm::json::Object &Data, EntityIdTable &,
     JSONFormat::EntityIdFromJSONFn EntityIdFromJSON) {
   const Array *UnsafeBuffersData = Data.getArray(UnsafeBuffersKey);
-  constexpr const char *const ErrMsg =
-      "unrecognized UnsafeBufferUsageEntitySummary data";
 
   if (!UnsafeBuffersData)
-    return llvm::createStringError(ErrMsg);
+    return llvm::createStringError("expected a json::Object with a key %s",
+                                   UnsafeBuffersKey);
 
   EntityPointerLevelSet EPLs;
 
@@ -58,13 +58,13 @@ UnsafeBufferUsageEntitySummary::jsonDeserializeFn(
     const Array *EltDataAsArr = EltData.getAsArray();
 
     if (!EltDataAsArr || EltDataAsArr->size() != 2)
-      return llvm::createStringError(ErrMsg);
+      return llvm::createStringError("expected a json::Array of size 2");
 
     const Object *IdData = (*EltDataAsArr)[0].getAsObject();
     std::optional<uint64_t> PtrLvData = (*EltDataAsArr)[1].getAsInteger();
 
     if (!IdData || !PtrLvData)
-      return llvm::createStringError(ErrMsg);
+      return llvm::createStringError("expected a json::Value of integer type");
 
     llvm::Expected<EntityId> Id = EntityIdFromJSON(*IdData);
 

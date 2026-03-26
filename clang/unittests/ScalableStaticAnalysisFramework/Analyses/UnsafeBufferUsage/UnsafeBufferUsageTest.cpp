@@ -259,13 +259,12 @@ TEST_F(UnsafeBufferUsageTest, UnsafeBufferUsageSerializeTest) {
                                      {"q", 4U}}));
 
   using Object = llvm::json::Object;
-  using Value = llvm::json::Value;
+
   std::map<EntityId, uint64_t> DummyTable{{*getEntityId("p"), 42},
                                           {*getEntityId("q"), 108}};
   Object JData = UnsafeBufferUsageEntitySummary::jsonSerializeFn(
-      *Sum, [&DummyTable](EntityId Id) {
-        return Object{{"@", Value(DummyTable[Id])}};
-      });
+      *Sum,
+      [&DummyTable](EntityId Id) { return Object{{"@", DummyTable[Id]}}; });
 
   EXPECT_EQ(llvm::formatv("{0:2}", llvm::json::Value(std::move(JData))).str(),
             SerilizationTestOracle);
