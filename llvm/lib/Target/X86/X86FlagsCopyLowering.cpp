@@ -949,3 +949,5 @@ X86FlagsCopyLoweringPass::run(MachineFunction &MF,
   return Changed ? PreservedAnalyses::all()
                  : getMachineFunctionPassPreservedAnalyses();
 }
+
+#undef PASS_KEY
