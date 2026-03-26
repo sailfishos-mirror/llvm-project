@@ -2523,3 +2523,5 @@ void HexagonDAGToDAGISel::rebalanceAddressTrees() {
   RootHeights.clear();
   RootWeights.clear();
 }
+
+#undef PASS_NAME

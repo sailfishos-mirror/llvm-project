@@ -597,3 +597,5 @@ FunctionPass *llvm::createAVRISelDag(AVRTargetMachine &TM,
                                      CodeGenOptLevel OptLevel) {
   return new AVRDAGToDAGISelLegacy(TM, OptLevel);
 }
+
+#undef PASS_NAME

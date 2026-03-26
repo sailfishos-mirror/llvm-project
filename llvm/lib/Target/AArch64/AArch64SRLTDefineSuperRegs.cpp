@@ -246,3 +246,5 @@ bool AArch64SRLTDefineSuperRegs::runOnMachineFunction(MachineFunction &MF) {
 FunctionPass *llvm::createAArch64SRLTDefineSuperRegsPass() {
   return new AArch64SRLTDefineSuperRegs();
 }
+
+#undef PASS_NAME

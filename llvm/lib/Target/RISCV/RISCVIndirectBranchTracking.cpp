@@ -128,3 +128,5 @@ bool RISCVIndirectBranchTracking::runOnMachineFunction(MachineFunction &MF) {
 
   return Changed;
 }
+
+#undef PASS_NAME

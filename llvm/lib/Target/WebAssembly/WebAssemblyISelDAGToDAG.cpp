@@ -643,3 +643,5 @@ FunctionPass *llvm::createWebAssemblyISelDag(WebAssemblyTargetMachine &TM,
                                              CodeGenOptLevel OptLevel) {
   return new WebAssemblyDAGToDAGISelLegacy(TM, OptLevel);
 }
+
+#undef PASS_NAME

@@ -5794,3 +5794,5 @@ FunctionPass *llvm::createARMISelDag(ARMBaseTargetMachine &TM,
                                      CodeGenOptLevel OptLevel) {
   return new ARMDAGToDAGISelLegacy(TM, OptLevel);
 }
+
+#undef PASS_NAME

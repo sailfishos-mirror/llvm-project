@@ -6890,3 +6890,5 @@ FunctionPass *llvm::createX86ISelDag(X86TargetMachine &TM,
                                      CodeGenOptLevel OptLevel) {
   return new X86DAGToDAGISelLegacy(TM, OptLevel);
 }
+
+#undef PASS_NAME
