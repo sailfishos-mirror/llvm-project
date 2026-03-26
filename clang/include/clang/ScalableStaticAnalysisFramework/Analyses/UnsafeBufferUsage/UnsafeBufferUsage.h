@@ -38,8 +38,8 @@ class EntityPointerLevel {
   EntityId Entity;
   unsigned PointerLevel;
 
-  friend class UnsafeBufferUsageTUSummaryExtractor;
   friend class UnsafeBufferUsageEntitySummary;
+  friend class UnsafeBufferUsageTUSummaryExtractor;
 
   EntityPointerLevel(EntityId Entity, unsigned PointerLevel)
       : Entity(Entity), PointerLevel(PointerLevel) {}

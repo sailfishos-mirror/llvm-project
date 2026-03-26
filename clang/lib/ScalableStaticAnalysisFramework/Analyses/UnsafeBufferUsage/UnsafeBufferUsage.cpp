@@ -16,10 +16,9 @@ constexpr const char *const UnsafeBuffersKey = "UnsafeBuffers";
 namespace clang::ssaf {
 using Object = llvm::json::Object;
 using Array = llvm::json::Array;
-using Value = llvm::json::Value;
 
 llvm::json::Object UnsafeBufferUsageEntitySummary::jsonSerializeFn(
-    const EntitySummary &ES, JSONFormat::EntityIdToJSONFn EntityId2JSON) {
+    const EntitySummary &ES, JSONFormat::EntityIdToJSONFn EntityIdToJSON) {
   // Writes a EntityPointerLevel as
   // Array {
   //   Object {
@@ -31,15 +30,14 @@ llvm::json::Object UnsafeBufferUsageEntitySummary::jsonSerializeFn(
 
   for (const auto &EPL :
        static_cast<const UnsafeBufferUsageEntitySummary &>(ES).UnsafeBuffers)
-    UnsafeBuffersData.push_back(
-        Value(Array{// EntityId:
-                    Value(EntityId2JSON(EPL.getEntity())),
-                    // PointerLevel:
-                    Value(EPL.getPointerLevel())}));
+    UnsafeBuffersData.push_back(Array{// EntityId:
+                                      EntityIdToJSON(EPL.getEntity()),
+                                      // PointerLevel:
+                                      EPL.getPointerLevel()});
 
   Object Data;
 
-  Data[UnsafeBuffersKey] = Value(std::move(UnsafeBuffersData));
+  Data[UnsafeBuffersKey] = std::move(UnsafeBuffersData);
   return Data;
 }
 
@@ -48,12 +46,13 @@ UnsafeBufferUsageEntitySummary::jsonDeserializeFn(
     const llvm::json::Object &Data, EntityIdTable &,
     JSONFormat::EntityIdFromJSONFn EntityIdFromJSON) {
   const Array *UnsafeBuffersData = Data.getArray(UnsafeBuffersKey);
-  constexpr const char *const ErrMsg = "unrecognized UnsafeBufferUsageEntitySummary data";
+  constexpr const char *const ErrMsg =
+      "unrecognized UnsafeBufferUsageEntitySummary data";
 
   if (!UnsafeBuffersData)
     return llvm::createStringError(ErrMsg);
 
-  EntityPointerLevelSet UnsafeBuffers;
+  EntityPointerLevelSet EPLs;
 
   for (auto &EltData : *UnsafeBuffersData) {
     const Array *EltDataAsArr = EltData.getAsArray();
@@ -71,10 +70,10 @@ UnsafeBufferUsageEntitySummary::jsonDeserializeFn(
 
     if (!Id)
       return Id.takeError();
-    UnsafeBuffers.insert(EntityPointerLevel(Id.get(), *PtrLvData));
+    EPLs.insert(EntityPointerLevel(Id.get(), *PtrLvData));
   }
   return std::make_unique<UnsafeBufferUsageEntitySummary>(
-      UnsafeBufferUsageEntitySummary(std::move(UnsafeBuffers)));
+      UnsafeBufferUsageEntitySummary(std::move(EPLs)));
 }
 
 static llvm::Registry<JSONFormat::FormatInfo>::Add<
