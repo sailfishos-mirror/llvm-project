@@ -1030,7 +1030,7 @@ static void computeWMMAScaleStall(const GPUSimState &State,
       // Check if VALU allowed at this slot
       auto StageOpt = State.ActiveWMMA.getCurrentStage(DesiredScaleSlot);
       if (StageOpt &&
-          State.ActiveWMMA.Info.canCoExec(InstClass::VALU, *StageOpt)) {
+          State.ActiveWMMA.Info.canCoExec(CoExecMask::VALU, *StageOpt)) {
         ScaleReadCycle = DesiredScaleSlot;
         WMMAStartCycle = XDLFreeAt;
       } else {
@@ -1610,12 +1610,12 @@ void logStalls(const StallSources &Stalls, const GPUSimState &State) {
     dbgs() << "    (Base stall lands at cycle " << Stalls.EffectiveCycle;
     if (EffectiveStage) {
       uint8_t Mask = State.ActiveWMMA.Info.StageMask[*EffectiveStage];
-      WMMAStageType StageType = CoExecMask::getStageType(Mask);
-      const char *StageName = StageType == WMMAStageType::E0  ? "E0"
-                              : StageType == WMMAStageType::E ? "E"
-                              : StageType == WMMAStageType::I ? "I"
-                              : StageType == WMMAStageType::V ? "V"
-                                                              : "?";
+      CoExecStageType StageType = CoExecInfo::getStageType(Mask);
+      const char *StageName = StageType == CoExecStageType::E0  ? "E0"
+                              : StageType == CoExecStageType::E ? "E"
+                              : StageType == CoExecStageType::I ? "I"
+                              : StageType == CoExecStageType::V ? "V"
+                                                                : "?";
       dbgs() << " [stage " << *EffectiveStage << "/"
              << State.ActiveWMMA.Info.TotalWindow << " " << StageName
              << " - blocked]";
@@ -1635,7 +1635,7 @@ void logWMMAWindow(const GPUSimState &State, InstClass IC) {
          << State.ActiveWMMA.Info.TotalWindow << "]";
   if (Stage) {
     uint8_t Mask = State.ActiveWMMA.Info.StageMask[*Stage];
-    WMMAStageType ST = CoExecMask::getStageType(Mask);
+    CoExecStageType ST = CoExecInfo::getStageType(Mask);
     const char *StageNames[] = {"?", "E0", "E", "I", "V"};
     dbgs() << " " << StageNames[(int)ST];
   }
@@ -1694,7 +1694,7 @@ void logUnitAndMemState(const GPUSimState &State, const InstTiming &T) {
 struct WMMAWindowCapture {
   bool WasInWindow = false;
   std::optional<unsigned> Stage;
-  WMMAStageType StageType = WMMAStageType::NONE;
+  CoExecStageType StageType = CoExecStageType::NONE;
   unsigned TotalWindow = 0;
 };
 
@@ -1710,7 +1710,7 @@ WMMAWindowCapture captureWMMAWindowState(const GPUSimState &State,
 
   if (Capture.Stage) {
     uint8_t Mask = State.ActiveWMMA.Info.StageMask[*Capture.Stage];
-    Capture.StageType = CoExecMask::getStageType(Mask);
+    Capture.StageType = CoExecInfo::getStageType(Mask);
   }
   return Capture;
 }

@@ -39,6 +39,7 @@
 #ifndef LLVM_LIB_TARGET_AMDGPU_AMDGPUSTATICSIMULATOR_H
 #define LLVM_LIB_TARGET_AMDGPU_AMDGPUSTATICSIMULATOR_H
 
+#include "AMDGPUCoExecInfo.h"
 #include "SIDefines.h"
 #include "SIInstrInfo.h"
 #include "Utils/AMDGPUBaseInfo.h"
@@ -156,15 +157,6 @@ enum class StallReason : uint8_t {
   IS_FETCH
 };
 
-/// Stage type for WMMA co-execution (for annotation display)
-enum class WMMAStageType : uint8_t {
-  NONE = 0, // Not in WMMA window
-  E0,       // Issue cycle - control only
-  E,        // External - MEM/SALU allowed
-  I,        // Internal - MEM/SALU/VALU allowed
-  V         // Vacant - MEM/SALU/WMMA allowed, no VALU
-};
-
 /// Per-instruction simulation data for assembly annotation
 struct InstrSimInfo {
   unsigned StallCycles = 0;
@@ -172,7 +164,7 @@ struct InstrSimInfo {
   bool InWMMAWindow = false;
   uint8_t WMMAStage = 0;
   uint8_t WMMATotalWindow = 0;
-  WMMAStageType StageType = WMMAStageType::NONE;
+  CoExecStageType StageType = CoExecStageType::NONE;
   bool CoExecuted = false;
   bool WasFused = false;
   bool WasExposed = false;
@@ -219,13 +211,13 @@ struct InstrSimInfo {
   /// Get stage type character for compact display
   char getStageChar() const {
     switch (StageType) {
-    case WMMAStageType::E0:
+    case CoExecStageType::E0:
       return '0';
-    case WMMAStageType::E:
+    case CoExecStageType::E:
       return 'E';
-    case WMMAStageType::I:
+    case CoExecStageType::I:
       return 'I';
-    case WMMAStageType::V:
+    case CoExecStageType::V:
       return 'V';
     default:
       return '?';
@@ -235,13 +227,13 @@ struct InstrSimInfo {
   /// Get stage type name
   const char *getStageName() const {
     switch (StageType) {
-    case WMMAStageType::E0:
+    case CoExecStageType::E0:
       return "E0";
-    case WMMAStageType::E:
+    case CoExecStageType::E:
       return "E";
-    case WMMAStageType::I:
+    case CoExecStageType::I:
       return "I";
-    case WMMAStageType::V:
+    case CoExecStageType::V:
       return "V";
     default:
       return "?";
@@ -319,64 +311,10 @@ enum class StageType : uint8_t {
   ANY, // Default - all instruction types allowed (fallback)
 };
 
-/// Bitmask for instruction types allowed to co-execute at a stage
-namespace CoExecMask {
-constexpr uint8_t None = 0;
-constexpr uint8_t CTRL = 1 << 0;  // Control: s_delay_alu, s_set_vgpr_msb
-constexpr uint8_t VALU = 1 << 1;  // Vector ALU
-constexpr uint8_t TRANS = 1 << 2; // Transcendentals (V_EXP etc)
-constexpr uint8_t SALU = 1 << 3;  // Scalar ALU
-constexpr uint8_t DS = 1 << 4;    // LDS read/write
-constexpr uint8_t VMEM = 1 << 5;  // Global memory
-constexpr uint8_t SMEM = 1 << 6;  // Scalar memory
-constexpr uint8_t WMMA = 1 << 7;  // Next WMMA (V stages only)
-constexpr uint8_t All = 0xFF;
+// CoExecMask, MaxCoExecStages, and CoExecInfo are in AMDGPUCoExecInfo.h
 
-constexpr uint8_t MEM = DS | VMEM | SMEM;
-constexpr uint8_t StageE0 = CTRL;             // Issue: control only
-constexpr uint8_t StageE = CTRL | SALU | MEM; // External: mem/salu
-constexpr uint8_t StageI =
-    CTRL | SALU | MEM | VALU | TRANS;                // Internal: all ALU
-constexpr uint8_t StageV = CTRL | SALU | MEM | WMMA; // Vacant: no valu/trans
-
-/// Get WMMAStageType from a stage mask value
-inline WMMAStageType getStageType(uint8_t Mask) {
-  if (Mask == StageE0)
-    return WMMAStageType::E0;
-  if (Mask == StageE)
-    return WMMAStageType::E;
-  if (Mask == StageI)
-    return WMMAStageType::I;
-  if (Mask == StageV)
-    return WMMAStageType::V;
-  // For 'All' or unknown, return based on what's allowed
-  if (Mask & VALU)
-    return WMMAStageType::I; // If VALU allowed, it's I-like
-  if (Mask & WMMA)
-    return WMMAStageType::V; // If WMMA allowed (not VALU), V-like
-  return WMMAStageType::E;   // Default to E
-}
-} // namespace CoExecMask
-
-/// Max stages: INT8 16x16x64 = 17 cycles, round up for safety
-constexpr unsigned MaxWMMAStages = 20;
-
-/// Per-WMMA-variant co-execution rules
-struct WMMACoExecInfo {
-  unsigned Occupancy;   // Cycles until XDL frees (next WMMA can issue)
-  unsigned TotalWindow; // Total window including V tail
-  uint8_t StageMask[MaxWMMAStages] = {}; // Per-stage allowed instruction mask
-  unsigned LastIStage; // Last I-stage index (for LD_SCALE rule)
-  bool HasScaling;     // True for FP8/FP6/FP4 scaled variants
-  StringRef Pattern;   // Pattern string for display (e.g., "0EEIIIVV")
-
-  /// Default constructor - initialize to safe defaults
-  WMMACoExecInfo()
-      : Occupancy(0), TotalWindow(0), LastIStage(0), HasScaling(false) {
-    for (unsigned i = 0; i < MaxWMMAStages; ++i)
-      StageMask[i] = CoExecMask::All; // Default: permissive
-  }
-
+/// Simulator-specific extensions to CoExecInfo with InstClass support.
+struct SimCoExecInfo : public CoExecInfo {
   /// Get the mask bit for an instruction class
   static uint8_t getMaskForIC(InstClass IC) {
     switch (IC) {
@@ -415,7 +353,7 @@ struct WMMACoExecInfo {
   bool canCoExec(InstClass IC, unsigned Stage) const {
     if (Stage >= TotalWindow)
       return false;
-    return StageMask[Stage] & getMaskForIC(IC);
+    return getMask(Stage) & getMaskForIC(IC);
   }
 
   /// Find the next stage (>= CurrentStage) where IC can co-execute.
@@ -426,7 +364,7 @@ struct WMMACoExecInfo {
       return std::nullopt;
 
     for (unsigned S = CurrentStage; S < TotalWindow; ++S) {
-      if (StageMask[S] & Needed)
+      if (getMask(S) & Needed)
         return S;
     }
     return std::nullopt;
@@ -437,105 +375,6 @@ struct WMMACoExecInfo {
     return NextWMMAStage >= Occupancy && NextWMMAStage < TotalWindow;
   }
 };
-
-/// Helper to create WMMACoExecInfo from a pattern string
-/// Pattern chars: '0'=E0, 'E'=External, 'I'=Internal, 'V'=Vacant, 'A'=Any
-inline WMMACoExecInfo makeWMMACoExecInfo(unsigned Occupancy,
-                                         unsigned TotalWindow,
-                                         const char *Pattern,
-                                         unsigned LastIStage, bool HasScaling) {
-  WMMACoExecInfo Info;
-  Info.Occupancy = Occupancy;
-  Info.TotalWindow = TotalWindow;
-  Info.LastIStage = LastIStage;
-  Info.HasScaling = HasScaling;
-  Info.Pattern = Pattern; // Store pattern for display
-
-  for (unsigned i = 0; i < TotalWindow && Pattern[i]; ++i) {
-    switch (Pattern[i]) {
-    case '0':
-      Info.StageMask[i] = CoExecMask::StageE0;
-      break; // E0: control only
-    case 'E':
-      Info.StageMask[i] = CoExecMask::StageE;
-      break; // External
-    case 'I':
-      Info.StageMask[i] = CoExecMask::StageI;
-      break; // Internal
-    case 'V':
-      Info.StageMask[i] = CoExecMask::StageV;
-      break; // Vacant
-    case 'A':
-      Info.StageMask[i] = CoExecMask::All;
-      break; // All allowed
-    default:
-      Info.StageMask[i] = CoExecMask::All;
-      break; // Safe default
-    }
-  }
-  return Info;
-}
-
-/// Get co-execution info for a WMMA/MFMA instruction.
-inline WMMACoExecInfo getWMMACoExecInfo(const MachineInstr &MI,
-                                        const SIInstrInfo &TII) {
-  StringRef Name = TII.getName(MI.getOpcode());
-
-  // Check for scaled variants (LD_SCALE rule applies)
-  bool HasScaling = Name.contains_insensitive("scale");
-
-  if (Name.contains_insensitive("16x16x64_iu8")) {
-    return makeWMMACoExecInfo(16, 17, "0EIIEEIIEEIIEEIIV", 15, HasScaling);
-  }
-
-  // F8F6F4 16x16x128: window size depends on operand formats
-  if (Name.contains_insensitive("16x16x128_f8f6f4")) {
-    // Check if both operands are FP4 (shorter window)
-    bool BothF4 = false;
-    if (const MachineOperand *FmtA =
-            TII.getNamedOperand(MI, AMDGPU::OpName::matrix_a_fmt)) {
-      if (const MachineOperand *FmtB =
-              TII.getNamedOperand(MI, AMDGPU::OpName::matrix_b_fmt)) {
-        BothF4 = (FmtA->getImm() == WMMA::MATRIX_FMT_FP4 &&
-                  FmtB->getImm() == WMMA::MATRIX_FMT_FP4);
-      }
-    }
-
-    if (BothF4) {
-      // f4×f4: 4-cycle occupancy, 6-cycle window
-      return makeWMMACoExecInfo(4, 6, "0EEIVV", 3, HasScaling);
-    } else {
-      // f8×*, f6×*, or mixed: 8-cycle occupancy, 10-cycle window
-      return makeWMMACoExecInfo(8, 10, "0EEIEEIIVV", 7, HasScaling);
-    }
-  }
-
-  // FP8/BF8 16x16x64: 4-cycle occupancy, 6-cycle window
-  if (Name.contains_insensitive("16x16x64_fp8") ||
-      Name.contains_insensitive("16x16x64_bf8")) {
-    return makeWMMACoExecInfo(4, 6, "0EEIVV", 3, HasScaling);
-  }
-
-  // F16/BF16 16x16x32: 8-cycle occupancy, 9-cycle window
-  if (Name.contains_insensitive("16x16x32_f16") ||
-      Name.contains_insensitive("16x16x32_bf16")) {
-    return makeWMMACoExecInfo(8, 9, "0EIIEEIIV", 7, HasScaling);
-  }
-
-  // FP8/BF8 16x16x128: 8-cycle occupancy, 10-cycle window
-  if (Name.contains_insensitive("16x16x128_fp8") ||
-      Name.contains_insensitive("16x16x128_bf8")) {
-    return makeWMMACoExecInfo(8, 10, "0EEIEEIIVV", 7, HasScaling);
-  }
-
-  // 32x16x128 F4 variants
-  if (Name.contains_insensitive("32x16x128_f4")) {
-    return makeWMMACoExecInfo(4, 6, "0EEIVV", 3, HasScaling);
-  }
-
-  // Default fallback: permissive 8-cycle pattern
-  return makeWMMACoExecInfo(8, 9, "AAAAAAAAA", 7, HasScaling);
-}
 
 //===----------------------------------------------------------------------===//
 // Instruction Store (IS) Cache Model
@@ -1317,7 +1156,7 @@ struct GPUSimState {
     unsigned OccupancyCycle = 0;
     bool Active = false;
     bool IsBackToBack = false;
-    WMMACoExecInfo Info;
+    CoExecInfo Info;
 
     std::optional<unsigned> getCurrentStage(unsigned Cycle) const {
       if (!Active || Cycle < StartCycle || Cycle >= EndCycle)
@@ -1479,7 +1318,7 @@ struct GPUSimState {
   /// For non-scaled WMMA: WMMAStartCycle == CurrentCycle
   unsigned startWMMAWindow(const MachineInstr &MI, const SIInstrInfo &TII,
                            unsigned WMMAStartCycle) {
-    WMMACoExecInfo Info = getWMMACoExecInfo(MI, TII);
+    CoExecInfo Info = getCoExecInfo(MI, TII);
 
     bool BackToBack = HadPreviousWMMA &&
                       WMMAStartCycle >= ActiveWMMA.OccupancyCycle &&
@@ -1556,7 +1395,7 @@ struct GPUSimState {
     if (!ActiveWMMA.Active)
       return 0;
 
-    const WMMACoExecInfo &Info = ActiveWMMA.Info;
+    const CoExecInfo &Info = ActiveWMMA.Info;
 
     // Scale read cycle: blocks all co-execution until window starts
     if (Info.HasScaling && AtCycle < ActiveWMMA.StartCycle) {
@@ -1569,11 +1408,12 @@ struct GPUSimState {
 
     unsigned Stage = *StageOpt;
 
-    if (Info.canCoExec(IC, Stage))
+    uint8_t Mask = SimCoExecInfo::getMaskForIC(IC);
+    if (Info.canCoExec(Mask, Stage))
       return 0;
 
     unsigned SearchFrom = Stage + 1;
-    auto NextStage = Info.findNextAllowedStage(IC, SearchFrom);
+    auto NextStage = Info.findNextAllowedStage(Mask, SearchFrom);
 
     if (NextStage)
       return *NextStage - Stage;
