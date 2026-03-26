@@ -1012,3 +1012,5 @@ writeWindowsResourceCOFF(COFF::MachineTypes MachineType,
 
 } // namespace object
 } // namespace llvm
+
+#undef RETURN_IF_ERROR

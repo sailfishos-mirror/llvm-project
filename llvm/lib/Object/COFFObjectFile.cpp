@@ -2399,3 +2399,5 @@ ResourceSectionRef::getContents(const coff_resource_data_entry &Entry) {
                              "address not found in image");
   }
 }
+
+#undef RETURN_IF_ERROR
