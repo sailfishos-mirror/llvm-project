@@ -1597,7 +1597,7 @@ bool ClauseProcessor::processLinear(mlir::omp::LinearClauseOps &result,
       // 3. Otherwise, leave unset (UnitAttr placeholder).
       auto getDeclareSimdDefaultMod = [](const semantics::Symbol &sym) {
         const auto &ultimate = sym.GetUltimate();
-        if (semantics::IsPointer(ultimate))
+        if (semantics::IsAllocatableOrPointer(ultimate))
           return mlir::omp::LinearModifier::ref;
         if (const auto *obj =
                 ultimate.detailsIf<semantics::ObjectEntityDetails>())
@@ -1621,7 +1621,7 @@ bool ClauseProcessor::processLinear(mlir::omp::LinearClauseOps &result,
       if (isDeclareSimd) {
         bool isRefLike = false;
         const auto &ultimate = sym->GetUltimate();
-        if (semantics::IsPointer(ultimate))
+        if (semantics::IsAllocatableOrPointer(ultimate))
           isRefLike = true;
         else if (const auto *obj =
                      ultimate
@@ -1650,6 +1650,10 @@ bool ClauseProcessor::processLinear(mlir::omp::LinearClauseOps &result,
                 }
               }
             }
+          } else {
+            TODO(currentLocation,
+                 "declare simd linear step rescaling for non-integer/"
+                 "non-float types (complex, character, derived)");
           }
         }
       }
