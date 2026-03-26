@@ -5,6 +5,6 @@
 
 // CHECK: Registered serialization formats:
 // CHECK-EMPTY:
-// CHECK-NEXT:   1. json  JSON serialization format
+// CHECK-NEXT:   1. json - JSON serialization format
 // CHECK-NEXT:     Analyses:
 // CHECK-NEXT:         1.1. UnsafeBufferUsage JSON Format info for UnsafeBufferUsageEntitySummary

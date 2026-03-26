@@ -25,6 +25,11 @@ extern volatile int SSAFJSONFormatAnchorSource;
 [[maybe_unused]] static int SSAFJSONFormatAnchorDestination =
     SSAFJSONFormatAnchorSource;
 
+// This anchor is used to force the linker to link the AnalysisRegistry.
+extern volatile int SSAFAnalysisRegistryAnchorSource;
+[[maybe_unused]] static int SSAFAnalysisRegistryAnchorDestination =
+    SSAFAnalysisRegistryAnchorSource;
+
 extern volatile int UnsafeBufferUsageSSAFJSONFormatAnchorSource;
 [[maybe_unused]] static int UnsafeBufferUsageSSAFJSONFormatAnchorDestination =
     UnsafeBufferUsageSSAFJSONFormatAnchorSource;
