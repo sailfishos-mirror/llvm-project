@@ -9,9 +9,7 @@
 #include "clang/ScalableStaticAnalysisFramework/Analyses/UnsafeBufferUsage/UnsafeBufferUsage.h"
 #include "llvm/Support/Error.h"
 
-namespace {
-constexpr const char *const UnsafeBuffersKey = "UnsafeBuffers";
-} // namespace
+static constexpr llvm::StringLiteral UnsafeBuffersKey = "UnsafeBuffers";
 
 namespace clang::ssaf {
 using Object = llvm::json::Object;
