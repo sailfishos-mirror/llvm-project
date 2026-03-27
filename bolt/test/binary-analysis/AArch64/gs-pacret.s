@@ -168,6 +168,23 @@ f_nonx30_ret_ok:
         ret     x16
         .size f_nonx30_ret_ok, .-f_nonx30_ret_ok
 
+        .globl  f_detect_clobbered_x30_passed_to_other
+        .type   f_detect_clobbered_x30_passed_to_other,@function
+f_detect_clobbered_x30_passed_to_other:
+        str x30, [sp]
+        ldr x30, [sp]
+// FIXME: Ideally, the pac-ret scanner would report on the following instruction, which
+// performs a tail call, that x30 might be attacker-controlled.
+// CHECK-NOT: function f_detect_clobbered_x30_passed_to_other
+        b   f_tail_called
+        .size f_detect_clobbered_x30_passed_to_other, .-f_detect_clobbered_x30_passed_to_other
+
+        .globl  f_tail_called
+        .type   f_tail_called,@function
+f_tail_called:
+        ret
+        .size f_tail_called, .-f_tail_called
+
         .globl  f_nonx30_ret_non_auted
         .type   f_nonx30_ret_non_auted,@function
 f_nonx30_ret_non_auted:
