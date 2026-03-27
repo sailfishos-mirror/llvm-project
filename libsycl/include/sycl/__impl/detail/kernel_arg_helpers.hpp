@@ -5,8 +5,6 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
-// to add
-//===----------------------------------------------------------------------===//
 
 #ifndef _LIBSYCL___IMPL_DETAIL_KERNEL_ARG_HELPERS
 #define _LIBSYCL___IMPL_DETAIL_KERNEL_ARG_HELPERS
