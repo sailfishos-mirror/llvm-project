@@ -17,6 +17,7 @@
 #include "perfect_hash_map.h"
 
 namespace LIBC_NAMESPACE_DECL {
+namespace wctype_internal {
 
 LIBC_INLINE_VAR constexpr cpp::array<cpp::array<wint_t, 2>, 1151>
     LOWER_TO_UPPER_DATA = {
@@ -485,6 +486,7 @@ LIBC_INLINE_VAR constexpr PerfectHashMap<307,
 
 #endif // WINT_MAX > 65535
 
+} // namespace wctype_internal
 } // namespace LIBC_NAMESPACE_DECL
 
 #endif // LLVM_LIBC_SRC___SUPPORT_WCTYPE_LOWER_TO_UPPER_H

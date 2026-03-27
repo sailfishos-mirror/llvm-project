@@ -22,7 +22,7 @@ def fetch_params(file_path: str, mappings: dict):
     for i, key in enumerate(mappings.keys()):
         arr[i] = key
 
-    res = LIBC_NAMESPACE.ptrhash.get_params(arr)
+    res = LIBC_NAMESPACE.wctype_internal.ptrhash.get_params(arr)
     pilots = LIBC_NAMESPACE.cpp.get[1](res)
     pilots_size = pilots.size()
     pilots = list(map(lambda x: f"0x{x:X}", map(cppyy.gbl.uint8_t, pilots)))
@@ -102,6 +102,7 @@ def write_hex_conversions(file_path: str, mappings: dict[int, int]) -> None:
 #include "perfect_hash_map.h"
 
 namespace LIBC_NAMESPACE_DECL {'{'}
+namespace wctype_internal {'{'}
 
 """
         )
@@ -115,5 +116,7 @@ namespace LIBC_NAMESPACE_DECL {'{'}
         file.write("\n\n#if WINT_MAX > 65535\n\n")
         write_content(file_path, file, data_var_name, mappings32, "_32")
         file.write("\n\n#endif // WINT_MAX > 65535")
-        file.write("\n\n} // namespace LIBC_NAMESPACE_DECL\n\n")
+        file.write(
+            "\n\n} // namespace wctype_internal\n} // namespace LIBC_NAMESPACE_DECL\n\n"
+        )
         file.write(f"#endif // LLVM_LIBC_SRC___SUPPORT_WCTYPE_{data_var_name[:-5]}_H\n")

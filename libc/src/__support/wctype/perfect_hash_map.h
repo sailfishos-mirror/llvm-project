@@ -6,8 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_LIBC_SRC___SUPPORT_WCTYPE_PTR_HASH_H
-#define LLVM_LIBC_SRC___SUPPORT_WCTYPE_PTR_HASH_H
+#ifndef LLVM_LIBC_SRC___SUPPORT_WCTYPE_PERFECT_HASH_MAP_H
+#define LLVM_LIBC_SRC___SUPPORT_WCTYPE_PERFECT_HASH_MAP_H
 
 #define LIBC_ENABLE_CONSTEXPR 1
 
@@ -15,20 +15,24 @@
 #include "hdr/types/wint_t.h"
 #include "src/__support/CPP/array.h"
 #include "src/__support/CPP/expected.h"
-#include "src/__support/CPP/monostate.h"
 #include "src/__support/CPP/optional.h"
 #include "src/__support/CPP/span.h"
 #include "src/__support/CPP/string.h"
 #include "src/__support/CPP/tuple.h"
-#include "src/__support/CPP/type_traits/is_unsigned.h"
-#include "src/__support/OSUtil/io.h"
+#include "src/__support/CPP/type_traits.h"
+#include "src/__support/macros/config.h"
 #include "src/__support/math/ceil.h"
 #include "src/__support/math/log.h"
 #include "src/__support/uint128.h"
 
+#ifdef _DEBUG
+#include "src/__support/OSUtil/io.h"
+#endif
+
 #undef LIBC_ENABLE_CONSTEXPR
 
 namespace LIBC_NAMESPACE_DECL {
+namespace wctype_internal {
 
 namespace ptrhash {
 
@@ -52,7 +56,7 @@ public:
 
     auto s = wrapping_add(seed, WY_CONST_0);
     seed = s;
-    auto const t =
+    const auto t =
         static_cast<UInt128>(s) * static_cast<UInt128>(s ^ WY_CONST_1);
     return static_cast<uint64_t>(t) ^ static_cast<uint64_t>(t >> 64);
   }
@@ -127,9 +131,11 @@ template <typename T> LIBC_INLINE constexpr bool is_power_of_two(T x) {
   return x != 0 && (x & (x - 1)) == 0;
 }
 
+// Formula of Vigna, eps-cost-sharding: https://arxiv.org/abs/2503.18397
+// (1-alpha)/2, so that on average we still have some room to play with.
 LIBC_INLINE constexpr size_t get_parts(size_t n) {
   size_t parts = 0;
-  auto eps = 0.01 / 2.0;
+  auto eps = 0.01 / 2.0; // alpha here is 0.99 for linear configuration
   auto x = static_cast<double>(n) * eps * eps / 2.0;
   auto target_parts = static_cast<size_t>(x / math::log(x));
   auto parts_per_shard = target_parts / SHARDS;
@@ -160,6 +166,9 @@ public:
       PARTS * BUCKETS_PER_PART;
 };
 
+// fxhash algorithm constant used in hashing numbers
+LIBC_INLINE_VAR constexpr uint64_t FXHASH_SEED = 0x517cc1b727220a95;
+
 template <size_t n_, size_t parts_, size_t parts_per_shard_,
           size_t slots_total_, size_t buckets_total_, size_t slots_,
           size_t buckets_, typename Key = uint64_t,
@@ -171,10 +180,6 @@ public:
       cpp::is_same_v<PilotsTypeV, cpp::span<uint8_t>> ||
           cpp::is_same_v<PilotsTypeV, cpp::array<uint8_t, buckets_total_>>,
       "V must be a byte slice or byte vector");
-
-  uint64_t seed;
-  PilotsTypeV pilots;
-  F remap;
 
   LIBC_INLINE constexpr PtrHash(uint64_t seed_, PilotsTypeV pilots_, F remap_)
       : seed(seed_), pilots(pilots_), remap(remap_) {}
@@ -289,19 +294,16 @@ public:
         continue;
       }
 
-      auto const remap = this->remap_free_slots(taken);
-
-      if (!remap) {
+      if (!this->remap_free_slots(taken)) {
         continue;
       }
-      break;
-    }
-    this->pilots = pilots;
 
-    return {{this->seed, this->pilots, this->remap}};
+      this->pilots = pilots;
+      return {{this->seed, this->pilots, this->remap}};
+    }
   }
 
-  LIBC_INLINE constexpr cpp::expected<cpp::monostate, cpp::nullopt_t>
+  LIBC_INLINE constexpr bool
   remap_free_slots(cpp::array<cpp::array<bool, slots_>, parts_> &taken) {
     cpp::array<size_t, parts_> val{};
     for (size_t i = 0; i < taken.size(); ++i) {
@@ -320,28 +322,30 @@ public:
     }
 
     if (acc != slots_total_ - n_) {
+#ifdef _DEBUG
       write_to_stderr("Not the right number of free slots left!\n");
       write_to_stderr(" total slots ");
       write_to_stderr(cpp::to_string(slots_total_));
       write_to_stderr(" - n ");
       write_to_stderr(cpp::to_string(n_));
       write_to_stderr("\n");
-      return cpp::unexpected(cpp::nullopt);
+#endif
+      return false;
     }
 
     if (slots_total_ == n_) {
-      return cpp::monostate{};
+      return true;
     }
 
     cpp::array<uint64_t, slots_total_ - n_> v{};
     size_t v_idx = 0;
 
-    auto const get = [&](cpp::array<cpp::array<bool, slots_>, parts_> &t,
+    const auto get = [&](cpp::array<cpp::array<bool, slots_>, parts_> &t,
                          size_t idx) { return t[idx / slots_][idx % slots_]; };
 
     size_t p = 0;
     for (const auto &t : taken) {
-      auto const offset = p * slots_;
+      const auto offset = p * slots_;
       for (size_t idx = 0; idx < t.size(); idx++) {
         if (!t[idx]) {
           auto result = offset + idx;
@@ -360,7 +364,7 @@ public:
       this->remap[i] = static_cast<uint32_t>(v[i]);
     }
 
-    return cpp::monostate{};
+    return true;
   }
 
   LIBC_INLINE constexpr auto shards(const cpp::array<Key, n_> &keys) const {
@@ -376,11 +380,12 @@ public:
     return {ret};
   }
 
-  LIBC_INLINE constexpr uint64_t hash_key(Key x) const {
+  // fxhash hasing method for number values
+  LIBC_INLINE constexpr uint64_t hash_key(Key key) const {
     uint64_t value = 0;
     constexpr uint64_t BITS = sizeof(uint64_t) * 8;
-    value = ((value << 5) | (value >> (BITS - 5))) ^ x;
-    value *= 0x517cc1b727220a95;
+    value = ((value << 5) | (value >> (BITS - 5))) ^ key;
+    value *= FXHASH_SEED;
     return value ^ this->seed;
   }
 
@@ -406,7 +411,9 @@ public:
     }
 
     if (!distinct) {
+#ifdef _DEBUG
       write_to_stderr("Hashes are not distinct\n");
+#endif
       return cpp::nullopt;
     }
 
@@ -492,7 +499,7 @@ public:
     cpp::array<uint32_t, buckets_ + 1> starts = cpp::get<0>(sorted_buckets);
     cpp::array<uint32_t, buckets_> bucket_order = cpp::get<1>(sorted_buckets);
 
-    auto kmax = 256u;
+    constexpr uint16_t KMAX = 256;
 
     cpp::array<uint32_t, slots_> slots{};
     for (size_t i = 0; i < slots_; i++) {
@@ -510,7 +517,7 @@ public:
       auto hashes_range = hashes.subspan(starts[b], starts[b + 1] - starts[b]);
 
       auto i = 0;
-      for (auto const &e1 : hashes_range) {
+      for (const auto &e1 : hashes_range) {
         auto hx = this->slot_in_part_hp(e1, hp);
         for (auto e2 : hashes_range.subspan(i + 1)) {
           auto hy = this->slot_in_part_hp(e2, hp);
@@ -523,6 +530,7 @@ public:
       return false;
     };
 
+    // process buckets for the current partition in batches of 16
     cpp::array<uint32_t, 16> recent{
         {BUCKET_IDX_NONE, BUCKET_IDX_NONE, BUCKET_IDX_NONE, BUCKET_IDX_NONE,
          BUCKET_IDX_NONE, BUCKET_IDX_NONE, BUCKET_IDX_NONE, BUCKET_IDX_NONE,
@@ -533,14 +541,14 @@ public:
     auto rng = FastRand();
 
     for (size_t iter_num = 0; iter_num < bucket_order.size(); iter_num++) {
-      auto const &new_b = bucket_order[iter_num];
-      auto const new_bucket =
+      const auto &new_b = bucket_order[iter_num];
+      const auto new_bucket =
           hashes.subspan(starts[new_b], starts[new_b + 1] - starts[new_b]);
       if (new_bucket.empty()) {
         pilots[new_b] = 0;
         continue;
       }
-      auto const new_b_len = new_bucket.size();
+      const auto new_b_len = new_bucket.size();
       size_t evictions = 0;
 
       heap.push({new_b_len, new_b});
@@ -551,16 +559,18 @@ public:
       recent[0] = new_b;
 
       while (!heap.empty()) {
-        auto const b = cpp::get<1>(heap.peek());
+        const auto b = cpp::get<1>(heap.peek());
         heap.pop();
-        if (evictions > slots_ && is_power_of_two((evictions))) {
-          if (evictions >= 10 * slots_) {
-            return cpp::nullopt;
-          }
+        if (evictions > slots_ && is_power_of_two((evictions)) &&
+            evictions >= 10 * slots_) {
+          // evictions from previous iteration must be smaller than 10 times the
+          // available slots to not expload the remap array in a single
+          // partition or shard
+          return cpp::nullopt;
         }
-        auto const bucket =
+        const auto bucket =
             hashes.subspan(starts[b], starts[b + 1] - starts[b]);
-        if (auto fpilot = this->find_pilot(kmax, bucket, taken)) {
+        if (auto fpilot = this->find_pilot(KMAX, bucket, taken)) {
           auto &[p, hp] = fpilot.value();
           pilots[b] = static_cast<uint8_t>(p);
           for (auto &item :
@@ -574,31 +584,29 @@ public:
         cpp::tuple<size_t, uint64_t> best = {
             cpp::numeric_limits<size_t>::max(),
             cpp::numeric_limits<uint64_t>::max()};
-        for (size_t delat = 0; delat < kmax; ++delat) {
+        for (size_t delta = 0; delta < KMAX; ++delta) {
           bool build_part_loop_continue_inner_continue = false;
-          auto const p = (p0 + delat) % kmax;
-          auto const hp = this->hash_pilot(p);
+          const auto p = (p0 + delta) % KMAX;
+          const auto hp = this->hash_pilot(p);
           size_t collision_score = 0;
           for (auto &item :
                hashes.subspan(starts[b], starts[b + 1] - starts[b])) {
             auto p = this->slot_in_part_hp(item, hp);
-            auto const s = slots[p];
+            const auto s = slots[p];
             size_t new_score = 0;
             if (s == BUCKET_IDX_NONE) {
               continue;
-            } else {
-              bool found = false;
-              for (auto it : recent) {
-                found = found || it == s;
-              }
-              if (found) {
-                build_part_loop_continue_inner_continue = true;
-                break;
-              } else {
-                auto const len = bucket_len(s);
-                new_score = len * len;
-              }
             }
+            bool found = false;
+            for (auto it : recent) {
+              found = found || it == s;
+            }
+            if (found) {
+              build_part_loop_continue_inner_continue = true;
+              break;
+            }
+            const auto len = bucket_len(s);
+            new_score = len * len;
             collision_score += new_score;
             if (collision_score >= cpp::get<0>(best)) {
               build_part_loop_continue_inner_continue = true;
@@ -620,13 +628,13 @@ public:
           return cpp::nullopt;
         }
 
-        auto const &p = cpp::get<1>(best);
+        const auto &p = cpp::get<1>(best);
         pilots[b] = static_cast<uint8_t>(p);
-        auto const hp = this->hash_pilot(p);
+        const auto hp = this->hash_pilot(p);
         for (auto &item :
              hashes.subspan(starts[b], starts[b + 1] - starts[b])) {
           auto slot = this->slot_in_part_hp(item, hp);
-          auto const b2 = slots[slot];
+          const auto b2 = slots[slot];
           if (b2 != BUCKET_IDX_NONE) {
             LIBC_ASSERT(b2 != b);
             heap.push({bucket_len(b2), b2});
@@ -655,25 +663,26 @@ public:
   }
 
   LIBC_INLINE constexpr cpp::optional<cpp::tuple<uint64_t, uint64_t>>
-  find_pilot(uint64_t kmax, cpp::span<uint64_t> bucket,
+  find_pilot(uint16_t kmax, cpp::span<uint64_t> bucket,
              cpp::array<bool, slots_> &taken) const {
-    auto const r = bucket.size() / 4 * 4;
+    const size_t r = bucket.size() >> 2 << 2; // round down to magnitude of 4
     for (size_t p = 0; p < kmax; p++) {
-      bool find_pilot_continue = false;
-      auto const hp = this->hash_pilot(p);
-      auto const check = [&](uint64_t hx) {
+      const auto hp = this->hash_pilot(p);
+      const auto check = [&](uint64_t hx) {
         return taken[this->slot_in_part_hp(hx, hp)];
       };
       auto bad = false;
+
       for (size_t i = 0; i < r; i++) {
         if (check(bucket[i])) {
-          find_pilot_continue = true;
+          bad = true;
           break;
         }
       }
-      if (find_pilot_continue) {
+      if (bad) {
         continue;
       }
+
       for (auto hx : bucket.subspan(r)) {
         bad |= check(hx);
       }
@@ -693,7 +702,7 @@ public:
                  cpp::array<bool, slots_> &taken) const {
     for (size_t i = 0; i < bucket.size(); i++) {
       size_t hx = bucket[i];
-      auto const slot = this->slot_in_part_hp(hx, hp);
+      const auto slot = this->slot_in_part_hp(hx, hp);
       if (taken[slot]) {
         for (auto hx : bucket.subspan(0, i)) {
           taken[this->slot_in_part_hp(hx, hp)] = false;
@@ -706,15 +715,16 @@ public:
   }
 
   LIBC_INLINE constexpr uint64_t hash_pilot(uint64_t p) const {
-    uint64_t c = 0x517cc1b727220a95;
+    // variant of fxhash hasing method
+    uint64_t c = FXHASH_SEED;
     uint64_t b = p ^ this->seed;
     uint64_t result = 0;
 
     while (b != 0) {
       if (b & 1) {
-        result = result + c;
+        result += c;
       }
-      c = c << 1;
+      c <<= 1;
       b >>= 1;
     }
 
@@ -790,6 +800,11 @@ public:
          static_cast<UInt128>(hx)) >>
         64);
   }
+
+private:
+  uint64_t seed;
+  PilotsTypeV pilots;
+  F remap;
 };
 
 template <size_t n, typename Key = uint64_t>
@@ -843,7 +858,7 @@ public:
     for (const auto &pair : pairs) {
       const auto &key = pair[0];
       const auto &value = pair[1];
-      auto const idx = hasher.index(key);
+      const auto idx = hasher.index(key);
       LIBC_ASSERT(idx < Capacity && "Index out of bounds");
       this->entries[idx] = Entry{key, value};
     }
@@ -854,11 +869,11 @@ public:
     if (idx >= Capacity)
       return cpp::nullopt;
 
-    const Entry &e = entries[idx];
-    if (e.key != key)
+    const auto entry = entries[idx];
+    if (entry.key != key)
       return cpp::nullopt;
 
-    return e.value;
+    return entry.value;
   }
 
   LIBC_INLINE constexpr bool contains(const wint_t key) const {
@@ -872,6 +887,7 @@ private:
   const Hasher &hasher;
 };
 
+} // namespace wctype_internal
 } // namespace LIBC_NAMESPACE_DECL
 
-#endif // LLVM_LIBC_SRC___SUPPORT_WCTYPE_PTR_HASH_H
+#endif // LLVM_LIBC_SRC___SUPPORT_WCTYPE_PERFECT_HASH_MAP_H

@@ -7,13 +7,13 @@ add_header_library(
     libc.hdr.types.wint_t
     libc.src.__support.CPP.array
     libc.src.__support.CPP.expected
-    libc.src.__support.CPP.monostate
     libc.src.__support.CPP.optional
     libc.src.__support.CPP.span
     libc.src.__support.CPP.string
     libc.src.__support.CPP.tuple
     libc.src.__support.CPP.type_traits
     libc.src.__support.OSUtil.osutil
+    libc.src.__support.macros.config
     libc.src.__support.math.ceil
     libc.src.__support.math.log
     libc.src.__support.uint128

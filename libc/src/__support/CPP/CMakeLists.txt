@@ -57,14 +57,6 @@ add_header_library(
 )
 
 add_header_library(
-  monostate
-  HDRS
-    monostate.h
-  DEPENDS
-    libc.src.__support.common
-)
-
-add_header_library(
   mutex
   HDRS
     mutex.h
