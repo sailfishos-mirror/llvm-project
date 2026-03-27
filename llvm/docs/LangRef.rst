@@ -4024,18 +4024,22 @@ For a simpler introduction to the ordering constraints, see the
 .. _syncscope:
 
 If an atomic operation is marked ``syncscope("singlethread")``, it only
-*synchronizes with* and only participates in the seq\_cst total orderings of
-other operations running in the same thread (for example, in signal handlers).
+*synchronizes with* other operations running in the same thread (for
+example, in signal handlers) and the constraints on its position
+relative to other operations in the seq\_cst order and the monotonic
+modification order only apply to operations in the same thread.
 
 If an atomic operation is marked ``syncscope("<target-scope>")``, where
-``<target-scope>`` is a target-specific synchronization scope, then it is target
-dependent if it *synchronizes with* and participates in the seq\_cst total
-orderings of other operations.
+``<target-scope>`` is a target-specific synchronization scope, then it
+is target-dependent if it *synchronizes with* other operations and
+relative to which operations the constraints on its position in the
+seq\_cst order and the monotonic modification order apply.
 
-Otherwise, an atomic operation that is not marked ``syncscope("singlethread")``
-or ``syncscope("<target-scope>")`` *synchronizes with* and participates in the
-seq\_cst total orderings of other operations that are not marked
-``syncscope("singlethread")`` or ``syncscope("<target-scope>")``.
+Otherwise, an atomic operation that is not marked
+``syncscope("singlethread")`` or ``syncscope("<target-scope>")`` at
+least *synchronizes with* and is ordered in the seq\_cst order and the
+monotonic modification order relative to other operations that are not
+marked ``syncscope("singlethread")`` or ``syncscope("<target-scope>")``.
 
 .. _floatenv:
 
