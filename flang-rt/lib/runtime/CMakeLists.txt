@@ -84,6 +84,7 @@ set(supported_sources
   ragged.cpp
   reduction.cpp
   stat.cpp
+  stl-overrides.cpp
   stop.cpp
   sum.cpp
   support.cpp
@@ -230,11 +231,10 @@ if (TARGET FortranFloat128MathILib)
   endif ()
 endif ()
 
-if (NOT FLANG_RT_ENABLE_STATIC AND NOT FLANG_RT_ENABLE_SHARED)
-  # If not compiling the library, only build the modules.
-  set(sources ${module_sources})
-elseif (LLVM_RUNTIMES_TARGET MATCHES "^amdgcn|^nvptx")
-  set(sources ${gpu_sources} ${module_sources})
+if ("${LLVM_DEFAULT_TARGET_TRIPLE}" MATCHES "^amdgcn|^nvptx")
+  set(sources ${gpu_sources})
+elseif(FLANG_RT_EXPERIMENTAL_OFFLOAD_SUPPORT STREQUAL "CUDA")
+  set(sources ${supported_sources})
 else ()
   set(sources ${supported_sources} ${host_sources} ${module_sources} ${f128_sources})
 endif ()
