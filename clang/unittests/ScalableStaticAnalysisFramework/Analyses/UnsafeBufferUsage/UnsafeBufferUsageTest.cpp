@@ -7,19 +7,22 @@
 //===----------------------------------------------------------------------===//
 
 #include "clang/ScalableStaticAnalysisFramework/Analyses/UnsafeBufferUsage/UnsafeBufferUsage.h"
+#include "Analyses/MockSerialization.h"
 #include "clang/AST/DynamicRecursiveASTVisitor.h"
 #include "clang/Frontend/ASTUnit.h"
 #include "clang/ScalableStaticAnalysisFramework/Analyses/UnsafeBufferUsage/UnsafeBufferUsageExtractor.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/ASTEntityMapping.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/Model/EntityId.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/Model/EntityName.h"
-#include "clang/ScalableStaticAnalysisFramework/Core/Serialization/JSONFormat.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/TUSummary/TUSummary.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/TUSummary/TUSummaryBuilder.h"
 #include "clang/Tooling/Tooling.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/Support/Error.h"
 #include "llvm/Testing/Support/Error.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include <initializer_list>
 
 using namespace clang;
 using namespace ssaf;
@@ -187,59 +190,32 @@ TEST_F(UnsafeBufferUsageTest, UnsafeBufferUsageEntityPointerLevelSetTest) {
 }
 
 //////////////////////////////////////////////////////////////
-//                     JSON Tests                           //
+//   (De-)Serialization Tests                               //
 //////////////////////////////////////////////////////////////
-// Oracle JSON output for the example:
-// void foo(int ***p, int ****q, int x) {
-//   p[5][5][5];
-//   q[5][5][5][5];
-// }
-constexpr const char *const SerilizationTestOracle = R"cpp({
-  "UnsafeBuffers": [
-    [
-      {
-        "@": 42
-      },
-      1
-    ],
-    [
-      {
-        "@": 42
-      },
-      2
-    ],
-    [
-      {
-        "@": 42
-      },
-      3
-    ],
-    [
-      {
-        "@": 108
-      },
-      1
-    ],
-    [
-      {
-        "@": 108
-      },
-      2
-    ],
-    [
-      {
-        "@": 108
-      },
-      3
-    ],
-    [
-      {
-        "@": 108
-      },
-      4
-    ]
-  ]
-})cpp";
+
+static MockSerializationAPI::Object SerilizedOracle(EntityId P, EntityId Q,
+                                                    MockSerializationAPI &MSA) {
+  // Oracle serialization data for the example:
+  // void foo(int ***p, int ****q, int x) {
+  //   p[5][5][5];
+  //   q[5][5][5][5];
+  // }
+  using Array = MockSerializationAPI::Array;
+  using Object = MockSerializationAPI::Object;
+
+  Object PData = MSA.EntityIdToFormat(P);
+  Object QData = MSA.EntityIdToFormat(Q);
+
+  return Object{std::pair{"UnsafeBuffers", Array{
+                                               Array{PData, 1U},
+                                               Array{PData, 2U},
+                                               Array{PData, 3U},
+                                               Array{QData, 1U},
+                                               Array{QData, 2U},
+                                               Array{QData, 3U},
+                                               Array{QData, 4U},
+                                           }}};
+}
 
 TEST_F(UnsafeBufferUsageTest, UnsafeBufferUsageSerializeTest) {
   auto Sum = setUpTest(R"cpp(
@@ -258,16 +234,15 @@ TEST_F(UnsafeBufferUsageTest, UnsafeBufferUsageSerializeTest) {
                                      {"q", 3U},
                                      {"q", 4U}}));
 
-  using Object = llvm::json::Object;
+  MockSerializationAPI MSA;
+  MockSerializationAPI::Object JData =
+      UnsafeBufferUsageEntitySummary::serialize<MockSerializationAPI>(MSA,
+                                                                      *Sum);
 
-  std::map<EntityId, uint64_t> DummyTable{{*getEntityId("p"), 42},
-                                          {*getEntityId("q"), 108}};
-  Object JData = UnsafeBufferUsageEntitySummary::jsonSerializeFn(
-      *Sum,
-      [&DummyTable](EntityId Id) { return Object{{"@", DummyTable[Id]}}; });
+  auto EntityP = getEntityId("p");
+  auto EntityQ = getEntityId("q");
 
-  EXPECT_EQ(llvm::formatv("{0:2}", llvm::json::Value(std::move(JData))).str(),
-            SerilizationTestOracle);
+  EXPECT_EQ(JData, SerilizedOracle(*EntityP, *EntityQ, MSA));
 }
 
 TEST_F(UnsafeBufferUsageTest, UnsafeBufferUsageDeserializeTest) {
@@ -287,25 +262,17 @@ TEST_F(UnsafeBufferUsageTest, UnsafeBufferUsageDeserializeTest) {
                                      {"q", 3U},
                                      {"q", 4U}}));
 
-  using Object = llvm::json::Object;
-  using Value = llvm::json::Value;
-  std::map<uint64_t, EntityId> DummyTable{{42, *getEntityId("p")},
-                                          {108, *getEntityId("q")}};
-  Expected<Value> ParsedJSON = llvm::json::parse(SerilizationTestOracle);
+  MockSerializationAPI MSA;
+  auto EntityP = getEntityId("p");
+  auto EntityQ = getEntityId("q");
+  auto DeserializedSum =
+      UnsafeBufferUsageEntitySummary::deserialize<MockSerializationAPI>(
+          MSA, SerilizedOracle(*EntityP, *EntityQ, MSA));
 
-  ASSERT_THAT_EXPECTED(ParsedJSON, llvm::Succeeded());
-  ASSERT_NE(ParsedJSON->getAsObject(), nullptr);
-
-  EntityIdTable Ignored;
-  auto ParsedSum = UnsafeBufferUsageEntitySummary::jsonDeserializeFn(
-      *ParsedJSON->getAsObject(), Ignored,
-      [&DummyTable](const Object &O) -> Expected<EntityId> {
-        return DummyTable.at(O.getInteger("@").value());
-      });
-
-  ASSERT_THAT_EXPECTED(ParsedSum, llvm::Succeeded());
-  EXPECT_EQ(*static_cast<UnsafeBufferUsageEntitySummary *>(ParsedSum->get()),
-            *Sum);
+  ASSERT_THAT_ERROR(DeserializedSum.takeError(), llvm::Succeeded());
+  EXPECT_EQ(
+      *static_cast<UnsafeBufferUsageEntitySummary *>(DeserializedSum->get()),
+      *Sum);
 }
 
 //////////////////////////////////////////////////////////////
