@@ -1621,6 +1621,36 @@ endfunction()
 
 # -- Explicit targets (small directories with 1-2 targets) --
 foreach(_target
+    # clang-tools-extra/clang-tidy (30+ check module targets with AST_MATCHER conflicts)
+    clangTidy
+    clangTidyAbseilModule
+    clangTidyAlteraModule
+    clangTidyAndroidModule
+    clangTidyBoostModule
+    clangTidyBugproneModule
+    clangTidyCERTModule
+    clangTidyConcurrencyModule
+    clangTidyCppCoreGuidelinesModule
+    clangTidyCustomModule
+    clangTidyDarwinModule
+    clangTidyFuchsiaModule
+    clangTidyGoogleModule
+    clangTidyHICPPModule
+    clangTidyLinuxKernelModule
+    clangTidyLLVMLibcModule
+    clangTidyLLVMModule
+    clangTidyMain
+    clangTidyMiscModule
+    clangTidyModernizeModule
+    clangTidyMPIModule
+    clangTidyObjCModule
+    clangTidyOpenMPModule
+    clangTidyPerformanceModule
+    clangTidyPlugin
+    clangTidyPortabilityModule
+    clangTidyReadabilityModule
+    clangTidyUtils
+    clangTidyZirconModule
     # clang-tools-extra/clangd/fuzzer
     clangd-fuzzer
     # clang/lib/Driver
@@ -1656,11 +1686,6 @@ foreach(_target
 endforeach()
 
 # -- Directory-based (directories with many subtargets) --
-# clang-tools-extra/clang-tidy: 30+ check module targets with AST_MATCHER conflicts
-if(TARGET clangTidy)
-  _disable_unity_build_in_dir(${LLVM_REPO_DIR}/clang-tools-extra/clang-tidy)
-endif()
-
 # lld: COFF/ELF/MachO/MinGW/Wasm targets + unittests
 if(TARGET lldCommon)
   _disable_unity_build_in_dir(${LLVM_REPO_DIR}/lld)
