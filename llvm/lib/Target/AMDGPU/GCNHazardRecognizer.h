@@ -45,6 +45,13 @@ private:
   // called.
   MachineInstr *CurrCycleInstr;
   std::list<MachineInstr*> EmittedInstrs;
+
+  // Track VALU/V_NOP separately which S_NOPs cannot resolve.
+  std::list<MachineInstr *> EmittedVALUInstrs;
+  static constexpr unsigned MaxVALULookAhead = 10;
+  // When true, stalls should be recorded in EmittedVALUInstrs.
+  bool HasPendingWMMACoexecHazard = false;
+
   const MachineFunction &MF;
   const GCNSubtarget &ST;
   const SIInstrInfo &TII;
@@ -84,6 +91,7 @@ private:
   int getWaitStatesSince(IsHazardFn IsHazard, int Limit,
                          GetNumWaitStatesFn GetNumWaitStates) const;
   int getWaitStatesSince(IsHazardFn IsHazard, int Limit) const;
+  int getWaitStatesSinceVALU(IsHazardFn IsHazard, int Limit) const;
   int getWaitStatesSinceDef(unsigned Reg, IsHazardFn IsHazardDef,
                             int Limit) const;
   int getWaitStatesSinceSetReg(IsHazardFn IsHazard, int Limit) const;

@@ -83,6 +83,8 @@ GCNHazardRecognizer::GCNHazardRecognizer(const MachineFunction &MF,
 
 void GCNHazardRecognizer::Reset() {
   EmittedInstrs.clear();
+  EmittedVALUInstrs.clear();
+  HasPendingWMMACoexecHazard = false;
 }
 
 void GCNHazardRecognizer::EmitInstruction(SUnit *SU) {
@@ -208,8 +210,10 @@ GCNHazardRecognizer::getHazardType(SUnit *SU, int Stalls) {
 
   // Hazards which cannot be mitigated with S_NOPs.
   if (!IsHazardRecognizerMode) {
-    if (checkWMMACoexecutionHazards(MI) > 0)
+    if (checkWMMACoexecutionHazards(MI) > 0) {
+      HasPendingWMMACoexecHazard = true;
       return Hazard;
+    }
   }
 
   if (ST.hasNoDataDepHazard())
@@ -412,6 +416,9 @@ unsigned GCNHazardRecognizer::PreEmitNoopsCommon(MachineInstr *MI) const {
 
 void GCNHazardRecognizer::EmitNoop() {
   EmittedInstrs.push_front(nullptr);
+
+  if (HasPendingWMMACoexecHazard)
+    EmittedVALUInstrs.push_front(nullptr);
 }
 
 void GCNHazardRecognizer::AdvanceCycle() {
@@ -419,8 +426,13 @@ void GCNHazardRecognizer::AdvanceCycle() {
   // emitting any instructions.
   if (!CurrCycleInstr) {
     EmittedInstrs.push_front(nullptr);
+
+    if (HasPendingWMMACoexecHazard)
+      EmittedVALUInstrs.push_front(nullptr);
     return;
   }
+
+  HasPendingWMMACoexecHazard = false;
 
   if (CurrCycleInstr->isBundle()) {
     processBundle();
@@ -436,6 +448,18 @@ void GCNHazardRecognizer::AdvanceCycle() {
   // Keep track of emitted instructions
   EmittedInstrs.push_front(CurrCycleInstr);
 
+  bool IsVALUOrWMMA = SIInstrInfo::isVALU(*CurrCycleInstr) ||
+                      SIInstrInfo::isWMMA(*CurrCycleInstr) ||
+                      SIInstrInfo::isSWMMAC(*CurrCycleInstr);
+  if (IsVALUOrWMMA) {
+    EmittedVALUInstrs.push_front(CurrCycleInstr);
+  } else {
+    // Stalls were optimistically recorded as V_NOPs, but a non-VALU was
+    // scheduled instead. These stalls won't resolve VALU-pipe hazards.
+    while (!EmittedVALUInstrs.empty() && EmittedVALUInstrs.front() == nullptr)
+      EmittedVALUInstrs.pop_front();
+  }
+
   // Add a nullptr for each additional wait state after the first.  Make sure
   // not to add more than getMaxLookAhead() items to the list, since we
   // truncate the list to that size right after this loop.
@@ -448,6 +472,8 @@ void GCNHazardRecognizer::AdvanceCycle() {
   // to insert, so there is no point in keeping track of more than that many
   // wait states.
   EmittedInstrs.resize(getMaxLookAhead());
+  if (EmittedVALUInstrs.size() > MaxVALULookAhead)
+    EmittedVALUInstrs.resize(MaxVALULookAhead);
 
   CurrCycleInstr = nullptr;
 }
@@ -650,6 +676,30 @@ int GCNHazardRecognizer::getWaitStatesSince(
 int GCNHazardRecognizer::getWaitStatesSince(IsHazardFn IsHazard,
                                             int Limit) const {
   return getWaitStatesSince(IsHazard, Limit, SIInstrInfo::getNumWaitStates);
+}
+
+int GCNHazardRecognizer::getWaitStatesSinceVALU(IsHazardFn IsHazard,
+                                                int Limit) const {
+  if (IsHazardRecognizerMode) {
+    auto GetVALUWaitStates = [](const MachineInstr &MI) -> unsigned {
+      return SIInstrInfo::isVALU(MI) ? 1 : 0;
+    };
+    return getWaitStatesSince(IsHazard, Limit, GetVALUWaitStates);
+  }
+
+  int WaitStates = 0;
+  for (MachineInstr *MI : EmittedVALUInstrs) {
+    if (MI) {
+      if (IsHazard(*MI))
+        return WaitStates;
+    }
+
+    ++WaitStates;
+
+    if (WaitStates >= Limit)
+      break;
+  }
+  return std::numeric_limits<int>::max();
 }
 
 int GCNHazardRecognizer::getWaitStatesSinceDef(unsigned Reg,
@@ -2130,30 +2180,16 @@ int GCNHazardRecognizer::checkWMMACoexecutionHazards(MachineInstr *MI) const {
 
   int Limit = 0;
 
-  auto GetWaitStatesFn = [](const MachineInstr &I) {
-    return SIInstrInfo::isVALU(I) ? 1 : 0;
-  };
-
   int WaitStatesNeeded = -1;
   if (TII->isXDLWMMA(*MI)) {
     for (Category = 0; WaitStatesNeeded < 0 && Category < 4; Category++) {
-      Limit = WMMAWaitStates[Category]; // for IsExpiredFn.
-      // 'getWaitStatesSince' returns the number of VALUs in between if hazard
-      // exists, and INT_MAX if there is no hazard. As a result, a negative
-      // WaitStatesNeeded here means no hazard, and we will continue to search
-      // for other categories.
-      WaitStatesNeeded =
-          Limit - getWaitStatesSince(IsWMMAHazardFn, Limit, GetWaitStatesFn);
+      Limit = WMMAWaitStates[Category];
+      WaitStatesNeeded = Limit - getWaitStatesSinceVALU(IsWMMAHazardFn, Limit);
     }
   } else { // Must be a co-executable VALU.
     for (Category = 0; WaitStatesNeeded < 0 && Category < 4; Category++) {
-      Limit = VALUWaitStates[Category]; // for IsExpiredFn.
-      // 'getWaitStatesSince' returns the number of VALUs in between if hazard
-      // exists, and INT_MAX if there is no hazard. As a result, a negative
-      // WaitStatesNeeded here means no hazard, and we will continue to search
-      // for other categories.
-      WaitStatesNeeded =
-          Limit - getWaitStatesSince(IsVALUHazardFn, Limit, GetWaitStatesFn);
+      Limit = VALUWaitStates[Category];
+      WaitStatesNeeded = Limit - getWaitStatesSinceVALU(IsVALUHazardFn, Limit);
     }
   }
 
