@@ -26709,6 +26709,7 @@ public:
     SmallPtrSet<Instruction *, 16> Visited;
     Instruction *TreeN = Root;
     unsigned Depth = 0;
+    bool ChainComplete = false;
     constexpr unsigned MaxReducedVals = 1024;
     while (TreeN) {
       if (Depth++ > RecursionMaxDepth)
@@ -26729,6 +26730,7 @@ public:
       if (!EdgeInst || getRdxKind(EdgeInst) != RdxKind ||
           !hasRequiredNumberOfUses(/*IsCmpSelMinMax=*/false, EdgeInst)) {
         ReducedVals.back().push_back(ChainVal);
+        ChainComplete = true;
         break;
       }
       TreeN = EdgeInst;
@@ -26739,7 +26741,7 @@ public:
     // because fadd is commutative — each step only relies on a+b == b+a,
     // never on associativity.
     std::reverse(ReducedVals.back().begin(), ReducedVals.back().end());
-    if (ReducedVals.back().size() < ReductionLimit) {
+    if (!ChainComplete || ReducedVals.back().size() < ReductionLimit) {
       for (ReductionOpsType &RdxOps : ReductionOps)
         for (Value *RdxOp : RdxOps)
           R.analyzedReductionRoot(cast<Instruction>(RdxOp));
@@ -27784,8 +27786,8 @@ public:
     // Intersect the fast-math-flags from all reduction operations.
     FastMathFlags RdxFMF;
     RdxFMF.set();
-    for (Value *V : Candidates)
-      for (Instruction *Op : ReducedValsToOps.at(V))
+    for (Value *RdxVal : Candidates)
+      for (Instruction *Op : ReducedValsToOps.at(RdxVal))
         if (auto *FPMO = dyn_cast<FPMathOperator>(Op))
           RdxFMF &= FPMO->getFastMathFlags();
 
@@ -27937,9 +27939,9 @@ public:
     // Fold leading scalars [0, SuccessStart) into an accumulator.
     Type *DestTy = ReductionRoot->getType();
     Value *VectorizedTree = nullptr;
-    Builder.SetCurrentDebugLocation(
-        cast<Instruction>(ReductionOps.front().front())->getDebugLoc());
     for (Value *RdxVal : ArrayRef(Candidates).take_front(SuccessStart)) {
+      Builder.SetCurrentDebugLocation(
+          ReducedValsToOps.at(RdxVal).front()->getDebugLoc());
       if (!VectorizedTree)
         VectorizedTree = RdxVal;
       else
@@ -27948,6 +27950,8 @@ public:
     }
 
     // Emit ordered reduction for the vectorized window.
+    Builder.SetCurrentDebugLocation(
+        cast<Instruction>(ReductionRoot)->getDebugLoc());
     if (VectorizedTree)
       VectorizedTree =
           emitReduction(SuccessRoot, Builder, TTI, DestTy, VectorizedTree);
@@ -27956,9 +27960,12 @@ public:
 
     // Fold trailing scalars [SuccessStart+SuccessWidth, N).
     for (Value *RdxVal :
-         ArrayRef(Candidates).drop_front(SuccessStart + SuccessWidth))
+         ArrayRef(Candidates).drop_front(SuccessStart + SuccessWidth)) {
+      Builder.SetCurrentDebugLocation(
+          ReducedValsToOps.at(RdxVal).front()->getDebugLoc());
       VectorizedTree = createOp(Builder, RdxKind, VectorizedTree, RdxVal,
                                 "op.rdx", ReductionOps);
+    }
 
     ReductionRoot->replaceAllUsesWith(VectorizedTree);
 
