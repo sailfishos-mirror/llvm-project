@@ -2084,7 +2084,6 @@ static cir::FuncOp getBadCastFn(CIRGenFunction &cgf) {
   // Prototype: void __cxa_bad_cast();
 
   // TODO(cir): set the calling convention of the runtime function.
-  assert(!cir::MissingFeatures::opFuncCallingConv());
 
   cir::FuncType fnTy =
       cgf.getBuilder().getFuncType({}, cgf.getBuilder().getVoidTy());
@@ -2092,8 +2091,7 @@ static cir::FuncOp getBadCastFn(CIRGenFunction &cgf) {
 }
 
 static void emitCallToBadCast(CIRGenFunction &cgf, mlir::Location loc) {
-  // TODO(cir): set the calling convention to the runtime function.
-  assert(!cir::MissingFeatures::opFuncCallingConv());
+  // TODO(cir): set the calling convention of the runtime function.
 
   cgf.emitRuntimeCall(loc, getBadCastFn(cgf));
   cir::UnreachableOp::create(cgf.getBuilder(), loc);
@@ -2173,8 +2171,6 @@ static cir::FuncOp getItaniumDynamicCastFn(CIRGenFunction &cgf) {
   assert(!cir::MissingFeatures::opFuncReadOnly());
 
   // TODO(cir): set the calling convention of the runtime function.
-  assert(!cir::MissingFeatures::opFuncCallingConv());
-
   cir::FuncType FTy = cgf.getBuilder().getFuncType(
       {voidPtrTy, rttiPtrTy, rttiPtrTy, ptrDiffTy}, voidPtrTy);
   cir::FuncOp fn = cgf.cgm.createRuntimeFunction(FTy, "__dynamic_cast");

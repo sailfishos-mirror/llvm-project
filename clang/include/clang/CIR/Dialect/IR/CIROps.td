@@ -3611,6 +3611,8 @@ def CIR_OptionalPriorityAttr : OptionalAttr<
   >
 >;
 
+// The enumeration values are not necessarily in sync with `clang::CallingConv`
+// or `llvm::CallingConv`.
 def CIR_CallingConv : CIR_I32EnumAttr<"CallingConv", "calling convention", [
   I32EnumAttrCase<"C", 1, "c">,
   I32EnumAttrCase<"SpirKernel", 2, "spir_kernel">,
@@ -3633,6 +3635,11 @@ def CIR_FuncOp : CIR_Op<"func", [
 
     The function linkage information is specified by `linkage`, as defined by
     `GlobalLinkageKind` attribute.
+
+    The `calling_conv` attribute specifies the calling convention of the function.
+    By default calling convention is `CallingConv::C`. When printed, C calling
+    convention is omitted. Other calling conventions are printed as `cc(<mnemonic>)`,
+    e.g. `cc(amdgpu_kernel)`.
 
     A compiler builtin function must be marked as `builtin` for further
     processing when lowering from CIR.
@@ -3675,6 +3682,9 @@ def CIR_FuncOp : CIR_Op<"func", [
     // Linkage information
     cir.func linkonce_odr @some_method(...)
 
+    // Calling convention information
+    cir.func @func1(...) cc(amdgpu_kernel)
+
     // Inline information
     cir.func no_inline @some_method(...)
     
@@ -3706,6 +3716,10 @@ def CIR_FuncOp : CIR_Op<"func", [
       CIR_GlobalLinkageKind,
       "cir::GlobalLinkageKind::ExternalLinkage"
     >:$linkage,
+    DefaultValuedAttr<
+      CIR_CallingConv,
+      "cir::CallingConv::C"
+    >:$calling_conv,
     OptionalAttr<StrAttr>:$sym_visibility,
     UnitAttr:$comdat,
     OptionalAttr<DictArrayAttr>:$arg_attrs,
@@ -3724,7 +3738,8 @@ def CIR_FuncOp : CIR_Op<"func", [
 
   let builders = [OpBuilder<(ins
     "llvm::StringRef":$sym_name, "FuncType":$type,
-    CArg<"cir::GlobalLinkageKind", "cir::GlobalLinkageKind::ExternalLinkage">:$linkage)
+    CArg<"cir::GlobalLinkageKind", "cir::GlobalLinkageKind::ExternalLinkage">:$linkage,
+    CArg<"cir::CallingConv", "cir::CallingConv::C">:$callingConv)
   >];
 
   let extraClassDeclaration = [{
