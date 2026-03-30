@@ -58,6 +58,7 @@ constexpr uint8_t StageE = CTRL | SALU | MEM; // External: mem/salu
 constexpr uint8_t StageI =
     CTRL | SALU | MEM | VALU | TRANS;                // Internal: all ALU
 constexpr uint8_t StageV = CTRL | SALU | MEM | WMMA; // Vacant: no valu/trans
+constexpr uint8_t StageTR = All & ~TRANS;             // TRANS co-exec: no TRANS
 } // namespace CoExecMask
 
 //===----------------------------------------------------------------------===//
@@ -189,8 +190,51 @@ enum class CoExecStageType : uint8_t {
   E0,       // Issue cycle - control only
   E,        // External - MEM/SALU allowed
   I,        // Internal - MEM/SALU/VALU allowed
-  V         // Vacant - MEM/SALU/WMMA allowed, no VALU
+  V,        // Vacant - MEM/SALU/WMMA allowed, no VALU
+  TR        // TRANS co-exec - everything except TRANS
 };
+
+inline const char *getStageTypeName(CoExecStageType T) {
+  switch (T) {
+  case CoExecStageType::NONE: return "--";
+  case CoExecStageType::E0:   return "E0";
+  case CoExecStageType::E:    return "E";
+  case CoExecStageType::I:    return "I";
+  case CoExecStageType::V:    return "V";
+  case CoExecStageType::TR:   return "TR";
+  }
+  llvm_unreachable("Unknown CoExecStageType");
+}
+
+/// Return a human-readable name for a CoExecMask bitmask value.
+inline const char *getCoExecMaskName(uint8_t Mask) {
+  switch (Mask) {
+  case CoExecMask::CTRL:  return "CTRL";
+  case CoExecMask::VALU:  return "VALU";
+  case CoExecMask::TRANS: return "TRANS";
+  case CoExecMask::SALU:  return "SALU";
+  case CoExecMask::DS:    return "DS";
+  case CoExecMask::VMEM:  return "VMEM";
+  case CoExecMask::SMEM:  return "SMEM";
+  case CoExecMask::WMMA:  return "WMMA";
+  default:                return "???";
+  }
+}
+
+/// Return a single character for a CoExecMask value (for visual window logs).
+inline char getCoExecMaskChar(uint8_t Mask) {
+  switch (Mask) {
+  case CoExecMask::WMMA:  return 'W';
+  case CoExecMask::VALU:  return 'V';
+  case CoExecMask::TRANS: return 'T';
+  case CoExecMask::SALU:  return 'S';
+  case CoExecMask::DS:    return 'D';
+  case CoExecMask::VMEM:  return 'M';
+  case CoExecMask::SMEM:  return 'm';
+  case CoExecMask::CTRL:  return 'c';
+  default:                return '?';
+  }
+}
 
 /// Max stages: INT8 16x16x64 = 17 cycles, round up for safety.
 constexpr unsigned MaxCoExecStages = 20;
@@ -301,6 +345,8 @@ struct CoExecInfo {
       return CoExecStageType::I;
     if (Mask == StageV)
       return CoExecStageType::V;
+    if (Mask == StageTR)
+      return CoExecStageType::TR;
     // For 'All' or unknown, return based on what's allowed
     if (Mask & VALU)
       return CoExecStageType::I; // If VALU allowed, it's I-like
@@ -339,7 +385,8 @@ struct CoExecInfo {
 //===----------------------------------------------------------------------===//
 
 /// Build CoExecInfo from a pattern string.
-/// Pattern chars: '0'=E0, 'E'=External, 'I'=Internal, 'V'=Vacant, 'A'=Any
+/// Pattern chars: '0'=E0, 'E'=External, 'I'=Internal, 'V'=Vacant,
+///                 'T'=TRANS co-exec (all except TRANS), 'A'=Any
 ///
 /// Example defining slot preferences with fluent interface:
 /// \code
@@ -398,6 +445,10 @@ inline CoExecInfo CoExecInfo::build(unsigned Occupancy, unsigned TotalWindow,
     case 'V':
       Info.Slots[I].Mask = CoExecMask::StageV;
       Info.Slots[I].TypeIndex = VCount++;
+      break;
+    case 'T':
+      Info.Slots[I].Mask = CoExecMask::StageTR;
+      Info.Slots[I].TypeIndex = 0;
       break;
     case 'A':
     default:

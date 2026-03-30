@@ -12,6 +12,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "AMDGPUCoExecSchedStrategy.h"
+#include "GCNHazardRecognizer.h"
 #include "llvm/Support/Debug.h"
 
 using namespace llvm;
@@ -434,6 +435,14 @@ void AMDGPUCoExecSchedStrategy::initialize(ScheduleDAGMI *DAG) {
 
   GCNSchedStrategy::initialize(DAG);
   Heurs.initialize(DAG, SchedModel, TRI);
+
+  // Replace the default hazard recognizer with our PreRA one.
+  // This must happen after GCNSchedStrategy::initialize() because
+  // GenericScheduler::initialize() calls SchedBoundary::reset() which
+  // deletes and recreates the hazard recognizer each region.
+  delete Top.HazardRec;
+  Top.HazardRec = new GCNHazardRecognizer(
+      DAG->MF, GCNHazardRecognizer::OperatingMode::PreRA);
 }
 
 void AMDGPUCoExecSchedStrategy::schedNode(SUnit *SU, bool IsTopNode) {
