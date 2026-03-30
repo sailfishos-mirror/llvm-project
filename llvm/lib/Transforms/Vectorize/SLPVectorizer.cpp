@@ -27791,9 +27791,9 @@ public:
 
     unsigned MaxVecRegSize = V.getMaxVecRegSize();
     unsigned EltSize = V.getVectorElementSize(Candidates[0]);
-    const unsigned MaxElts = std::clamp<unsigned>(
-        llvm::bit_floor(MaxVecRegSize / EltSize), RedValsMaxNumber,
-        RegMaxNumber * RedValsMaxNumber);
+    const unsigned MaxElts =
+        std::clamp<unsigned>(llvm::bit_floor(MaxVecRegSize / EltSize),
+                             RedValsMaxNumber, RegMaxNumber * RedValsMaxNumber);
 
     unsigned ReduxWidth = 0;
     auto GetVectorFactor = [&, &TTI = *TTI](unsigned ReduxWidth) {
@@ -27860,13 +27860,12 @@ public:
 
       V.transformNodes();
       V.computeMinimumValueSizes();
-      InstructionCost TreeCost =
-          V.calculateTreeCostAndTrimNonProfitable(VL);
+      InstructionCost TreeCost = V.calculateTreeCostAndTrimNonProfitable(VL);
       V.buildExternalUses(LocalExternallyUsedValues);
 
-      InstructionCost ReductionCost = getReductionCost(
-          TTI, VL, EmptySameValuesCounter, /*IsCmpSelMinMax=*/false, RdxFMF, V,
-          DT, DL, TLI);
+      InstructionCost ReductionCost =
+          getReductionCost(TTI, VL, EmptySameValuesCounter,
+                           /*IsCmpSelMinMax=*/false, RdxFMF, V, DT, DL, TLI);
       InstructionCost Cost =
           V.getTreeCost(TreeCost, VL, ReductionCost, RdxRootInst);
       LLVM_DEBUG(dbgs() << "SLP: Found cost = " << Cost
@@ -27875,9 +27874,8 @@ public:
           (Cost == -SLPCostThreshold && V.getTreeSize() > 1)) {
         if (Cost.isValid())
           V.getORE()->emit([&]() {
-            return OptimizationRemarkMissed(
-                       SV_NAME, "HorSLPNotBeneficial",
-                       ReducedValsToOps.at(VL[0]).front())
+            return OptimizationRemarkMissed(SV_NAME, "HorSLPNotBeneficial",
+                                            ReducedValsToOps.at(VL[0]).front())
                    << "Vectorizing ordered reduction is possible "
                    << "but not beneficial with cost " << ore::NV("Cost", Cost)
                    << " and threshold "
@@ -27887,8 +27885,8 @@ public:
         return false;
       }
 
-      LLVM_DEBUG(dbgs() << "SLP: Vectorizing ordered reduction at cost:"
-                        << Cost << ". (HorRdx)\n");
+      LLVM_DEBUG(dbgs() << "SLP: Vectorizing ordered reduction at cost:" << Cost
+                        << ". (HorRdx)\n");
       V.getORE()->emit([&]() {
         return OptimizationRemark(SV_NAME, "VectorizedHorizontalReduction",
                                   ReducedValsToOps.at(VL[0]).front())
@@ -27898,8 +27896,7 @@ public:
       });
 
       Builder.setFastMathFlags(RdxFMF);
-      SuccessRoot =
-          V.vectorizeTree(LocalExternallyUsedValues, RdxRootInst);
+      SuccessRoot = V.vectorizeTree(LocalExternallyUsedValues, RdxRootInst);
       assert(SuccessRoot && "Expected vectorized tree");
       SuccessStart = Start;
       SuccessWidth = Width;
@@ -28883,12 +28880,10 @@ bool SLPVectorizerPass::vectorizeHorReduction(
       }
     if (HorizontalReduction::isSupportedOrderedReductionOp(Inst)) {
       if (HorRdx.matchOrderedReduction(R, Inst, /*MatchLHS=*/true))
-        if (Value *Red =
-                HorRdx.tryToReduceOrdered(R, *DL, TTI, *TLI, AC, *DT))
+        if (Value *Red = HorRdx.tryToReduceOrdered(R, *DL, TTI, *TLI, AC, *DT))
           return Red;
       if (HorRdx.matchOrderedReduction(R, Inst, /*MatchLHS=*/false))
-        if (Value *Red =
-                HorRdx.tryToReduceOrdered(R, *DL, TTI, *TLI, AC, *DT))
+        if (Value *Red = HorRdx.tryToReduceOrdered(R, *DL, TTI, *TLI, AC, *DT))
           return Red;
     }
     return Res;
