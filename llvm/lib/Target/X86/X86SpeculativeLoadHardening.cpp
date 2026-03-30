@@ -57,7 +57,6 @@
 
 using namespace llvm;
 
-#undef PASS_KEY
 #define PASS_KEY "x86-slh"
 #define DEBUG_TYPE PASS_KEY
 

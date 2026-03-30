@@ -41,9 +41,6 @@
 #include <cassert>
 #include <optional>
 
-#undef DEBUG_TYPE
-#define DEBUG_TYPE "debug-info"
-
 using namespace llvm;
 using namespace llvm::at;
 using namespace llvm::dwarf;

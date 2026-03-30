@@ -1578,12 +1578,22 @@ if(LLVM_UNITY_BUILD)
   _get_all_cmake_targets(all_targets ${CMAKE_CURRENT_LIST_DIR})
 
   foreach(target ${all_targets})
-    set(after [[
+    set(undefs [[
     #undef DEBUG_TYPE
     #undef DBGS
+    #undef REGISTER_CHECKER
+    #undef GOODFLAGS
+    #undef PASS_NAME
+    #undef PASS_KEY
+    #undef RETURN_IF_ERROR
+    #undef FAILURE_IF_FAILED
+    #undef ERROR_IF
+    #undef REMUI
+    #undef DIVUI
     ]])
     set_target_properties(${target} PROPERTIES
-      UNITY_BUILD_CODE_AFTER_INCLUDE "${after}"
+      UNITY_BUILD_CODE_BEFORE_INCLUDE "${undefs}"
+      UNITY_BUILD_CODE_AFTER_INCLUDE "${undefs}"
     )
   endforeach()
 endif()
