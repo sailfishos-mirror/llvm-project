@@ -1598,3 +1598,85 @@ if(TARGET Polly)
     TARGET_DIRECTORY Polly
     PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
 endif()
+
+# ======================================================================
+# Targets with UNITY_BUILD OFF
+# ======================================================================
+# Some directories have pervasive unity build conflicts (duplicate symbols,
+# ObjC++ files, using-namespace collisions, etc.) that make per-file
+# SKIP_UNITY_BUILD_INCLUSION impractical. Disable unity build entirely
+# for these targets.
+
+# Helper: recursively disable unity build for all targets under a directory.
+function(_disable_unity_build_in_dir dir)
+  get_property(_targets DIRECTORY ${dir} PROPERTY BUILDSYSTEM_TARGETS)
+  foreach(_t ${_targets})
+    set_target_properties(${_t} PROPERTIES UNITY_BUILD OFF)
+  endforeach()
+  get_property(_subdirs DIRECTORY ${dir} PROPERTY SUBDIRECTORIES)
+  foreach(_sd ${_subdirs})
+    _disable_unity_build_in_dir(${_sd})
+  endforeach()
+endfunction()
+
+# -- Explicit targets (small directories with 1-2 targets) --
+foreach(_target
+    # clang-tools-extra/clangd/fuzzer
+    clangd-fuzzer
+    # clang/lib/Driver
+    clangDriver
+    # clang/unittests
+    AllClangUnitTests
+    BasicTests
+    FormatTests
+    SemaTests
+    ClangScalableAnalysisTests
+    ClangReplInterpreterTests
+    CIRUnitTests
+    # llvm/lib/CAS
+    LLVMCAS
+    # llvm/lib/DebugInfo/LogicalView
+    LLVMDebugInfoLogicalView
+    # llvm/tools/llvm-remarkutil
+    llvm-remarkutil
+    # llvm/tools/llvm-xray
+    llvm-xray
+    # mlir/examples/toy
+    toyc-ch4
+    toyc-ch5
+    toyc-ch6
+    toyc-ch7)
+  if(TARGET ${_target})
+    set_target_properties(${_target} PROPERTIES UNITY_BUILD OFF)
+  endif()
+  # Also handle object library targets (obj.X) created by add_*_library macros
+  if(TARGET obj.${_target})
+    set_target_properties(obj.${_target} PROPERTIES UNITY_BUILD OFF)
+  endif()
+endforeach()
+
+# -- Directory-based (directories with many subtargets) --
+# clang-tools-extra/clang-tidy: 30+ check module targets with AST_MATCHER conflicts
+if(TARGET clangTidy)
+  _disable_unity_build_in_dir(${LLVM_REPO_DIR}/clang-tools-extra/clang-tidy)
+endif()
+
+# lld: COFF/ELF/MachO/MinGW/Wasm targets + unittests
+if(TARGET lldCommon)
+  _disable_unity_build_in_dir(${LLVM_REPO_DIR}/lld)
+endif()
+
+# lldb: 180+ targets with pervasive "using namespace lldb" conflicts
+if(TARGET lldb-server OR TARGET liblldb)
+  _disable_unity_build_in_dir(${LLVM_REPO_DIR}/lldb)
+endif()
+
+# libclc: dynamically-generated targets
+if(TARGET libclc)
+  _disable_unity_build_in_dir(${LLVM_REPO_DIR}/libclc)
+endif()
+
+# llvm/unittests: 75+ unittest targets
+if(TARGET UnitTests)
+  _disable_unity_build_in_dir(${LLVM_SRC_DIR}/unittests)
+endif()

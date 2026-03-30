@@ -1,8 +1,6 @@
 add_custom_target(ClangUnitTests)
 set_target_properties(ClangUnitTests PROPERTIES FOLDER "Clang/Tests")
 
-set(CMAKE_UNITY_BUILD OFF)
-
 if(CLANG_BUILT_STANDALONE)
   # LLVMTesting* libraries are needed for some of the unittests.
   if (EXISTS ${LLVM_MAIN_SRC_DIR}/lib/Testing/Annotations
