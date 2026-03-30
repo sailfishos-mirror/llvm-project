@@ -7,7 +7,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "clang/ScalableStaticAnalysisFramework/Analyses/UnsafeBufferUsage/UnsafeBufferUsage.h"
-#include "Analyses/MockSerialization.h"
 #include "clang/AST/DynamicRecursiveASTVisitor.h"
 #include "clang/Frontend/ASTUnit.h"
 #include "clang/ScalableStaticAnalysisFramework/Analyses/UnsafeBufferUsage/UnsafeBufferUsageExtractor.h"
@@ -22,11 +21,18 @@
 #include "llvm/Testing/Support/Error.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include <initializer_list>
+#include <memory>
 
 using namespace clang;
 using namespace ssaf;
 using testing::UnorderedElementsAre;
+
+// Declare the test proxy function defined in UnsafeBufferUsage.cpp:
+extern llvm::Expected<std::unique_ptr<EntitySummary>>
+serializeDeserializeRoundTrip(
+    const UnsafeBufferUsageEntitySummary &S,
+    std::function<uint64_t(EntityId)> IdToIntFn,
+    std::function<llvm::Expected<EntityId>(uint64_t)> IdFromIntFn);
 
 namespace {
 
@@ -193,30 +199,6 @@ TEST_F(UnsafeBufferUsageTest, UnsafeBufferUsageEntityPointerLevelSetTest) {
 //   (De-)Serialization Tests                               //
 //////////////////////////////////////////////////////////////
 
-static MockSerializationAPI::Object SerilizedOracle(EntityId P, EntityId Q,
-                                                    MockSerializationAPI &MSA) {
-  // Oracle serialization data for the example:
-  // void foo(int ***p, int ****q, int x) {
-  //   p[5][5][5];
-  //   q[5][5][5][5];
-  // }
-  using Array = MockSerializationAPI::Array;
-  using Object = MockSerializationAPI::Object;
-
-  Object PData = MSA.EntityIdToFormat(P);
-  Object QData = MSA.EntityIdToFormat(Q);
-
-  return Object{std::pair{"UnsafeBuffers", Array{
-                                               Array{PData, 1U},
-                                               Array{PData, 2U},
-                                               Array{PData, 3U},
-                                               Array{QData, 1U},
-                                               Array{QData, 2U},
-                                               Array{QData, 3U},
-                                               Array{QData, 4U},
-                                           }}};
-}
-
 TEST_F(UnsafeBufferUsageTest, UnsafeBufferUsageSerializeTest) {
   auto Sum = setUpTest(R"cpp(
     void foo(int ***p, int ****q, int x) {
@@ -234,45 +216,31 @@ TEST_F(UnsafeBufferUsageTest, UnsafeBufferUsageSerializeTest) {
                                      {"q", 3U},
                                      {"q", 4U}}));
 
-  MockSerializationAPI MSA;
-  MockSerializationAPI::Object JData =
-      UnsafeBufferUsageEntitySummary::serialize<MockSerializationAPI>(MSA,
-                                                                      *Sum);
-
-  auto EntityP = getEntityId("p");
-  auto EntityQ = getEntityId("q");
-
-  EXPECT_EQ(JData, SerilizedOracle(*EntityP, *EntityQ, MSA));
-}
-
-TEST_F(UnsafeBufferUsageTest, UnsafeBufferUsageDeserializeTest) {
-  auto Sum = setUpTest(R"cpp(
-    void foo(int ***p, int ****q, int x) {
-      p[5][5][5];
-      q[5][5][5][5];
+  std::vector<EntityId> Table;
+  std::function<uint64_t(EntityId)> IdToIntFn =
+      [&Table](EntityId Id) -> uint64_t {
+    auto I = llvm::find(Table, Id);
+    if (I == Table.end()) {
+      Table.push_back(Id);
+      return Table.size() - 1;
     }
-  )cpp",
-                       "foo");
-  ASSERT_NE(Sum, nullptr);
-  EXPECT_EQ(*Sum, makeSet(__LINE__, {{"p", 1U},
-                                     {"p", 2U},
-                                     {"p", 3U},
-                                     {"q", 1U},
-                                     {"q", 2U},
-                                     {"q", 3U},
-                                     {"q", 4U}}));
+    return I - Table.begin();
+  };
+  std::function<llvm::Expected<EntityId>(uint64_t)> IdFromIntFn =
+      [&Table](uint64_t Int) -> llvm::Expected<EntityId> {
+    if (0 <= Int && Int < Table.size())
+      return Table[Int];
+    return llvm::createStringError(
+        "unrecognized dummy index %d for an EntityId", Int);
+  };
 
-  MockSerializationAPI MSA;
-  auto EntityP = getEntityId("p");
-  auto EntityQ = getEntityId("q");
-  auto DeserializedSum =
-      UnsafeBufferUsageEntitySummary::deserialize<MockSerializationAPI>(
-          MSA, SerilizedOracle(*EntityP, *EntityQ, MSA));
+  auto RoundTripResult =
+      serializeDeserializeRoundTrip(*Sum, IdToIntFn, IdFromIntFn);
 
-  ASSERT_THAT_ERROR(DeserializedSum.takeError(), llvm::Succeeded());
-  EXPECT_EQ(
-      *static_cast<UnsafeBufferUsageEntitySummary *>(DeserializedSum->get()),
-      *Sum);
+  EXPECT_THAT_ERROR(RoundTripResult.takeError(), llvm::Succeeded());
+  ASSERT_NE(*RoundTripResult, nullptr);
+  EXPECT_EQ(*Sum, *static_cast<const UnsafeBufferUsageEntitySummary *>(
+                      RoundTripResult->get()));
 }
 
 //////////////////////////////////////////////////////////////

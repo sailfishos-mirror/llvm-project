@@ -11,9 +11,8 @@
 
 #include "clang/ScalableStaticAnalysisFramework/Core/Model/EntityId.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/Model/SummaryName.h"
-#include "clang/ScalableStaticAnalysisFramework/Core/Serialization/JSONFormat.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/TUSummary/EntitySummary.h"
-#include "llvm/ADT/StringRef.h"
+#include "llvm/ADT/iterator_range.h"
 #include <set>
 
 namespace clang::ssaf {
@@ -41,6 +40,7 @@ class EntityPointerLevel {
 
   friend class UnsafeBufferUsageEntitySummary;
   friend class UnsafeBufferUsageTUSummaryExtractor;
+  friend EntityPointerLevel buildEntityPointerLevel(EntityId, unsigned);
 
   EntityPointerLevel(EntityId Entity, unsigned PointerLevel)
       : Entity(Entity), PointerLevel(PointerLevel) {}
@@ -89,12 +89,13 @@ class UnsafeBufferUsageEntitySummary final : public EntitySummary {
   const EntityPointerLevelSet UnsafeBuffers;
 
   friend class UnsafeBufferUsageTUSummaryExtractor;
+  friend UnsafeBufferUsageEntitySummary
+      buildUnsafeBufferUsageEntitySummary(EntityPointerLevelSet);
+  friend llvm::iterator_range<EntityPointerLevelSet::const_iterator>
+  getUnsafeBuffers(const UnsafeBufferUsageEntitySummary &);
 
   UnsafeBufferUsageEntitySummary(EntityPointerLevelSet UnsafeBuffers)
       : EntitySummary(), UnsafeBuffers(std::move(UnsafeBuffers)) {}
-
-  static constexpr llvm::StringLiteral SummarySerializationKey =
-      "UnsafeBuffers";
 
 public:
   SummaryName getSummaryName() const override { return summaryName(); };
@@ -110,64 +111,6 @@ public:
   bool empty() const { return UnsafeBuffers.empty(); }
 
   static SummaryName summaryName() { return SummaryName{"UnsafeBufferUsage"}; }
-
-  // A SerializationAPI implementation for a specific Format needs to implement:
-  //
-  // 1) Abstract data types, Object (map), Array, Value, ..., etc. with
-  //   supported operations, and
-  // 2) EntityIdToFormatFn, and
-  // 3) EntityIdFromFotmatFn.
-
-  // Format-independent (de-)serialization functions:
-  template <typename SerializationAPI>
-  typename SerializationAPI::Object static serialize(
-      SerializationAPI &SA, const UnsafeBufferUsageEntitySummary &S) {
-    using Array = typename SerializationAPI::Array;
-    using Object = typename SerializationAPI::Object;
-    Array UnsafeBuffersData;
-
-    UnsafeBuffersData.reserve(S.UnsafeBuffers.size());
-    for (const auto &EPL : S.UnsafeBuffers)
-      UnsafeBuffersData.push_back(
-          Array{SA.EntityIdToFormat(EPL.getEntity()), EPL.getPointerLevel()});
-    return Object{{SummarySerializationKey.data(), std::move(UnsafeBuffersData)}};
-  }
-
-  template <typename SerializationAPI>
-  llvm::Expected<std::unique_ptr<EntitySummary>> static deserialize(
-      SerializationAPI &SA, const typename SerializationAPI::Object &Data) {
-    using Array = typename SerializationAPI::Array;
-    using Object = typename SerializationAPI::Object;
-    const Array *UnsafeBuffersData = Data.getArray(SummarySerializationKey.data());
-
-    if (!UnsafeBuffersData)
-      return llvm::createStringError("expected a json::Object with a key %s",
-                                     SummarySerializationKey.data());
-
-    EntityPointerLevelSet EPLs;
-
-    for (auto &EltData : *UnsafeBuffersData) {
-      const Array *EltDataAsArr = EltData.getAsArray();
-
-      if (!EltDataAsArr || EltDataAsArr->size() != 2)
-        return llvm::createStringError("expected a json::Array of size 2");
-
-      const Object *IdData = (*EltDataAsArr)[0].getAsObject();
-      std::optional<uint64_t> PtrLvData = (*EltDataAsArr)[1].getAsInteger();
-
-      if (!IdData || !PtrLvData)
-        return llvm::createStringError(
-            "expected a json::Value of integer type");
-
-      llvm::Expected<EntityId> Id = SA.EntityIdFromFormat(*IdData);
-
-      if (!Id)
-        return Id.takeError();
-      EPLs.insert(EntityPointerLevel(Id.get(), *PtrLvData));
-    }
-    return std::make_unique<UnsafeBufferUsageEntitySummary>(
-        UnsafeBufferUsageEntitySummary(std::move(EPLs)));
-  }
 };
 } // namespace clang::ssaf
 
