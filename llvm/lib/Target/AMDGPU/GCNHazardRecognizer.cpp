@@ -680,13 +680,26 @@ int GCNHazardRecognizer::getWaitStatesSince(IsHazardFn IsHazard,
 
 int GCNHazardRecognizer::getWaitStatesSinceVALU(IsHazardFn IsHazard,
                                                 int Limit) const {
+  auto GetXDLWaitStates = [this](const MachineInstr *MI) -> unsigned {
+    assert(MI);
+    if (TII.isXDLWMMA(*MI))
+      return TSchedModel.computeInstrLatency(MI);
+    return 0;
+  };
+
+  // In hazard recognizer mode, fall back to the regular method since we don't
+  // track EmittedVALUInstrs there (it walks the CFG instead).
   if (IsHazardRecognizerMode) {
-    auto GetVALUWaitStates = [](const MachineInstr &MI) -> unsigned {
+    auto GetVALUWaitStates =
+        [GetXDLWaitStates](const MachineInstr &MI) -> unsigned {
+      if (unsigned XDLWaitStates = GetXDLWaitStates(&MI))
+        return XDLWaitStates;
       return SIInstrInfo::isVALU(MI) ? 1 : 0;
     };
     return getWaitStatesSince(IsHazard, Limit, GetVALUWaitStates);
   }
 
+  // In scheduler mode, use the dedicated VALU instruction list.
   int WaitStates = 0;
   for (MachineInstr *MI : EmittedVALUInstrs) {
     if (MI) {
@@ -694,7 +707,12 @@ int GCNHazardRecognizer::getWaitStatesSinceVALU(IsHazardFn IsHazard,
         return WaitStates;
     }
 
-    ++WaitStates;
+    // This list only contains VALU/WMMA instructions, so every entry counts as
+    // at least one. Nullptr corresponds to V_NOP in hazard recognizer.
+    if (MI && TII.isXDLWMMA(*MI))
+      WaitStates += TSchedModel.computeInstrLatency(MI);
+    else
+      ++WaitStates;
 
     if (WaitStates >= Limit)
       break;
