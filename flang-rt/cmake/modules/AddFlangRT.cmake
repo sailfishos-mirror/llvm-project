@@ -223,7 +223,7 @@ function (add_flangrt_library name)
   # apply them to ${alltargets}. In worst case, they are ignored by CMake.
   foreach (tgtname IN LISTS alltargets)
     # Minimum required C++ version for Flang-RT, even if CMAKE_CXX_STANDARD is defined to something else.
-    # target_compile_features(${tgtname} PRIVATE cxx_std_17)
+    target_compile_features(${tgtname} PRIVATE cxx_std_17)
 
     # When building the flang runtime if LTO is enabled the archive file
     # contains LLVM IR rather than object code. Currently flang is not
