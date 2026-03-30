@@ -270,11 +270,11 @@ int useSRet(Root *r) {
     // TODO: we should know that this instance is non nil.
     // CHECK: call void @"-[Root getAggregate]D_thunk"
     [r getAggregate].a +
-    // CHECK-NOT: call i64 @"+[Root classGetComplex]"(ptr noundef
-    // CHECK: call i64 @"+[Root classGetComplex]_thunk"(ptr noundef
+    // CHECK-NOT: call i64 @"+[Root classGetComplex]D"(ptr noundef
+    // CHECK: call i64 @"+[Root classGetComplex]D_thunk"(ptr noundef
     [Root classGetComplex].a +
-    // CHECK-NOT: call void @"+[Root classGetAggregate]_thunk"(ptr {{.*}}sret
-    // CHECK: call void @"+[Root classGetAggregate]"(ptr {{.*}}sret
+    // CHECK-NOT: call void @"+[Root classGetAggregate]D_thunk"(ptr {{.*}}sret
+    // CHECK: call void @"+[Root classGetAggregate]D"(ptr {{.*}}sret
     [Root classGetAggregate].a
   );
 }
@@ -293,5 +293,5 @@ int useSRet(Root *r) {
 // CHECK: dummy_ret_block:
 // CHECK:   ret void
 
-// CHECK: define {{.*}} @"+[Root classGetComplex]_thunk"
-// CHECK-NOT: define {{.*}} @"+[Root classGetAggregate]_thunk"
+// CHECK: define {{.*}} @"+[Root classGetComplex]D_thunk"
+// CHECK-NOT: define {{.*}} @"+[Root classGetAggregate]D_thunk"
