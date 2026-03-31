@@ -507,6 +507,8 @@ static bool checkTargetOptions(const TargetOptions &TargetOpts,
 #undef CHECK_TARGET_OPT
 
   // Compare feature sets.
+  // Alternatively, we could be diffing TargetOpts.Features, but that would
+  // clutter the output with implied features.
   std::vector<std::string> ExistingFeatures =
       accumulateFeaturesAsWritten(ExistingTargetOpts.FeaturesAsWritten);
   std::vector<std::string> ReadFeatures =
