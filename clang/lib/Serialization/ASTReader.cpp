@@ -454,26 +454,22 @@ static bool checkCodegenOptions(const CodeGenOptions &CGOpts,
   return false;
 }
 
-static std::set<StringRef>
-accumulateFeaturesAsWritten(const std::vector<std::string> &FeaturesAsWritten) {
-  std::set<StringRef> Out;
-  for (StringRef Name : FeaturesAsWritten) {
-    if (Name.size() < 2)
-      continue;
-    StringRef Feature = Name.substr(1);
-    if (Name[0] == '+') {
-      Out.emplace(Name);
-      std::string Inverse = (std::string("-") + Feature).str();
-      if (auto It = Out.find(Inverse); It != Out.end())
-        Out.erase(It);
-    } else if (Name[0] == '-') {
-      Out.emplace(Name);
-      std::string Inverse = (std::string("+") + Feature).str();
-      if (auto It = Out.find(Inverse); It != Out.end())
-        Out.erase(It);
-    }
-  }
-  return Out;
+static std::vector<std::string>
+accumulateFeaturesAsWritten(std::vector<std::string> FeaturesAsWritten) {
+  llvm::erase_if(FeaturesAsWritten, [](const std::string &S) {
+    return S.empty() || (S[0] != '+' && S[0] != '-');
+  });
+  llvm::stable_sort(FeaturesAsWritten,
+                    [](const std::string &A, const std::string &B) {
+                      return A.substr(1) < B.substr(1);
+                    });
+  auto NewRend =
+      std::unique(FeaturesAsWritten.rbegin(), FeaturesAsWritten.rend(),
+                  [](const std::string &A, const std::string &B) {
+                    return A.substr(1) == B.substr(1);
+                  });
+  FeaturesAsWritten.erase(FeaturesAsWritten.begin(), NewRend.base());
+  return FeaturesAsWritten;
 }
 
 /// Compare the given set of target options against an existing set of
@@ -511,9 +507,9 @@ static bool checkTargetOptions(const TargetOptions &TargetOpts,
 #undef CHECK_TARGET_OPT
 
   // Compare feature sets.
-  std::set<StringRef> ExistingFeatures =
+  std::vector<std::string> ExistingFeatures =
       accumulateFeaturesAsWritten(ExistingTargetOpts.FeaturesAsWritten);
-  std::set<StringRef> ReadFeatures =
+  std::vector<std::string> ReadFeatures =
       accumulateFeaturesAsWritten(TargetOpts.FeaturesAsWritten);
 
   // We compute the set difference in both directions explicitly so that we can
@@ -6358,7 +6354,8 @@ llvm::Error ASTReader::ReadSubmoduleBlock(ModuleFile &F,
                                        "too many submodules");
 
       if (!ParentModule) {
-        if (const ModuleFileKey *CurFileKey = CurrentModule->getASTFileKey()) {
+        if ([[maybe_unused]] const ModuleFileKey *CurFileKey =
+                CurrentModule->getASTFileKey()) {
           // Don't emit module relocation error if we have -fno-validate-pch
           if (!bool(PP.getPreprocessorOpts().DisablePCHOrModuleValidation &
                     DisableValidationForModuleKind::Module)) {
