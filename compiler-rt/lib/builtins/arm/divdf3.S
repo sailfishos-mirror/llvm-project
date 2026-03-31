@@ -13,7 +13,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "../assembly.h"
-#include "endian.h"
+#include "crt_endian.h"
 
 // The basic strategy of this division code is to use Newton-Raphson iteration
 // to calculate an approximation to 1/y, then multiply it by x. This procedure
