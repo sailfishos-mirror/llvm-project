@@ -75,6 +75,8 @@ struct MissingFeatures {
   static bool opFuncCPUAndFeaturesAttributes() { return false; }
   static bool opFuncExceptions() { return false; }
   static bool opFuncExtraAttrs() { return false; }
+  static bool opFuncCallingConv() { return false; }
+  static bool callConvOpenCLKernel() { return false; }
   static bool opFuncMaybeHandleStaticInExternC() { return false; }
   static bool opFuncMinSizeAttr() { return false; }
   static bool opFuncMultipleReturnVals() { return false; }

@@ -2660,9 +2660,11 @@ void CIRGenModule::setCIRFunctionAttributes(GlobalDecl globalDecl,
 
   // TODO(cir): Check X86_VectorCall incompatibility wiht WinARM64EC
 
-  // TODO(cir): Apply the calling convention computed by constructAttributeList
-  // to the function. Requires CodeGen target wiring (e.g., AMDGPU sets
-  // AMDGPUKernel). See CIRGenModule::setCIRFunctionAttributes in OG.
+  // TODO(cir): Set the calling convention computed by constructAttributeList
+  // on the function. FuncOp supports calling_conv, but target-specific
+  // CodeGen is needed to set it correctly (e.g., AMDGPU kernel functions
+  // should be marked with AMDGPUKernel).
+  assert(!cir::MissingFeatures::opFuncCallingConv());
 }
 
 void CIRGenModule::setFunctionAttributes(GlobalDecl globalDecl,
@@ -3106,8 +3108,7 @@ cir::FuncOp CIRGenModule::createRuntimeFunction(cir::FuncType ty,
   if (entry) {
     // TODO(cir): set the attributes of the function.
     assert(!cir::MissingFeatures::setLLVMFunctionFEnvAttributes());
-    // TODO(cir): Set the calling convention on runtime functions if needed.
-    // Runtime functions typically use CallingConv::C (the default).
+    assert(!cir::MissingFeatures::opFuncCallingConv());
     setWindowsItaniumDLLImport(*this, isLocal, entry, name);
     entry.setDSOLocal(true);
   }
