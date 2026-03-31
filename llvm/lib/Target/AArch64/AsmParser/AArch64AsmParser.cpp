@@ -268,6 +268,8 @@ private:
   ParseStatus tryParseRPRFMOperand(OperandVector &Operands);
   ParseStatus tryParsePSBHint(OperandVector &Operands);
   ParseStatus tryParseBTIHint(OperandVector &Operands);
+  ParseStatus tryParseSHUHintOperand(OperandVector &Operands);
+  ParseStatus tryParseTSBHintOperand(OperandVector &Operands);
   ParseStatus tryParseCMHPriorityHint(OperandVector &Operands);
   ParseStatus tryParseTIndexHint(OperandVector &Operands);
   ParseStatus tryParseAdrpLabel(OperandVector &Operands);
@@ -374,6 +376,8 @@ private:
     k_PSBHint,
     k_PHint,
     k_BTIHint,
+    k_SHUHint,
+    k_TSBHint,
     k_CMHPriorityHint,
     k_TIndexHint,
   } Kind;
@@ -505,6 +509,16 @@ private:
     unsigned Length;
     unsigned Val;
   };
+  struct SHUHintOp {
+    const char *Data;
+    unsigned Length;
+    unsigned Val;
+  };
+  struct TSBHintOp {
+    const char *Data;
+    unsigned Length;
+    unsigned Val;
+  };
   struct CMHPriorityHintOp {
     const char *Data;
     unsigned Length;
@@ -541,6 +555,8 @@ private:
     struct PSBHintOp PSBHint;
     struct PHintOp PHint;
     struct BTIHintOp BTIHint;
+    struct SHUHintOp SHUHint;
+    struct TSBHintOp TSBHint;
     struct CMHPriorityHintOp CMHPriorityHint;
     struct TIndexHintOp TIndexHint;
     struct ShiftExtendOp ShiftExtend;
@@ -612,6 +628,12 @@ public:
       break;
     case k_BTIHint:
       BTIHint = o.BTIHint;
+      break;
+    case k_SHUHint:
+      SHUHint = o.SHUHint;
+      break;
+    case k_TSBHint:
+      TSBHint = o.TSBHint;
       break;
     case k_CMHPriorityHint:
       CMHPriorityHint = o.CMHPriorityHint;
@@ -788,9 +810,29 @@ public:
     return BTIHint.Val;
   }
 
+  unsigned getSHUHint() const {
+    assert(Kind == k_SHUHint && "Invalid access!");
+    return SHUHint.Val;
+  }
+
+  unsigned getTSBHint() const {
+    assert(Kind == k_TSBHint && "Invalid access!");
+    return TSBHint.Val;
+  }
+
   StringRef getBTIHintName() const {
     assert(Kind == k_BTIHint && "Invalid access!");
     return StringRef(BTIHint.Data, BTIHint.Length);
+  }
+
+  StringRef getSHUHintName() const {
+    assert(Kind == k_SHUHint && "Invalid access!");
+    return StringRef(SHUHint.Data, SHUHint.Length);
+  }
+
+  StringRef getTSBHintName() const {
+    assert(Kind == k_TSBHint && "Invalid access!");
+    return StringRef(TSBHint.Data, TSBHint.Length);
   }
 
   unsigned getCMHPriorityHint() const {
@@ -1555,6 +1597,8 @@ public:
   bool isPSBHint() const { return Kind == k_PSBHint; }
   bool isPHint() const { return Kind == k_PHint; }
   bool isBTIHint() const { return Kind == k_BTIHint; }
+  bool isSHUHint() const { return Kind == k_SHUHint; }
+  bool isTSBHint() const { return Kind == k_TSBHint; }
   bool isCMHPriorityHint() const { return Kind == k_CMHPriorityHint; }
   bool isTIndexHint() const { return Kind == k_TIndexHint; }
   bool isShiftExtend() const { return Kind == k_ShiftExtend; }
@@ -2242,6 +2286,16 @@ public:
     Inst.addOperand(MCOperand::createImm(getBTIHint()));
   }
 
+  void addSHUHintOperands(MCInst &Inst, unsigned N) const {
+    assert(N == 1 && "Invalid number of operands!");
+    Inst.addOperand(MCOperand::createImm(getSHUHint()));
+  }
+
+  void addTSBHintOperands(MCInst &Inst, unsigned N) const {
+    assert(N == 1 && "Invalid number of operands!");
+    Inst.addOperand(MCOperand::createImm(getTSBHint()));
+  }
+
   void addCMHPriorityHintOperands(MCInst &Inst, unsigned N) const {
     assert(N == 1 && "Invalid number of operands!");
     Inst.addOperand(MCOperand::createImm(getCMHPriorityHint()));
@@ -2600,6 +2654,28 @@ public:
   }
 
   static std::unique_ptr<AArch64Operand>
+  CreateSHUHint(unsigned Val, StringRef Str, SMLoc S, MCContext &Ctx) {
+    auto Op = std::make_unique<AArch64Operand>(k_SHUHint, Ctx);
+    Op->SHUHint.Val = Val + 50;
+    Op->SHUHint.Data = Str.data();
+    Op->SHUHint.Length = Str.size();
+    Op->StartLoc = S;
+    Op->EndLoc = S;
+    return Op;
+  }
+
+  static std::unique_ptr<AArch64Operand>
+  CreateTSBHint(unsigned Val, StringRef Str, SMLoc S, MCContext &Ctx) {
+    auto Op = std::make_unique<AArch64Operand>(k_TSBHint, Ctx);
+    Op->TSBHint.Val = Val | 16;
+    Op->TSBHint.Data = Str.data();
+    Op->TSBHint.Length = Str.size();
+    Op->StartLoc = S;
+    Op->EndLoc = S;
+    return Op;
+  }
+
+  static std::unique_ptr<AArch64Operand>
   CreateCMHPriorityHint(unsigned Val, StringRef Str, SMLoc S, MCContext &Ctx) {
     auto Op = std::make_unique<AArch64Operand>(k_CMHPriorityHint, Ctx);
     Op->CMHPriorityHint.Val = Val;
@@ -2730,6 +2806,12 @@ void AArch64Operand::print(raw_ostream &OS, const MCAsmInfo &MAI) const {
     break;
   case k_BTIHint:
     OS << getBTIHintName();
+    break;
+  case k_SHUHint:
+    OS << getSHUHintName();
+    break;
+  case k_TSBHint:
+    OS << getTSBHintName();
     break;
   case k_CMHPriorityHint:
     OS << getCMHPriorityHintName();
@@ -4446,6 +4528,39 @@ AArch64AsmParser::tryParsePHintInstOperand(OperandVector &Operands) {
 
   Operands.push_back(AArch64Operand::CreatePHintInst(
       PH->Encoding, Tok.getString(), S, getContext()));
+  Lex(); // Eat identifier token.
+  return ParseStatus::Success;
+}
+
+ParseStatus AArch64AsmParser::tryParseSHUHintOperand(OperandVector &Operands) {
+  SMLoc S = getLoc();
+  const AsmToken &Tok = getTok();
+  if (Tok.isNot(AsmToken::Identifier))
+    return TokError("invalid operand for instruction");
+
+  auto SHU =
+      AArch64CMHPriorityHint::lookupCMHPriorityHintByName(Tok.getString());
+  if (!SHU)
+    return TokError("invalid operand for instruction");
+
+  Operands.push_back(AArch64Operand::CreateSHUHint(
+      SHU->Encoding, Tok.getString(), S, getContext()));
+  Lex(); // Eat identifier token.
+  return ParseStatus::Success;
+}
+
+ParseStatus AArch64AsmParser::tryParseTSBHintOperand(OperandVector &Operands) {
+  SMLoc S = getLoc();
+  const AsmToken &Tok = getTok();
+  if (Tok.isNot(AsmToken::Identifier))
+    return TokError("'csync' operand expected");
+
+  auto TSB = AArch64TSB::lookupTSBByName(Tok.getString());
+  if (!TSB || TSB->Encoding != AArch64TSB::csync)
+    return TokError("'csync' operand expected");
+
+  Operands.push_back(AArch64Operand::CreateTSBHint(
+      TSB->Encoding, Tok.getString(), S, getContext()));
   Lex(); // Eat identifier token.
   return ParseStatus::Success;
 }
