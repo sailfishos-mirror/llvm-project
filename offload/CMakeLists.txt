@@ -81,6 +81,7 @@ set(OPENMP_INSTALL_LIBDIR "lib${LLVM_LIBDIR_SUFFIX}")
 else()
   set(OPENMP_ENABLE_WERROR ${LLVM_ENABLE_WERROR})
   # If building in tree, we honor the same install suffix LLVM uses.
+  # TODO: Use common runtimes infrastructure for output and install paths
   set(OPENMP_INSTALL_LIBDIR "lib${LLVM_LIBDIR_SUFFIX}")
 
   if (NOT MSVC)
@@ -403,6 +404,7 @@ if(LIBOMP_OMP_TOOLS_INCLUDE_DIR)
   include_directories(${LIBOMP_OMP_TOOLS_INCLUDE_DIR})
 endif()
 
+# TODO: Use RUNTIMES_OUTPUT_RESOURCE_LIB_DIR instead
 set(LIBOMPTARGET_LLVM_LIBRARY_DIR "${LLVM_LIBRARY_DIR}" CACHE STRING
   "Path to folder containing llvm library libomptarget.so")
 set(LIBOMPTARGET_LLVM_LIBRARY_INTDIR "${LIBOMPTARGET_INTDIR}" CACHE STRING
