@@ -1964,7 +1964,10 @@ private:
     uint64_t __fp = 0;            // Frame pointer x29
     uint64_t __lr = 0;            // Link register x30
     uint64_t __sp = 0;            // Stack pointer x31
-    uint64_t __pc = 0;            // Program counter
+    // Program counter.
+    // When PtrAuth-protected, uses ptrauth_key_return_address with address
+    // discrimination. Zero value must be signed to be valid (see getIP/setIP).
+    uint64_t __pc = 0;
     uint64_t __ra_sign_state = 0; // RA sign state register
   };
 
@@ -2056,8 +2059,12 @@ inline uint64_t Registers_arm64::lazyGetVG() const {
 }
 
 inline uint64_t Registers_arm64::getRegister(int regNum) const {
+  // When _LIBUNWIND_TARGET_AARCH64_AUTHENTICATED_UNWINDING is in effect, the
+  // return value is signed with (ptrauth_key_return_address, getSP()) schema
+  // with 0 value signed as any other value.
   if (regNum == UNW_REG_IP || regNum == UNW_AARCH64_PC)
     return getIP();
+
   if (regNum == UNW_REG_SP || regNum == UNW_AARCH64_SP)
     return _registers.__sp;
   if (regNum == UNW_AARCH64_RA_SIGN_STATE)
@@ -2074,8 +2081,12 @@ inline uint64_t Registers_arm64::getRegister(int regNum) const {
 }
 
 inline void Registers_arm64::setRegister(int regNum, uint64_t value) {
+  // When _LIBUNWIND_TARGET_AARCH64_AUTHENTICATED_UNWINDING is in effect,
+  // `value` must be signed with (ptrauth_key_return_address, getSP()) schema
+  // with 0 value signed as any other value.
   if (regNum == UNW_REG_IP || regNum == UNW_AARCH64_PC)
     setIP(value);
+
   else if (regNum == UNW_REG_SP || regNum == UNW_AARCH64_SP)
     _registers.__sp = value;
   else if (regNum == UNW_AARCH64_RA_SIGN_STATE)
