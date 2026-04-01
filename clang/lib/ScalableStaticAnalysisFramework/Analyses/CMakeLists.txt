@@ -2,9 +2,10 @@ set(LLVM_LINK_COMPONENTS
   Support
   )
 
-add_clang_library(clangScalableStaticAnalysisFrameworkAnalyses
+add_clang_library(clangScalableStaticAnalysisFrameworkAnalyses 
+  CallGraph/CallGraphExtractor.cpp
   UnsafeBufferUsage/UnsafeBufferUsage.cpp
-  UnsafeBufferUsage/UnsafeBufferUsageExtractor.cpp  
+  UnsafeBufferUsage/UnsafeBufferUsageExtractor.cpp
 
   LINK_LIBS
   clangAST
