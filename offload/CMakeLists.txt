@@ -50,127 +50,12 @@ list(INSERT CMAKE_MODULE_PATH 0
   "${LLVM_COMMON_CMAKE_UTILS}/Modules"
   )
 
-<<<<<<< HEAD
-  # Group common settings.
-  set(OPENMP_ENABLE_WERROR FALSE CACHE BOOL
-    "Enable -Werror flags to turn warnings into errors for supporting compilers.")
-  set(OPENMP_LIBDIR_SUFFIX "" CACHE STRING
-    "Suffix of lib installation directory, e.g. 64 => lib64")
-  # Do not use OPENMP_LIBDIR_SUFFIX directly, use OPENMP_INSTALL_LIBDIR.
-  set(OPENMP_INSTALL_LIBDIR "lib${OPENMP_LIBDIR_SUFFIX}")
-
-  # Used by llvm_add_tool() and tests.
-  set(LLVM_RUNTIME_OUTPUT_INTDIR ${CMAKE_CURRENT_BINARY_DIR})
-
-  # Group test settings.
-  set(OPENMP_TEST_C_COMPILER ${CMAKE_C_COMPILER} CACHE STRING
-    "C compiler to use for testing OpenMP runtime libraries.")
-  set(OPENMP_TEST_CXX_COMPILER ${CMAKE_CXX_COMPILER} CACHE STRING
-    "C++ compiler to use for testing OpenMP runtime libraries.")
-  set(OPENMP_TEST_Fortran_COMPILER ${CMAKE_Fortran_COMPILER} CACHE STRING
-    "FORTRAN compiler to use for testing OpenMP runtime libraries.")
-  set(OPENMP_LLVM_TOOLS_DIR "" CACHE PATH "Path to LLVM tools for testing.")
-
-  set(CMAKE_CXX_STANDARD 17 CACHE STRING "C++ standard to conform to")
-  set(CMAKE_CXX_STANDARD_REQUIRED NO)
-  set(CMAKE_CXX_EXTENSIONS NO)
-else()
-  set(OPENMP_ENABLE_WERROR ${LLVM_ENABLE_WERROR})
-  # If building in tree, we honor the same install suffix LLVM uses.
-  # TODO: Use common runtimes infrastructure for output and install paths
-  set(OPENMP_INSTALL_LIBDIR "lib${LLVM_LIBDIR_SUFFIX}")
-
-  if (NOT MSVC)
-    set(OPENMP_TEST_C_COMPILER ${LLVM_TOOLS_BINARY_DIR}/clang)
-    set(OPENMP_TEST_CXX_COMPILER ${LLVM_TOOLS_BINARY_DIR}/clang++)
-  else()
-    set(OPENMP_TEST_C_COMPILER ${LLVM_TOOLS_BINARY_DIR}/clang.exe)
-    set(OPENMP_TEST_CXX_COMPILER ${LLVM_TOOLS_BINARY_DIR}/clang++.exe)
-  endif()
-
-  # Check for flang
-  if (NOT MSVC)
-    set(OPENMP_TEST_Fortran_COMPILER ${LLVM_TOOLS_BINARY_DIR}/flang)
-  else()
-    set(OPENMP_TEST_Fortran_COMPILER ${LLVM_TOOLS_BINARY_DIR}/flang.exe)
-  endif()
-
-  # Set fortran test compiler if flang is found
-  if (EXISTS "${OPENMP_TEST_Fortran_COMPILER}")
-    message("Using local flang build at ${OPENMP_TEST_Fortran_COMPILER}")
-  else()
-    unset(OPENMP_TEST_Fortran_COMPILER)
-  endif()
-
-  # If not standalone, set CMAKE_CXX_STANDARD but don't set the global cache value,
-  # only set it locally for OpenMP.
-  set(CMAKE_CXX_STANDARD 17)
-  set(CMAKE_CXX_STANDARD_REQUIRED NO)
-  set(CMAKE_CXX_EXTENSIONS NO)
-||||||| 23af867e6d93
-  # Group common settings.
-  set(OPENMP_ENABLE_WERROR FALSE CACHE BOOL
-    "Enable -Werror flags to turn warnings into errors for supporting compilers.")
-  set(OPENMP_LIBDIR_SUFFIX "" CACHE STRING
-    "Suffix of lib installation directory, e.g. 64 => lib64")
-  # Do not use OPENMP_LIBDIR_SUFFIX directly, use OPENMP_INSTALL_LIBDIR.
-  set(OPENMP_INSTALL_LIBDIR "lib${OPENMP_LIBDIR_SUFFIX}")
-
-  # Used by llvm_add_tool() and tests.
-  set(LLVM_RUNTIME_OUTPUT_INTDIR ${CMAKE_CURRENT_BINARY_DIR})
-
-  # Group test settings.
-  set(OPENMP_TEST_C_COMPILER ${CMAKE_C_COMPILER} CACHE STRING
-    "C compiler to use for testing OpenMP runtime libraries.")
-  set(OPENMP_TEST_CXX_COMPILER ${CMAKE_CXX_COMPILER} CACHE STRING
-    "C++ compiler to use for testing OpenMP runtime libraries.")
-  set(OPENMP_TEST_Fortran_COMPILER ${CMAKE_Fortran_COMPILER} CACHE STRING
-    "FORTRAN compiler to use for testing OpenMP runtime libraries.")
-  set(OPENMP_LLVM_TOOLS_DIR "" CACHE PATH "Path to LLVM tools for testing.")
-
-  set(CMAKE_CXX_STANDARD 17 CACHE STRING "C++ standard to conform to")
-  set(CMAKE_CXX_STANDARD_REQUIRED NO)
-  set(CMAKE_CXX_EXTENSIONS NO)
-else()
-  set(OPENMP_ENABLE_WERROR ${LLVM_ENABLE_WERROR})
-  # If building in tree, we honor the same install suffix LLVM uses.
-  set(OPENMP_INSTALL_LIBDIR "lib${LLVM_LIBDIR_SUFFIX}")
-
-  if (NOT MSVC)
-    set(OPENMP_TEST_C_COMPILER ${LLVM_TOOLS_BINARY_DIR}/clang)
-    set(OPENMP_TEST_CXX_COMPILER ${LLVM_TOOLS_BINARY_DIR}/clang++)
-  else()
-    set(OPENMP_TEST_C_COMPILER ${LLVM_TOOLS_BINARY_DIR}/clang.exe)
-    set(OPENMP_TEST_CXX_COMPILER ${LLVM_TOOLS_BINARY_DIR}/clang++.exe)
-  endif()
-
-  # Check for flang
-  if (NOT MSVC)
-    set(OPENMP_TEST_Fortran_COMPILER ${LLVM_TOOLS_BINARY_DIR}/flang)
-  else()
-    set(OPENMP_TEST_Fortran_COMPILER ${LLVM_TOOLS_BINARY_DIR}/flang.exe)
-  endif()
-
-  # Set fortran test compiler if flang is found
-  if (EXISTS "${OPENMP_TEST_Fortran_COMPILER}")
-    message("Using local flang build at ${OPENMP_TEST_Fortran_COMPILER}")
-  else()
-    unset(OPENMP_TEST_Fortran_COMPILER)
-  endif()
-
-  # If not standalone, set CMAKE_CXX_STANDARD but don't set the global cache value,
-  # only set it locally for OpenMP.
-  set(CMAKE_CXX_STANDARD 17)
-  set(CMAKE_CXX_STANDARD_REQUIRED NO)
-  set(CMAKE_CXX_EXTENSIONS NO)
-=======
 set(OPENMP_TEST_C_COMPILER_default "${LLVM_TOOLS_BINARY_DIR}/clang${CMAKE_EXECUTABLE_SUFFIX}")
 set(OPENMP_TEST_CXX_COMPILER_default "${LLVM_TOOLS_BINARY_DIR}/clang++${CMAKE_EXECUTABLE_SUFFIX}")
 set(OPENMP_TEST_Fortran_COMPILER_default "${LLVM_TOOLS_BINARY_DIR}/flang${CMAKE_EXECUTABLE_SUFFIX}")
 if (NOT TARGET "clang")
   set(OPENMP_TEST_C_COMPILER_default "${CMAKE_C_COMPILER}")
   set(OPENMP_TEST_CXX_COMPILER_default "${CMAKE_CXX_COMPILER}")
->>>>>>> main
 endif()
 if (NOT TARGET "flang")
   if (CMAKE_Fortran_COMPILER)
