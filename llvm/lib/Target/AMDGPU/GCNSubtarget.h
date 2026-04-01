@@ -1011,10 +1011,7 @@ public:
     return getGeneration() >= GFX10 || isTgSplitEnabled();
   }
 
-  bool isGloballyAddressableScratchEnabled() const {
-    return HasGloballyAddressableScratchSupport &&
-           EnableGloballyAddressableScratch;
-  }
+  bool isGloballyAddressableScratchEnabled() const;
 };
 
 class GCNUserSGPRUsageInfo {
