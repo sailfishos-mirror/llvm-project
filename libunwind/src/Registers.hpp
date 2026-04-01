@@ -1940,8 +1940,8 @@ public:
     const auto newDiscriminator = ptrauth_blend_discriminator(
         &result, __ptrauth_unwind_registers_arm64_link_reg_disc);
     reg_t resigned = (reg_t)ptrauth_auth_and_resign(
-        (void *)_registers.__pc, ptrauth_key_return_address,
-        &_registers.__pc, ptrauth_key_return_address, newDiscriminator);
+        (void *)_registers.__pc, ptrauth_key_return_address, &_registers.__pc,
+        ptrauth_key_return_address, newDiscriminator);
     memcpy((void *)&result, &resigned, sizeof(resigned));
   }
 #endif
