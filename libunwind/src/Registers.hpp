@@ -1922,6 +1922,17 @@ public:
   void
   loadAndAuthenticateLinkRegister(reg_t inplaceAuthedLinkRegister,
                                   link_reg_t *referenceAuthedLinkRegister) {
+    // Make sure that zero result is written as all zero bits, as implicitly
+    // assumed for __ptrauth-qualified types.
+    // FIXME Drop this hack when options support for __ptrauth qualifier
+    //       will be implemented.
+    if (0 == ptrauth_auth_data((void *)inplaceAuthedLinkRegister,
+                               ptrauth_key_return_address, _registers.__sp)) {
+      memset((void *)referenceAuthedLinkRegister, 0,
+             sizeof(referenceAuthedLinkRegister));
+      return;
+    }
+
     // In arm64e or pauthtest ABI frame, the PC should have been signed with
     // the SP - resign it with a schema that can be represented with __ptrauth.
     //
