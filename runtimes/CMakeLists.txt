@@ -277,6 +277,7 @@ cmake_path(NORMAL_PATH RUNTIMES_INSTALL_RESOURCE_LIB_PATH)
 # hence must be included their those variables are defined.
 include(config-Fortran)
 
+
 option(LLVM_INCLUDE_TESTS "Generate build targets for the runtimes unit tests." ON)
 option(LLVM_INCLUDE_DOCS "Generate build targets for the runtimes documentation." ON)
 option(LLVM_ENABLE_SPHINX "Use Sphinx to generate the runtimes documentation." OFF)
