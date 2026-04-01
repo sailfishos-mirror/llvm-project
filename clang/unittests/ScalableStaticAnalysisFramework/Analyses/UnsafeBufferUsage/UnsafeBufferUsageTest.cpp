@@ -7,11 +7,13 @@
 //===----------------------------------------------------------------------===//
 
 #include "clang/ScalableStaticAnalysisFramework/Analyses/UnsafeBufferUsage/UnsafeBufferUsage.h"
+#include "TestFixture.h"
 #include "clang/AST/DynamicRecursiveASTVisitor.h"
 #include "clang/Frontend/ASTUnit.h"
 #include "clang/ScalableStaticAnalysisFramework/Analyses/UnsafeBufferUsage/UnsafeBufferUsageExtractor.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/ASTEntityMapping.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/Model/EntityId.h"
+#include "clang/ScalableStaticAnalysisFramework/Core/Model/EntityIdTable.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/Model/EntityName.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/TUSummary/TUSummary.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/TUSummary/TUSummaryBuilder.h"
@@ -22,6 +24,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include <memory>
+#include <optional>
 
 using namespace clang;
 using namespace ssaf;
@@ -69,7 +72,7 @@ const FunctionDecl *findFnByName(StringRef Name, ASTContext &Ctx) {
 constexpr inline auto buildEntityPointerLevel =
     UnsafeBufferUsageTUSummaryExtractor::buildEntityPointerLevel;
 
-class UnsafeBufferUsageTest : public testing::Test {
+class UnsafeBufferUsageTest : public TestFixture {
 protected:
   TUSummary TUSum;
   TUSummaryBuilder Builder;
@@ -216,22 +219,20 @@ TEST_F(UnsafeBufferUsageTest, UnsafeBufferUsageSerializeTest) {
                                      {"q", 3U},
                                      {"q", 4U}}));
 
-  std::vector<EntityId> Table;
-  std::function<uint64_t(EntityId)> IdToIntFn =
-      [&Table](EntityId Id) -> uint64_t {
-    auto I = llvm::find(Table, Id);
-    if (I == Table.end()) {
-      Table.push_back(Id);
-      return Table.size() - 1;
-    }
-    return I - Table.begin();
+  std::function<uint64_t(EntityId)> IdToIntFn = [](EntityId Id) -> uint64_t {
+    return getIndex(Id);
   };
   std::function<llvm::Expected<EntityId>(uint64_t)> IdFromIntFn =
-      [&Table](uint64_t Int) -> llvm::Expected<EntityId> {
-    if (0 <= Int && Int < Table.size())
-      return Table[Int];
-    return llvm::createStringError(
-        "unrecognized dummy index %d for an EntityId", Int);
+      [this](uint64_t Int) -> llvm::Expected<EntityId> {
+    std::optional<EntityId> Result = std::nullopt;
+
+    getIdTable(TUSum).forEach([&Int, &Result](const EntityName &, EntityId Id) {
+      if (getIndex(Id) == Int)
+        Result = Id;
+    });
+    if (Result)
+      return *Result;
+    return llvm::createStringError("failed to convert %d to an EntityId", Int);
   };
 
   auto RoundTripResult =

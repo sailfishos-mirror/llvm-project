@@ -7,4 +7,4 @@
 // CHECK-EMPTY:
 // CHECK-NEXT:  1. json - JSON serialization format
 // CHECK-NEXT:     Analyses:
-// CHECK-DAG:        1.1. UnsafeBufferUsage - JSON Format info for UnsafeBufferUsageEntitySummary
+// CHECK-DAG:        {{.*}}. UnsafeBufferUsage - JSON Format info for UnsafeBufferUsageEntitySummary

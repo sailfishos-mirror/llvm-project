@@ -9,7 +9,6 @@
 #include "clang/ScalableStaticAnalysisFramework/Analyses/UnsafeBufferUsage/UnsafeBufferUsage.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/Model/EntityId.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/Serialization/JSONFormat.h"
-#include "clang/ScalableStaticAnalysisFramework/SSAFBuiltinForceLinker.h" // IWYU pragma: keep
 #include "llvm/Support/Error.h"
 #include "llvm/Support/JSON.h"
 #include <cstdint>
@@ -19,40 +18,35 @@ using namespace ssaf;
 using Array = llvm::json::Array;
 using Object = llvm::json::Object;
 
-namespace {
 static constexpr llvm::StringLiteral SummarySerializationKey = "UnsafeBuffers";
-} // namespace
 
-namespace clang::ssaf {
-EntityPointerLevel buildEntityPointerLevel(EntityId Id, unsigned PtrLv) {
+EntityPointerLevel ssaf::buildEntityPointerLevel(EntityId Id, unsigned PtrLv) {
   return EntityPointerLevel(Id, PtrLv);
 }
 
 UnsafeBufferUsageEntitySummary
-buildUnsafeBufferUsageEntitySummary(EntityPointerLevelSet UnsafeBuffers) {
+ssaf::buildUnsafeBufferUsageEntitySummary(EntityPointerLevelSet UnsafeBuffers) {
   return UnsafeBufferUsageEntitySummary(std::move(UnsafeBuffers));
 }
 
 llvm::iterator_range<EntityPointerLevelSet::const_iterator>
-getUnsafeBuffers(const UnsafeBufferUsageEntitySummary &S) {
+ssaf::getUnsafeBuffers(const UnsafeBufferUsageEntitySummary &S) {
   return llvm::make_range(S.UnsafeBuffers.begin(), S.UnsafeBuffers.end());
 }
-} // namespace clang::ssaf
 
-Object static serialize(const EntitySummary &S,
+static Object serialize(const EntitySummary &S,
                         JSONFormat::EntityIdToJSONFn Fn) {
-  const UnsafeBufferUsageEntitySummary *SS =
-      static_cast<const UnsafeBufferUsageEntitySummary *>(&S);
+  const auto &SS = static_cast<const UnsafeBufferUsageEntitySummary &>(S);
   Array UnsafeBuffersData;
 
-  for (const auto &EPL : getUnsafeBuffers(*SS))
+  for (const auto &EPL : getUnsafeBuffers(SS))
     UnsafeBuffersData.push_back(
         Array{Fn(EPL.getEntity()), EPL.getPointerLevel()});
   return Object{{SummarySerializationKey.data(), std::move(UnsafeBuffersData)}};
 }
 
-llvm::Expected<std::unique_ptr<EntitySummary>> static deserializeImpl(
-    const Object &Data, JSONFormat::EntityIdFromJSONFn Fn) {
+static llvm::Expected<std::unique_ptr<EntitySummary>>
+deserializeImpl(const Object &Data, JSONFormat::EntityIdFromJSONFn Fn) {
   const Array *UnsafeBuffersData =
       Data.getArray(SummarySerializationKey.data());
 
@@ -62,7 +56,7 @@ llvm::Expected<std::unique_ptr<EntitySummary>> static deserializeImpl(
 
   EntityPointerLevelSet EPLs;
 
-  for (auto &EltData : *UnsafeBuffersData) {
+  for (const auto &EltData : *UnsafeBuffersData) {
     const Array *EltDataAsArr = EltData.getAsArray();
 
     if (!EltDataAsArr || EltDataAsArr->size() != 2)
@@ -84,8 +78,9 @@ llvm::Expected<std::unique_ptr<EntitySummary>> static deserializeImpl(
       buildUnsafeBufferUsageEntitySummary(std::move(EPLs)));
 }
 
-llvm::Expected<std::unique_ptr<EntitySummary>> static deserialize(
-    const Object &Data, EntityIdTable &, JSONFormat::EntityIdFromJSONFn Fn) {
+static llvm::Expected<std::unique_ptr<EntitySummary>>
+deserialize(const Object &Data, EntityIdTable &,
+            JSONFormat::EntityIdFromJSONFn Fn) {
   return deserializeImpl(Data, Fn);
 }
 
