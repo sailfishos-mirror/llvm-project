@@ -1919,34 +1919,30 @@ public:
   void setFP(uint64_t value) { _registers.__fp = value; }
 
 #if defined(_LIBUNWIND_TARGET_AARCH64_AUTHENTICATED_UNWINDING)
-  void
-  loadAndAuthenticateLinkRegister(reg_t inplaceAuthedLinkRegister,
-                                  link_reg_t *referenceAuthedLinkRegister) {
+  void loadAndResignIP(link_hardened_reg_arg_t result) {
     // Make sure that zero result is written as all zero bits, as implicitly
     // assumed for __ptrauth-qualified types.
     // FIXME Drop this hack when options support for __ptrauth qualifier
     //       will be implemented.
-    if (0 == ptrauth_auth_data((void *)inplaceAuthedLinkRegister,
-                               ptrauth_key_return_address, _registers.__sp)) {
-      memset((void *)referenceAuthedLinkRegister, 0,
-             sizeof(referenceAuthedLinkRegister));
+    if (0 == ptrauth_auth_data((void *)_registers.__pc,
+                               ptrauth_key_return_address, &_registers.__pc)) {
+      memset((void *)&result, 0, sizeof(result));
       return;
     }
 
-    // In arm64e or pauthtest ABI frame, the PC should have been signed with
-    // the SP - resign it with a schema that can be represented with __ptrauth.
+    // _registers.__pc is signed with its storage address as the discriminator,
+    // with zero values signed as any other values.
     //
     // Call the resign builtin explicitly instead of relying on implicit signing
     // of the authenticated value on assignment to *referenceAuthedLinkRegister,
     // as the latter results in comparison against 0 between auth and sign
     // operations.
     const auto newDiscriminator = ptrauth_blend_discriminator(
-        referenceAuthedLinkRegister,
-        __ptrauth_unwind_registers_arm64_link_reg_disc);
+        &result, __ptrauth_unwind_registers_arm64_link_reg_disc);
     reg_t resigned = (reg_t)ptrauth_auth_and_resign(
-        (void *)inplaceAuthedLinkRegister, ptrauth_key_return_address,
-        _registers.__sp, ptrauth_key_return_address, newDiscriminator);
-    memcpy((void *)referenceAuthedLinkRegister, &resigned, sizeof(resigned));
+        (void *)_registers.__pc, ptrauth_key_return_address,
+        &_registers.__pc, ptrauth_key_return_address, newDiscriminator);
+    memcpy((void *)&result, &resigned, sizeof(resigned));
   }
 #endif
 
