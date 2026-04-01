@@ -122,8 +122,8 @@ void ProgramManager::removeImages(__sycl_tgt_bin_desc *FatbinDesc) {
         ProgramIt != MPrograms.end()) {
       for (auto &[Device, Program] : ProgramIt->second) {
         MProgramWrappers.erase(Program);
-        MPrograms.erase(ProgramIt);
       }
+      MPrograms.erase(ProgramIt);
     }
     MDeviceImageWrappers.erase(DevImageIt);
   }
@@ -163,7 +163,7 @@ DeviceImageWrapper *ProgramManager::getDeviceImage(std::string_view KernelName,
 
 ol_symbol_handle_t ProgramManager::getOrCreateKernel(const char *KernelName,
                                                      DeviceImpl &Device) {
-  std::lock_guard<std::mutex> ImageGuard(MImageCollectionMutex);
+  std::unique_lock<std::mutex> ImageGuard(MImageCollectionMutex);
 
   auto KernelIDIt = MKernelNameToID.find(KernelName);
   if (KernelIDIt == MKernelNameToID.end())
@@ -179,8 +179,8 @@ ol_symbol_handle_t ProgramManager::getOrCreateKernel(const char *KernelName,
 
   DeviceImageWrapper *DevImage =
       getDeviceImage(KernelName, KernelIDIt->second, Device);
-  if (!DevImage)
-    throw;
+
+  ImageGuard.unlock();
 
   ol_program_handle_t Program = getOrCreateProgram(Device, DevImage);
   assert(Program);
@@ -202,11 +202,9 @@ ProgramManager::getOrCreateProgram(DeviceImpl &Device,
   std::unique_ptr<ProgramWrapper> NewProgramWrapper(
       new ProgramWrapper(Device.getHandle(), *DevImage));
   auto Program = NewProgramWrapper->getHandle();
-  {
-    MPrograms[DevImage].insert(std::make_pair(Device.getHandle(), Program));
-    MProgramWrappers.insert(std::make_pair(NewProgramWrapper->getHandle(),
-                                           std::move(NewProgramWrapper)));
-  }
+  MPrograms[DevImage].insert(std::make_pair(Device.getHandle(), Program));
+  MProgramWrappers.insert(std::make_pair(NewProgramWrapper->getHandle(),
+                                         std::move(NewProgramWrapper)));
 
   return Program;
 }
@@ -215,6 +213,8 @@ ol_symbol_handle_t ProgramManager::createKernel(ol_program_handle_t Program,
                                                 const kernel_id &KernelID,
                                                 const char *KernelName,
                                                 DeviceImpl &Device) {
+  assert((getKernel(KernelID, Device) == nullptr) &&
+         "Attempt to create kernel that already exists.");
   ol_symbol_handle_t Kernel{};
   callAndThrow(olGetSymbol, Program, KernelName, OL_SYMBOL_KIND_KERNEL,
                &Kernel);

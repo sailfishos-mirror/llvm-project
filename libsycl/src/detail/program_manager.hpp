@@ -58,6 +58,11 @@ public:
   /// olDestroyProgram.
   ~ProgramWrapper();
 
+  ProgramWrapper(const ProgramWrapper &) = delete;
+  ProgramWrapper &operator=(const ProgramWrapper &) = delete;
+  ProgramWrapper(ProgramWrapper &&) = delete;
+  ProgramWrapper &operator=(ProgramWrapper &&) = delete;
+
   /// \return the corresponding liboffload program handle.
   ol_program_handle_t getHandle() { return MProgram; }
 
