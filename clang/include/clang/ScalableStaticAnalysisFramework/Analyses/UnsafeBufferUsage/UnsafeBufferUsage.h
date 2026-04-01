@@ -12,6 +12,7 @@
 #include "clang/ScalableStaticAnalysisFramework/Core/Model/EntityId.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/Model/SummaryName.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/TUSummary/EntitySummary.h"
+#include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/iterator_range.h"
 #include <set>
 
@@ -98,6 +99,8 @@ class UnsafeBufferUsageEntitySummary final : public EntitySummary {
       : EntitySummary(), UnsafeBuffers(std::move(UnsafeBuffers)) {}
 
 public:
+  static constexpr llvm::StringLiteral Name = "UnsafeBufferUsage";
+
   SummaryName getSummaryName() const override { return summaryName(); };
 
   bool operator==(const EntityPointerLevelSet &Other) const {
@@ -110,7 +113,7 @@ public:
 
   bool empty() const { return UnsafeBuffers.empty(); }
 
-  static SummaryName summaryName() { return SummaryName{"UnsafeBufferUsage"}; }
+  static SummaryName summaryName() { return SummaryName{Name.data()}; }
 };
 } // namespace clang::ssaf
 

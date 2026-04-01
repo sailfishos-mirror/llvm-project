@@ -7,6 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "clang/ScalableStaticAnalysisFramework/Analyses/UnsafeBufferUsage/UnsafeBufferUsage.h"
+#include "clang/ScalableStaticAnalysisFramework/Analyses/UnsafeBufferUsage/UnsafeBufferUsageTest.h"
 #include "TestFixture.h"
 #include "clang/AST/DynamicRecursiveASTVisitor.h"
 #include "clang/Frontend/ASTUnit.h"
@@ -29,13 +30,6 @@
 using namespace clang;
 using namespace ssaf;
 using testing::UnorderedElementsAre;
-
-// Declare the test proxy function defined in UnsafeBufferUsage.cpp:
-extern llvm::Expected<std::unique_ptr<EntitySummary>>
-serializeDeserializeRoundTrip(
-    const UnsafeBufferUsageEntitySummary &S,
-    std::function<uint64_t(EntityId)> IdToIntFn,
-    std::function<llvm::Expected<EntityId>(uint64_t)> IdFromIntFn);
 
 namespace {
 

@@ -7,6 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "clang/ScalableStaticAnalysisFramework/Analyses/UnsafeBufferUsage/UnsafeBufferUsage.h"
+#include "clang/ScalableStaticAnalysisFramework/Analyses/UnsafeBufferUsage/UnsafeBufferUsageTest.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/Model/EntityId.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/Serialization/JSONFormat.h"
 #include "llvm/Support/Error.h"
@@ -93,15 +94,15 @@ struct UnsafeBufferUsageJSONFormatInfo : JSONFormat::FormatInfo {
 static llvm::Registry<JSONFormat::FormatInfo>::Add<
     UnsafeBufferUsageJSONFormatInfo>
     RegisterUnsafeBufferUsageJSONFormatInfo(
-        "UnsafeBufferUsage",
+        UnsafeBufferUsageEntitySummary::Name,
         "JSON Format info for UnsafeBufferUsageEntitySummary");
 
 // NOLINTNEXTLINE(misc-use-internal-linkage)
 volatile int UnsafeBufferUsageSSAFJSONFormatAnchorSource = 0;
 
 // For unit test:
-extern llvm::Expected<std::unique_ptr<EntitySummary>>
-serializeDeserializeRoundTrip(
+llvm::Expected<std::unique_ptr<EntitySummary>>
+ssaf::serializeDeserializeRoundTrip(
     const UnsafeBufferUsageEntitySummary &S,
     std::function<uint64_t(EntityId)> IdToIntFn,
     std::function<llvm::Expected<EntityId>(uint64_t)> IdFromIntFn) {
