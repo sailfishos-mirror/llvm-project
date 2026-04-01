@@ -1919,14 +1919,14 @@ public:
   void setFP(uint64_t value) { _registers.__fp = value; }
 
 #if defined(_LIBUNWIND_TARGET_AARCH64_AUTHENTICATED_UNWINDING)
-  void loadAndResignIP(link_hardened_reg_arg_t result) {
+  void loadAndResignIP(link_reg_t *output) {
     // Make sure that zero result is written as all zero bits, as implicitly
     // assumed for __ptrauth-qualified types.
     // FIXME Drop this hack when options support for __ptrauth qualifier
     //       will be implemented.
     if (0 == ptrauth_auth_data((void *)_registers.__pc,
                                ptrauth_key_return_address, &_registers.__pc)) {
-      memset((void *)&result, 0, sizeof(result));
+      memset((void *)output, 0, sizeof(*output));
       return;
     }
 
@@ -1938,11 +1938,11 @@ public:
     // as the latter results in comparison against 0 between auth and sign
     // operations.
     const auto newDiscriminator = ptrauth_blend_discriminator(
-        &result, __ptrauth_unwind_registers_arm64_link_reg_disc);
+        output, __ptrauth_unwind_registers_arm64_link_reg_disc);
     reg_t resigned = (reg_t)ptrauth_auth_and_resign(
         (void *)_registers.__pc, ptrauth_key_return_address, &_registers.__pc,
         ptrauth_key_return_address, newDiscriminator);
-    memcpy((void *)&result, &resigned, sizeof(resigned));
+    memcpy((void *)output, &resigned, sizeof(resigned));
   }
 #endif
 

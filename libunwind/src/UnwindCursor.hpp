@@ -1071,7 +1071,7 @@ private:
   int stepWithDwarfFDE(bool stage2) {
     typename R::link_reg_t pc;
 #if defined(_LIBUNWIND_TARGET_AARCH64_AUTHENTICATED_UNWINDING)
-    _registers.loadAndResignIP(pc);
+    _registers.loadAndResignIP(&pc);
 #else
     pc = this->getReg(UNW_REG_IP);
 #endif
@@ -2730,7 +2730,7 @@ void UnwindCursor<A, R>::setInfoBasedOnIPRegister(bool isReturnAddress) {
 
   typename R::link_reg_t pc;
 #if defined(_LIBUNWIND_TARGET_AARCH64_AUTHENTICATED_UNWINDING)
-  _registers.loadAndResignIP(pc);
+  _registers.loadAndResignIP(&pc);
 #elif defined(_LIBUNWIND_ARM_EHABI)
   pc = this->getReg(UNW_REG_IP);
   // Remove the thumb bit so the IP represents the actual instruction address.
@@ -3306,7 +3306,7 @@ bool UnwindCursor<A, R>::getFunctionName(char *buf, size_t bufLen,
                                          unw_word_t *offset) {
   typename R::link_reg_t pc;
 #if defined(_LIBUNWIND_TARGET_AARCH64_AUTHENTICATED_UNWINDING)
-  _registers.loadAndResignIP(pc);
+  _registers.loadAndResignIP(&pc);
 #else
   pc = this->getReg(UNW_REG_IP);
 #endif
