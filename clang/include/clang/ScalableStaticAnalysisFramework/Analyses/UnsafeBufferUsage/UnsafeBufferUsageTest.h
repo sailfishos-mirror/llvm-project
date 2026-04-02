@@ -16,6 +16,7 @@
 #include "clang/ScalableStaticAnalysisFramework/Analyses/UnsafeBufferUsage/UnsafeBufferUsage.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/TUSummary/EntitySummary.h"
 #include "llvm/Support/Error.h"
+
 namespace clang::ssaf {
 
 llvm::Expected<std::unique_ptr<EntitySummary>> serializeDeserializeRoundTrip(
