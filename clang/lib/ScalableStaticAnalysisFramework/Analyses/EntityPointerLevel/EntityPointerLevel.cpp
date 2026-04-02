@@ -1,4 +1,4 @@
-//===----------------- EntityPointerLevel.cpp -------------------*- C++ -*-===//
+//===- EntityPointerLevel.cpp ----------------------------------*- C++ -*-===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -6,18 +6,21 @@
 //
 //===----------------------------------------------------------------------===//
 #include "clang/ScalableStaticAnalysisFramework/Analyses/EntityPointerLevel/EntityPointerLevel.h"
+#include "clang/AST/ASTContext.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclCXX.h"
+#include "clang/AST/StmtVisitor.h"
+#include "clang/ScalableStaticAnalysisFramework/Analyses/EntityPointerLevel/EntityPointerLevelFormat.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/ASTEntityMapping.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/Model/EntityName.h"
-#include "llvm/Support/JSON.h"
 #include <optional>
 
-namespace {
 using namespace clang;
+using namespace ssaf;
+
 template <typename NodeTy, typename... Ts>
-static inline llvm::Error strErrAtNode(ASTContext &Ctx, const NodeTy &N,
-                                       StringRef Fmt, const Ts &...Args) {
+static inline llvm::Error makeErrAtNode(ASTContext &Ctx, const NodeTy &N,
+                                        StringRef Fmt, const Ts &...Args) {
   std::string LocStr = N.getBeginLoc().printToString(Ctx.getSourceManager());
   llvm::SmallVector<char> FmtData;
 
@@ -25,10 +28,10 @@ static inline llvm::Error strErrAtNode(ASTContext &Ctx, const NodeTy &N,
   return llvm::createStringError(FmtData.data(), Args..., LocStr.c_str());
 }
 
-static inline llvm::Error entityNameErrFor(ASTContext &Ctx,
-                                           const NamedDecl &D) {
-  return strErrAtNode(Ctx, D, "failed to create entity name for %s",
-                      D.getNameAsString().data());
+static inline llvm::Error makeEntityNameErr(ASTContext &Ctx,
+                                            const NamedDecl &D) {
+  return makeErrAtNode(Ctx, D, "failed to create entity name for %s",
+                       D.getNameAsString().data());
 }
 
 template <typename DeclOrExpr>
@@ -37,18 +40,6 @@ static bool hasPtrOrArrType(const DeclOrExpr &E) {
          llvm::isa<ArrayType>(E.getType().getCanonicalType());
 }
 
-template <typename... Ts>
-static inline llvm::Error makeErrorSawButExpected(const llvm::json::Value &Saw,
-                                                  llvm::StringRef Expected,
-                                                  const Ts &...ExpectedArgs) {
-  return llvm::createStringError(
-      ("saw %s but expected " + Expected).str().c_str(),
-      llvm::formatv("{0:2}", Saw).str().data(), Expected.data(),
-      ExpectedArgs...);
-}
-} // namespace
-
-namespace clang::ssaf {
 // Translate a pointer type expression 'E' to a (set of) EntityPointerLevel(s)
 // associated with the declared type of the base address of `E`. If the base
 // address of `E` is not associated with an entity, the translation result is an
@@ -68,16 +59,16 @@ namespace clang::ssaf {
 //   Translate(arr[5])             -> {(arr, 2)}
 //   Translate(cond ? p1[5] : p2)  -> {(p1, 2), (p2, 1)}
 //   Translate(&arr[5])            -> {(arr, 1)}
-class EntityPointerLevelTranslator
+class clang::ssaf::EntityPointerLevelTranslator
     : public ConstStmtVisitor<EntityPointerLevelTranslator,
                               Expected<EntityPointerLevelSet>> {
   friend class StmtVisitorBase;
 
   // Fallback method for all unsupported expression kind:
   llvm::Error fallback(const Stmt *E) {
-    return strErrAtNode(Ctx, *E,
-                        "attempt to translate %s to EntityPointerLevels",
-                        E->getStmtClassName());
+    return makeErrAtNode(Ctx, *E,
+                         "attempt to translate %s to EntityPointerLevels",
+                         E->getStmtClassName());
   }
 
   EntityPointerLevel createEntityPointerLevelFor(const EntityName &Name) {
@@ -108,7 +99,7 @@ public:
   Expected<EntityPointerLevelSet> translate(const Expr *E) { return Visit(E); }
   Expected<EntityPointerLevel> translate(const NamedDecl *D, bool IsRet) {
     if (IsRet && !isa<FunctionDecl>(D))
-      return strErrAtNode(
+      return makeErrAtNode(
           Ctx, *D,
           "attempt to call getEntityNameForReturn on a NamedDecl of %s kind",
           D->getDeclKindName());
@@ -118,7 +109,7 @@ public:
               : getEntityName(D);
     if (EN)
       return createEntityPointerLevelFor(*EN);
-    return entityNameErrFor(Ctx, *D);
+    return makeEntityNameErr(Ctx, *D);
   }
 
   static EntityPointerLevel incrementPointerLevel(const EntityPointerLevel &E) {
@@ -241,14 +232,14 @@ private:
   Expected<EntityPointerLevelSet> VisitDeclRefExpr(const DeclRefExpr *E) {
     if (auto EntityName = getEntityName(E->getDecl()))
       return EntityPointerLevelSet{createEntityPointerLevelFor(*EntityName)};
-    return entityNameErrFor(Ctx, *E->getDecl());
+    return makeEntityNameErr(Ctx, *E->getDecl());
   }
 
   // Translate({., ->}f) -> {(MemberDecl, 1)}
   Expected<EntityPointerLevelSet> VisitMemberExpr(const MemberExpr *E) {
     if (auto EntityName = getEntityName(E->getMemberDecl()))
       return EntityPointerLevelSet{createEntityPointerLevelFor(*EntityName)};
-    return entityNameErrFor(Ctx, *E->getMemberDecl());
+    return makeEntityNameErr(Ctx, *E->getMemberDecl());
   }
 
   // Translate(`DefaultArg`) -> Translate(`DefaultArg->getExpr()`)
@@ -263,30 +254,70 @@ private:
   }
 };
 
-Expected<EntityPointerLevelSet>
-translateEntityPointerLevel(const Expr *E, ASTContext &Ctx,
-                            std::function<EntityId(EntityName EN)> AddEntity) {
+Expected<EntityPointerLevelSet> clang::ssaf::translateEntityPointerLevel(
+    const Expr *E, ASTContext &Ctx,
+    std::function<EntityId(EntityName EN)> AddEntity) {
   EntityPointerLevelTranslator Translator(AddEntity, Ctx);
 
   return Translator.translate(E);
 }
 
 /// Create an EntityPointerLevel from a ValueDecl of a pointer type.
-Expected<EntityPointerLevel>
-creatEntityPointerLevel(const NamedDecl *D, ASTContext &Ctx,
-                        std::function<EntityId(EntityName EN)> AddEntity,
-                        bool IsFunRet) {
+Expected<EntityPointerLevel> clang::ssaf::creatEntityPointerLevel(
+    const NamedDecl *D, ASTContext &Ctx,
+    std::function<EntityId(EntityName EN)> AddEntity, bool IsFunRet) {
   EntityPointerLevelTranslator Translator(AddEntity, Ctx);
 
   return Translator.translate(D, IsFunRet);
 }
 
-EntityPointerLevel incrementPointerLevel(const EntityPointerLevel &E) {
+EntityPointerLevel
+clang::ssaf::incrementPointerLevel(const EntityPointerLevel &E) {
   return EntityPointerLevelTranslator::incrementPointerLevel(E);
 }
 
-EntityPointerLevel buildEntityPointerLevel(EntityId Id, unsigned PtrLv) {
+EntityPointerLevel clang::ssaf::buildEntityPointerLevel(EntityId Id,
+                                                        unsigned PtrLv) {
   return EntityPointerLevel({Id, PtrLv});
 }
 
-} // namespace clang::ssaf
+// Writes an EntityPointerLevel as
+// Array [
+//   Object { "@" : [entity-id]},
+//   [pointer-level-integer]
+// ]
+llvm::json::Value clang::ssaf::entityPointerLevelToJSON(
+    const EntityPointerLevel &EPL, JSONFormat::EntityIdToJSONFn EntityId2JSON) {
+  return llvm::json::Array{EntityId2JSON(EPL.getEntity()),
+                           llvm::json::Value(EPL.getPointerLevel())};
+}
+
+Expected<EntityPointerLevel> clang::ssaf::entityPointerLevelFromJSON(
+    const llvm::json::Value &EPLData,
+    JSONFormat::EntityIdFromJSONFn EntityIdFromJSON) {
+  auto *AsArr = EPLData.getAsArray();
+
+  if (!AsArr || AsArr->size() != 2)
+    return makeSawButExpectedError(
+        EPLData, "an array with exactly two elements representing "
+                 "EntityId and PointerLevel, respectively");
+
+  auto *EntityIdObj = (*AsArr)[0].getAsObject();
+
+  if (!EntityIdObj)
+    return makeSawButExpectedError((*AsArr)[0],
+                                   "an object representing EntityId");
+
+  Expected<EntityId> Id = EntityIdFromJSON(*EntityIdObj);
+
+  if (!Id)
+    return Id.takeError();
+
+  std::optional<uint64_t> PtrLv = (*AsArr)[1].getAsInteger();
+
+  if (!PtrLv)
+    return makeSawButExpectedError((*AsArr)[1],
+                                   "an integer representing PointerLevel");
+
+  return buildEntityPointerLevel(*Id, *PtrLv);
+}

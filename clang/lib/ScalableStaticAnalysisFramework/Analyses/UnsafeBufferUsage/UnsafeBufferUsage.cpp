@@ -48,8 +48,7 @@ deserializeImpl(const Object &Data, JSONFormat::EntityIdFromJSONFn Fn) {
       Data.getArray(SummarySerializationKey.data());
 
   if (!UnsafeBuffersData)
-    return makeSawButExpectedError(Object(Data),
-                                   "an Object with a key %s",
+    return makeSawButExpectedError(Object(Data), "an Object with a key %s",
                                    SummarySerializationKey.data());
 
   EntityPointerLevelSet EPLs;
