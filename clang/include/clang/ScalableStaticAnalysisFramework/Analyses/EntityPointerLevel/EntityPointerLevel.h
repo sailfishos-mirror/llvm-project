@@ -6,12 +6,12 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_CLANG_SCALABLESTATICANALYSISFRAMEWORK_ANALYSES_ENTITYPOINTERLEVEL_H
-#define LLVM_CLANG_SCALABLESTATICANALYSISFRAMEWORK_ANALYSES_ENTITYPOINTERLEVEL_H
+#ifndef LLVM_CLANG_SCALABLESTATICANALYSISFRAMEWORK_ANALYSES_ENTITYPOINTERLEVEL_ENTITYPOINTERLEVEL_H
+#define LLVM_CLANG_SCALABLESTATICANALYSISFRAMEWORK_ANALYSES_ENTITYPOINTERLEVEL_ENTITYPOINTERLEVEL_H
 
 #include "clang/AST/Decl.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/Model/EntityId.h"
-#include "clang/ScalableStaticAnalysisFramework/Core/Serialization/JSONFormat.h"
+#include "clang/ScalableStaticAnalysisFramework/Core/Model/EntityName.h"
 #include <set>
 
 namespace clang::ssaf {
@@ -39,9 +39,6 @@ class EntityPointerLevel {
   unsigned PointerLevel;
 
   friend class EntityPointerLevelTranslator;
-  friend llvm::Expected<EntityPointerLevel>
-  entityPointerLevelFromJSON(const llvm::json::Value &EPLData,
-                             JSONFormat::EntityIdFromJSONFn EntityIdFromJSON);
   // For unittests:
   friend EntityPointerLevel buildEntityPointerLevel(EntityId, unsigned);
 
@@ -114,21 +111,14 @@ creatEntityPointerLevel(const NamedDecl *ND, ASTContext &Ctx,
                         std::function<EntityId(EntityName EN)> AddEntity,
                         bool IsFunRet = false);
 
+/// Creates a `EntityPointerLevel` from a pair of an EntityId and a pointer
+/// level:
+EntityPointerLevel buildEntityPointerLevel(EntityId, unsigned);
+
 /// Creates a new EntityPointerLevel (EPL) from `E` by incrementing `E`'s
 /// pointer level.
 /// \return the EPL that is associated with the pointee (or array element) type
 /// of `E`'s associated pointer/array tyoe of the same entity.
 EntityPointerLevel incrementPointerLevel(const EntityPointerLevel &E);
-
-llvm::json::Value
-entityPointerLevelToJSON(const EntityPointerLevel &EPL,
-                         JSONFormat::EntityIdToJSONFn EntityId2JSON);
-
-llvm::Expected<EntityPointerLevel>
-entityPointerLevelFromJSON(const llvm::json::Value &EPLData,
-                           JSONFormat::EntityIdFromJSONFn EntityIdFromJSON);
-
-/// Proxy function creating EPLs for unit tests:
-EntityPointerLevel buildEntityPointerLevel(EntityId, unsigned);
 } // namespace clang::ssaf
-#endif // LLVM_CLANG_SCALABLESTATICANALYSISFRAMEWORK_ANALYSES_ENTITYPOINTERLEVEL_H
+#endif // LLVM_CLANG_SCALABLESTATICANALYSISFRAMEWORK_ANALYSES_ENTITYPOINTERLEVEL_ENTITYPOINTERLEVEL_H

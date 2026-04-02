@@ -5,11 +5,12 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
-#include "clang/ScalableStaticAnalysisFramework/Analyses/EntityPointerLevel.h"
+#include "clang/ScalableStaticAnalysisFramework/Analyses/EntityPointerLevel/EntityPointerLevel.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclCXX.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/ASTEntityMapping.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/Model/EntityName.h"
+#include "llvm/Support/JSON.h"
 #include <optional>
 
 namespace {
@@ -282,47 +283,6 @@ creatEntityPointerLevel(const NamedDecl *D, ASTContext &Ctx,
 
 EntityPointerLevel incrementPointerLevel(const EntityPointerLevel &E) {
   return EntityPointerLevelTranslator::incrementPointerLevel(E);
-}
-
-// Writes an EntityPointerLevel as
-// Array [
-//   Object { "@" : [entity-id]},
-//   [pointer-level-integer]
-// ]
-llvm::json::Value
-entityPointerLevelToJSON(const EntityPointerLevel &EPL,
-                         JSONFormat::EntityIdToJSONFn EntityId2JSON) {
-  return llvm::json::Array{EntityId2JSON(EPL.getEntity()),
-                           llvm::json::Value(EPL.getPointerLevel())};
-}
-
-Expected<EntityPointerLevel>
-entityPointerLevelFromJSON(const llvm::json::Value &EPLData,
-                           JSONFormat::EntityIdFromJSONFn EntityIdFromJSON) {
-  auto *AsArr = EPLData.getAsArray();
-
-  if (!AsArr || AsArr->size() != 2)
-    return makeErrorSawButExpected(
-        EPLData, "a JSON array of size 2: [EntityId, PointerLevel]");
-
-  auto *EntityIdObj = (*AsArr)[0].getAsObject();
-
-  if (!EntityIdObj)
-    return makeErrorSawButExpected((*AsArr)[0],
-                                   "a JSON object representing EntityID");
-
-  Expected<EntityId> Id = EntityIdFromJSON(*EntityIdObj);
-
-  if (!Id)
-    return Id.takeError();
-
-  std::optional<uint64_t> PtrLv = (*AsArr)[1].getAsInteger();
-
-  if (!PtrLv)
-    return makeErrorSawButExpected((*AsArr)[1],
-                                   "a JSON value representing an integer");
-
-  return EntityPointerLevel{std::tie(*Id, *PtrLv)};
 }
 
 EntityPointerLevel buildEntityPointerLevel(EntityId Id, unsigned PtrLv) {
