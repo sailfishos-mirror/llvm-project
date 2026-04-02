@@ -9,16 +9,15 @@
 #include "SSAFAnalysesCommon.h"
 #include "clang/AST/ASTConsumer.h"
 #include "clang/AST/ASTContext.h"
+#include "clang/AST/DynamicRecursiveASTVisitor.h"
 #include "clang/Analysis/Analyses/UnsafeBufferUsage.h"
-#include "clang/ScalableStaticAnalysisFramework/Analyses/EntityPointerLevel.h"
-#include "clang/ScalableStaticAnalysisFramework/Analyses/UnsafeBufferUsage.h"
+#include "clang/ScalableStaticAnalysisFramework/Analyses/EntityPointerLevel/EntityPointerLevel.h"
+#include "clang/ScalableStaticAnalysisFramework/Analyses/UnsafeBufferUsage/UnsafeBufferUsage.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/ASTEntityMapping.h"
+#include "clang/ScalableStaticAnalysisFramework/Core/Model/EntityId.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/Model/EntityName.h"
-#include "clang/ScalableStaticAnalysisFramework/Core/TUSummary/ExtractorRegistry.h"
-#include "clang/ScalableStaticAnalysisFramework/Core/TUSummary/TUSummaryBuilder.h"
-#include "clang/ScalableStaticAnalysisFramework/Core/TUSummary/TUSummaryExtractor.h"
-#include "clang/ScalableStaticAnalysisFramework/SSAFForceLinker.h" // IWYU pragma: keep
-#include <memory>
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/Support/Error.h"
 
 namespace {
 using namespace clang;
@@ -38,6 +37,54 @@ void findFactsInContributor(const NamedDecl *Contributor, ASTContext &Ctx,
 
   Finder.findMatches(Contributor);
   UnsafePointers.merge(Matcher.UnsafePointers);
+}
+
+static llvm::Error makeCreateEntityNameError(const NamedDecl *FailedDecl,
+                                             ASTContext &Ctx) {
+  std::string LocStr = FailedDecl->getSourceRange().getBegin().printToString(
+      Ctx.getSourceManager());
+  return llvm::createStringError(
+      "failed to create entity name for %s declared at %s",
+      FailedDecl->getNameAsString().c_str(), LocStr.c_str());
+}
+
+static llvm::Error makeAddEntitySummaryError(const NamedDecl *FailedContributor,
+                                             ASTContext &Ctx) {
+  std::string LocStr =
+      FailedContributor->getSourceRange().getBegin().printToString(
+          Ctx.getSourceManager());
+  return llvm::createStringError(
+      "failed to add entity summary for contributor %s declared at %s",
+      FailedContributor->getNameAsString().c_str(), LocStr.c_str());
+}
+
+Expected<EntityPointerLevelSet>
+buildEntityPointerLevels(std::set<const Expr *> &&UnsafePointers,
+                         UnsafeBufferUsageTUSummaryExtractor &Extractor,
+                         ASTContext &Ctx,
+                         std::function<EntityId(EntityName)> AddEntity) {
+  EntityPointerLevelSet Result{};
+  llvm::Error AllErrors = llvm::ErrorSuccess();
+
+  for (const Expr *Ptr : UnsafePointers) {
+    Expected<EntityPointerLevelSet> Translation =
+        translateEntityPointerLevel(Ptr, Ctx, AddEntity);
+
+    if (Translation) {
+      // Filter out those temporary invalid EntityPointerLevels associated with
+      // `&E` pointers:
+      auto FilteredTranslation = llvm::make_filter_range(
+          *Translation, [](const EntityPointerLevel &E) -> bool {
+            return E.getPointerLevel() > 0;
+          });
+      Result.insert(FilteredTranslation.begin(), FilteredTranslation.end());
+      continue;
+    }
+    AllErrors = llvm::joinErrors(std::move(AllErrors), Translation.takeError());
+  }
+  if (AllErrors)
+    return AllErrors;
+  return Result;
 }
 } // namespace
 
