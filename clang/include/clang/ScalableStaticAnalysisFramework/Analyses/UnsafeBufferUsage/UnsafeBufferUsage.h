@@ -113,7 +113,7 @@ public:
 
   bool empty() const { return UnsafeBuffers.empty(); }
 
-  static SummaryName summaryName() { return SummaryName{Name.data()}; }
+  static SummaryName summaryName() { return SummaryName{Name.str()}; }
 };
 } // namespace clang::ssaf
 
