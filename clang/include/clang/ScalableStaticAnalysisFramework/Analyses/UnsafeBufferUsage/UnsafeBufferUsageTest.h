@@ -6,7 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Functions and data structures that help UnsafeBufferUsage unit tests
+// Functions and data structures that help UnsafeBufferUsage unit tests.
 //
 //===----------------------------------------------------------------------===//
 #ifndef LLVM_CLANG_SCALABLESTATICANALYSISFRAMEWORK_ANALYSES_UNSAFEBUFFERUSAGETEST_H
