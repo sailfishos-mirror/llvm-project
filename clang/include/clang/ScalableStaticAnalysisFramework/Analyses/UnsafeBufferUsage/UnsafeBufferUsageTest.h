@@ -9,8 +9,9 @@
 // Functions and data structures that help UnsafeBufferUsage unit tests.
 //
 //===----------------------------------------------------------------------===//
-#ifndef LLVM_CLANG_SCALABLESTATICANALYSISFRAMEWORK_ANALYSES_UNSAFEBUFFERUSAGETEST_H
-#define LLVM_CLANG_SCALABLESTATICANALYSISFRAMEWORK_ANALYSES_UNSAFEBUFFERUSAGETEST_H
+
+#ifndef LLVM_CLANG_SCALABLESTATICANALYSISFRAMEWORK_ANALYSES_UNSAFEBUFFERUSAGE_UNSAFEBUFFERUSAGETEST_H
+#define LLVM_CLANG_SCALABLESTATICANALYSISFRAMEWORK_ANALYSES_UNSAFEBUFFERUSAGE_UNSAFEBUFFERUSAGETEST_H
 
 #include "clang/ScalableStaticAnalysisFramework/Analyses/UnsafeBufferUsage/UnsafeBufferUsage.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/TUSummary/EntitySummary.h"
