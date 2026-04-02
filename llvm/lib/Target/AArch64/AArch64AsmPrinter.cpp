@@ -197,6 +197,10 @@ public:
     uint64_t IntDisc;
     Register AddrDisc;
     bool AddrDiscIsKilled;
+
+    bool addrDiscIsKilledAndNoneOf(std::initializer_list<Register> Regs) {
+      return AddrDiscIsKilled && !llvm::is_contained(Regs, AddrDisc);
+    }
   };
 
   // Helper for emitting AUTRELLOADPAC: increment Pointer by Addend and then by
@@ -2361,28 +2365,26 @@ void AArch64AsmPrinter::emitPtrauthAuthResign(
     std::optional<PtrAuthSchema> SignSchema, std::optional<int64_t> Addend,
     Value *DS) {
   const bool IsResign = SignSchema.has_value();
+  Register SignAddrDiscOrNone =
+      SignSchema ? SignSchema->AddrDisc : AArch64::NoRegister;
 
   const auto [ShouldCheck, ShouldTrap] = getCheckAndTrapMode(MF, IsResign);
-  const bool ShouldSkipSignOnAuthFailure = ShouldCheck && !ShouldTrap;
   assert((ShouldCheck || !ShouldTrap) && "ShouldTrap implies ShouldCheck");
 
-  // It is hardly meaningful to authenticate or sign a pointer using its own
-  // value, thus we only have to take care not to early-clobber
-  // AuthSchema.AddrDisc that is aliased with SignSchema->AddrDisc.
-  assert(Pointer != AuthSchema.AddrDisc);
-  assert(!SignSchema || Pointer != SignSchema->AddrDisc);
-  bool IsResignWithAliasedAddrDiscs =
-      IsResign && AuthSchema.AddrDisc == SignSchema->AddrDisc;
-  bool MayReuseAUTAddrDisc =
-      !IsResignWithAliasedAddrDiscs && AuthSchema.AddrDiscIsKilled;
-  Register AUTDiscReg = emitPtrauthDiscriminator(
-      AuthSchema.IntDisc, AuthSchema.AddrDisc, Scratch, MayReuseAUTAddrDisc);
+  MCSymbol *OnFailure = nullptr;
+  if (ShouldCheck && !ShouldTrap)
+    OnFailure = createTempSymbol("resign_end_");
 
+  // While rather unlikely, it is technically possible to use the Pointer to
+  // compute its own discriminator.
+  // AuthSchema.AddrDisc may be clobbered by emitPtrauthDiscriminator as long as
+  // it is not used past this point neither externally (the register operand is
+  // "killed"), nor internally (it does not alias anything being used later).
+  Register AUTDiscReg = emitPtrauthDiscriminator(
+      AuthSchema.IntDisc, AuthSchema.AddrDisc, Scratch,
+      AuthSchema.addrDiscIsKilledAndNoneOf({Pointer, SignAddrDiscOrNone}));
   if (!emitDeactivationSymbolRelocation(DS))
     emitAUT(AuthSchema.Key, Pointer, AUTDiscReg);
-
-  MCSymbol *OnFailure =
-      ShouldSkipSignOnAuthFailure ? createTempSymbol("resign_end_") : nullptr;
 
   if (ShouldCheck)
     emitPtrauthCheckAuthenticatedValue(Pointer, Scratch, AuthSchema.Key,
@@ -2397,10 +2399,9 @@ void AArch64AsmPrinter::emitPtrauthAuthResign(
   if (Addend.has_value())
     emitPtrauthApplyIndirectAddend(Pointer, Scratch, *Addend);
 
-  Register PACDiscReg =
-      emitPtrauthDiscriminator(SignSchema->IntDisc, SignSchema->AddrDisc,
-                               Scratch, SignSchema->AddrDiscIsKilled);
-
+  Register PACDiscReg = emitPtrauthDiscriminator(
+      SignSchema->IntDisc, SignSchema->AddrDisc, Scratch,
+      SignSchema->addrDiscIsKilledAndNoneOf({Pointer}));
   emitPAC(SignSchema->Key, Pointer, PACDiscReg);
 
   if (OnFailure)
