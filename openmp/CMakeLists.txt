@@ -70,12 +70,6 @@ set(OPENMP_TEST_CXX_COMPILER "${OPENMP_TEST_CXX_COMPILER_default}" CACHE STRING
 set(OPENMP_TEST_Fortran_COMPILER "${OPENMP_TEST_Fortran_COMPILER_default}" CACHE STRING
   "Fortran compiler to use for testing OpenMP runtime libraries.")
 
-# Set fortran test compiler if flang is found
-if (EXISTS "${OPENMP_TEST_Fortran_COMPILER}")
-  message("Using local flang build at ${OPENMP_TEST_Fortran_COMPILER}")
-else()
-  unset(OPENMP_TEST_Fortran_COMPILER)
-endif()
 
 # If not standalone, set CMAKE_CXX_STANDARD but don't set the global cache value,
 # only set it locally for OpenMP.
@@ -105,6 +99,9 @@ math(EXPR LIBOMP_VERSION_BUILD_MONTH_DAY "${LIBOMP_VERSION_BUILD}%10000")
 # Currently don't record any timestamps
 set(LIBOMP_BUILD_DATE "No_Timestamp")
 
+
+set(LIBOMP_FORTRAN_MODULES "${RUNTIMES_FLANG_MODULES_ENABLED}" CACHE BOOL
+  "Create Fortran module files? (requires fortran compiler)")
 
 # Set up testing infrastructure.
 include(OpenMPTesting)
@@ -138,11 +135,13 @@ else()
   get_clang_resource_dir(LIBOMP_HEADERS_INSTALL_PATH SUBDIR include)
 endif()
 
-if(RUNTIMES_FLANG_MODULES_ENABLED)
+if(LIBOMP_FORTRAN_MODULES)
   add_subdirectory(module)
 else()
-  message(STATUS "Building omp_lib.mod disabled by RUNTIMES_FLANG_MODULES_ENABLED='${RUNTIMES_FLANG_MODULES_ENABLED}'; libomp-mod does nothing")
-  add_custom_target(libomp-mod)
+  message(STATUS "Building omp_lib.mod disabled by LIBOMP_FORTRAN_MODULES='${LIBOMP_FORTRAN_MODULES}'; libomp-mod does nothing")
+  add_custom_target(libomp-mod
+    COMMAND ${CMAKE_COMMAND} -E echo "Building omp_lib.mod disabled by LIBOMP_FORTRAN_MODULES=${LIBOMP_FORTRAN_MODULES}"
+  )
 endif()
 
 # Use the current compiler target to determine the appropriate runtime to build.
