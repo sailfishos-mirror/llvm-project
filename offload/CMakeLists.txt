@@ -87,6 +87,7 @@ set(CMAKE_CXX_EXTENSIONS NO)
 
 # Set the path of all resulting libraries to a unified location so that it can
 # be used for testing.
+# TODO: Use common runtimes infrastructure for output and install paths
 set(LIBOMPTARGET_LIBRARY_DIR ${CMAKE_CURRENT_BINARY_DIR})
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${LIBOMPTARGET_LIBRARY_DIR})
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${LIBOMPTARGET_LIBRARY_DIR})
