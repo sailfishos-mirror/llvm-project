@@ -26,4 +26,4 @@ llvm::Expected<std::unique_ptr<EntitySummary>> serializeDeserializeRoundTrip(
 
 } // namespace clang::ssaf
 
-#endif
+#endif // LLVM_CLANG_SCALABLESTATICANALYSISFRAMEWORK_ANALYSES_UNSAFEBUFFERUSAGE_UNSAFEBUFFERUSAGETEST_H
