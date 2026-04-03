@@ -28928,7 +28928,8 @@ bool SLPVectorizerPass::vectorizeHorReduction(
       }
     if (HorizontalReduction::isSupportedOrderedReductionOp(Inst)) {
       if (HorRdx.matchOrderedReduction(R, Inst, /*MatchLHS=*/true))
-        if (Value *Red = HorRdx.tryToReduceOrdered(R, *DL, TTI, *TLI, AC, *DT)) {
+        if (Value *Red =
+                HorRdx.tryToReduceOrdered(R, *DL, TTI, *TLI, AC, *DT)) {
           if (Red != Inst)
             return Red;
           Res = Red;
