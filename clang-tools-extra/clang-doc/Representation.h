@@ -104,23 +104,17 @@ llvm::ArrayRef<T> deepCopyArray(llvm::ArrayRef<T> V,
   return llvm::ArrayRef<T>(Allocated, V.size());
 }
 
-// An abstraction for owned pointers. Initially mapped to OwnedPtr,
-// to be eventually transitioned to bare pointers in an arena.
-template <typename T> using OwnedPtr = T *;
-
 // An abstraction for lists that are dynamically managed (inserted/removed).
 // To be eventually transitioned to llvm::simple_ilist.
 template <typename T> using DocList = llvm::simple_ilist<T>;
 
 // A helper function to create memory allocated in the TransientArena.
-template <typename T, typename... Args>
-OwnedPtr<T> allocateTransient(Args &&...args) {
+template <typename T, typename... Args> T *allocateTransient(Args &&...args) {
   return new (TransientArena.Allocate<T>()) T(std::forward<Args>(args)...);
 }
 
 // A helper function to create memory allocated in the TransientArena.
-template <typename T, typename... Args>
-OwnedPtr<T> allocatePersistent(Args &&...args) {
+template <typename T, typename... Args> T *allocatePersistent(Args &&...args) {
   return new (PersistentArena.Allocate<T>()) T(std::forward<Args>(args)...);
 }
 
@@ -129,10 +123,6 @@ template <typename T, typename... Args>
 T *allocatePtr(llvm::BumpPtrAllocator &Alloc, Args &&...args) {
   return new (Alloc.Allocate<T>()) T(std::forward<Args>(args)...);
 }
-
-// A helper function to access the underlying pointer from an owned pointer,
-// abstracting away the pointer dereferencing mechanism.
-template <typename T> T *getPtr(const OwnedPtr<T> &O) { return O; }
 
 // SHA1'd hash of a USR.
 using SymbolID = std::array<uint8_t, 20>;
@@ -772,8 +762,7 @@ llvm::Expected<Info *> mergeInfos(SmallVectorImpl<Info *> &Values);
 
 // Merges a single new Info into an existing Reduced Info (allocating it if
 // needed).
-llvm::Error mergeSingleInfo(doc::OwnedPtr<doc::Info> &Reduced,
-                            doc::OwnedPtr<doc::Info> &&NewInfo,
+llvm::Error mergeSingleInfo(doc::Info *&Reduced, doc::Info *NewInfo,
                             llvm::BumpPtrAllocator &Arena);
 
 struct ClangDocContext {
