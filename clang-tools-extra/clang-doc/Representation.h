@@ -200,18 +200,15 @@ struct CommentInfo : public llvm::ilist_node<CommentInfo> {
   // the vector.
   bool operator<(const CommentInfo &Other) const;
 
-  llvm::ArrayRef<CommentInfo>
-      Children;              // List of child comments for this CommentInfo.
-  StringRef Direction;       // Parameter direction (for (T)ParamCommand).
-  StringRef Name;            // Name of the comment (for Verbatim and HTML).
-  StringRef ParamName;       // Parameter name (for (T)ParamCommand).
-  StringRef CloseName;       // Closing tag name (for VerbatimBlock).
-  StringRef Text;            // Text of the comment.
-  llvm::ArrayRef<StringRef> AttrKeys; // List of attribute keys (for HTML).
-  llvm::ArrayRef<StringRef>
-      AttrValues; // List of attribute values for each key (for HTML).
-  llvm::ArrayRef<StringRef>
-      Args; // List of arguments to commands (for InlineCommand).
+  ArrayRef<CommentInfo> Children; // List of child comments.
+  StringRef Direction;            // Parameter direction (for (T)ParamCommand).
+  StringRef Name;               // Name of the comment (for Verbatim and HTML).
+  StringRef ParamName;          // Parameter name (for (T)ParamCommand).
+  StringRef CloseName;          // Closing tag name (for VerbatimBlock).
+  StringRef Text;               // Text of the comment.
+  ArrayRef<StringRef> AttrKeys; // List of attribute keys (for HTML).
+  ArrayRef<StringRef> AttrValues; // List of attribute values (for HTML).
+  ArrayRef<StringRef> Args; // List of command arguments (for InlineCommand).
   CommentKind Kind = CommentKind::
       CK_Unknown; // Kind of comment (FullComment, ParagraphComment,
                   // TextComment, InlineCommandComment, HTMLStartTagComment,
