@@ -3611,15 +3611,15 @@ def CIR_OptionalPriorityAttr : OptionalAttr<
   >
 >;
 
-// The enumeration values are not necessarily in sync with `clang::CallingConv`
-// or `llvm::CallingConv`.
+// The enumeration cases are ordered to match `llvm::CallingConv`. The values
+// are CIR-specific and are not in sync with `llvm::CallingConv` or
+// `clang::CallingConv`.
 def CIR_CallingConv : CIR_I32EnumAttr<"CallingConv", "calling convention", [
-  I32EnumAttrCase<"C", 1, "c">,
-  I32EnumAttrCase<"SpirKernel", 2, "spir_kernel">,
-  I32EnumAttrCase<"SpirFunction", 3, "spir_function">,
-  I32EnumAttrCase<"OpenCLKernel", 4, "opencl_kernel">,
-  I32EnumAttrCase<"PTXKernel", 5, "ptx_kernel">,
-  I32EnumAttrCase<"AMDGPUKernel", 6, "amdgpu_kernel">
+  I32EnumAttrCase<"C", 0, "c">,
+  I32EnumAttrCase<"PTXKernel", 1, "ptx_kernel">,
+  I32EnumAttrCase<"SpirFunction", 2, "spir_function">,
+  I32EnumAttrCase<"SpirKernel", 3, "spir_kernel">,
+  I32EnumAttrCase<"AMDGPUKernel", 4, "amdgpu_kernel">
 ]>;
 
 def CIR_FuncOp : CIR_Op<"func", [

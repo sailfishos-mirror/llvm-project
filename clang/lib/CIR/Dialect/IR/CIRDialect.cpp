@@ -2141,8 +2141,6 @@ void cir::FuncOp::build(OpBuilder &builder, OperationState &result,
       GlobalLinkageKindAttr::get(builder.getContext(), linkage));
   result.addAttribute(getCallingConvAttrName(result.name),
                       CallingConvAttr::get(builder.getContext(), callingConv));
-  result.addAttribute(getGlobalVisibilityAttrName(result.name),
-                      cir::VisibilityAttr::get(builder.getContext()));
 }
 
 ParseResult cir::FuncOp::parse(OpAsmParser &parser, OperationState &state) {
