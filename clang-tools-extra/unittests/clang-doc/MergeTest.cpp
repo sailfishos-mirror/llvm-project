@@ -54,7 +54,7 @@ TEST_F(MergeTest, mergeNamespaceInfos) {
   E2.Name = "TwoEnum";
   Two.Children.Enums.push_back(E2);
 
-  OwningPtrVec<Info> Infos;
+  SmallVector<Info *> Infos;
   Infos.push_back(&One);
   Infos.push_back(&Two);
 
@@ -151,7 +151,7 @@ TEST_F(MergeTest, mergeRecordInfos) {
   E2.Name = "TwoEnum";
   Two.Children.Enums.push_back(E2);
 
-  OwningPtrVec<Info> Infos;
+  SmallVector<Info *> Infos;
   Infos.push_back(&One);
   Infos.push_back(&Two);
 
@@ -243,7 +243,7 @@ TEST_F(MergeTest, mergeFunctionInfos) {
   CommentInfo TopTwo(CommentKind::CK_FullComment, TwoPara);
   Two.Description.push_back(TopTwo);
 
-  OwningPtrVec<Info> Infos;
+  SmallVector<Info *> Infos;
   Infos.push_back(&One);
   Infos.push_back(&Two);
 
@@ -298,7 +298,7 @@ TEST_F(MergeTest, mergeEnumInfos) {
   EnumValueInfo EV2[] = {EnumValueInfo("X"), EnumValueInfo("Y")};
   Two.Members = llvm::ArrayRef(EV2);
 
-  OwningPtrVec<Info> Infos;
+  SmallVector<Info *> Infos;
   Infos.push_back(&One);
   Infos.push_back(&Two);
 
