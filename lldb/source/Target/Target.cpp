@@ -1542,19 +1542,6 @@ Module *Target::GetExecutableModulePointer() {
   return GetExecutableModule().get();
 }
 
-static void LoadScriptingResourceForModule(const ModuleSP &module_sp,
-                                           Target *target) {
-  Status error;
-  if (module_sp && !module_sp->LoadScriptingResourceInTarget(target, error)) {
-    if (error.AsCString())
-      target->GetDebugger().GetAsyncErrorStream()->Printf(
-          "unable to load scripting data for module %s - error reported was "
-          "%s\n",
-          module_sp->GetFileSpec().GetFileNameStrippingExtension().GetCString(),
-          error.AsCString());
-  }
-}
-
 void Target::ClearModules(bool delete_locations) {
   ModulesDidUnload(m_images, delete_locations);
   m_section_load_history.Clear();
@@ -1857,9 +1844,13 @@ void Target::ModulesDidLoad(ModuleList &module_list) {
 
   const size_t num_images = module_list.GetSize();
   if (m_valid && num_images) {
+    std::list<Status> errors;
+    module_list.LoadScriptingResourcesInTarget(this, errors);
+    for (const auto &err : errors)
+      GetDebugger().GetAsyncErrorStream()->PutCString(err.AsCString());
+
     for (size_t idx = 0; idx < num_images; ++idx) {
       ModuleSP module_sp(module_list.GetModuleAtIndex(idx));
-      LoadScriptingResourceForModule(module_sp, this);
       LoadTypeSummariesForModule(module_sp);
       LoadFormattersForModule(module_sp);
     }
@@ -2637,9 +2628,10 @@ Target::GetScratchTypeSystemForLanguage(lldb::LanguageType language,
 CompilerType Target::GetRegisterType(const std::string &name,
                                      const lldb_private::RegisterFlags &flags,
                                      uint32_t byte_size) {
-  RegisterTypeBuilderSP provider = PluginManager::GetRegisterTypeBuilder(*this);
-  assert(provider);
-  return provider->GetRegisterType(name, flags, byte_size);
+  if (!m_register_type_builder_sp)
+    m_register_type_builder_sp = PluginManager::GetRegisterTypeBuilder(*this);
+  assert(m_register_type_builder_sp);
+  return m_register_type_builder_sp->GetRegisterType(name, flags, byte_size);
 }
 
 std::vector<lldb::TypeSystemSP>
