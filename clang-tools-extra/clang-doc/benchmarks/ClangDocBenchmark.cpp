@@ -92,7 +92,7 @@ BENCHMARK(BM_Mapper_Scale)->Range(10, 10000);
 // --- Reducer Benchmarks ---
 
 static void BM_SerializeFunctionInfo(benchmark::State &State) {
-  auto I = allocatePtr<FunctionInfo>();
+  auto I = allocateTransient<FunctionInfo>();
   I->Name = "f";
   I->DefLoc = Location(0, 0, "test.cpp");
   I->ReturnType = TypeInfo("void");
@@ -120,7 +120,7 @@ static void BM_MergeInfos_Scale(benchmark::State &State) {
     SmallVector<Info *> Input;
     Input.reserve(State.range(0));
     for (int Idx = 0; Idx < State.range(0); ++Idx) {
-      auto *I = allocatePtr<FunctionInfo>();
+      auto *I = allocateTransient<FunctionInfo>();
       I->Name = "f";
       I->USR = USR;
       I->DefLoc = Location(10, Idx, "test.cpp");
@@ -181,7 +181,7 @@ static void BM_JSONGenerator_Scale(benchmark::State &State) {
     return;
   }
   int NumRecords = State.range(0);
-  auto NI = allocatePtr<NamespaceInfo>();
+  auto NI = allocateTransient<NamespaceInfo>();
   NI->Name = "GlobalNamespace";
   for (int i = 0; i < NumRecords; ++i) {
     Reference *R = new (TransientArena.Allocate<Reference>())

@@ -98,11 +98,10 @@ static llvm::Expected<Info *> reduce(SmallVectorImpl<Info *> &Values) {
   if (Values.empty() || !Values[0])
     return llvm::createStringError(llvm::inconvertibleErrorCode(),
                                    "no value to reduce");
-  OwnedPtr<Info> Merged = allocatePtr<T>(Values[0]->USR);
-  T *Tmp = static_cast<T *>(getPtr(Merged));
+  T *Merged = allocateTransient<T>(Values[0]->USR);
   for (auto &I : Values)
-    Tmp->merge(std::move(*static_cast<T *>(getPtr(I))));
-  return std::move(Merged);
+    Merged->merge(std::move(*static_cast<T *>(I)));
+  return Merged;
 }
 
 template <typename T>
@@ -115,7 +114,7 @@ static void reduceChildren(llvm::simple_ilist<T> &Children,
     auto It = llvm::find_if(
         Children, [&](const T &C) { return C.USR == ChildToMerge->USR; });
     if (It == Children.end()) {
-      T *NewChild = allocatePtr<T>(PersistentArena, ChildToMerge->USR);
+      T *NewChild = allocatePersistent<T>(ChildToMerge->USR);
       NewChild->merge(std::move(*ChildToMerge));
       Children.push_back(*NewChild);
     } else {
@@ -136,7 +135,7 @@ void reduceChildren<Reference>(
       return C.USR == ChildToMerge->USR;
     });
     if (It == Children.end()) {
-      Reference *NewChild = allocatePtr<Reference>(PersistentArena);
+      Reference *NewChild = allocatePersistent<Reference>();
       NewChild->USR = ChildToMerge->USR;
       NewChild->RefType = ChildToMerge->RefType;
       NewChild->merge(std::move(*ChildToMerge));
@@ -154,7 +153,7 @@ static void mergeUnkeyed(Container &Target, Container &&Source) {
     auto &Item = Source.front();
     Source.pop_front();
     if (llvm::none_of(Target, [&](const auto &E) { return E == Item; })) {
-      T *NewItem = allocatePtr<T>(PersistentArena, Item);
+      T *NewItem = allocatePersistent<T>(Item);
       Target.push_back(*NewItem);
     }
   }
@@ -168,7 +167,7 @@ void mergeUnkeyed<DocList<CommentInfo>>(DocList<CommentInfo> &Target,
     Source.pop_front();
     if (llvm::none_of(Target, [&](const auto &E) { return E == Item; })) {
       CommentInfo *NewItem =
-          allocatePtr<CommentInfo>(PersistentArena, Item, PersistentArena);
+          allocatePersistent<CommentInfo>(Item, PersistentArena);
       Target.push_back(*NewItem);
     }
   }

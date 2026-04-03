@@ -135,9 +135,9 @@ static llvm::Error decodeRecord(const Record &R, DocList<Location> &Field,
     return llvm::createStringError(llvm::inconvertibleErrorCode(),
                                    "integer too large to parse");
 
-  Field.push_back(*allocatePtr<Location>(static_cast<int>(R[0]),
-                                         static_cast<int>(R[1]), Blob,
-                                         static_cast<bool>(R[2])));
+  Field.push_back(*allocateTransient<Location>(static_cast<int>(R[0]),
+                                               static_cast<int>(R[1]), Blob,
+                                               static_cast<bool>(R[2])));
   return llvm::Error::success();
 }
 
@@ -884,7 +884,7 @@ template <typename T> static llvm::Expected<CommentInfo *> getCommentInfo(T I) {
   if constexpr (std::is_pointer_v<T>) {
     using Pointee = std::remove_pointer_t<T>;
     if constexpr (has_description<Pointee>::value) {
-      auto *NewComment = allocatePtr<CommentInfo>();
+      auto *NewComment = allocateTransient<CommentInfo>();
       I->Description.push_back(*NewComment);
       return NewComment;
     }
@@ -1080,7 +1080,7 @@ static void addChild(Target I, Child &&R) {
     if constexpr (has_children<Pointee>::value) {
       using BareChild = std::remove_cv_t<std::remove_reference_t<Child>>;
       if constexpr (is_valid_child<BareChild>::value) {
-        auto *Node = allocatePtr<BareChild>(std::move(R));
+        auto *Node = allocateTransient<BareChild>(std::move(R));
         getList(I->Children, Node).push_back(*Node);
         return;
       }
@@ -1409,10 +1409,10 @@ llvm::Error ClangDocBitcodeReader::readBlockInfoBlock() {
 template <typename T>
 llvm::Expected<OwnedPtr<Info>> ClangDocBitcodeReader::createInfo(unsigned ID) {
   llvm::TimeTraceScope("Reducing infos", "createInfo");
-  OwnedPtr<Info> I = doc::allocatePtr<T>();
+  auto *I = doc::allocateTransient<T>();
   if (auto Err = readBlock(ID, static_cast<T *>(getPtr(I))))
     return std::move(Err);
-  return OwnedPtr<Info>{std::move(I)};
+  return I;
 }
 
 llvm::Expected<OwnedPtr<Info>>
