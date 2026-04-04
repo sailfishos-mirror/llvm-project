@@ -148,9 +148,7 @@ namespace PR21289 {
   void g() { f<void, void, void>(); }
 
   template<typename ...Ts> void h(S<int>) {}
-  // Pending a core issue, it's not clear if these are redeclarations, but they
-  // are probably intended to be... even though substitution can succeed for one
-  // of them but fail for the other!
-  template<typename ...Ts> void h(S<X<Ts>...>) {} // expected-note {{previous}}
-  template<typename ...Ts> void h(S<Y<Ts, sizeof(Ts)>...>) {} // expected-error {{redefinition}}
+
+  template<typename ...Ts> void h(S<X<Ts>...>) {}
+  template<typename ...Ts> void h(S<Y<Ts, sizeof(Ts)>...>) {}
 }

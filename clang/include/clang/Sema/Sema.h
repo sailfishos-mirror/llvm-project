@@ -10277,6 +10277,7 @@ public:
   /// If `Reversed` is true, the parameters of `NewType` will be compared in
   /// reverse order. That's useful if one of the functions is being used as a
   /// C++20 synthesized operator overload with a reversed parameter order.
+  /// The parameter types are assumed to be functionally-canonicalized.
   bool FunctionParamTypesAreEqual(ArrayRef<QualType> Old,
                                   ArrayRef<QualType> New,
                                   unsigned *ArgPos = nullptr,

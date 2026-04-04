@@ -139,16 +139,17 @@ void TemplateParameterList::Profile(llvm::FoldingSetNodeID &ID,
   const Expr *RC = getRequiresClause();
   ID.AddBoolean(RC != nullptr);
   if (RC)
-    RC->Profile(ID, C, /*Canonical=*/true);
+    RC->Profile(ID, C, CanonicalizationKind::Functional);
   ID.AddInteger(size());
   for (NamedDecl *D : *this) {
     if (const auto *NTTP = dyn_cast<NonTypeTemplateParmDecl>(D)) {
       ID.AddInteger(0);
       ID.AddBoolean(NTTP->isParameterPack());
-      NTTP->getType().getCanonicalType().Profile(ID);
+      C.getCanonicalType(NTTP->getType(), CanonicalizationKind::Functional)
+          .Profile(ID);
       ID.AddBoolean(NTTP->hasPlaceholderTypeConstraint());
       if (const Expr *E = NTTP->getPlaceholderTypeConstraint())
-        E->Profile(ID, C, /*Canonical=*/true);
+        E->Profile(ID, C, CanonicalizationKind::Functional);
       continue;
     }
     if (const auto *TTP = dyn_cast<TemplateTypeParmDecl>(D)) {
@@ -156,8 +157,8 @@ void TemplateParameterList::Profile(llvm::FoldingSetNodeID &ID,
       ID.AddBoolean(TTP->isParameterPack());
       ID.AddBoolean(TTP->hasTypeConstraint());
       if (const TypeConstraint *TC = TTP->getTypeConstraint())
-        TC->getImmediatelyDeclaredConstraint()->Profile(ID, C,
-                                                        /*Canonical=*/true);
+        TC->getImmediatelyDeclaredConstraint()->Profile(
+            ID, C, CanonicalizationKind::Functional);
       continue;
     }
     const auto *TTP = cast<TemplateTemplateParmDecl>(D);
@@ -1165,15 +1166,13 @@ ClassTemplatePartialSpecializationDecl::ClassTemplatePartialSpecializationDecl(
     ASTContext &Context, TagKind TK, DeclContext *DC, SourceLocation StartLoc,
     SourceLocation IdLoc, TemplateParameterList *Params,
     ClassTemplateDecl *SpecializedTemplate, ArrayRef<TemplateArgument> Args,
-    CanQualType CanonInjectedTST,
     ClassTemplatePartialSpecializationDecl *PrevDecl)
     : ClassTemplateSpecializationDecl(
           Context, ClassTemplatePartialSpecialization, TK, DC, StartLoc, IdLoc,
           // Tracking StrictPackMatch for Partial
           // Specializations is not needed.
           SpecializedTemplate, Args, /*StrictPackMatch=*/false, PrevDecl),
-      TemplateParams(Params), InstantiatedFromMember(nullptr, false),
-      CanonInjectedTST(CanonInjectedTST) {
+      TemplateParams(Params), InstantiatedFromMember(nullptr, false) {
   if (AdoptTemplateParameterList(Params, this))
     setInvalidDecl();
 }
@@ -1183,11 +1182,10 @@ ClassTemplatePartialSpecializationDecl::Create(
     ASTContext &Context, TagKind TK, DeclContext *DC, SourceLocation StartLoc,
     SourceLocation IdLoc, TemplateParameterList *Params,
     ClassTemplateDecl *SpecializedTemplate, ArrayRef<TemplateArgument> Args,
-    CanQualType CanonInjectedTST,
     ClassTemplatePartialSpecializationDecl *PrevDecl) {
   auto *Result = new (Context, DC) ClassTemplatePartialSpecializationDecl(
       Context, TK, DC, StartLoc, IdLoc, Params, SpecializedTemplate, Args,
-      CanonInjectedTST, PrevDecl);
+      PrevDecl);
   Result->setSpecializationKind(TSK_ExplicitSpecialization);
   return Result;
 }
@@ -1202,11 +1200,13 @@ CanQualType
 ClassTemplatePartialSpecializationDecl::getCanonicalInjectedSpecializationType(
     const ASTContext &Ctx) const {
   if (CanonInjectedTST.isNull()) {
+    SmallVector<TemplateArgument, 4> CanonicalArgs(getTemplateArgs().asArray());
+    Ctx.canonicalizeTemplateArguments(CanonicalArgs);
     CanonInjectedTST =
         CanQualType::CreateUnsafe(Ctx.getCanonicalTemplateSpecializationType(
             ElaboratedTypeKeyword::None,
             TemplateName(getSpecializedTemplate()->getCanonicalDecl()),
-            getTemplateArgs().asArray()));
+            CanonicalArgs));
   }
   return CanonInjectedTST;
 }

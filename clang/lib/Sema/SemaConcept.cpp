@@ -182,7 +182,7 @@ struct SatisfactionStackRAII {
 static bool DiagRecursiveConstraintEval(
     Sema &S, llvm::FoldingSetNodeID &ID, const NamedDecl *Templ, const Expr *E,
     const MultiLevelTemplateArgumentList *MLTAL = nullptr) {
-  E->Profile(ID, S.Context, /*Canonical=*/true);
+  E->Profile(ID, S.Context, CanonicalizationKind::Functional);
   if (MLTAL) {
     for (const auto &List : *MLTAL)
       for (const auto &TemplateArg : List.Args)
@@ -1627,10 +1627,8 @@ bool Sema::AreConstraintExpressionsEqual(const NamedDecl *Old,
       return false;
   }
 
-  llvm::FoldingSetNodeID ID1, ID2;
-  OldConstr->Profile(ID1, Context, /*Canonical=*/true);
-  NewConstr->Profile(ID2, Context, /*Canonical=*/true);
-  return ID1 == ID2;
+  return Context.hasSameExpr(OldConstr, NewConstr,
+                             CanonicalizationKind::Functional);
 }
 
 bool Sema::FriendConstraintsDependOnEnclosingTemplate(const FunctionDecl *FD) {
@@ -2641,11 +2639,8 @@ bool Sema::MaybeEmitAmbiguousAtomicConstraintsDiagnostic(
       return true;
 
     // Not the same source level expression - are the expressions
-    // identical?
-    llvm::FoldingSetNodeID IDA, IDB;
-    EA->Profile(IDA, Context, /*Canonical=*/true);
-    EB->Profile(IDB, Context, /*Canonical=*/true);
-    if (IDA != IDB)
+    // functionally equivalent?
+    if (!Context.hasSameExpr(EA, EB, CanonicalizationKind::Functional))
       return false;
 
     AmbiguousAtomic1 = EA;

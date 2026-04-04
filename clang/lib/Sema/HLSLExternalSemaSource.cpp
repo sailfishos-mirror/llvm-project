@@ -308,16 +308,11 @@ addVectorTexturePartialSpecialization(Sema &S, NamespaceDecl *HLSLNamespace,
       SourceLocation());
 
   // Create the partial specialization declaration.
-  QualType CanonInjectedTST =
-      AST.getCanonicalType(AST.getTemplateSpecializationType(
-          ElaboratedTypeKeyword::Class, TemplateName(TextureTemplate),
-          {TemplateArgument(VectorType)}, {}));
-
   auto *PartialSpec = ClassTemplatePartialSpecializationDecl::Create(
       AST, TagDecl::TagKind::Class, HLSLNamespace, SourceLocation(),
       SourceLocation(), TemplateParams, TextureTemplate,
       {TemplateArgument(VectorType)},
-      CanQualType::CreateUnsafe(CanonInjectedTST), nullptr);
+      /*PrevDecl=*/nullptr);
 
   // Set the template arguments as written.
   TemplateArgument Arg(VectorType);

@@ -61,18 +61,22 @@ DeclContext *Sema::computeDeclContext(const CXXScopeSpec &SS,
     if (EnteringContext) {
       if (NNS.getKind() != NestedNameSpecifier::Kind::Type)
         return nullptr;
-      const Type *NNSType = NNS.getAsType();
+
+      bool AnyNonCanonical = false;
+      QualType NNSType = Context.getCanonicalType(
+          QualType(NNS.getAsType(), 0), CanonicalizationKind::Functional,
+          AnyNonCanonical);
 
       // Look through type alias templates, per C++0x [temp.dep.type]p1.
-      NNSType = Context.getCanonicalType(NNSType);
       if (const auto *SpecType =
-              dyn_cast<TemplateSpecializationType>(NNSType)) {
+              NNSType->getAsNonAliasTemplateSpecializationType()) {
         // We are entering the context of the nested name specifier, so try to
         // match the nested name specifier to either a primary class template
         // or a class template partial specialization.
         if (ClassTemplateDecl *ClassTemplate =
                 dyn_cast_or_null<ClassTemplateDecl>(
-                    SpecType->getTemplateName().getAsTemplateDecl())) {
+                    SpecType->getTemplateName().getAsTemplateDecl(
+                        /*IgnoreDeduced=*/true))) {
           // FIXME: The fallback on the search of partial
           // specialization using ContextType should be eventually removed since
           // it doesn't handle the case of constrained template parameters
@@ -88,9 +92,33 @@ DeclContext *Sema::computeDeclContext(const CXXScopeSpec &SS,
                                return TPL->getDepth() == Depth;
                              });
             if (L != TemplateParamLists.end()) {
+              SmallVector<TemplateArgument, 8> SpecArgs;
+              if (AnyNonCanonical) {
+                // FIXME: Horrid hack to get back a converted template argument
+                // list.
+                TemplateArgumentListInfo TemplateArgs;
+                for (const auto &Arg : SpecType->template_arguments())
+                  TemplateArgs.addArgument(getTrivialTemplateArgumentLoc(
+                      Arg, /*NTTPType=*/QualType(), SourceLocation()));
+                CheckTemplateArgumentInfo CTAI;
+                DefaultArguments DefaultArgs;
+                SFINAETrap Trap(*this);
+                [[maybe_unused]] bool Res = CheckTemplateArgumentList(
+                    ClassTemplate, ClassTemplate->getTemplateParameters(),
+                    SourceLocation(), TemplateArgs, DefaultArgs,
+                    /*PartialTemplateArgs=*/false, CTAI);
+                assert(
+                    !Res && !Trap.hasErrorOccurred() &&
+                    "template argument list should have been checked already");
+                SpecArgs = std::move(CTAI.SugaredConverted);
+                Context.canonicalizeTemplateArguments(
+                    SpecArgs, CanonicalizationKind::Functional);
+              }
+
               void *Pos = nullptr;
               PartialSpec = ClassTemplate->findPartialSpecialization(
-                  SpecType->template_arguments(), *L, Pos);
+                  AnyNonCanonical ? SpecArgs : SpecType->template_arguments(),
+                  *L, Pos);
             }
           } else {
             PartialSpec =
@@ -119,9 +147,9 @@ DeclContext *Sema::computeDeclContext(const CXXScopeSpec &SS,
           if (Context.hasSameType(Injected, QualType(SpecType, 0)))
             return ClassTemplate->getTemplatedDecl();
         }
-      } else if (const auto *RecordT = dyn_cast<RecordType>(NNSType)) {
+      } else if (auto *RD = NNSType->getAsCXXRecordDecl()) {
         // The nested name specifier refers to a member of a class template.
-        return RecordT->getDecl()->getDefinitionOrSelf();
+        return RD;
       }
     }
 
@@ -853,6 +881,7 @@ bool Sema::ActOnCXXNestedNameSpecifierDecltype(CXXScopeSpec &SS,
 
   TypeLocBuilder TLB;
   DecltypeTypeLoc DecltypeTL = TLB.push<DecltypeTypeLoc>(T);
+  DecltypeTL.setUnderlyingExpr(DS.getRepAsExpr());
   DecltypeTL.setDecltypeLoc(DS.getTypeSpecTypeLoc());
   DecltypeTL.setRParenLoc(DS.getTypeofParensRange().getEnd());
   SS.Make(Context, TLB.getTypeLocInContext(Context, T), ColonColonLoc);

@@ -4915,14 +4915,19 @@ TemplateDeclInstantiator::InstantiateClassTemplatePartialSpecialization(
   // Check these arguments are valid for a template partial specialization.
   if (SemaRef.CheckTemplatePartialSpecializationArgs(
           PartialSpec->getLocation(), ClassTemplate, InstTemplateArgs.size(),
-          CTAI.CanonicalConverted))
+          CTAI.SugaredConverted))
     return nullptr;
+
+  SmallVector<TemplateArgument, 4> FunctionallyEquivalentConverted =
+      CTAI.SugaredConverted;
+  SemaRef.Context.canonicalizeTemplateArguments(
+      FunctionallyEquivalentConverted, CanonicalizationKind::Functional);
 
   // Figure out where to insert this class template partial specialization
   // in the member template's set of class template partial specializations.
   void *InsertPos = nullptr;
   ClassTemplateSpecializationDecl *PrevDecl =
-      ClassTemplate->findPartialSpecialization(CTAI.CanonicalConverted,
+      ClassTemplate->findPartialSpecialization(FunctionallyEquivalentConverted,
                                                InstParams, InsertPos);
 
   // Create the class template partial specialization declaration.
@@ -4930,8 +4935,7 @@ TemplateDeclInstantiator::InstantiateClassTemplatePartialSpecialization(
       ClassTemplatePartialSpecializationDecl::Create(
           SemaRef.Context, PartialSpec->getTagKind(), Owner,
           PartialSpec->getBeginLoc(), PartialSpec->getLocation(), InstParams,
-          ClassTemplate, CTAI.CanonicalConverted,
-          /*CanonInjectedTST=*/CanQualType(),
+          ClassTemplate, FunctionallyEquivalentConverted,
           /*PrevDecl=*/nullptr);
 
   InstPartialSpec->setTemplateArgsAsWritten(InstTemplateArgs);
@@ -5024,14 +5028,19 @@ TemplateDeclInstantiator::InstantiateVarTemplatePartialSpecialization(
   // Check these arguments are valid for a template partial specialization.
   if (SemaRef.CheckTemplatePartialSpecializationArgs(
           PartialSpec->getLocation(), VarTemplate, InstTemplateArgs.size(),
-          CTAI.CanonicalConverted))
+          CTAI.SugaredConverted))
     return nullptr;
+
+  SmallVector<TemplateArgument, 4> FunctionallyEquivalentConverted =
+      CTAI.SugaredConverted;
+  SemaRef.Context.canonicalizeTemplateArguments(
+      FunctionallyEquivalentConverted, CanonicalizationKind::Functional);
 
   // Figure out where to insert this variable template partial specialization
   // in the member template's set of variable template partial specializations.
   void *InsertPos = nullptr;
   VarTemplateSpecializationDecl *PrevDecl =
-      VarTemplate->findPartialSpecialization(CTAI.CanonicalConverted,
+      VarTemplate->findPartialSpecialization(FunctionallyEquivalentConverted,
                                              InstParams, InsertPos);
 
   // Do substitution on the type of the declaration
@@ -5053,7 +5062,7 @@ TemplateDeclInstantiator::InstantiateVarTemplatePartialSpecialization(
       VarTemplatePartialSpecializationDecl::Create(
           SemaRef.Context, Owner, PartialSpec->getInnerLocStart(),
           PartialSpec->getLocation(), InstParams, VarTemplate, TSI->getType(),
-          TSI, PartialSpec->getStorageClass(), CTAI.CanonicalConverted);
+          TSI, PartialSpec->getStorageClass(), FunctionallyEquivalentConverted);
 
   InstPartialSpec->setTemplateArgsAsWritten(InstTemplateArgs);
 

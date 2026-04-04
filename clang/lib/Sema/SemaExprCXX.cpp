@@ -7423,6 +7423,7 @@ ExprResult Sema::ActOnPseudoDestructorExpr(Scope *S, Expr *Base,
   case DeclSpec::TST_decltype: {
     T = BuildDecltypeType(DS.getRepAsExpr(), /*AsUnevaluated=*/false);
     DecltypeTypeLoc DecltypeTL = TLB.push<DecltypeTypeLoc>(T);
+    DecltypeTL.setUnderlyingExpr(DS.getRepAsExpr());
     DecltypeTL.setDecltypeLoc(DS.getTypeSpecTypeLoc());
     DecltypeTL.setRParenLoc(DS.getTypeofParensRange().getEnd());
     break;
@@ -8084,15 +8085,17 @@ Sema::ActOnStartRequiresExpr(SourceLocation RequiresKWLoc,
   PushDeclContext(BodyScope, Body);
 
   for (ParmVarDecl *Param : LocalParameters) {
-    if (Param->getType()->isVoidType()) {
+    if (QualType PT = Param->getType(); PT->isVoidType()) {
       if (LocalParameters.size() > 1) {
         Diag(Param->getBeginLoc(), diag::err_void_only_param);
         Param->setType(Context.IntTy);
       } else if (Param->getIdentifier()) {
         Diag(Param->getBeginLoc(), diag::err_param_with_void_type);
         Param->setType(Context.IntTy);
-      } else if (Param->getType().hasQualifiers()) {
+      } else if (PT.hasQualifiers()) {
         Diag(Param->getBeginLoc(), diag::err_void_param_qualified);
+      } else if (!Context.hasEquivalentType(PT, Context.VoidTy)) {
+        Diag(Param->getBeginLoc(), diag::err_void_param_not_equivalent_to_void);
       }
     } else if (Param->hasDefaultArg()) {
       // C++2a [expr.prim.req] p4

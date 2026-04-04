@@ -1888,8 +1888,6 @@ Sema::BuildImplicitMemberExpr(const CXXScopeSpec &SS,
                               bool IsKnownInstance, const Scope *S) {
   assert(!R.empty() && !R.isAmbiguous());
 
-  SourceLocation loc = R.getNameLoc();
-
   // If this is known to be an instance access, go ahead and build an
   // implicit 'this' expression now.
   QualType ThisTy = getCurrentThisType();
@@ -1900,7 +1898,7 @@ Sema::BuildImplicitMemberExpr(const CXXScopeSpec &SS,
     SourceLocation Loc = R.getNameLoc();
     if (SS.getRange().isValid())
       Loc = SS.getRange().getBegin();
-    baseExpr = BuildCXXThisExpr(loc, ThisTy, /*IsImplicit=*/true);
+    baseExpr = BuildCXXThisExpr(Loc, ThisTy, /*IsImplicit=*/true);
   }
 
   return BuildMemberReferenceExpr(

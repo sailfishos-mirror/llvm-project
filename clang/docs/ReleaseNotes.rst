@@ -147,6 +147,11 @@ C++17 Feature Support
 Resolutions to C++ Defect Reports
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+- Clang now implements the proposed direction for CWG1980: now it's possible to overload on signatures with
+  differing requirements for instantiation failure, effectively supporting SFINAE on `void_t`. (#GH190388)
+- Clang now implements CWG2064: `decltype(expr)` is not dependent anymore when the value of the expression
+  is dependent. (#GH8740) (#GH61818)
+
 C Language Changes
 ------------------
 
