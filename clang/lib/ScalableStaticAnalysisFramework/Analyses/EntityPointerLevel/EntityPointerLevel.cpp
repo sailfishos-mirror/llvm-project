@@ -6,6 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 #include "clang/ScalableStaticAnalysisFramework/Analyses/EntityPointerLevel/EntityPointerLevel.h"
+#include "SSAFAnalysesCommon.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclCXX.h"
@@ -17,28 +18,6 @@
 
 using namespace clang;
 using namespace ssaf;
-
-template <typename NodeTy, typename... Ts>
-static inline llvm::Error makeErrAtNode(ASTContext &Ctx, const NodeTy &N,
-                                        StringRef Fmt, const Ts &...Args) {
-  std::string LocStr = N.getBeginLoc().printToString(Ctx.getSourceManager());
-  llvm::SmallVector<char> FmtData;
-
-  (Fmt + " at %s").toStringRef(FmtData);
-  return llvm::createStringError(FmtData.data(), Args..., LocStr.c_str());
-}
-
-static inline llvm::Error makeEntityNameErr(ASTContext &Ctx,
-                                            const NamedDecl &D) {
-  return makeErrAtNode(Ctx, D, "failed to create entity name for %s",
-                       D.getNameAsString().data());
-}
-
-template <typename DeclOrExpr>
-static bool hasPtrOrArrType(const DeclOrExpr &E) {
-  return llvm::isa<PointerType>(E.getType().getCanonicalType()) ||
-         llvm::isa<ArrayType>(E.getType().getCanonicalType());
-}
 
 // Translate a pointer type expression 'E' to a (set of) EntityPointerLevel(s)
 // associated with the declared type of the base address of `E`. If the base

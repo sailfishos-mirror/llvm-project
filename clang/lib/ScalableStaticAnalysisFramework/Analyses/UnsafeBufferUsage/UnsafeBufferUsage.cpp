@@ -54,12 +54,12 @@ deserializeImpl(const Object &Data, JSONFormat::EntityIdFromJSONFn Fn) {
 
   EntityPointerLevelSet EPLs;
 
-  for (auto &UnsafeBufferData : *AsArr) {
-    auto EPL = entityPointerLevelFromJSON(UnsafeBufferData, EntityIdFromJSON);
+  for (auto &EPLData : *UnsafeBuffersData) {
+    auto EPL = entityPointerLevelFromJSON(EPLData, Fn);
 
     if (!EPL)
       return EPL.takeError();
-    UnsafeBuffers.insert(*EPL);
+    EPLs.insert(*EPL);
   }
   return std::make_unique<UnsafeBufferUsageEntitySummary>(
       buildUnsafeBufferUsageEntitySummary(std::move(EPLs)));
