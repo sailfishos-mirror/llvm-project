@@ -62,11 +62,6 @@ bool llvm::checkVOPDRegConstraints(const SIInstrInfo &TII,
   };
   SmallVector<Register> UniqueScalarRegs;
 
-  // MIX must not modify any registers used by MIY.
-  for (const auto &Use : MIY.uses())
-    if (Use.isReg() && MIX.modifiesRegister(Use.getReg(), TRI))
-      return false;
-
   auto getVRegIdx = [&](unsigned OpcodeIdx, unsigned OperandIdx) {
     const MachineInstr &MI = (OpcodeIdx == VOPD::X) ? MIX : MIY;
     const MachineOperand &Operand = MI.getOperand(OperandIdx);
@@ -175,6 +170,41 @@ bool llvm::checkVOPDRegConstraints(const SIInstrInfo &TII,
   return true;
 }
 
+bool checkRegDeppendancy(const MachineInstr &MIX, const MachineInstr &MIY) {
+  const GCNSubtarget &ST = MIX.getMF()->getSubtarget<GCNSubtarget>();
+  const SIRegisterInfo *TRI = dyn_cast<SIRegisterInfo>(ST.getRegisterInfo());
+  for (const auto &Use : MIY.uses()) {
+    if (Use.isReg() && MIX.modifiesRegister(Use.getReg(), TRI))
+      return false;
+  }
+  return true;
+}
+
+bool llvm::checkVOPDRegConstraintsSched(const SIInstrInfo &TII,
+                                        const MachineInstr &MIX,
+                                        const MachineInstr &MIY, bool IsVOPD3) {
+  if (!checkRegDeppendancy(MIX, MIY))
+    return false;
+
+  const GCNSubtarget &ST = MIX.getMF()->getSubtarget<GCNSubtarget>();
+  unsigned EncodingFamily = AMDGPU::getVOPDEncodingFamily(ST);
+  unsigned XOpc = AMDGPU::getVOPDOpcode(MIX.getOpcode(), IsVOPD3);
+  unsigned YOpc = AMDGPU::getVOPDOpcode(MIY.getOpcode(), IsVOPD3);
+  int VOPDOpc = AMDGPU::getVOPDFull(XOpc, YOpc, EncodingFamily, IsVOPD3);
+  if (VOPDOpc != -1)
+    return checkVOPDRegConstraints(TII, MIX, MIY, IsVOPD3);
+  return checkVOPDRegConstraints(TII, MIY, MIX, IsVOPD3);
+}
+
+bool llvm::checkVOPDRegConstraintsComb(const SIInstrInfo &TII,
+                                       const MachineInstr &MIX,
+                                       const MachineInstr &MIY, bool IsVOPD3) {
+  if (!checkRegDeppendancy(MIX, MIY))
+    return false;
+
+  return checkVOPDRegConstraints(TII, MIX, MIY, IsVOPD3);
+}
+
 /// Check if the instr pair, FirstMI and SecondMI, should be scheduled
 /// together. Given SecondMI, when FirstMI is unspecified, then check if
 /// SecondMI may be part of a fused pair at all.
@@ -212,7 +242,7 @@ static bool shouldScheduleVOPDAdjacent(const TargetInstrInfo &TII,
     }() && "Expected FirstMI to precede SecondMI");
 #endif
 
-    return checkVOPDRegConstraints(STII, *FirstMI, SecondMI, VOPD3);
+    return checkVOPDRegConstraintsSched(STII, *FirstMI, SecondMI, VOPD3);
   };
 
   return checkVOPD(false) || (ST.hasVOPD3() && checkVOPD(true));
