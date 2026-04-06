@@ -99,12 +99,12 @@ protected:
 
   template <typename ContributorDecl = NamedDecl>
   const UnsafeBufferUsageEntitySummary *
-  getEntitySummary(StringRef ContributoEntityrName) {
+  getEntitySummary(StringRef ContributorEntityName) {
     auto *ContributorDefn = findDeclByName<ContributorDecl>(
-        ContributoEntityrName, AST->getASTContext());
+        ContributorEntityName, AST->getASTContext());
 
     if (!ContributorDefn) {
-      ADD_FAILURE() << "failed to find Decl of \"" << ContributoEntityrName
+      ADD_FAILURE() << "failed to find Decl of \"" << ContributorEntityName
                     << "\"";
       return nullptr;
     }
@@ -113,7 +113,7 @@ protected:
 
     if (!EN) {
       ADD_FAILURE() << "failed to get EntityName for contributor \""
-                    << ContributoEntityrName << "\"";
+                    << ContributorEntityName << "\"";
       return nullptr;
     }
 

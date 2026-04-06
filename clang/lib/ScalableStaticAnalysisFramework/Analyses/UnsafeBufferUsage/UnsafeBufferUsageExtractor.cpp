@@ -89,20 +89,16 @@ public:
     for (auto *CD : ContributorFinder.Contributors) {
       auto EntitySummary = extractEntitySummary(CD, Ctx);
 
-      if (!EntitySummary) {
-        llvm::report_fatal_error(EntitySummary.takeError());
-        continue;
-      }
+      if (!EntitySummary)
+        llvm::reportFatalInternalError(EntitySummary.takeError());
       assert(*EntitySummary);
       if ((*EntitySummary)->empty())
         continue;
 
       auto ContributorName = getEntityName(CD);
 
-      if (!ContributorName) {
-        llvm::report_fatal_error(makeEntityNameErr(Ctx, *CD));
-        continue;
-      }
+      if (!ContributorName)
+        llvm::reportFatalInternalError(makeEntityNameErr(Ctx, *CD));
 
       auto [Ignored, InsertionSucceeded] = SummaryBuilder.addSummary(
           addEntity(*ContributorName), std::move(*EntitySummary));

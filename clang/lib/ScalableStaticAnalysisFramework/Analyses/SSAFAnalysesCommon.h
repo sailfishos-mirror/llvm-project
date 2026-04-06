@@ -21,7 +21,6 @@
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/JSON.h"
 
-namespace {
 using namespace clang;
 
 template <typename NodeTy, typename... Ts>
@@ -59,11 +58,12 @@ static inline llvm::Error makeSawButExpectedError(const llvm::json::Value &Saw,
 }
 
 template <typename DeclOrExpr>
-static bool hasPtrOrArrType(const DeclOrExpr &E) {
+static inline bool hasPtrOrArrType(const DeclOrExpr &E) {
   return llvm::isa<PointerType>(E.getType().getCanonicalType()) ||
          llvm::isa<ArrayType>(E.getType().getCanonicalType());
 }
 
+namespace clang::ssaf {
 /// Traverses the AST and finds contributors:
 class ContributorFinder : public DynamicRecursiveASTVisitor {
 public:
@@ -144,5 +144,5 @@ public:
     return true; // skip lambda as it is a callable
   }
 };
-} // namespace
+} // namespace clang::ssaf
 #endif // LLVM_CLANG_SCALABLESTATICANALYSISFRAMEWORK_ANALYSES_SSAFANALYSESCOMMON_H
