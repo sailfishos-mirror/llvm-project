@@ -278,8 +278,8 @@ entry:
 }
 
 ; log(1.0) is folded to 0.0, because this is an exact value.
-define double @sin_exact() #0 {
-; CHECK-LABEL: define double @sin_exact(
+define double @log_exact() #0 {
+; CHECK-LABEL: define double @log_exact(
 ; CHECK-SAME: ) #[[ATTR0]] {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
 ; CHECK-NEXT:    [[RESULT:%.*]] = call double @llvm.log.f64(double 1.000000e+00)
@@ -291,8 +291,8 @@ entry:
 }
 
 ; log(2.0) is NOT folded, because rounding mode is unknown at compile time.
-define double @sin_inexact() #0 {
-; CHECK-LABEL: define double @sin_inexact(
+define double @log_inexact() #0 {
+; CHECK-LABEL: define double @log_inexact(
 ; CHECK-SAME: ) #[[ATTR0]] {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
 ; CHECK-NEXT:    [[RESULT:%.*]] = call double @llvm.log.f64(double 2.000000e+00)

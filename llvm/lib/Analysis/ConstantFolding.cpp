@@ -3562,6 +3562,8 @@ static Constant *ConstantFoldIntrinsicCall2(Intrinsic::ID IntrinsicID, Type *Ty,
       default:
         break;
       case Intrinsic::pow:
+        if (IsStrictFP)
+          return nullptr;
         return ConstantFoldBinaryFP(pow, Op1V, Op2V, Ty);
       case Intrinsic::amdgcn_fmul_legacy:
         // The legacy behaviour is that multiplying +/- 0.0 by anything, even
@@ -3994,8 +3996,7 @@ static Constant *ConstantFoldScalarCall3(StringRef Name,
         }
         case Intrinsic::fma:
         case Intrinsic::fmuladd: {
-          if (isCalledFromStrictFPFunction(Call).value_or(true) &&
-              (C1.isSignaling() || C2.isSignaling() || C3.isSignaling()))
+          if (isCalledFromStrictFPFunction(Call).value_or(true))
             return nullptr;
           APFloat V = C1;
           V.fusedMultiplyAdd(C2, C3, APFloat::rmNearestTiesToEven);
