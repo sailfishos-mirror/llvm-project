@@ -2,6 +2,7 @@
 ; RUN: llc < %s -mtriple=i686 --relocation-model=pic -enable-tlsdesc | FileCheck %s --check-prefix=X86
 ; RUN: llc < %s -mtriple=x86_64-pc-linux-gnux32 --relocation-model=pic -enable-tlsdesc | FileCheck %s --check-prefix=X32
 ; RUN: llc < %s -mtriple=x86_64 --relocation-model=pic -enable-tlsdesc | FileCheck %s --check-prefix=X64
+;; Fuchsia only supports TLSDESC for its ABI, so check it is set correctly, without -enable-tlsdesc.
 ; RUN: llc < %s -mtriple=x86_64-unknown-fuchsia --relocation-model=pic | FileCheck %s --check-prefix=X64-FUCHSIA
 
 @x = thread_local global i32 0, align 4
