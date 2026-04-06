@@ -39,7 +39,7 @@ extern volatile int UnsafeBufferUsageSSAFJSONFormatAnchorSource;
 extern volatile int UnsafeBufferUsageTUSummaryExtractorAnchorSource;
 [[maybe_unused]] static int
     UnsafeBufferUsageTUSummaryExtractorAnchorDestination =
-        UnsafeBufferUsageSSAFJSONFormatAnchorSource;
+        UnsafeBufferUsageTUSummaryExtractorAnchorSource;
 
 // This anchor is used to force the linker to link the CallGraphExtractor.
 extern volatile int CallGraphExtractorAnchorSource;

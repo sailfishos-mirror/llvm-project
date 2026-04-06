@@ -537,7 +537,7 @@ TEST_F(UnsafeBufferUsageTest, PointerToArrayOfPointers) {
   ASSERT_EQ(setUpTest(R"cpp(
     void foo() {
       int * arr[10];
-      int * (*p)[10] = arr;
+      int * (*p)[10] = &arr;
 
       (*p)[5][5]; // '(*p)[5]' is unsafe
                   // '(*p)' is fine because 5 < 10
