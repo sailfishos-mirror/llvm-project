@@ -62,14 +62,6 @@ bool llvm::checkVOPDRegConstraints(const SIInstrInfo &TII,
   };
   SmallVector<Register> UniqueScalarRegs;
 
-  auto getVRegIdx = [&](unsigned OpcodeIdx, unsigned OperandIdx) {
-    const MachineInstr &MI = (OpcodeIdx == VOPD::X) ? MIX : MIY;
-    const MachineOperand &Operand = MI.getOperand(OperandIdx);
-    if (Operand.isReg() && TRI->isVectorRegister(MRI, Operand.getReg()))
-      return Operand.getReg();
-    return Register();
-  };
-
   auto InstInfo = AMDGPU::getVOPDInstInfo(MIX.getDesc(), MIY.getDesc());
 
   for (auto CompIdx : VOPD::COMPONENTS) {
@@ -87,33 +79,37 @@ bool llvm::checkVOPDRegConstraints(const SIInstrInfo &TII,
       addLiteral(Src0);
     }
 
+    // VOPD only. src1 for V_FMAMK_F32 and src2 for V_FMAAK_F32.
+    // VOP3 instructions don't set MandatoryLiteralIdx
     if (InstInfo[CompIdx].hasMandatoryLiteral()) {
-      if (IsVOPD3)
-        return false;
-
       auto CompOprIdx = InstInfo[CompIdx].getMandatoryLiteralCompOperandIndex();
       addLiteral(MI.getOperand(CompOprIdx));
     }
+
+    const MachineOperand *Src1 = TII.getNamedOperand(MI, AMDGPU::OpName::src1);
+    if (IsVOPD3 && Src1 &&
+        (!Src1->isReg() || !TRI->isVGPR(MRI, Src1->getReg())))
+      return false;
+
+    const MachineOperand *Src2 = TII.getNamedOperand(MI, AMDGPU::OpName::src2);
+
+    if (AMDGPU::hasNamedOperand(MI.getOpcode(), AMDGPU::OpName::bitop3)) {
+      // VOPD3 only, BITOP3 can be converted to DUAL_BITOP2 when src2 is zero.
+      if (!Src2->isImm() || Src2->getImm())
+        return false;
+    } else if (MI.getOpcode() == AMDGPU::V_CNDMASK_B32_e64) { // VOPD3 only
+      UniqueScalarRegs.push_back(Src2->getReg());
+    } else {
+      if (IsVOPD3 && Src2 &&
+          (!Src2->isReg() || !TRI->isVGPR(MRI, Src2->getReg())))
+        return false;
+    }
+
+    // VOPD only. Affects V_CNDMASK_B32_e32.
     if (MI.getDesc().hasImplicitUseOfPhysReg(AMDGPU::VCC))
       UniqueScalarRegs.push_back(AMDGPU::VCC_LO);
 
     if (IsVOPD3) {
-      for (auto OpName : {AMDGPU::OpName::src1, AMDGPU::OpName::src2}) {
-        const MachineOperand *Src = TII.getNamedOperand(MI, OpName);
-        if (!Src)
-          continue;
-        if (OpName == AMDGPU::OpName::src2) {
-          if (AMDGPU::hasNamedOperand(MI.getOpcode(), AMDGPU::OpName::bitop3))
-            continue;
-          if (MI.getOpcode() == AMDGPU::V_CNDMASK_B32_e64) {
-            UniqueScalarRegs.push_back(Src->getReg());
-            continue;
-          }
-        }
-        if (!Src->isReg() || !TRI->isVGPR(MRI, Src->getReg()))
-          return false;
-      }
-
       for (auto OpName : {AMDGPU::OpName::clamp, AMDGPU::OpName::omod,
                           AMDGPU::OpName::op_sel}) {
         if (TII.hasModifiersSet(MI, OpName))
@@ -137,6 +133,14 @@ bool llvm::checkVOPDRegConstraints(const SIInstrInfo &TII,
   if ((UniqueLiterals.size() + UniqueScalarRegs.size()) > 2)
     return false;
 
+  auto getVRegIdx = [&](unsigned OpcodeIdx, unsigned OperandIdx) {
+    const MachineInstr &MI = (OpcodeIdx == VOPD::X) ? MIX : MIY;
+    const MachineOperand &Operand = MI.getOperand(OperandIdx);
+    if (Operand.isReg() && TRI->isVectorRegister(MRI, Operand.getReg()))
+      return Operand.getReg();
+    return Register();
+  };
+
   // On GFX1170+ if both OpX and OpY are V_MOV_B32 then OPY uses SRC2
   // source-cache.
   bool SkipSrc = (ST.hasGFX11_7Insts() || ST.hasGFX12Insts()) &&
@@ -144,26 +148,10 @@ bool llvm::checkVOPDRegConstraints(const SIInstrInfo &TII,
                  MIY.getOpcode() == AMDGPU::V_MOV_B32_e32;
   bool AllowSameVGPR = ST.hasGFX1250Insts();
 
+  // Check VGPR bank constraints for operand registers across both instructions.
   if (InstInfo.hasInvalidOperand(getVRegIdx, *TRI, SkipSrc, AllowSameVGPR,
                                  IsVOPD3))
     return false;
-
-  if (IsVOPD3) {
-    // BITOP3 can be converted to DUAL_BITOP2 only if src2 is zero.
-    // MIX check is only relevant to scheduling?
-    if (AMDGPU::hasNamedOperand(MIX.getOpcode(), AMDGPU::OpName::bitop3)) {
-      const MachineOperand &Src2 =
-          *TII.getNamedOperand(MIX, AMDGPU::OpName::src2);
-      if (!Src2.isImm() || Src2.getImm())
-        return false;
-    }
-    if (AMDGPU::hasNamedOperand(MIY.getOpcode(), AMDGPU::OpName::bitop3)) {
-      const MachineOperand &Src2 =
-          *TII.getNamedOperand(MIY, AMDGPU::OpName::src2);
-      if (!Src2.isImm() || Src2.getImm())
-        return false;
-    }
-  }
 
   LLVM_DEBUG(dbgs() << "VOPD Reg Constraints Passed\n\tX: " << MIX
                     << "\n\tY: " << MIY << "\n");
