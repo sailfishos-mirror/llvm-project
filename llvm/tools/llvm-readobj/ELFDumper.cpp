@@ -4870,7 +4870,7 @@ static bool checkPTDynamic(const typename ELFT::Phdr &Phdr,
 template <class ELFT>
 void GNUELFDumper<ELFT>::printProgramHeaders(
     bool PrintProgramHeaders, cl::boolOrDefault PrintSectionMapping) {
-  const bool ShouldPrintSectionMapping = (PrintSectionMapping != cl::BOU_FALSE);
+  bool ShouldPrintSectionMapping = (PrintSectionMapping != cl::BOU_FALSE);
   // Exit early if no program header or section mapping details were requested.
   if (!PrintProgramHeaders && !ShouldPrintSectionMapping)
     return;
@@ -4879,6 +4879,7 @@ void GNUELFDumper<ELFT>::printProgramHeaders(
     Expected<uint32_t> PhNumOrErr = this->Obj.getPhNum();
     if (!PhNumOrErr) {
       this->reportUniqueWarning(PhNumOrErr.takeError());
+      ShouldPrintSectionMapping = false;
     } else if (*PhNumOrErr == 0) {
       OS << "\nThere are no program headers in this file.\n";
     } else {
@@ -4897,10 +4898,12 @@ template <class ELFT> void GNUELFDumper<ELFT>::printProgramHeaders() {
                      48 + Bias, 56 + Bias, 64 + Bias, 68 + Bias};
   uint32_t PhNum = 0;
   Expected<uint32_t> PhNumOrErr = this->Obj.getPhNum();
+  // Defer error reporting to program_headers() so that we can prevent some
+  // duplications.
   if (PhNumOrErr)
     PhNum = *PhNumOrErr;
   else
-    this->reportUniqueWarning(PhNumOrErr.takeError());
+    llvm::consumeError(PhNumOrErr.takeError());
 
   OS << "\nElf file type is "
      << enumToString(Header.e_type, ArrayRef(ElfObjectFileType)) << "\n"
