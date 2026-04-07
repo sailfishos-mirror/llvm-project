@@ -2223,14 +2223,14 @@ Error LTO::runThinLTO(AddStreamFn AddStream, FileCache Cache,
   auto GetTripleFromConf = [&]() -> Triple {
     if (!Conf.OverrideTriple.empty())
       return Triple(Conf.OverrideTriple);
-    if (!RegularLTO.CombinedModule->getTargetTriple().empty())
-      return RegularLTO.CombinedModule->getTargetTriple();
-    return Triple(Conf.DefaultTriple);
+    return Triple(RegularLTO.CombinedModule->getTargetTriple());
   };
 
   auto RunBackends = [&](ThinBackendProc *BackendProcess) -> Error {
     Triple TheTriple = GetTripleFromConf();
-    assert(!TheTriple.getTriple().empty() && "Empty TargetTriple for ThinLTO!");
+    if (TheTriple.getTriple().empty())
+      return make_error<StringError>("Empty TargetTriple for ThinLTO!",
+                                     inconvertibleErrorCode());
     auto ProcessOneModule = [&](int I) -> Error {
       auto &Mod = *(ModuleMap.begin() + I);
       // Tasks 0 through ParallelCodeGenParallelismLevel-1 are reserved for
