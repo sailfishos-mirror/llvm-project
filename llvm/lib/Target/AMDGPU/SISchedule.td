@@ -67,6 +67,7 @@ def Write8PassDGEMM : SchedWrite;
 def Write16PassDGEMM : SchedWrite;
 
 // WMMA/SWMMA instructions
+def WriteXDL1PassWMMA : SchedWrite;
 def WriteXDL2PassWMMA : SchedWrite;
 def WriteXDL4PassWMMA : SchedWrite;
 def Write4PassWMMA : SchedWrite;
@@ -494,22 +495,23 @@ def : HWWriteRes<WriteSALUDummy, [HWSALU],  2>;
 
 }  // End SchedModel = GFX12SpeedModel
 
-// Check if any matrix inputs are interpreted as f8 in an f8f6f4
-// wmma instruction.
-def PredIsF8_WMMA_SCALE : SchedPredicate<[{
-  TII->getNamedOperand(*MI, AMDGPU::OpName::matrix_a_fmt)->getImm() <= AMDGPU::WMMA::MATRIX_FMT_BF8 ||
-  TII->getNamedOperand(*MI, AMDGPU::OpName::matrix_b_fmt)->getImm() <= AMDGPU::WMMA::MATRIX_FMT_BF8
+// Check if either matrix input is not FP4 in an f8f6f4 wmma instruction.
+// Any F8 or F6 input doubles the cycle count vs both-F4.
+def PredIsNotBothF4_WMMA_SCALE : SchedPredicate<[{
+  TII->getNamedOperand(*MI, AMDGPU::OpName::matrix_a_fmt)->getImm() != AMDGPU::WMMA::MATRIX_FMT_FP4 ||
+  TII->getNamedOperand(*MI, AMDGPU::OpName::matrix_b_fmt)->getImm() != AMDGPU::WMMA::MATRIX_FMT_FP4
 }]>;
 
-// If either matrix format is f8, the instruction takes 2x as many
-// cycles. TODO: This isn't reflected in MCA.
+// F8F6F4 WMMA: both F4 = 4 cycles (1-pass), any F6/F8 = 8 cycles (2-pass).
 def WriteWMMAScale_16X16X128_F8F6F4 : SchedWriteVariant<[
-    SchedVar<PredIsF8_WMMA_SCALE, [WriteXDL4PassWMMA]>,
-    SchedVar<NoSchedPred, [WriteXDL2PassWMMA]>
+    SchedVar<PredIsNotBothF4_WMMA_SCALE, [WriteXDL2PassWMMA]>,
+    SchedVar<NoSchedPred, [WriteXDL1PassWMMA]>
 ]>;
 
 multiclass GFX125xCommonWriteRes {
 
+let ReleaseAtCycles = [4] in
+def : HWWriteRes<WriteXDL1PassWMMA, [HWXDL], 4>;
 let ReleaseAtCycles = [8] in
 def : HWWriteRes<WriteXDL2PassWMMA, [HWXDL], 8>;
 let ReleaseAtCycles = [16] in
@@ -537,11 +539,20 @@ def : HWWriteRes<WriteBarrier,           [HWBranch],       2000>;
 
 def : InstRW<[WriteCopy], (instrs COPY)>;
 
-def : InstRW<[WriteXDL2PassWMMA], (instregex "^V_[S]*WMMA[C]*_.*_(FP8|BF8|BF16|F16)_w32")>;
+// 4-cycle XDL: 16x16x64 FP8/BF8
+def : InstRW<[WriteXDL1PassWMMA], (instregex "^V_[S]*WMMA[C]*_.*_16X16X64_(FP8|BF8)_(FP8|BF8)_w32")>;
+// 8-cycle XDL: 16x16x16/32 F16/BF16
+def : InstRW<[WriteXDL2PassWMMA], (instregex "^V_[S]*WMMA[C]*_.*_(BF16|F16)_w32")>;
+// 8-cycle XDL: 16x16x128 FP8/BF8
+def : InstRW<[WriteXDL2PassWMMA], (instregex "^V_[S]*WMMA[C]*_.*_16X16X128_(FP8|BF8)_(FP8|BF8)_w32")>;
+// 16-cycle XDL: IU8/IU4
 def : InstRW<[WriteXDL4PassWMMA], (instregex "^V_[S]*WMMA[C]*_.*_(IU8|IU4)_w32")>;
+// F8F6F4 scaled: variant selects 2-pass (any F6/F8) vs 1-pass (both F4)
 def : InstRW<[WriteWMMAScale_16X16X128_F8F6F4], (instregex "^V_WMMA_.*_16X16X128_F8F6F4.*_w32")>;
-def : InstRW<[Write4PassWMMA],    (instregex "^V_WMMA_F32_16X16X4_F32_w32")>;
+// 8-cycle XDL: 32x16x128 F4
 def : InstRW<[WriteXDL2PassWMMA], (instregex "^V_WMMA.*_F32_32X16X128_F4")>;
+// F32 WMMA (not XDL, uses VALU)
+def : InstRW<[Write4PassWMMA],    (instregex "^V_WMMA_F32_16X16X4_F32_w32")>;
 
 let NumMicroOps = 0 in {
 def : HWWriteRes<WriteVALUDummy, [HWVALU],  5>;

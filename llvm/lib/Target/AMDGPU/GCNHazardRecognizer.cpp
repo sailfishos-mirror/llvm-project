@@ -2119,7 +2119,7 @@ static bool isCoexecutableVALUInst(const MachineInstr &MI) {
 static bool IsWMMAHazardInstInCategory(const MachineInstr &MI,
                                        const SIInstrInfo *TII, unsigned Latency,
                                        unsigned Category) {
-  assert(TII->isXDLWMMA(MI) && (Latency == 8 || Latency == 16) &&
+  assert(TII->isXDLWMMA(MI) && (Latency == 4 || Latency == 8 || Latency == 16) &&
          "Handle me if the xdl wmma instruction latency changes");
 
   switch (Category) {
@@ -2130,7 +2130,7 @@ static bool IsWMMAHazardInstInCategory(const MachineInstr &MI,
           //   WMMA_*BF8FP8
           //   WMMA_*BF8BF8
           //   WMMA_*F8F6F4 if SRCA & SRCB != F8
-    return Latency == 8 && SIInstrInfo::isWMMA(MI);
+    return (Latency == 4 || Latency == 8) && SIInstrInfo::isWMMA(MI);
 
   case 1: // Dense WMMA Instructions:
           //   WMMA_IU8
