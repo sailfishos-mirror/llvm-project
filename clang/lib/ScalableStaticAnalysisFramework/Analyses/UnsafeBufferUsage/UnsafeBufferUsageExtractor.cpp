@@ -9,19 +9,23 @@
 #include "SSAFAnalysesCommon.h"
 #include "clang/AST/ASTConsumer.h"
 #include "clang/AST/ASTContext.h"
+#include "clang/AST/DynamicRecursiveASTVisitor.h"
 #include "clang/Analysis/Analyses/UnsafeBufferUsage.h"
-#include "clang/ScalableStaticAnalysisFramework/Analyses/EntityPointerLevel.h"
-#include "clang/ScalableStaticAnalysisFramework/Analyses/UnsafeBufferUsage.h"
+#include "clang/ScalableStaticAnalysisFramework/Analyses/EntityPointerLevel/EntityPointerLevel.h"
+#include "clang/ScalableStaticAnalysisFramework/Analyses/UnsafeBufferUsage/UnsafeBufferUsage.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/ASTEntityMapping.h"
+#include "clang/ScalableStaticAnalysisFramework/Core/Model/EntityId.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/Model/EntityName.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/TUSummary/ExtractorRegistry.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/TUSummary/TUSummaryBuilder.h"
-#include "clang/ScalableStaticAnalysisFramework/Core/TUSummary/TUSummaryExtractor.h"
-#include "clang/ScalableStaticAnalysisFramework/SSAFForceLinker.h" // IWYU pragma: keep
-#include <memory>
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/Support/Error.h"
+#include "llvm/Support/ErrorHandling.h"
 
-namespace {
 using namespace clang;
+using namespace ssaf;
+namespace {
+
 struct UnsafePointerMatcher {
   std::set<const Expr *> UnsafePointers;
 
@@ -41,9 +45,8 @@ void findFactsInContributor(const NamedDecl *Contributor, ASTContext &Ctx,
 }
 } // namespace
 
-namespace clang::ssaf {
-
-class UnsafeBufferUsageTUSummaryExtractor : public TUSummaryExtractor {
+class clang::ssaf::UnsafeBufferUsageTUSummaryExtractor
+    : public TUSummaryExtractor {
 public:
   UnsafeBufferUsageTUSummaryExtractor(TUSummaryBuilder &Builder)
       : TUSummaryExtractor(Builder) {}
@@ -80,68 +83,35 @@ public:
   }
 
   void HandleTranslationUnit(ASTContext &Ctx) override {
-    llvm::Error Errors = llvm::ErrorSuccess();
-    auto addError = [&Errors](llvm::Error Err) {
-      Errors = llvm::joinErrors(std::move(Errors), std::move(Err));
-    };
     ContributorFinder ContributorFinder;
 
-    ContributorFinder.VisitTranslationUnitDecl(Ctx.getTranslationUnitDecl());
+    ContributorFinder.TraverseAST(Ctx);
     for (auto *CD : ContributorFinder.Contributors) {
       auto EntitySummary = extractEntitySummary(CD, Ctx);
 
-      if (!EntitySummary) {
-        addError(EntitySummary.takeError());
-        continue;
-      }
-      assert(*EntitySummary &&
-             "std::unique_ptr<EntitySummary> should not be null");
+      if (!EntitySummary)
+        llvm::reportFatalInternalError(EntitySummary.takeError());
+      assert(*EntitySummary);
       if ((*EntitySummary)->empty())
         continue;
 
       auto ContributorName = getEntityName(CD);
 
-      if (!ContributorName) {
-        addError(entityNameErrFor(Ctx, *CD));
-        continue;
-      }
+      if (!ContributorName)
+        llvm::reportFatalInternalError(makeEntityNameErr(Ctx, *CD));
 
-      auto [EntitySummaryPtr, Success] = SummaryBuilder.addSummary(
+      auto [Ignored, InsertionSucceeded] = SummaryBuilder.addSummary(
           addEntity(*ContributorName), std::move(*EntitySummary));
 
-      if (!Success)
-        addError(failedToAddEntitySummaryFor(Ctx, CD));
+      assert(InsertionSucceeded && "duplicated contributor extraction");
     }
-    // FIXME: handle errors!
-    llvm::consumeError(std::move(Errors));
   }
 };
 
-// Proxy functions for unit tests:
-extern Expected<std::unique_ptr<UnsafeBufferUsageEntitySummary>>
-extractEntitySummary(UnsafeBufferUsageTUSummaryExtractor &Extractor,
-                     const NamedDecl *Contributor, ASTContext &Ctx) {
-  return Extractor.extractEntitySummary(Contributor, Ctx);
-}
-
-extern UnsafeBufferUsageTUSummaryExtractor *
-createUnsafeBufferUsageTUSummaryExtractor(TUSummaryBuilder &Builder) {
-  return new UnsafeBufferUsageTUSummaryExtractor(Builder);
-}
-
-extern void destroyUnsafeBufferUsageTUSummaryExtractor(
-    UnsafeBufferUsageTUSummaryExtractor *Extractor) {
-  delete Extractor;
-}
-
-extern EntityId addEntity(UnsafeBufferUsageTUSummaryExtractor &Extractor,
-                          const EntityName &EN) {
-  return Extractor.addEntity(EN);
-}
-} // namespace clang::ssaf
-
+// NOLINTNEXTLINE(misc-use-internal-linkage)
 volatile int UnsafeBufferUsageTUSummaryExtractorAnchorSource = 0;
+
 static clang::ssaf::TUSummaryExtractorRegistry::Add<
     ssaf::UnsafeBufferUsageTUSummaryExtractor>
-    RegisterExtractor("UnsafeBufferUsageTUSummaryExtractor",
+    RegisterExtractor(UnsafeBufferUsageEntitySummary::Name,
                       "The TUSummaryExtractor for unsafe buffer pointers");

@@ -12,4 +12,5 @@ clang_target_link_libraries(clang-ssaf-linker
   clangBasic
   clangScalableStaticAnalysisFrameworkAnalyses
   clangScalableStaticAnalysisFrameworkCore
+  clangScalableStaticAnalysisFrameworkTool
   )

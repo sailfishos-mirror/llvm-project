@@ -1,4 +1,4 @@
-//===---------- UnsafeBufferUsage.cpp -------------------------------------===//
+//===- UnsafeBufferUsage.cpp ----------------------------------------------===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -6,72 +6,104 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "clang/ScalableStaticAnalysisFramework/Analyses/UnsafeBufferUsage.h"
+#include "clang/ScalableStaticAnalysisFramework/Analyses/UnsafeBufferUsage/UnsafeBufferUsage.h"
 #include "SSAFAnalysesCommon.h"
-#include "clang/ScalableStaticAnalysisFramework/Analyses/EntityPointerLevel.h"
-#include "clang/ScalableStaticAnalysisFramework/SSAFForceLinker.h" // IWYU pragma: keep
+#include "clang/ScalableStaticAnalysisFramework/Analyses/EntityPointerLevel/EntityPointerLevel.h"
+#include "clang/ScalableStaticAnalysisFramework/Analyses/EntityPointerLevel/EntityPointerLevelFormat.h"
+#include "clang/ScalableStaticAnalysisFramework/Analyses/UnsafeBufferUsage/UnsafeBufferUsageTest.h"
+#include "clang/ScalableStaticAnalysisFramework/Core/Serialization/JSONFormat.h"
+#include "llvm/Support/Error.h"
 #include "llvm/Support/JSON.h"
+#include <cstdint>
 
-namespace {
-constexpr const char *const UnsafeBuffersKey = "UnsafeBuffers";
-} // namespace
-
-namespace clang::ssaf {
-using Object = llvm::json::Object;
+using namespace clang;
+using namespace ssaf;
 using Array = llvm::json::Array;
-using Value = llvm::json::Value;
+using Object = llvm::json::Object;
 
-// Writes the summary into an array of EntityPointerLevels:
-llvm::json::Object UnsafeBufferUsageEntitySummary::summaryToJSON(
-    const EntitySummary &ES, JSONFormat::EntityIdToJSONFn EntityId2JSON) {
-  Array UnsafeBuffersData;
+static constexpr llvm::StringLiteral SummarySerializationKey = "UnsafeBuffers";
 
-  for (const auto &EPL :
-       static_cast<const UnsafeBufferUsageEntitySummary &>(ES).UnsafeBuffers)
-    UnsafeBuffersData.push_back(entityPointerLevelToJSON(EPL, EntityId2JSON));
-
-  Object Data;
-
-  Data[UnsafeBuffersKey] = Value(std::move(UnsafeBuffersData));
-  return Data;
+UnsafeBufferUsageEntitySummary
+ssaf::buildUnsafeBufferUsageEntitySummary(EntityPointerLevelSet UnsafeBuffers) {
+  return UnsafeBufferUsageEntitySummary(std::move(UnsafeBuffers));
 }
 
-llvm::Expected<std::unique_ptr<EntitySummary>>
-UnsafeBufferUsageEntitySummary::summaryFromJSON(
-    const Object &Data, EntityIdTable &,
-    JSONFormat::EntityIdFromJSONFn EntityIdFromJSON) {
-  const Value *UnsafeBuffersData = Data.get(UnsafeBuffersKey);
+llvm::iterator_range<EntityPointerLevelSet::const_iterator>
+ssaf::getUnsafeBuffers(const UnsafeBufferUsageEntitySummary &S) {
+  return llvm::make_range(S.UnsafeBuffers.begin(), S.UnsafeBuffers.end());
+}
+
+static Object serialize(const EntitySummary &S,
+                        JSONFormat::EntityIdToJSONFn Fn) {
+  const auto &SS = static_cast<const UnsafeBufferUsageEntitySummary &>(S);
+  Array UnsafeBuffersData;
+
+  for (const auto &EPL : getUnsafeBuffers(SS))
+    UnsafeBuffersData.push_back(entityPointerLevelToJSON(EPL, Fn));
+  return Object{{SummarySerializationKey.data(), std::move(UnsafeBuffersData)}};
+}
+
+static llvm::Expected<std::unique_ptr<EntitySummary>>
+deserializeImpl(const Object &Data, JSONFormat::EntityIdFromJSONFn Fn) {
+  const Array *UnsafeBuffersData =
+      Data.getArray(SummarySerializationKey.data());
 
   if (!UnsafeBuffersData)
-    return makeErrorSawButExpected(
-        Object(Data), "a JSON object with the key: %s", UnsafeBuffersKey);
+    return makeSawButExpectedError(Object(Data), "an Object with a key %s",
+                                   SummarySerializationKey.data());
 
-  const auto *AsArr = UnsafeBuffersData->getAsArray();
+  EntityPointerLevelSet EPLs;
 
-  if (!AsArr)
-    return makeErrorSawButExpected(*UnsafeBuffersData,
-                                   "a JSON array of EntityPointerLevels");
-
-  EntityPointerLevelSet UnsafeBuffers;
-
-  for (auto &UnsafeBufferData : *AsArr) {
-    auto EPL = entityPointerLevelFromJSON(UnsafeBufferData, EntityIdFromJSON);
+  for (auto &EPLData : *UnsafeBuffersData) {
+    auto EPL = entityPointerLevelFromJSON(EPLData, Fn);
 
     if (!EPL)
       return EPL.takeError();
-    UnsafeBuffers.insert(*EPL);
+    EPLs.insert(*EPL);
   }
   return std::make_unique<UnsafeBufferUsageEntitySummary>(
-      UnsafeBufferUsageEntitySummary(std::move(UnsafeBuffers)));
+      buildUnsafeBufferUsageEntitySummary(std::move(EPLs)));
 }
+
+static llvm::Expected<std::unique_ptr<EntitySummary>>
+deserialize(const Object &Data, EntityIdTable &,
+            JSONFormat::EntityIdFromJSONFn Fn) {
+  return deserializeImpl(Data, Fn);
+}
+
+struct UnsafeBufferUsageJSONFormatInfo : JSONFormat::FormatInfo {
+  UnsafeBufferUsageJSONFormatInfo()
+      : JSONFormat::FormatInfo(UnsafeBufferUsageEntitySummary::summaryName(),
+                               serialize, deserialize) {}
+};
 
 static llvm::Registry<JSONFormat::FormatInfo>::Add<
     UnsafeBufferUsageJSONFormatInfo>
     RegisterUnsafeBufferUsageJSONFormatInfo(
-        "UnsafeBufferUsage",
+        UnsafeBufferUsageEntitySummary::Name,
         "JSON Format info for UnsafeBufferUsageEntitySummary");
-
-} // namespace clang::ssaf
 
 // NOLINTNEXTLINE(misc-use-internal-linkage)
 volatile int UnsafeBufferUsageSSAFJSONFormatAnchorSource = 0;
+
+// For unit test:
+llvm::Expected<std::unique_ptr<EntitySummary>>
+ssaf::serializeDeserializeRoundTrip(
+    const UnsafeBufferUsageEntitySummary &S,
+    std::function<uint64_t(EntityId)> IdToIntFn,
+    std::function<llvm::Expected<EntityId>(uint64_t)> IdFromIntFn) {
+
+  auto IdToJson = [&IdToIntFn](EntityId Id) -> Object {
+    return Object({{"@", IdToIntFn(Id)}});
+  };
+  auto IdFromJson =
+      [&IdFromIntFn](const Object &O) -> llvm::Expected<EntityId> {
+    const auto *Int = O.get("@");
+
+    if (Int && Int->getAsUINT64())
+      return IdFromIntFn(*Int->getAsUINT64());
+    return llvm::createStringError("failed to get EntityId from Object");
+  };
+
+  return deserializeImpl(serialize(S, IdToJson), IdFromJson);
+}

@@ -1,4 +1,4 @@
-//===------------------ SSAFAnalysesCommon.h --------------------*- C++ -*-===//
+//===-- SSAFAnalysesCommon.h ------------------------------------*- C++ -*-===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -12,20 +12,20 @@
 #ifndef LLVM_CLANG_SCALABLESTATICANALYSISFRAMEWORK_ANALYSES_SSAFANALYSESCOMMON_H
 #define LLVM_CLANG_SCALABLESTATICANALYSISFRAMEWORK_ANALYSES_SSAFANALYSESCOMMON_H
 
+#include "clang/AST/ASTTypeTraits.h"
 #include "clang/AST/Decl.h"
-#include "clang/AST/ParentMapContext.h"
-#include "clang/AST/TypeBase.h"
+#include "clang/AST/DeclObjC.h"
+#include "clang/AST/DynamicRecursiveASTVisitor.h"
 #include "clang/Basic/SourceLocation.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/JSON.h"
 
-namespace {
 using namespace clang;
 
 template <typename NodeTy, typename... Ts>
-static inline llvm::Error strErrAtNode(ASTContext &Ctx, const NodeTy &N,
-                                       StringRef Fmt, const Ts &...Args) {
+static inline llvm::Error makeErrAtNode(ASTContext &Ctx, const NodeTy &N,
+                                        StringRef Fmt, const Ts &...Args) {
   std::string LocStr = N.getBeginLoc().printToString(Ctx.getSourceManager());
   llvm::SmallVector<char> FmtData;
 
@@ -33,14 +33,14 @@ static inline llvm::Error strErrAtNode(ASTContext &Ctx, const NodeTy &N,
   return llvm::createStringError(FmtData.data(), Args..., LocStr.c_str());
 }
 
-static inline llvm::Error entityNameErrFor(ASTContext &Ctx,
-                                           const NamedDecl &D) {
-  return strErrAtNode(Ctx, D, "failed to create entity name for %s",
-                      D.getNameAsString().data());
+static inline llvm::Error makeEntityNameErr(ASTContext &Ctx,
+                                            const NamedDecl &D) {
+  return makeErrAtNode(Ctx, D, "failed to create entity name for %s",
+                       D.getNameAsString().data());
 }
 
-static inline llvm::Error failedToAddEntitySummaryFor(ASTContext &Ctx,
-                                                      const NamedDecl *D) {
+static inline llvm::Error makeAddEntitySummaryErr(ASTContext &Ctx,
+                                                  const NamedDecl *D) {
   std::string LocStr = D->getBeginLoc().printToString(Ctx.getSourceManager());
 
   return llvm::createStringError("failed to add entity summary for %s at %s",
@@ -48,20 +48,22 @@ static inline llvm::Error failedToAddEntitySummaryFor(ASTContext &Ctx,
 }
 
 template <typename... Ts>
-static inline llvm::Error makeErrorSawButExpected(const llvm::json::Value &Saw,
+static inline llvm::Error makeSawButExpectedError(const llvm::json::Value &Saw,
                                                   llvm::StringRef Expected,
                                                   const Ts &...ExpectedArgs) {
-  return llvm::createStringError(
-      ("saw %s but expected " + Expected).str().c_str(),
-      llvm::formatv("{0:2}", Saw).str().data(), Expected.data(),
-      ExpectedArgs...);
+  std::string Fmt = ("saw %s but expected " + Expected).str();
+  std::string SawStr = llvm::formatv("{0:2}", Saw).str();
+
+  return llvm::createStringError(Fmt.c_str(), SawStr.c_str(), ExpectedArgs...);
 }
 
-template <typename TypedObj> static bool hasPtrOrArrType(const TypedObj &E) {
+template <typename DeclOrExpr>
+static inline bool hasPtrOrArrType(const DeclOrExpr &E) {
   return llvm::isa<PointerType>(E.getType().getCanonicalType()) ||
          llvm::isa<ArrayType>(E.getType().getCanonicalType());
 }
 
+namespace clang::ssaf {
 /// Traverses the AST and finds contributors:
 class ContributorFinder : public DynamicRecursiveASTVisitor {
 public:
@@ -82,12 +84,12 @@ public:
 
     if (DC->isFileContext() || DC->isNamespace())
       Contributors.push_back(D);
-    return false;
+    return true;
   }
 };
 
-/// An AST visitor that skips callable decl and record decl strict-descendant
-/// because those are separate contributors.
+/// An AST visitor that skips the root node's strict-descendants that are
+/// callable Decls and record Decls, because those are separate contributors.
 ///
 /// The visitor calls
 /// `MatcherTy::matchFact(DynTypedNode &, ASTContext &, const NamedDecl
@@ -142,6 +144,6 @@ public:
     return true; // skip lambda as it is a callable
   }
 };
-} // namespace
+} // namespace clang::ssaf
 #endif // LLVM_CLANG_SCALABLESTATICANALYSISFRAMEWORK_ANALYSES_SSAFANALYSESCOMMON_H
 

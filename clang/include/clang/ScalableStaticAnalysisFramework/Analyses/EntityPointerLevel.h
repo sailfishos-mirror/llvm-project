@@ -107,12 +107,12 @@ translateEntityPointerLevel(const Expr *E, ASTContext &Ctx,
 /// \param Ctx the AST context of `E`
 /// \param AddEntity the callback provided by the caller to convert EntityNames
 /// to EntityIds.
-/// \param IsFunRet true iff the created EPL(s) is associated with the return
-/// type of a function entity.
-llvm::Expected<EntityPointerLevelSet>
-creatEntityPointerLevel(const NamedDecl *ND, ASTContext &Ctx,
-                        std::function<EntityId(EntityName EN)> AddEntity,
-                        bool IsFunRet = false);
+/// \param IsFunRet true iff the created EPL is associated with the return type
+/// of a function entity.
+llvm::Expected<EntityPointerLevel>
+createEntityPointerLevel(const NamedDecl *ND, ASTContext &Ctx,
+                         std::function<EntityId(EntityName EN)> AddEntity,
+                         bool IsFunRet = false);
 
 /// Creates new EntityPointerLevel(s) (EPLs) from the provided
 /// one(s) by incrementing their pointer levels.
