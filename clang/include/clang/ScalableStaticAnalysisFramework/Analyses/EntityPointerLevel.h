@@ -111,8 +111,8 @@ translateEntityPointerLevel(const Expr *E, ASTContext &Ctx,
 /// of a function entity.
 llvm::Expected<EntityPointerLevel>
 createEntityPointerLevel(const NamedDecl *ND, ASTContext &Ctx,
-                        std::function<EntityId(EntityName EN)> AddEntity,
-                        bool IsFunRet = false);
+                         std::function<EntityId(EntityName EN)> AddEntity,
+                         bool IsFunRet = false);
 
 /// Creates a new EntityPointerLevel (EPL) from `E` by incrementing `E`'s
 /// pointer level.
