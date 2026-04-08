@@ -6899,7 +6899,8 @@ RValue CodeGenFunction::EmitCall(QualType CalleeType,
   // scope to intercept these lifetime markers. However, we only do this if the
   // call is "safe".
   std::optional<RunCleanupsScope> Scope;
-  if (isSafeToTightenLifetime(E))
+  if (!CGM.getCodeGenOpts().NoLifetimeMarkersForTemporaries &&
+      isSafeToTightenLifetime(E))
     Scope.emplace(*this);
 
   const Decl *TargetDecl =
