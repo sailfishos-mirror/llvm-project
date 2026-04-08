@@ -10,19 +10,29 @@
 #include "SSAFAnalysesCommon.h"
 #include "clang/ScalableStaticAnalysisFramework/Analyses/EntityPointerLevel/EntityPointerLevelFormat.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/Model/EntityId.h"
-#include "clang/ScalableStaticAnalysisFramework/SSAFForceLinker.h" // IWYU pragma: keep
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/JSON.h"
+
+using namespace clang;
+using namespace ssaf;
+using Object = llvm::json::Object;
+using Array = llvm::json::Array;
+using Value = llvm::json::Value;
 
 namespace {
 constexpr const char *const PointerFlowKey = "PointerFlow";
 } // namespace
 
-namespace clang::ssaf {
-using Object = llvm::json::Object;
-using Array = llvm::json::Array;
-using Value = llvm::json::Value;
+ssaf::PointerFlowEntitySummary
+ssaf::buildPointerFlowEntitySummary(EdgeSet Edges) {
+  return PointerFlowEntitySummary(std::move(Edges));
+}
+
+llvm::iterator_range<EdgeSet::const_iterator>
+ssaf::getEdges(const PointerFlowEntitySummary &Sum) {
+  return Sum.Edges;
+}
 
 // Writes the 'Edges' map as an array of array of EntityPointerLevels:
 // Array [
@@ -30,12 +40,13 @@ using Value = llvm::json::Value;
 //    Array [ [lhs-node], [rhs-node], [rhs-node], ...]
 //    ...
 // ]
-llvm::json::Object PointerFlowEntitySummary::summaryToJSON(
-    const EntitySummary &ES, JSONFormat::EntityIdToJSONFn EntityId2JSON) {
+static llvm::json::Object
+summaryToJSON(const EntitySummary &ES,
+              JSONFormat::EntityIdToJSONFn EntityId2JSON) {
   Array EdgesData;
 
   for (const auto &Entry :
-       static_cast<const PointerFlowEntitySummary &>(ES).Edges) {
+       getEdges(static_cast<const PointerFlowEntitySummary &>(ES))) {
     Array EdgesEntryData;
     EntityPointerLevel LHS = Entry.first;
 
@@ -52,10 +63,9 @@ llvm::json::Object PointerFlowEntitySummary::summaryToJSON(
   return Data;
 }
 
-llvm::Expected<std::unique_ptr<EntitySummary>>
-PointerFlowEntitySummary::summaryFromJSON(
-    const Object &Data, EntityIdTable &,
-    JSONFormat::EntityIdFromJSONFn EntityIdFromJSON) {
+static llvm::Expected<std::unique_ptr<EntitySummary>>
+summaryFromJSON(const Object &Data, EntityIdTable &,
+                JSONFormat::EntityIdFromJSONFn EntityIdFromJSON) {
   const Value *EdgesData = Data.get(PointerFlowKey);
 
   if (!EdgesData)
@@ -91,14 +101,18 @@ PointerFlowEntitySummary::summaryFromJSON(
     Edges[*EPLs.begin()].insert(EPLs.begin() + 1, EPLs.end());
   }
   return std::make_unique<PointerFlowEntitySummary>(
-      PointerFlowEntitySummary(std::move(Edges)));
+      buildPointerFlowEntitySummary(std::move(Edges)));
 }
+
+struct PointerFlowJSONFormatInfo : JSONFormat::FormatInfo {
+  PointerFlowJSONFormatInfo()
+      : JSONFormat::FormatInfo(PointerFlowEntitySummary::summaryName(),
+                               summaryToJSON, summaryFromJSON) {}
+};
 
 static llvm::Registry<JSONFormat::FormatInfo>::Add<PointerFlowJSONFormatInfo>
     RegisterPointerFlowJSONFormatInfo(
         "PointerFlow", "JSON Format info for PointerFlowEntitySummary");
-
-} // namespace clang::ssaf
 
 // NOLINTNEXTLINE(misc-use-internal-linkage)
 volatile int PointerFlowSSAFJSONFormatAnchorSource = 0;

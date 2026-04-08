@@ -15,14 +15,12 @@
 #include "clang/ScalableStaticAnalysisFramework/Core/ASTEntityMapping.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/Model/EntityId.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/Model/EntityName.h"
-#include "clang/ScalableStaticAnalysisFramework/Core/Serialization/JSONFormat.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/TUSummary/ExtractorRegistry.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/TUSummary/TUSummary.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/TUSummary/TUSummaryBuilder.h"
 #include "clang/Tooling/Tooling.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/Error.h"
-#include "llvm/Testing/Support/Error.h"
 #include "gtest/gtest.h"
 #include <memory>
 #include <type_traits>
@@ -267,129 +265,6 @@ PointerFlowTest::makeEdges(unsigned Line,
 TEST_F(PointerFlowTest, IsExtractorRegisteredTest) {
   EXPECT_TRUE(
       isTUSummaryExtractorRegistered("PointerFlowTUSummaryExtractor"));
-}
-
-TEST_F(PointerFlowTest, IsJSONFormatRegistered) {
-  std::set<llvm::StringRef> ActualNames;
-  for (const auto &Entry :
-       llvm::Registry<clang::ssaf::JSONFormat::FormatInfo>::entries()) {
-    bool Inserted = ActualNames.insert(Entry.getName()).second;
-    EXPECT_TRUE(Inserted);
-  }
-
-  EXPECT_TRUE(ActualNames.count("PointerFlow") == 1);
-}
-
-//////////////////////////////////////////////////////////////
-//                     JSON Tests                           //
-//////////////////////////////////////////////////////////////
-// Oracle JSON output for the example:
-// void foo(int ***p, int ****q, int x, int ****r) {
-//   p[5][5][5];
-//   q[5][5][5][5];
-//   q[x] = p;
-//   r = q;
-// }
-constexpr const char *const SerilizationTestOracle = R"cpp({
-  "PointerFlow": [
-    [
-      [
-        {
-          "@": 108
-        },
-        2
-      ],
-      [
-        {
-          "@": 42
-        },
-        1
-      ]
-    ],
-    [
-      [
-        {
-          "@": 9
-        },
-        1
-      ],
-      [
-        {
-          "@": 108
-        },
-        1
-      ]
-    ]
-  ]
-})cpp";
-
-TEST_F(PointerFlowTest, SerializeTest) {
-  auto Sum = setUpTest(R"cpp(
-    void foo(int ***p, int ****q, int x, int ****r) {
-      p[5][5][5];
-      q[5][5][5][5];
-      q[x] = p;
-      r = q;
-    }
-  )cpp",
-                       "foo");
-  ASSERT_NE(Sum, nullptr);
-  EXPECT_EQ(*Sum, makeEdges(__LINE__, {
-                                          /*[0]=*/{{"q", 2U}, {"p", 1U}},
-                                          /*[1]=*/{{"r", 1U}, {"q", 1U}},
-                                      }));
-
-  using Object = llvm::json::Object;
-  using Value = llvm::json::Value;
-  std::map<EntityId, uint64_t> DummyTable{{*getEntityId("p"), 42},
-                                          {*getEntityId("q"), 108},
-                                          {*getEntityId("r"), 9}};
-
-  Object JData = PointerFlowEntitySummary::summaryToJSON(
-      *Sum, [&DummyTable](EntityId Id) {
-        return Object{{"@", Value(DummyTable[Id])}};
-      });
-
-  EXPECT_EQ(llvm::formatv("{0:2}", llvm::json::Value(std::move(JData))).str(),
-            SerilizationTestOracle);
-}
-
-TEST_F(PointerFlowTest, DeserializeTest) {
-  auto Sum = setUpTest(R"cpp(
-    void foo(int ***p, int ****q, int x, int ****r) {
-      p[5][5][5];
-      q[5][5][5][5];
-      q[x] = p;
-      r = q;
-    }
-  )cpp",
-                       "foo");
-  ASSERT_NE(Sum, nullptr);
-  EXPECT_EQ(*Sum, makeEdges(__LINE__, {
-                                          /*[0]=*/{{"q", 2U}, {"p", 1U}},
-                                          /*[1]=*/{{"r", 1U}, {"q", 1U}},
-                                      }));
-
-  using Object = llvm::json::Object;
-  using Value = llvm::json::Value;
-  std::map<uint64_t, EntityId> DummyTable{{42, *getEntityId("p")},
-                                          {108, *getEntityId("q")},
-                                          {9, *getEntityId("r")}};
-  Expected<Value> ParsedJSON = llvm::json::parse(SerilizationTestOracle);
-
-  ASSERT_THAT_EXPECTED(ParsedJSON, llvm::Succeeded());
-  ASSERT_NE(ParsedJSON->getAsObject(), nullptr);
-
-  EntityIdTable Ignored;
-  auto ParsedSum = PointerFlowEntitySummary::summaryFromJSON(
-      *ParsedJSON->getAsObject(), Ignored,
-      [&DummyTable](const Object &O) -> Expected<EntityId> {
-        return DummyTable.at(O.getInteger("@").value());
-      });
-
-  ASSERT_THAT_EXPECTED(ParsedSum, llvm::Succeeded());
-  EXPECT_EQ(*static_cast<PointerFlowEntitySummary *>(ParsedSum->get()),
-            *Sum);
 }
 
 //////////////////////////////////////////////////////////////

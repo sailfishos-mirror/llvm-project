@@ -11,11 +11,10 @@
 //  nodes.
 //
 //===----------------------------------------------------------------------===//
-#ifndef LLVM_CLANG_SCALABLESTATICANALYSISFRAMEWORK_ANALYSES_POINTERFLOW_POINTERASSIGNMENTS_H
-#define LLVM_CLANG_SCALABLESTATICANALYSISFRAMEWORK_ANALYSES_POINTERFLOW_POINTERASSIGNMENTS_H
+#ifndef LLVM_CLANG_SCALABLESTATICANALYSISFRAMEWORK_ANALYSES_POINTERFLOW_POINTERFLOW_H
+#define LLVM_CLANG_SCALABLESTATICANALYSISFRAMEWORK_ANALYSES_POINTERFLOW_POINTERFLOW_H
 
 #include "clang/ScalableStaticAnalysisFramework/Analyses/EntityPointerLevel/EntityPointerLevel.h"
-#include "clang/ScalableStaticAnalysisFramework/Core/Serialization/JSONFormat.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/TUSummary/EntitySummary.h"
 
 namespace clang::ssaf {
@@ -27,6 +26,9 @@ class PointerFlowEntitySummary final : public EntitySummary {
   EdgeSet Edges;
 
   friend class PointerFlowTUSummaryExtractor;
+  friend PointerFlowEntitySummary buildPointerFlowEntitySummary(EdgeSet Edges);
+  friend llvm::iterator_range<EdgeSet::const_iterator>
+  getEdges(const PointerFlowEntitySummary &);
 
   PointerFlowEntitySummary(EdgeSet Edges)
       : EntitySummary(), Edges(std::move(Edges)) {}
@@ -42,25 +44,8 @@ public:
 
   bool empty() const { return Edges.empty() && Edges.empty(); }
 
-  static llvm::json::Object
-  summaryToJSON(const EntitySummary &ES,
-                JSONFormat::EntityIdToJSONFn EntityId2JSON);
-
-  static llvm::Expected<std::unique_ptr<EntitySummary>>
-  summaryFromJSON(const llvm::json::Object &Data, EntityIdTable &,
-                  JSONFormat::EntityIdFromJSONFn EntityIdFromJSON);
-
   static SummaryName summaryName() { return SummaryName{"PointerFlow"}; }
 };
-
-struct PointerFlowJSONFormatInfo : JSONFormat::FormatInfo {
-  PointerFlowJSONFormatInfo()
-      : JSONFormat::FormatInfo(
-            PointerFlowEntitySummary::summaryName(),
-            PointerFlowEntitySummary::summaryToJSON,
-            PointerFlowEntitySummary::summaryFromJSON) {}
-};
-
 } // namespace clang::ssaf
 
-#endif // LLVM_CLANG_SCALABLESTATICANALYSISFRAMEWORK_ANALYSES_POINTERFLOW_POINTERASSIGNMENTS_H
+#endif // LLVM_CLANG_SCALABLESTATICANALYSISFRAMEWORK_ANALYSES_POINTERFLOW_POINTERFLOW_H
