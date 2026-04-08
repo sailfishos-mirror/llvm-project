@@ -17,6 +17,7 @@
 #include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclObjC.h"
 #include "clang/AST/DynamicRecursiveASTVisitor.h"
+#include "clang/AST/ExprCXX.h"
 #include "clang/Basic/SourceLocation.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Twine.h"
