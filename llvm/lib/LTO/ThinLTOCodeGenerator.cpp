@@ -12,6 +12,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/LTO/legacy/ThinLTOCodeGenerator.h"
+#include "llvm/CodeGen/CommandFlags.h"
 #include "llvm/Support/CommandLine.h"
 
 #include "llvm/ADT/ScopeExit.h"
@@ -375,6 +376,9 @@ public:
       return;
 
     llvm::lto::Config Conf;
+    Conf.InitTargetOptions = [](const Triple &TT) {
+      return codegen::InitTargetOptionsFromCodeGenFlags(TT);
+    };
     Conf.OptLevel = OptLevel;
     Conf.CPU = TMBuilder.MCpu;
     Conf.MAttrs.push_back(TMBuilder.MAttr);
@@ -529,6 +533,9 @@ static void resolvePrevailingInIndex(
 
   // TODO Conf.VisibilityScheme can be lto::Config::ELF for ELF.
   lto::Config Conf;
+  Conf.InitTargetOptions = [](const Triple &TT) {
+    return codegen::InitTargetOptionsFromCodeGenFlags(TT);
+  };
   thinLTOResolvePrevailingInIndex(Conf, Index, isPrevailing, recordNewLinkage,
                                   GUIDPreservedSymbols);
 }

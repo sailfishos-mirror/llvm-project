@@ -352,6 +352,10 @@ static int run(int argc, char **argv) {
     Conf.RelocModel = *RM;
   Conf.CodeModel = codegen::getExplicitCodeModel();
 
+  Conf.InitTargetOptions = [](const Triple &TT) {
+    return codegen::InitTargetOptionsFromCodeGenFlags(TT);
+  };
+
   Conf.DebugPassManager = DebugPassManager;
 
   if (SaveTemps && !SelectSaveTemps.empty()) {

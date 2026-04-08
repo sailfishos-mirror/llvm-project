@@ -49,11 +49,12 @@ struct Config {
   // Note: when adding fields here, consider whether they need to be added to
   // computeLTOCacheKey in LTO.cpp.
   std::string CPU;
-  // Callback to modify the target options once they are instantiated.
+  // Callback to initialize TargetOptions. Callers must set this to
+  // incorporate target-specific options.
   std::function<TargetOptions(const Triple &TheTriple)> InitTargetOptions =
-      [](const Triple &TheTriple) {
-        return codegen::InitTargetOptionsFromCodeGenFlags(TheTriple);
-      };
+      [](const Triple &) -> TargetOptions {
+    llvm_unreachable("InitTargetOptions must be set by the LTO client");
+  };
   std::vector<std::string> MAttrs;
   std::vector<std::string> MllvmArgs;
   // LTO will register both lists of plugins, but
