@@ -1,5 +1,12 @@
 /*
  * kmp_adt.h -- Advanced Data Types used internally
+ *
+ * FIXME: This is in intermediate solution until we agree and implement some
+ * common resource according to
+ * https://discourse.llvm.org/t/meta-rfc-adts-without-c-runtime-dependency/90317.
+ * As soon as we will have this common resource that can be used for runtimes
+ * such as openmp that want to avoid the link dependency to the C++ STL, this
+ * shall be refactored.
  */
 
 //===----------------------------------------------------------------------===//
