@@ -777,9 +777,9 @@ bool PerfScriptReader::extractLBRStack(TraceStream &TraceIt,
 bool PerfScriptReader::extractCallstack(TraceStream &TraceIt,
                                         SmallVectorImpl<uint64_t> &CallStack) {
   // The raw format of call stack is like:
-  //            4005dc                  # leaf frame (no buildid)
+  //            4005dc               # leaf frame (no buildid)
   //	          400634
-  //	          deadbeef:0x400684       # frame with buildid prefix
+  //	          deadbeef:400684      # root frame (with buildid prefix)
   // It's in bottom-up order with each frame in one line.
 
   // Extract stack frames from sample
