@@ -7,6 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "clang/ScalableStaticAnalysisFramework/Analyses/PointerFlow/PointerFlow.h"
+#include "TestFixture.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclCXX.h"
 #include "clang/AST/DynamicRecursiveASTVisitor.h"
@@ -21,6 +22,7 @@
 #include "clang/Tooling/Tooling.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/Error.h"
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include <memory>
 #include <type_traits>
@@ -28,39 +30,6 @@
 
 using namespace clang;
 using namespace ssaf;
-
-namespace clang::ssaf {
-/////////////////////////////////////////////////////
-// Declare Proxy functions
-/////////////////////////////////////////////////////
-class PointerFlowTUSummaryExtractor;
-
-extern Expected<std::unique_ptr<PointerFlowEntitySummary>>
-extractEntitySummary(PointerFlowTUSummaryExtractor &Extractor,
-                     const NamedDecl *Contributor, ASTContext &Ctx);
-
-extern PointerFlowTUSummaryExtractor *
-createPointerFlowTUSummaryExtractor(TUSummaryBuilder &Builder);
-
-extern void deletePointerFlowTUSummaryExtractor(
-    PointerFlowTUSummaryExtractor *);
-
-extern EntityId addEntity(PointerFlowTUSummaryExtractor &Extractor,
-                          EntityName &EN);
-
-class PointerFlowTUSummaryExtractorProxy {
-  PointerFlowTUSummaryExtractor *Ptr;
-
-public:
-  explicit PointerFlowTUSummaryExtractorProxy(TUSummaryBuilder &Builder)
-      : Ptr(createPointerFlowTUSummaryExtractor(Builder)) {}
-  ~PointerFlowTUSummaryExtractorProxy() {
-    deletePointerFlowTUSummaryExtractor(Ptr);
-  }
-
-  PointerFlowTUSummaryExtractor &operator*() const { return *Ptr; }
-};
-} // namespace clang::ssaf
 
 namespace {
 // Use FindEntityByName to identify entities in unit tests.
@@ -100,8 +69,6 @@ StringRef toStringRef(const FindEntityByName &N) {
 
 const NamedDecl *matchNamedDeclByFindEntityByName(const FindEntityByName &N,
                                                   const NamedDecl *D) {
-  if (std::holds_alternative<LambdaOfVar>(N))
-    D->dump();
   return std::visit(
       Overloaded{
           [&D](StringRef S) -> const NamedDecl * {
@@ -119,7 +86,6 @@ const NamedDecl *matchNamedDeclByFindEntityByName(const FindEntityByName &N,
           },
           [&D](const LambdaOfVar &L) -> const NamedDecl * {
             if (const auto *VD = dyn_cast<VarDecl>(D); VD && VD->getInit()) {
-              VD->dump();
               if (isa<LambdaExpr>(VD->getInit()) &&
                   VD->getNameAsString() == L.VarName)
                 return cast<LambdaExpr>(VD->getInit())->getCallOperator();
@@ -175,51 +141,81 @@ struct EPLPair {
   bool isFunRet;
 };
 
-class PointerFlowTest : public testing::Test {
+class PointerFlowTest : public TestFixture {
 protected:
   TUSummary TUSum;
   TUSummaryBuilder Builder;
-  PointerFlowTUSummaryExtractorProxy ExtractorProxy;
+  std::unique_ptr<TUSummaryExtractor> Extractor;
   std::unique_ptr<ASTUnit> AST;
 
   PointerFlowTest()
       : TUSum(BuildNamespace(BuildNamespaceKind::CompilationUnit, "Mock.cpp")),
-        Builder(TUSum), ExtractorProxy(Builder) {}
+        Builder(TUSum), Extractor(nullptr) {}
 
   template <typename ContributorDecl = NamedDecl,
             typename =
                 std::enable_if_t<std::is_base_of_v<NamedDecl, ContributorDecl>>>
-  std::unique_ptr<PointerFlowEntitySummary>
-  setUpTest(StringRef Code, FindEntityByName ContributorName) {
+  bool setUpTest(StringRef Code) {
     AST = tooling::buildASTFromCodeWithArgs(
         Code, {"-Wno-unused-value", "-Wno-int-to-pointer-cast"});
 
-    const auto *ContributorDefn = findEntityByName<ContributorDecl>(
-        ContributorName, AST->getASTContext());
+    for (auto &E : clang::ssaf::TUSummaryExtractorRegistry::entries()) {
+      if (E.getName() == PointerFlowEntitySummary::Name) {
+        Extractor = E.instantiate(Builder);
+        break;
+      }
+    }
 
-    if (!ContributorDefn)
+    if (!Extractor) {
+      ADD_FAILURE() << "failed to find PointerFlowTUSummaryExtractor";
+      return false;
+    }
+    Extractor->HandleTranslationUnit(AST->getASTContext());
+    return true;
+  }
+
+  template <typename ContributorDecl = NamedDecl>
+  const PointerFlowEntitySummary *getEntitySummary(FindEntityByName Name) {
+    const auto *ContributorDefn =
+        findEntityByName<ContributorDecl>(Name, AST->getASTContext());
+
+    if (!ContributorDefn) {
+      ADD_FAILURE() << "failed to find Decl of \"" << toStringRef(Name) << "\"";
       return nullptr;
+    }
 
     std::optional<EntityName> EN = getEntityName(ContributorDefn);
 
-    if (!EN)
-      return nullptr;
-
-    auto Sum = extractEntitySummary(*ExtractorProxy, ContributorDefn,
-                                    AST->getASTContext());
-    if (!Sum) {
-      llvm::consumeError(std::move(Sum.takeError()));
+    if (!EN) {
+      ADD_FAILURE() << "failed to get EntityName for contributor \""
+                    << toStringRef(Name) << "\"";
       return nullptr;
     }
-    assert(*Sum);
-    return std::move(*Sum);
+
+    EntityId ContributorEntityId = Builder.addEntity(*EN);
+    auto &TUSumData = getData(TUSum);
+    auto EntitiesSumIter =
+        TUSumData.find(PointerFlowEntitySummary::summaryName());
+
+    // If none entity summary was collected, it may not be an entry in
+    // `TUSumData`:
+    if (EntitiesSumIter == TUSumData.end())
+      return nullptr;
+
+    auto EntitySumIter = EntitiesSumIter->second.find(ContributorEntityId);
+
+    // If entity summary is empty, it may not exist:
+    if (EntitySumIter == EntitiesSumIter->second.end())
+      return nullptr;
+    return static_cast<const PointerFlowEntitySummary *>(
+        EntitySumIter->second.get());
   }
 
 public:
   std::optional<EntityId> getEntityId(FindEntityByName Name) {
     if (const auto *D = findEntityByName(Name, AST->getASTContext())) {
       if (auto EntityName = getEntityName(D))
-        return addEntity(*ExtractorProxy, *EntityName);
+        return Builder.addEntity(*EntityName);
     }
     return std::nullopt;
   }
@@ -227,7 +223,7 @@ public:
   std::optional<EntityId> getEntityIdForReturn(FindEntityByName FunName) {
     if (const auto *D = findFnByName(FunName, AST->getASTContext())) {
       if (auto EntityName = getEntityNameForReturn(D))
-        return addEntity(*ExtractorProxy, *EntityName);
+        return Builder.addEntity(*EntityName);
     }
     return std::nullopt;
   }
@@ -254,7 +250,7 @@ static constexpr auto ToEPL =
 
 EdgeSet
 PointerFlowTest::makeEdges(unsigned Line,
-                                  ArrayRef<std::pair<EPLPair, EPLPair>> Edges) {
+                           ArrayRef<std::pair<EPLPair, EPLPair>> Edges) {
   EdgeSet Result;
   for (auto Edge : Edges)
     Result[ToEPL(this, Line)(Edge.first)].insert(
@@ -263,69 +259,78 @@ PointerFlowTest::makeEdges(unsigned Line,
 }
 
 TEST_F(PointerFlowTest, IsExtractorRegisteredTest) {
-  EXPECT_TRUE(
-      isTUSummaryExtractorRegistered("PointerFlowTUSummaryExtractor"));
+  EXPECT_TRUE(isTUSummaryExtractorRegistered("PointerFlow"));
 }
 
 //////////////////////////////////////////////////////////////
 //          Simple Assign Tests                             //
 //////////////////////////////////////////////////////////////
 TEST_F(PointerFlowTest, SimpleAssign) {
-  auto Sum = setUpTest(R"cpp(
+  ASSERT_EQ(setUpTest(R"cpp(
     void foo(int *p, int *q) {
       q = p;
     }
-  )cpp",
-                       "foo");
+  )cpp"),
+            true);
+
+  auto *Sum = getEntitySummary("foo");
 
   ASSERT_NE(Sum, nullptr);
   EXPECT_EQ(*Sum, makeEdges(__LINE__, {{{"q", 1U}, {"p", 1U}}}));
 }
 
 TEST_F(PointerFlowTest, AssignWithSubscriptLHS) {
-  auto Sum = setUpTest(R"cpp(
+  ASSERT_EQ(setUpTest(R"cpp(
     void foo(int **q, int *p, int x) {
       q[x] = p;
     }
-  )cpp",
-                       "foo");
+  )cpp"),
+            true);
+
+  auto *Sum = getEntitySummary("foo");
 
   ASSERT_NE(Sum, nullptr);
   EXPECT_EQ(*Sum, makeEdges(__LINE__, {{{"q", 2U}, {"p", 1U}}}));
 }
 
 TEST_F(PointerFlowTest, AssignWithPtrArithRHS) {
-  auto Sum = setUpTest(R"cpp(
+  ASSERT_EQ(setUpTest(R"cpp(
     void foo(int *p, int *q) {
       q = p + 5;
     }
-  )cpp",
-                       "foo");
+  )cpp"),
+            true);
+
+  auto *Sum = getEntitySummary("foo");
 
   ASSERT_NE(Sum, nullptr);
   EXPECT_EQ(*Sum, makeEdges(__LINE__, {{{"q", 1U}, {"p", 1U}}}));
 }
 
 TEST_F(PointerFlowTest, AssignInSubscript) {
-  auto Sum = setUpTest(R"cpp(
+  ASSERT_EQ(setUpTest(R"cpp(
     void foo(int *p, int *q) {
       (q = p)[5];
     }
-  )cpp",
-                       "foo");
+  )cpp"),
+            true);
+
+  auto *Sum = getEntitySummary("foo");
 
   ASSERT_NE(Sum, nullptr);
   EXPECT_EQ(*Sum, makeEdges(__LINE__, {{{"q", 1U}, {"p", 1U}}}));
 }
 
 TEST_F(PointerFlowTest, MultipleAssign) {
-  auto Sum = setUpTest(R"cpp(
+  ASSERT_EQ(setUpTest(R"cpp(
     void foo(int *p, int *q, int *r) {
       q = p;
       r = q;
     }
-  )cpp",
-                       "foo");
+  )cpp"),
+            true);
+
+  auto *Sum = getEntitySummary("foo");
 
   ASSERT_NE(Sum, nullptr);
   EXPECT_EQ(*Sum, makeEdges(__LINE__, {
@@ -335,12 +340,14 @@ TEST_F(PointerFlowTest, MultipleAssign) {
 }
 
 TEST_F(PointerFlowTest, ChainedAssign) {
-  auto Sum = setUpTest(R"cpp(
+  ASSERT_EQ(setUpTest(R"cpp(
     void foo(int *p, int *q, int *r) {
       r = q = p;
     }
-  )cpp",
-                       "foo");
+  )cpp"),
+            true);
+
+  auto *Sum = getEntitySummary("foo");
 
   ASSERT_NE(Sum, nullptr);
   EXPECT_EQ(*Sum, makeEdges(__LINE__, {
@@ -350,38 +357,44 @@ TEST_F(PointerFlowTest, ChainedAssign) {
 }
 
 TEST_F(PointerFlowTest, CastToRValue) {
-  auto Sum = setUpTest(R"cpp(
+  ASSERT_EQ(setUpTest(R"cpp(
     void foo(int *p, int *q) {
       q = static_cast<int *&&>(p);
     }
-  )cpp",
-                       "foo");
+  )cpp"),
+            true);
+
+  auto *Sum = getEntitySummary("foo");
 
   ASSERT_NE(Sum, nullptr);
   EXPECT_EQ(*Sum, makeEdges(__LINE__, {{{"q", 1U}, {"p", 1U}}}));
 }
 
 TEST_F(PointerFlowTest, AssignToMember) {
-  auto Sum = setUpTest(R"cpp(
+  ASSERT_EQ(setUpTest(R"cpp(
     struct S { int *field; };
     void foo(S s, int *p) {
       s.field = p;
     }
-  )cpp",
-                       "foo");
+  )cpp"),
+            true);
+
+  auto *Sum = getEntitySummary("foo");
 
   ASSERT_NE(Sum, nullptr);
   EXPECT_EQ(*Sum, makeEdges(__LINE__, {{{"field", 1U}, {"p", 1U}}}));
 }
 
 TEST_F(PointerFlowTest, AssignToMember2) {
-  auto Sum = setUpTest(R"cpp(
+  ASSERT_EQ(setUpTest(R"cpp(
     struct S { int *field; };
     void foo(S *s, int *p) {
       s->field = p;
     }
-  )cpp",
-                       "foo");
+  )cpp"),
+            true);
+
+  auto *Sum = getEntitySummary("foo");
 
   ASSERT_NE(Sum, nullptr);
   EXPECT_EQ(*Sum, makeEdges(__LINE__, {{{"field", 1U}, {"p", 1U}}}));
@@ -391,26 +404,30 @@ TEST_F(PointerFlowTest, AssignToMember2) {
 //          Call Expr Tests.                                //
 //////////////////////////////////////////////////////////////
 TEST_F(PointerFlowTest, CallArg) {
-  auto Sum = setUpTest(R"cpp(
+  ASSERT_EQ(setUpTest(R"cpp(
     void bar(int *param);
     void foo(int *p) {
       bar(p);
     }
-  )cpp",
-                       "foo");
+  )cpp"),
+            true);
+
+  auto *Sum = getEntitySummary("foo");
 
   ASSERT_NE(Sum, nullptr);
   EXPECT_EQ(*Sum, makeEdges(__LINE__, {{{"param", 1U}, {"p", 1U}}}));
 }
 
 TEST_F(PointerFlowTest, CallMultiArgs) {
-  auto Sum = setUpTest(R"cpp(
+  ASSERT_EQ(setUpTest(R"cpp(
     void bar(int *param1, int y, int *param2);
     void foo(int *p, int x, int *q) {
       bar(p, x, q);
     }
-  )cpp",
-                       "foo");
+  )cpp"),
+            true);
+
+  auto *Sum = getEntitySummary("foo");
 
   ASSERT_NE(Sum, nullptr);
   EXPECT_EQ(*Sum, makeEdges(__LINE__, {
@@ -420,14 +437,16 @@ TEST_F(PointerFlowTest, CallMultiArgs) {
 }
 
 TEST_F(PointerFlowTest, CallAsCallArg) {
-  auto Sum = setUpTest(R"cpp(
+  ASSERT_EQ(setUpTest(R"cpp(
 
     int *bar(int * w);
     void foo(int * p) {
       foo(bar(p));
     }
-  )cpp",
-                       "foo");
+  )cpp"),
+            true);
+
+  auto *Sum = getEntitySummary("foo");
 
   ASSERT_NE(Sum, nullptr);
   EXPECT_EQ(*Sum, makeEdges(__LINE__, {{{"w", 1U}, {"p", 1U}},
@@ -435,15 +454,17 @@ TEST_F(PointerFlowTest, CallAsCallArg) {
 }
 
 TEST_F(PointerFlowTest, CXXOperatorCallMultiArgs) {
-  auto Sum = setUpTest(R"cpp(
+  ASSERT_EQ(setUpTest(R"cpp(
     struct S {
       int* operator()(int *a, int *b);
     };
     void foo(S obj, int *p, int *q) {
       foo(obj, obj(p, q), obj(p, q));
     }
-  )cpp",
-                       "foo");
+  )cpp"),
+            true);
+
+  auto *Sum = getEntitySummary("foo");
 
   ASSERT_NE(Sum, nullptr);
   EXPECT_EQ(*Sum, makeEdges(__LINE__, {
@@ -455,15 +476,17 @@ TEST_F(PointerFlowTest, CXXOperatorCallMultiArgs) {
 }
 
 TEST_F(PointerFlowTest, CXXMemberCall) {
-  auto Sum = setUpTest(R"cpp(
+  ASSERT_EQ(setUpTest(R"cpp(
     struct S {
       int* method(int *a, int *b);
     };
     void foo(S obj, int *p, int *q) {
       foo(obj, obj.method(p, q), obj.method(p, q));
     }
-  )cpp",
-                       "foo");
+  )cpp"),
+            true);
+
+  auto *Sum = getEntitySummary("foo");
 
   ASSERT_NE(Sum, nullptr);
   EXPECT_EQ(*Sum, makeEdges(__LINE__, {{{"a", 1U}, {"p", 1U}},
@@ -473,30 +496,34 @@ TEST_F(PointerFlowTest, CXXMemberCall) {
 }
 
 TEST_F(PointerFlowTest, VirtualMethodCall) {
-  auto Sum = setUpTest(R"cpp(
+  ASSERT_EQ(setUpTest(R"cpp(
     struct Base {
       virtual void method(int *a);
     };
     void foo(Base &obj, int *p) {
       obj.method(p);
     }
-  )cpp",
-                       "foo");
+  )cpp"),
+            true);
+
+  auto *Sum = getEntitySummary("foo");
 
   ASSERT_NE(Sum, nullptr);
   EXPECT_EQ(*Sum, makeEdges(__LINE__, {{{"a", 1U}, {"p", 1U}}}));
 }
 
 TEST_F(PointerFlowTest, StaticMethodCall) {
-  auto Sum = setUpTest(R"cpp(
+  ASSERT_EQ(setUpTest(R"cpp(
     struct S {
       static void method(int *a, int *b);
     };
     void foo(int *p, int *q) {
       S::method(p, q);
     }
-  )cpp",
-                       "foo");
+  )cpp"),
+            true);
+
+  auto *Sum = getEntitySummary("foo");
 
   ASSERT_NE(Sum, nullptr);
   EXPECT_EQ(*Sum, makeEdges(__LINE__, {
@@ -506,14 +533,16 @@ TEST_F(PointerFlowTest, StaticMethodCall) {
 }
 
 TEST_F(PointerFlowTest, DefaultArg) {
-  auto Sum = setUpTest(R"cpp(
+  ASSERT_EQ(setUpTest(R"cpp(
     int *g;
     void bar(int *a, int *b = g);
     void foo(int *p) {
       bar(p);
     }
-  )cpp",
-                       "foo");
+  )cpp"),
+            true);
+
+  auto *Sum = getEntitySummary("foo");
 
   ASSERT_NE(Sum, nullptr);
   EXPECT_EQ(*Sum, makeEdges(__LINE__,
@@ -521,14 +550,16 @@ TEST_F(PointerFlowTest, DefaultArg) {
 }
 
 TEST_F(PointerFlowTest, DefaultArg2) {
-  auto Sum = setUpTest(R"cpp(
+  ASSERT_EQ(setUpTest(R"cpp(
     int *g;
     void bar(int *a, int *b = g);
     void foo(int *p) {
       bar(p, p);
     }
-  )cpp",
-                       "foo");
+  )cpp"),
+            true);
+
+  auto *Sum = getEntitySummary("foo");
 
   ASSERT_NE(Sum, nullptr);
   EXPECT_EQ(*Sum, makeEdges(__LINE__, {
@@ -541,15 +572,17 @@ TEST_F(PointerFlowTest, DefaultArg2) {
 //          CXX Ctor Tests.                                 //
 //////////////////////////////////////////////////////////////
 TEST_F(PointerFlowTest, CXXCtorCallMultiArgs) {
-  auto Sum = setUpTest(R"cpp(
+  ASSERT_EQ(setUpTest(R"cpp(
     struct S {
       S(int *a, int *b) {}
     };
     void foo(int *p, int *q) {
       S s{p, q};
     }
-  )cpp",
-                       "foo");
+  )cpp"),
+            true);
+
+  auto *Sum = getEntitySummary("foo");
 
   ASSERT_NE(Sum, nullptr);
   EXPECT_EQ(*Sum, makeEdges(__LINE__, {
@@ -559,15 +592,17 @@ TEST_F(PointerFlowTest, CXXCtorCallMultiArgs) {
 }
 
 TEST_F(PointerFlowTest, CXXCtorCallMultiArgs2) {
-  auto Sum = setUpTest(R"cpp(
+  ASSERT_EQ(setUpTest(R"cpp(
     struct S {
       S(int *a, int x, int *b) {}
     };
     void foo(int *p, int x, int *q) {
       S s{p, x, q};
     }
-  )cpp",
-                       "foo");
+  )cpp"),
+            true);
+
+  auto *Sum = getEntitySummary("foo");
 
   ASSERT_NE(Sum, nullptr);
   EXPECT_EQ(*Sum, makeEdges(__LINE__, {
@@ -577,7 +612,7 @@ TEST_F(PointerFlowTest, CXXCtorCallMultiArgs2) {
 }
 
 TEST_F(PointerFlowTest, CXXCtorCallAsCallArg) {
-  auto Sum = setUpTest(R"cpp(
+  ASSERT_EQ(setUpTest(R"cpp(
     struct Wrapper {
       Wrapper(int *q) {}
     };
@@ -585,21 +620,25 @@ TEST_F(PointerFlowTest, CXXCtorCallAsCallArg) {
     void foo(int *p) {
       bar(Wrapper{p});
     }
-  )cpp",
-                       "foo");
+  )cpp"),
+            true);
+
+  auto *Sum = getEntitySummary("foo");
 
   ASSERT_NE(Sum, nullptr);
   EXPECT_EQ(*Sum, makeEdges(__LINE__, {{{"q", 1U}, {"p", 1U}}}));
 }
 
 TEST_F(PointerFlowTest, DelegatingCXXCtorCall) {
-  auto Sum = setUpTest<CXXConstructorDecl>(R"cpp(
+  ASSERT_EQ(setUpTest(R"cpp(
     struct S {
       S(int *a, int *b) {}
       S(int *p) : S(p, p) {}
     };
-  )cpp",
-                                           CXXCtorOfNumParms{"S", 1});
+  )cpp"),
+            true);
+
+  auto *Sum = getEntitySummary<CXXConstructorDecl>(CXXCtorOfNumParms{"S", 1});
 
   ASSERT_NE(Sum, nullptr);
   EXPECT_EQ(*Sum, makeEdges(__LINE__, {
@@ -609,15 +648,17 @@ TEST_F(PointerFlowTest, DelegatingCXXCtorCall) {
 }
 
 TEST_F(PointerFlowTest, CXXCtorBaseInit) {
-  auto Sum = setUpTest<CXXConstructorDecl>(R"cpp(
+  ASSERT_EQ(setUpTest(R"cpp(
     struct Base {
       Base(int *a) {}
     };
     struct Derived : Base {
       Derived(int *p) : Base(p) {}
     };
-  )cpp",
-                                           "Derived");
+  )cpp"),
+            true);
+
+  auto *Sum = getEntitySummary<CXXConstructorDecl>("Derived");
 
   ASSERT_NE(Sum, nullptr);
   EXPECT_EQ(*Sum, makeEdges(__LINE__, {{{"a", 1U}, {"p", 1U}}}));
@@ -627,38 +668,44 @@ TEST_F(PointerFlowTest, CXXCtorBaseInit) {
 //          Initializers Tests.                             //
 //////////////////////////////////////////////////////////////
 TEST_F(PointerFlowTest, LocalVarDeclInit) {
-  auto Sum = setUpTest(R"cpp(
+  ASSERT_EQ(setUpTest(R"cpp(
     void foo(int *p) {
       int *q = p;
     }
-  )cpp",
-                       "foo");
+  )cpp"),
+            true);
+
+  auto *Sum = getEntitySummary("foo");
 
   ASSERT_NE(Sum, nullptr);
   EXPECT_EQ(*Sum, makeEdges(__LINE__, {{{"q", 1U}, {"p", 1U}}}));
 }
 
 TEST_F(PointerFlowTest, LocalVarDeclInit2) {
-  auto Sum = setUpTest(R"cpp(
+  ASSERT_EQ(setUpTest(R"cpp(
     void foo(int (*arr)[10]) {
       int (*p)[10] = arr;
     }
-  )cpp",
-                       "foo");
+  )cpp"),
+            true);
+
+  auto *Sum = getEntitySummary("foo");
 
   ASSERT_NE(Sum, nullptr);
   EXPECT_EQ(*Sum, makeEdges(__LINE__, {{{"p", 1U}, {"arr", 1U}}}));
 }
 
 TEST_F(PointerFlowTest, FieldInit) {
-  auto Sum = setUpTest(R"cpp(
+  ASSERT_EQ(setUpTest(R"cpp(
     void foo(int *p) {
       struct Bar {
         int *field = p;
       };
     }
-  )cpp",
-                       "Bar");
+  )cpp"),
+            true);
+
+  auto *Sum = getEntitySummary("Bar");
 
   ASSERT_NE(Sum, nullptr);
   EXPECT_EQ(*Sum, makeEdges(__LINE__, {{{"field", 1U}, {"p", 1U}}}));
@@ -675,46 +722,54 @@ TEST_F(PointerFlowTest, CXXCtorMemberInit) {
     }
   )cpp";
 
-  auto Sum = setUpTest<CXXConstructorDecl>(Code, "Bar");
+  ASSERT_EQ(setUpTest(Code), true);
+  auto *Sum = getEntitySummary<CXXConstructorDecl>("Bar");
 
   ASSERT_NE(Sum, nullptr);
   EXPECT_EQ(*Sum, makeEdges(__LINE__, {{{"member", 1U}, {"q", 1U}}}));
 
-  Sum = setUpTest(Code, "foo");
+  Sum = getEntitySummary("foo");
 
   ASSERT_NE(Sum, nullptr);
   EXPECT_EQ(*Sum, makeEdges(__LINE__, {{{"q", 1U}, {"p", 1U}}}));
 }
 
 TEST_F(PointerFlowTest, GlobalVarInit) {
-  auto Sum = setUpTest<VarDecl>(R"cpp(
+  ASSERT_EQ(setUpTest(R"cpp(
     int *q;
     int *g = q;
-  )cpp",
-                                "g");
+  )cpp"),
+            true);
+
+  auto *Sum = getEntitySummary<VarDecl>("g");
 
   ASSERT_NE(Sum, nullptr);
   EXPECT_EQ(*Sum, makeEdges(__LINE__, {{{"g", 1U}, {"q", 1U}}}));
 }
 
 TEST_F(PointerFlowTest, StaticLocalInit) {
-  auto Sum = setUpTest(R"cpp(
+  ASSERT_EQ(setUpTest(R"cpp(
     void foo(int *p) {
       static int *s = p;
     }
-  )cpp",
-                       "foo");
+  )cpp"),
+            true);
+
+  auto *Sum = getEntitySummary("foo");
 
   ASSERT_NE(Sum, nullptr);
   EXPECT_EQ(*Sum, makeEdges(__LINE__, {{{"s", 1U}, {"p", 1U}}}));
 }
 
 TEST_F(PointerFlowTest, StaticMemberInit) {
-  auto Sum = setUpTest<VarDecl>(R"cpp(
+  ASSERT_EQ(setUpTest(R"cpp(
     int *g;
-    struct S { static int *member = g; };   
-  )cpp",
-                                "member");
+    struct S { static int *member; };
+    int *S::member = g;
+  )cpp"),
+            true);
+
+  auto *Sum = getEntitySummary<VarDecl>("member");
 
   ASSERT_NE(Sum, nullptr);
   EXPECT_EQ(*Sum, makeEdges(__LINE__, {{{"member", 1U}, {"g", 1U}}}));
@@ -725,12 +780,14 @@ TEST_F(PointerFlowTest, StaticMemberInit) {
 //////////////////////////////////////////////////////////////
 
 TEST_F(PointerFlowTest, ArrayInitList) {
-  auto Sum = setUpTest(R"cpp(
+  ASSERT_EQ(setUpTest(R"cpp(
     void foo(int *p, int *q) {
       int *arr[] = {p, q};
     }
-  )cpp",
-                       "foo");
+  )cpp"),
+            true);
+
+  auto *Sum = getEntitySummary("foo");
 
   ASSERT_NE(Sum, nullptr);
   EXPECT_EQ(*Sum, makeEdges(__LINE__, {
@@ -740,13 +797,15 @@ TEST_F(PointerFlowTest, ArrayInitList) {
 }
 
 TEST_F(PointerFlowTest, StructInitList) {
-  auto Sum = setUpTest(R"cpp(
+  ASSERT_EQ(setUpTest(R"cpp(
     struct S { int *a; int *b; };
     void foo(int *p, int *q) {
       S s = {p, q};
     }
-  )cpp",
-                       "foo");
+  )cpp"),
+            true);
+
+  auto *Sum = getEntitySummary("foo");
 
   ASSERT_NE(Sum, nullptr);
   EXPECT_EQ(*Sum, makeEdges(__LINE__, {
@@ -757,27 +816,31 @@ TEST_F(PointerFlowTest, StructInitList) {
 
 // A union initialized with a brace-enclosed initializer:
 TEST_F(PointerFlowTest, UnionInitList) {
-  auto Sum = setUpTest(R"cpp(
+  ASSERT_EQ(setUpTest(R"cpp(
     union U { int *x; int y; };
     void foo(int *p) {
       U u = {p};
     }
-  )cpp",
-                       "foo");
+  )cpp"),
+            true);
+
+  auto *Sum = getEntitySummary("foo");
 
   ASSERT_NE(Sum, nullptr);
   EXPECT_EQ(*Sum, makeEdges(__LINE__, {{{"x", 1U}, {"p", 1U}}}));
 }
 
 TEST_F(PointerFlowTest, NestedInitList) {
-  auto Sum = setUpTest(R"cpp(
+  ASSERT_EQ(setUpTest(R"cpp(
     struct Inner { int * a; int * b; };
     struct S { Inner c; int * d; };
     void foo(int *p, int *q, int *r) {
       S s = {{p, q}, r};
     }
-  )cpp",
-                       "foo");
+  )cpp"),
+            true);
+
+  auto *Sum = getEntitySummary("foo");
 
   ASSERT_NE(Sum, nullptr);
   EXPECT_EQ(*Sum, makeEdges(__LINE__, {
@@ -788,14 +851,16 @@ TEST_F(PointerFlowTest, NestedInitList) {
 }
 
 TEST_F(PointerFlowTest, NestedInitList2) {
-  auto Sum = setUpTest(R"cpp(
+  ASSERT_EQ(setUpTest(R"cpp(
     union Inner { int * a; int b; };
     struct S { Inner c; int * d; };
     void foo(int *p, int *q) {
       S s = {{p}, q};
     }
-  )cpp",
-                       "foo");
+  )cpp"),
+            true);
+
+  auto *Sum = getEntitySummary("foo");
 
   ASSERT_NE(Sum, nullptr);
   EXPECT_EQ(*Sum, makeEdges(__LINE__, {
@@ -805,14 +870,16 @@ TEST_F(PointerFlowTest, NestedInitList2) {
 }
 
 TEST_F(PointerFlowTest, NestedInitList3) {
-  auto Sum = setUpTest(R"cpp(
+  ASSERT_EQ(setUpTest(R"cpp(
     struct Inner { int * a; int * b; };
     union S { Inner c; int * d; };
     void foo(int *p, int *q) {
       S s = {{p, q}};
     }
-  )cpp",
-                       "foo");
+  )cpp"),
+            true);
+
+  auto *Sum = getEntitySummary("foo");
 
   ASSERT_NE(Sum, nullptr);
   EXPECT_EQ(*Sum, makeEdges(__LINE__, {
@@ -822,12 +889,14 @@ TEST_F(PointerFlowTest, NestedInitList3) {
 }
 
 TEST_F(PointerFlowTest, NestedArrayInitList) {
-  auto Sum = setUpTest(R"cpp(
+  ASSERT_EQ(setUpTest(R"cpp(
     void foo(int *p, int *q, int *r, int *s) {
       int *arr[][2] = {{p, q}, {r, s}};
     }
-  )cpp",
-                       "foo");
+  )cpp"),
+            true);
+
+  auto *Sum = getEntitySummary("foo");
 
   ASSERT_NE(Sum, nullptr);
   EXPECT_EQ(*Sum, makeEdges(__LINE__, {
@@ -839,13 +908,15 @@ TEST_F(PointerFlowTest, NestedArrayInitList) {
 }
 
 TEST_F(PointerFlowTest, MixedNestedArrayStructInitList) {
-  auto Sum = setUpTest(R"cpp(
+  ASSERT_EQ(setUpTest(R"cpp(
     struct T { int *arr[2]; };
     void foo(int *p, int *q, int *r, int *s) {
       T t[2] = {{p, q}, {r, s}};
     }
-  )cpp",
-                       "foo");
+  )cpp"),
+            true);
+
+  auto *Sum = getEntitySummary("foo");
 
   ASSERT_NE(Sum, nullptr);
   EXPECT_EQ(*Sum, makeEdges(__LINE__, {
@@ -857,13 +928,15 @@ TEST_F(PointerFlowTest, MixedNestedArrayStructInitList) {
 }
 
 TEST_F(PointerFlowTest, ArrayOfStructInitList) {
-  auto Sum = setUpTest(R"cpp(
+  ASSERT_EQ(setUpTest(R"cpp(
     struct S { int *a; int *b; };
     void foo(int *p, int *q, int *r, int *s) {
       S arr[] = {{p, q}, {r, s}};
     }
-  )cpp",
-                       "foo");
+  )cpp"),
+            true);
+
+  auto *Sum = getEntitySummary("foo");
 
   ASSERT_NE(Sum, nullptr);
   EXPECT_EQ(*Sum, makeEdges(__LINE__, {
@@ -879,26 +952,30 @@ TEST_F(PointerFlowTest, ArrayOfStructInitList) {
 //////////////////////////////////////////////////////////////
 
 TEST_F(PointerFlowTest, ReturnEdge) {
-  auto Sum = setUpTest(R"cpp(
+  ASSERT_EQ(setUpTest(R"cpp(
     int *foo(int *p) {
       return p;
     }
-  )cpp",
-                       "foo");
+  )cpp"),
+            true);
+
+  auto *Sum = getEntitySummary("foo");
 
   ASSERT_NE(Sum, nullptr);
   EXPECT_EQ(*Sum, makeEdges(__LINE__, {{{"foo", 1U, true}, {"p", 1U}}}));
 }
 
 TEST_F(PointerFlowTest, MultipleReturnEdges) {
-  auto Sum = setUpTest(R"cpp(
+  ASSERT_EQ(setUpTest(R"cpp(
     int *foo(int *p, int *q, bool cond) {
       if (cond)
         return p;
       return q;
     }
-  )cpp",
-                       "foo");
+  )cpp"),
+            true);
+
+  auto *Sum = getEntitySummary("foo");
 
   ASSERT_NE(Sum, nullptr);
   EXPECT_EQ(*Sum, makeEdges(__LINE__, {
@@ -908,19 +985,21 @@ TEST_F(PointerFlowTest, MultipleReturnEdges) {
 }
 
 TEST_F(PointerFlowTest, NoReturnEdgeForNonPointerReturnType) {
-  auto Sum = setUpTest(R"cpp(
+  ASSERT_EQ(setUpTest(R"cpp(
     int foo(int *p, int x) {
       return x;
     }
-  )cpp",
-                       "foo");
+  )cpp"),
+            true);
 
-  ASSERT_NE(Sum, nullptr);
-  EXPECT_EQ(*Sum, makeEdges(__LINE__, {}));
+  auto *Sum = getEntitySummary("foo");
+
+  EXPECT_THAT(Sum, testing::AnyOf(testing::IsNull(),
+                                  testing::Pointee(makeEdges(__LINE__, {}))));
 }
 
 TEST_F(PointerFlowTest, ReturnEdgeNotFromNestedFunction) {
-  auto *Code = R"cpp(
+  StringRef Code = R"cpp(
     int *foo(int *p) {
       struct Inner {
         int *bar(int *q) { return q; }
@@ -928,54 +1007,58 @@ TEST_F(PointerFlowTest, ReturnEdgeNotFromNestedFunction) {
       return p;
     }
   )cpp";
-  auto Sum = setUpTest(Code, "foo");
+
+  ASSERT_EQ(setUpTest(Code), true);
+  auto *Sum = getEntitySummary("foo");
 
   ASSERT_NE(Sum, nullptr);
   EXPECT_EQ(*Sum, makeEdges(__LINE__, {{{"foo", 1U, true}, {"p", 1U}}}));
 
-  Sum = setUpTest(Code, "bar");
+  Sum = getEntitySummary("bar");
 
   ASSERT_NE(Sum, nullptr);
   EXPECT_EQ(*Sum, makeEdges(__LINE__, {{{"bar", 1U, true}, {"q", 1U}}}));
 }
 
 TEST_F(PointerFlowTest, ReturnEdgeInClassMethod) {
-  auto Sum = setUpTest(R"cpp(
+  ASSERT_EQ(setUpTest(R"cpp(
   void foo() {
     struct S {
       int *method(int *p, int *q) { return p; }
     };
   }
-  )cpp",
-                       "method");
+  )cpp"),
+            true);
+
+  auto *Sum = getEntitySummary("method");
 
   ASSERT_NE(Sum, nullptr);
   EXPECT_EQ(*Sum, makeEdges(__LINE__, {{{"method", 1U, true}, {"p", 1U}}}));
 }
 
 TEST_F(PointerFlowTest, NoEdgeFromIndirectCall) {
-  auto Sum = setUpTest(R"cpp(
+  ASSERT_EQ(setUpTest(R"cpp(
     void bar(int *param1);
     void baz(int *param2);
-    
+
     void foo(int *p, void (*fp)(int *)) {
       fp(p);
     }
 
-    void main() {
+    int main() {
       int *q;
       foo(q, bar);
       foo(q, baz);
+      return 0;
     }
-  )cpp",
-                       "foo");
+  )cpp"),
+            true);
 
-  ASSERT_NE(Sum, nullptr);
-  EXPECT_EQ(
-      *Sum,
-      makeEdges(
-          __LINE__,
-          /* FIXME or TBD: Currently indirect calls produce no edge: */ {}));
+  /* FIXME or TBD: Currently indirect calls produce no edge: */
+  auto *Sum = getEntitySummary("foo");
+
+  EXPECT_THAT(Sum, testing::AnyOf(testing::IsNull(),
+                                  testing::Pointee(makeEdges(__LINE__, {}))));
 }
 
 //////////////////////////////////////////////////////////////
@@ -990,14 +1073,15 @@ TEST_F(PointerFlowTest, ReturnInLambda) {
     }
   )cpp";
 
-  auto Sum = setUpTest(Code, "foo");
+  ASSERT_EQ(setUpTest(Code), true);
+  auto *Sum = getEntitySummary("foo");
 
   ASSERT_NE(Sum, nullptr);
   EXPECT_EQ(*Sum, makeEdges(__LINE__, {{{"r", 1U}, {"p", 1U}},
                                        {{"foo", 1U, true},
                                         {LambdaOfVar{"local"}, 1U, true}}}));
 
-  Sum = setUpTest(Code, LambdaOfVar{"local"});
+  Sum = getEntitySummary(LambdaOfVar{"local"});
   ASSERT_NE(Sum, nullptr);
   EXPECT_EQ(*Sum, makeEdges(__LINE__,
                             {{{LambdaOfVar{"local"}, 1U, true}, {"r", 1U}}}));
@@ -1013,11 +1097,12 @@ TEST_F(PointerFlowTest, NestedLambdaAssign) {
     }
   )cpp";
 
-  auto Sum = setUpTest(Code, LambdaOfVar{"outer_lambda"});
+  ASSERT_EQ(setUpTest(Code), true);
+  auto *Sum = getEntitySummary(LambdaOfVar{"outer_lambda"});
   ASSERT_NE(Sum, nullptr);
   EXPECT_EQ(*Sum, makeEdges(__LINE__, {{{"s", 1U}, {"r", 1U}}}));
 
-  Sum = setUpTest(Code, LambdaOfVar{"inner_lambda"});
+  Sum = getEntitySummary(LambdaOfVar{"inner_lambda"});
   ASSERT_NE(Sum, nullptr);
   EXPECT_EQ(*Sum, makeEdges(__LINE__, {{{"y", 1U}, {"x", 1U}}}));
 }

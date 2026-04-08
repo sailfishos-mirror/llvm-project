@@ -14,6 +14,7 @@
 
 #include "clang/AST/ASTTypeTraits.h"
 #include "clang/AST/Decl.h"
+#include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclObjC.h"
 #include "clang/AST/DynamicRecursiveASTVisitor.h"
 #include "clang/Basic/SourceLocation.h"
@@ -82,8 +83,16 @@ public:
   bool VisitVarDecl(VarDecl *D) override {
     DeclContext *DC = D->getDeclContext();
 
-    if (DC->isFileContext() || DC->isNamespace())
+    // Collects Decl for global variables or static data members:
+    if (DC->isFileContext() || DC->isNamespace() || D->isStaticDataMember())
       Contributors.push_back(D);
+    return true;
+  }
+
+  bool VisitLambdaExpr(LambdaExpr *L) override {
+    // TraversetLambdaExpr directly visits the body stmt, but we need to collect
+    // the CXXMethodDecl as a contributor:
+    VisitFunctionDecl(L->getCallOperator());
     return true;
   }
 };

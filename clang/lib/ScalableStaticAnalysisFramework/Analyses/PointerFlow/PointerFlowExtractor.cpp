@@ -315,73 +315,35 @@ public:
         PointerFlowEntitySummary(std::move(Matcher.Results)));
   }
 
-  void HandleTranslationUnit(ASTContext &Ctx) override;
-};
+  void HandleTranslationUnit(ASTContext &Ctx) override {
+    ContributorFinder ContributorFinder;
 
-void PointerFlowTUSummaryExtractor::HandleTranslationUnit(
-    ASTContext &Ctx) {
-  llvm::Error Errors = llvm::ErrorSuccess();
-  auto addError = [&Errors](llvm::Error Err) {
-    Errors = llvm::joinErrors(std::move(Errors), std::move(Err));
-  };
-  ContributorFinder ContributorFinder;
+    ContributorFinder.TraverseAST(Ctx);
+    for (auto *CD : ContributorFinder.Contributors) {
+      auto EntitySummary = extractEntitySummary(CD, Ctx);
 
-  ContributorFinder.VisitTranslationUnitDecl(Ctx.getTranslationUnitDecl());
-  for (auto *CD : ContributorFinder.Contributors) {
-    auto EntitySummary = extractEntitySummary(CD, Ctx);
+      if (!EntitySummary)
+        llvm::reportFatalInternalError(EntitySummary.takeError());
+      assert(*EntitySummary);
+      if ((*EntitySummary)->empty())
+        continue;
 
-    if (!EntitySummary) {
-      addError(EntitySummary.takeError());
-      continue;
+      auto ContributorName = getEntityName(CD);
+
+      if (!ContributorName)
+        llvm::reportFatalInternalError(makeEntityNameErr(Ctx, *CD));
+
+      auto [Ignored, InsertionSucceeded] = SummaryBuilder.addSummary(
+          addEntity(*ContributorName), std::move(*EntitySummary));
+
+      assert(InsertionSucceeded && "duplicated contributor extraction");
     }
-    assert(*EntitySummary &&
-           "std::unique_ptr<EntitySummary> should not be null");
-    if ((*EntitySummary)->empty())
-      continue;
-
-    auto ContributorName = getEntityName(CD);
-
-    if (!ContributorName) {
-      addError(makeEntityNameErr(Ctx, *CD));
-      continue;
-    }
-
-    auto [EntitySummaryPtr, Success] = SummaryBuilder.addSummary(
-        addEntity(*ContributorName), std::move(*EntitySummary));
-
-    if (!Success)
-      addError(makeAddEntitySummaryErr(Ctx, CD));
   }
-  // FIXME: handle errors!
-  llvm::consumeError(std::move(Errors));
-}
-
-// Proxy functions for unit test:
-extern Expected<std::unique_ptr<PointerFlowEntitySummary>>
-extractEntitySummary(PointerFlowTUSummaryExtractor &Extractor,
-                     const NamedDecl *Contributor, ASTContext &Ctx) {
-  return Extractor.extractEntitySummary(Contributor, Ctx);
-}
-
-extern PointerFlowTUSummaryExtractor *
-createPointerFlowTUSummaryExtractor(TUSummaryBuilder &Builder) {
-  return new PointerFlowTUSummaryExtractor(
-      PointerFlowTUSummaryExtractor(Builder));
-}
-
-extern void deletePointerFlowTUSummaryExtractor(
-    PointerFlowTUSummaryExtractor *Ptr) {
-  delete Ptr;
-}
-
-extern EntityId addEntity(PointerFlowTUSummaryExtractor &Extractor,
-                          EntityName &EN) {
-  return Extractor.addEntity(EN);
-}
+};
 } // namespace clang::ssaf
 
 // NOLINTNEXTLINE(misc-use-internal-linkage)
 volatile int PointerFlowTUSummaryExtractorAnchorSource = 0;
 static TUSummaryExtractorRegistry::Add<PointerFlowTUSummaryExtractor>
-    RegisterExtractor("PointerFlowTUSummaryExtractor",
+    RegisterExtractor(PointerFlowEntitySummary::Name,
                       "The TUSummaryExtractor for pointer assignments");

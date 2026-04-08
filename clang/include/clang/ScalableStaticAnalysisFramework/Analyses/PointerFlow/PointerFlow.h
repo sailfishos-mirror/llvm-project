@@ -34,6 +34,8 @@ class PointerFlowEntitySummary final : public EntitySummary {
       : EntitySummary(), Edges(std::move(Edges)) {}
 
 public:
+  static constexpr llvm::StringLiteral Name = "PointerFlow";
+
   SummaryName getSummaryName() const override { return summaryName(); };
 
   bool operator==(const EdgeSet &Other) const { return Edges == Other; }
@@ -44,7 +46,7 @@ public:
 
   bool empty() const { return Edges.empty() && Edges.empty(); }
 
-  static SummaryName summaryName() { return SummaryName{"PointerFlow"}; }
+  static SummaryName summaryName() { return SummaryName{Name.str()}; }
 };
 } // namespace clang::ssaf
 
