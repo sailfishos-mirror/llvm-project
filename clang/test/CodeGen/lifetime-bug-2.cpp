@@ -33,4 +33,12 @@ void foo(){
 //
 // CHECK: [[LPAD1]]:
 // CHECK-NEXT: landingpad
+// CHECK: llvm.lifetime.end.p0(ptr [[TMP2]])
+// CHECK-NEXT: br label %[[EHCLEANUP:.*]]
+//
+// CHECK: [[LPAD2]]:
+// CHECK-NEXT: landingpad
+// CHECK-NOT: llvm.lifetime.end
+//
+// CHECK: [[EHCLEANUP]]:
 // CHECK: llvm.lifetime.end.p0(ptr [[TMP1]])
