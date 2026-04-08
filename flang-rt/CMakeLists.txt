@@ -122,6 +122,8 @@ else ()
   option(FLANG_RT_ENABLE_SHARED "Build Flang-RT as a shared library." OFF)
 endif ()
 
+option(FLANG_RT_FORTRAN_MODULES "Build Flang-RT modules" "${RUNTIMES_FLANG_MODULES_ENABLED}")
+
 
 # TODO: Support tests for the GPU target.
 set(FLANG_RT_INCLUDE_TESTS_default ${LLVM_INCLUDE_TESTS})
@@ -138,7 +140,6 @@ if (FLANG_RT_INCLUDE_TESTS AND NOT FLANG_RT_ENABLE_STATIC AND NOT FLANG_RT_ENABL
                   "Tests are disabled: check-flang-rt does nothing")
   set(FLANG_RT_INCLUDE_TESTS OFF)
 endif ()
-option(FLANG_RT_INCLUDE_TESTS "Generate build targets for the flang-rt unit and regression-tests." "${FLANG_RT_INCLUDE_TESTS_default}")
 
 
 set(FLANG_RT_EXPERIMENTAL_OFFLOAD_SUPPORT "" CACHE STRING "Compile Flang-RT with GPU support (CUDA)")

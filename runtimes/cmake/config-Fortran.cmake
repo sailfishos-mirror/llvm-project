@@ -1,9 +1,20 @@
 # Check whether the build environment supports building Fortran modules
 # flang-rt and openmp are the only runtimes that contain Fortran modules.
-#
-# Sets:
-#  * RUNTIMES_FLANG_MODULES_ENABLED Whether .mod files can be created
-#  * CMAKE_Fortran_*                CMake Fortran toolchain info for older versions of CMake
+
+
+# Whether building modules for Fortran is supported in the current build environment.
+# Also initializes RUNTIMES_ENABLE_FLANG_MODULES.
+# This is currently not intended to be a user-configuration but derived from CMAKE_Fortran_COMPILER.
+set(RUNTIMES_ENABLE_FORTRAN OFF)
+
+# List of targets that must be built by artifacts that compile using the Fortran compiler
+set(RUNTIMES_FORTRAN_BUILD_DEPS "")
+
+# Currently we hardcode which runtimes make use of Fortran
+set(request_fortran_support OFF)
+if ("flang-rt" IN_LIST LLVM_ENABLE_RUNTIMES OR "openmp" IN_LIST LLVM_ENABLE_RUNTIMES)
+  set(request_fortran_support ON)
+endif ()
 
 
 # Check whether the Fortran compiler already has access to builtin modules. Sets
@@ -53,10 +64,11 @@ function (check_fortran_builtins_available)
 endfunction ()
 
 
-set(FORTRAN_MODULE_DEPS "")
-if (CMAKE_Fortran_COMPILER AND ("flang-rt" IN_LIST LLVM_ENABLE_RUNTIMES OR "openmp" IN_LIST LLVM_ENABLE_RUNTIMES))
+# Check whether we can compile Fortran sources
+if (request_fortran_support)
+  # Workarounds for older versions of CMake not recognizing FLang. Hence, we
+  # cannot use CMAKE_Fortran_COMPILER_ID.
   cmake_path(GET CMAKE_Fortran_COMPILER STEM _Fortran_COMPILER_STEM)
-
   if (_Fortran_COMPILER_STEM STREQUAL "flang-new" OR _Fortran_COMPILER_STEM STREQUAL "flang")
     # CMake 3.24 is the first version of CMake that directly recognizes Flang.
     # LLVM's requirement is only CMake 3.20, teach CMake 3.20-3.23 how to use Flang, if used.
@@ -106,20 +118,19 @@ if (CMAKE_Fortran_COMPILER AND ("flang-rt" IN_LIST LLVM_ENABLE_RUNTIMES OR "open
     endif ()
   endif ()
 
-  include(CheckFortranSourceCompiles)
   include(CheckLanguage)
-
-  set(RUNTIMES_FLANG_MODULES_ENABLED_default OFF)
   check_language(Fortran)
   if (CMAKE_Fortran_COMPILER)
     enable_language(Fortran)
+    include(CheckFortranSourceCompiles)
 
     if (CMAKE_Fortran_COMPILER_ID STREQUAL "LLVMFlang" AND "flang-rt" IN_LIST LLVM_ENABLE_RUNTIMES)
       # In a bootstrapping build (or any runtimes-build that includes flang-rt),
       # the intrinsic modules are not built yet. Targets can depend on
       # flang-rt-mod to ensure that flang-rt's modules are built first.
-      set(FORTRAN_MODULE_DEPS flang-rt-mod)
-      set(RUNTIMES_FLANG_MODULES_ENABLED_default ON)
+      list(APPEND RUNTIMES_FORTRAN_BUILD_DEPS flang-rt-mod)
+      set(RUNTIMES_ENABLE_FORTRAN ON)
+      message(STATUS "Fortran support enabled using just-built Flang-RT builtin modules")
     else ()
       # Check whether building modules works, avoid causing the entire build to
       # fail because of Fortran. The primary situation we want to support here
@@ -127,18 +138,26 @@ if (CMAKE_Fortran_COMPILER AND ("flang-rt" IN_LIST LLVM_ENABLE_RUNTIMES OR "open
       # non-bootstrapping build.
       check_fortran_builtins_available()
       if (HAVE_FORTRAN_INTRINSIC_MODS)
-        set(RUNTIMES_FLANG_MODULES_ENABLED_default ON)
-        message(STATUS "${LLVM_SUBPROJECT_TITLE}: Non-bootstrapping Fortran modules build (${CMAKE_Fortran_COMPILER_ID} located at ${CMAKE_Fortran_COMPILER})")
+        set(RUNTIMES_ENABLE_FORTRAN ON)
+        message(STATUS "Fortran support enabled using compiler's own modules")
       else ()
-        message(STATUS "Not compiling Flang modules: Not passing smoke check")
+        message(STATUS "Fortran support disabled: Not passing smoke check")
       endif ()
     endif ()
+  else ()
+    message(STATUS "Fortran support disabled: not enabled in CMake; Use CMAKE_Fortran_COMPILER_WORKS=yes if the issues is missing builtin modules")
   endif ()
-
-  option(RUNTIMES_FLANG_MODULES_ENABLED "Build Fortran modules" "${RUNTIMES_FLANG_MODULES_ENABLED_default}")
-else ()
-  set(RUNTIMES_FLANG_MODULES_ENABLED NO)
 endif ()
+
+
+# Check whether modules files are compatible with our version of Flang.
+set(RUNTIMES_ENABLE_FLANG_MODULES_default OFF)
+if (CMAKE_Fortran_COMPILER_ID STREQUAL "LLVMFlang")
+  set(RUNTIMES_ENABLE_FLANG_MODULES_default ON)
+else ()
+  set(RUNTIMES_ENABLE_FLANG_MODULES_default OFF)
+endif ()
+option(RUNTIMES_ENABLE_FLANG_MODULES "Make Fortran .mod files available to Flang; should only be enabled if compiling with a matching version of Flang" "${RUNTIMES_ENABLE_FLANG_MODULES_default}")
 
 
 # Determine the paths for Fortran .mod files.
@@ -146,18 +165,11 @@ endif ()
 # Sets:
 #  * RUNTIMES_OUTPUT_RESOURCE_MOD_DIR   Path for .mod files in build dir
 #  * RUNTIMES_INSTALL_RESOURCE_MOD_PATH Path for .mod files in install dir, relative to CMAKE_INSTALL_PREFIX
-if (RUNTIMES_FLANG_MODULES_ENABLED)
-  if (CMAKE_Fortran_COMPILER_ID STREQUAL "LLVMFlang")
-    # Flang expects its builtin modules in Clang's resource directory.
-    get_toolchain_module_subdir(toolchain_mod_subdir)
-    extend_path(RUNTIMES_OUTPUT_RESOURCE_MOD_DIR "${RUNTIMES_OUTPUT_RESOURCE_DIR}" "${toolchain_mod_subdir}")
-    extend_path(RUNTIMES_INSTALL_RESOURCE_MOD_PATH "${RUNTIMES_INSTALL_RESOURCE_PATH}" "${toolchain_mod_subdir}")
-  else ()
-    # For non-Flang compilers, avoid the risk of Flang accidentally picking them up.
-    extend_path(RUNTIMES_OUTPUT_RESOURCE_MOD_DIR "${RUNTIMES_OUTPUT_RESOURCE_DIR}" "finclude-${CMAKE_Fortran_COMPILER_ID}")
-    extend_path(RUNTIMES_INSTALL_RESOURCE_MOD_PATH "${RUNTIMES_INSTALL_RESOURCE_PATH}" "finclude-${CMAKE_Fortran_COMPILER_ID}")
-  endif ()
-  cmake_path(NORMAL_PATH RUNTIMES_OUTPUT_RESOURCE_MOD_DIR)
+if (RUNTIMES_ENABLE_FLANG_MODULES)
+  # Flang expects its builtin modules in Clang's resource directory.
+  get_toolchain_module_subdir(toolchain_mod_subdir)
+  extend_path(RUNTIMES_OUTPUT_RESOURCE_MOD_DIR "${RUNTIMES_OUTPUT_RESOURCE_DIR}" "${toolchain_mod_subdir}")
+  extend_path(RUNTIMES_INSTALL_RESOURCE_MOD_PATH "${RUNTIMES_INSTALL_RESOURCE_PATH}" "${toolchain_mod_subdir}")
   cmake_path(NORMAL_PATH RUNTIMES_INSTALL_RESOURCE_MOD_PATH)
 
   # No way to find out which mod files are built by a target, so install the
@@ -166,10 +178,17 @@ if (RUNTIMES_FLANG_MODULES_ENABLED)
   # https://stackoverflow.com/questions/52712416/cmake-fortran-module-directory-to-be-used-with-add-library
   set(destination "${RUNTIMES_INSTALL_RESOURCE_MOD_PATH}/..")
   cmake_path(NORMAL_PATH destination)
-    install(DIRECTORY "${RUNTIMES_OUTPUT_RESOURCE_MOD_DIR}"
-      DESTINATION "${destination}"
-    )
+  install(DIRECTORY "${RUNTIMES_OUTPUT_RESOURCE_MOD_DIR}"
+    DESTINATION "${destination}"
+  )
+else ()
+  # If Flang modules are disabled (e.g. because the compiler is not Flang), avoid the risk of Flang accidentally picking them up.
+  extend_path(RUNTIMES_OUTPUT_RESOURCE_MOD_DIR "${CMAKE_CURRENT_BINARY_DIR}" "finclude-${CMAKE_Fortran_COMPILER_ID}")
+
+  # We don't know how to install non-Flang modules
+  set(RUNTIMES_INSTALL_RESOURCE_MOD_PATH "")
 endif ()
+cmake_path(NORMAL_PATH RUNTIMES_OUTPUT_RESOURCE_MOD_DIR)
 
 
 # Set options to compile Fortran module files. Assumes the code above has run.
@@ -181,7 +200,7 @@ endif ()
 #     Modules files are to be used by other Fortran sources. If a library is
 #     compiled multiple times (e.g. static/shared, or msvcrt variants), only
 #     one of those can be public module files; non-public modules are still
-#     generated but to be forgotten deep inside the build directory to not
+#     generated but to be forgotten inside the build directory to not
 #     conflict with each other.
 #     Also, installs the module with the toolchain.
 # )
@@ -191,17 +210,14 @@ function (flang_module_target tgtname)
     "${options}"
     ""
     ""
-    ${ARGN})
+    ${ARGN}
+  )
 
-  if (NOT RUNTIMES_FLANG_MODULES_ENABLED)
-    message(WARNING "Cannot build module files for ${tgtname} when RUNTIMES_FLANG_MODULES_ENABLED is ${RUNTIMES_FLANG_MODULES_ENABLED}")
-    return ()
-  endif ()
-
+  # Let all modules find the public module files
   target_compile_options(${tgtname} PRIVATE
-    # Let non-public modules find the public module files
     "$<$<COMPILE_LANGUAGE:Fortran>:-fintrinsic-modules-path=${RUNTIMES_OUTPUT_RESOURCE_MOD_DIR}>"
   )
+
   if (CMAKE_Fortran_COMPILER_ID MATCHES "LLVM")
     target_compile_options(${tgtname} PRIVATE
       # Flang bug workaround: Reformating of cooked token buffer causes
@@ -214,11 +230,9 @@ function (flang_module_target tgtname)
     set_target_properties(${tgtname}
       PROPERTIES
         Fortran_MODULE_DIRECTORY "${RUNTIMES_OUTPUT_RESOURCE_MOD_DIR}"
-      )
+    )
   else ()
-    set_target_properties(${tgtname}
-      PROPERTIES
-        Fortran_MODULE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/${tgtname}.mod"
-      )
+    # Keep non-public modules where CMake would put them normally;
+    # Modules of different target must not overwrite each other.
   endif ()
 endfunction ()

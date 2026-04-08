@@ -24,12 +24,12 @@ set(module_sources
   __fortran_type_info.f90
   flang_debug.f90
   iso_fortran_env.f90
+  iso_fortran_env_impl.f90
   ieee_arithmetic.f90
   ieee_exceptions.f90
   ieee_features.f90
   iso_c_binding.f90
   iso_fortran_env.f90
-  iso_fortran_env_impl.f90
 
   __cuda_device.f90
   cooperative_groups.f90

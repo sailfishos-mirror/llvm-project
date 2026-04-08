@@ -12,6 +12,7 @@ include(CMakePushCheckState)
 #    a compiler introspection environment, see
 #    https://gitlab.kitware.com/cmake/cmake/-/issues/27419
 #    Additionally wrap it in a function namespace.
+#
 function (check_fortran_quadmath_support)
   cmake_push_check_state(RESET)
   set(CMAKE_REQUIRED_FLAGS "-ffree-form")

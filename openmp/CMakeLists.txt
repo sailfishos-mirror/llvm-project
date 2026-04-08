@@ -70,7 +70,6 @@ set(OPENMP_TEST_CXX_COMPILER "${OPENMP_TEST_CXX_COMPILER_default}" CACHE STRING
 set(OPENMP_TEST_Fortran_COMPILER "${OPENMP_TEST_Fortran_COMPILER_default}" CACHE STRING
   "Fortran compiler to use for testing OpenMP runtime libraries.")
 
-
 # If not standalone, set CMAKE_CXX_STANDARD but don't set the global cache value,
 # only set it locally for OpenMP.
 set(CMAKE_CXX_STANDARD 17)
@@ -100,8 +99,8 @@ math(EXPR LIBOMP_VERSION_BUILD_MONTH_DAY "${LIBOMP_VERSION_BUILD}%10000")
 set(LIBOMP_BUILD_DATE "No_Timestamp")
 
 
-set(LIBOMP_FORTRAN_MODULES "${RUNTIMES_FLANG_MODULES_ENABLED}" CACHE BOOL
-  "Create Fortran module files? (requires fortran compiler)")
+set(LIBOMP_FORTRAN_MODULES "${RUNTIMES_ENABLE_FORTRAN}" CACHE BOOL
+  "Create Fortran module files? (requires Fortran compiler)")
 
 # Set up testing infrastructure.
 include(OpenMPTesting)

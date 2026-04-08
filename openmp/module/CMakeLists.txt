@@ -13,7 +13,7 @@ configure_file(omp_lib.h.var "${CMAKE_CURRENT_BINARY_DIR}/../runtime/src/omp_lib
 
 # One compilation step creates both, omp_lib.mod and omp_lib_kinds.mod. Only
 # these files are used, the object file itself can be discarded.
-# FIXME: Adding it to libomp.so would allow implementing Fortran API in Fortran
+# TODO: Adding it to libomp ($<TARGET_OBJECTS:libomp-mod) would allow implementing Fortran API in Fortran
 add_library(libomp-mod OBJECT
   "{CMAKE_CURRENT_BINARY_DIR}/omp_lib.F90"
 )
@@ -27,15 +27,11 @@ if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
 endif ()
 
 flang_module_target(libomp-mod PUBLIC)
-if (FORTRAN_MODULE_DEPS)
-  add_dependencies(libomp-mod ${FORTRAN_MODULE_DEPS})
+if (RUNTIMES_FORTRAN_BUILD_DEPS)
+  add_dependencies(libomp-mod ${RUNTIMES_FORTRAN_BUILD_DEPS})
 endif ()
 
-set(destination "${LIBOMP_HEADERS_INSTALL_PATH}")
-if (LIBOMP_MODULES_INSTALL_PATH)
-  set(destination "${LIBOMP_MODULES_INSTALL_PATH}")
-endif ()
 install(FILES
   "${CMAKE_CURRENT_BINARY_DIR}/../runtime/src/omp_lib.h"
-  DESTINATION ${destination}
+  DESTINATION ${LIBOMP_HEADERS_INSTALL_PATH}
 )
