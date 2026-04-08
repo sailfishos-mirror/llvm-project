@@ -6,10 +6,10 @@ add_clang_library(clangScalableStaticAnalysisFrameworkAnalyses
   CallGraph/CallGraphExtractor.cpp
   CallGraph/CallGraphJSONFormat.cpp
   EntityPointerLevel/EntityPointerLevel.cpp
+  PointerFlow/PointerFlow.cpp
+  PointerFlow/PointerFlowExtractor.cpp  
   UnsafeBufferUsage/UnsafeBufferUsage.cpp
   UnsafeBufferUsage/UnsafeBufferUsageExtractor.cpp
-  PointerAssignments/PointerAssignments.cpp
-  PointerAssignments/PointerAssignmentsExtractor.cpp
 
   LINK_LIBS
   clangAST

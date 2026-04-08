@@ -1,4 +1,4 @@
-//===---------- PointerAssignments.cpp -----------------------------------===//
+//===- PointerFlow.cpp ---------------------------------------------------===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -6,8 +6,9 @@
 //
 //===---------------------------------------------------------------------===//
 
-#include "clang/ScalableStaticAnalysisFramework/Analyses/PointerAssignments.h"
+#include "clang/ScalableStaticAnalysisFramework/Analyses/PointerFlow/PointerFlow.h"
 #include "SSAFAnalysesCommon.h"
+#include "clang/ScalableStaticAnalysisFramework/Analyses/EntityPointerLevel/EntityPointerLevelFormat.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/Model/EntityId.h"
 #include "clang/ScalableStaticAnalysisFramework/SSAFForceLinker.h" // IWYU pragma: keep
 #include "llvm/ADT/STLExtras.h"
@@ -15,7 +16,7 @@
 #include "llvm/Support/JSON.h"
 
 namespace {
-constexpr const char *const PointerAssignmentsKey = "PointerAssignments";
+constexpr const char *const PointerFlowKey = "PointerFlow";
 } // namespace
 
 namespace clang::ssaf {
@@ -29,12 +30,12 @@ using Value = llvm::json::Value;
 //    Array [ [lhs-node], [rhs-node], [rhs-node], ...]
 //    ...
 // ]
-llvm::json::Object PointerAssignmentsEntitySummary::summaryToJSON(
+llvm::json::Object PointerFlowEntitySummary::summaryToJSON(
     const EntitySummary &ES, JSONFormat::EntityIdToJSONFn EntityId2JSON) {
   Array EdgesData;
 
   for (const auto &Entry :
-       static_cast<const PointerAssignmentsEntitySummary &>(ES).Edges) {
+       static_cast<const PointerFlowEntitySummary &>(ES).Edges) {
     Array EdgesEntryData;
     EntityPointerLevel LHS = Entry.first;
 
@@ -47,31 +48,31 @@ llvm::json::Object PointerAssignmentsEntitySummary::summaryToJSON(
 
   Object Data;
 
-  Data[PointerAssignmentsKey] = Value(std::move(EdgesData));
+  Data[PointerFlowKey] = Value(std::move(EdgesData));
   return Data;
 }
 
 llvm::Expected<std::unique_ptr<EntitySummary>>
-PointerAssignmentsEntitySummary::summaryFromJSON(
+PointerFlowEntitySummary::summaryFromJSON(
     const Object &Data, EntityIdTable &,
     JSONFormat::EntityIdFromJSONFn EntityIdFromJSON) {
-  const Value *EdgesData = Data.get(PointerAssignmentsKey);
+  const Value *EdgesData = Data.get(PointerFlowKey);
 
   if (!EdgesData)
-    return makeErrorSawButExpected(
-        Object(Data), "a JSON object with the key: %s", PointerAssignmentsKey);
+    return makeSawButExpectedError(
+        Object(Data), "a JSON object with the key: %s", PointerFlowKey);
 
   EdgeSet Edges;
   const auto *EdgesDataAsArr = EdgesData->getAsArray();
 
   if (!EdgesDataAsArr)
-    return makeErrorSawButExpected(
+    return makeSawButExpectedError(
         *EdgesData, "a JSON array of arary of EntityPointerLevels");
   for (const auto &EdgesEntryData : *EdgesDataAsArr) {
     const auto *EPLArray = EdgesEntryData.getAsArray();
 
     if (!EPLArray || EPLArray->size() <= 1)
-      return makeErrorSawButExpected(
+      return makeSawButExpectedError(
           EdgesEntryData, "a JSON array of EntityPointerLevels with a size "
                           "greater than 1: [lhs, rhs, rhs, ...]");
 
@@ -89,17 +90,15 @@ PointerAssignmentsEntitySummary::summaryFromJSON(
       return Err;
     Edges[*EPLs.begin()].insert(EPLs.begin() + 1, EPLs.end());
   }
-  return std::make_unique<PointerAssignmentsEntitySummary>(
-      PointerAssignmentsEntitySummary(std::move(Edges)));
+  return std::make_unique<PointerFlowEntitySummary>(
+      PointerFlowEntitySummary(std::move(Edges)));
 }
 
-static llvm::Registry<JSONFormat::FormatInfo>::Add<
-    PointerAssignmentsJSONFormatInfo>
-    RegisterPointerAssignmentsJSONFormatInfo(
-        "PointerAssignments",
-        "JSON Format info for PointerAssignmentsEntitySummary");
+static llvm::Registry<JSONFormat::FormatInfo>::Add<PointerFlowJSONFormatInfo>
+    RegisterPointerFlowJSONFormatInfo(
+        "PointerFlow", "JSON Format info for PointerFlowEntitySummary");
 
 } // namespace clang::ssaf
 
 // NOLINTNEXTLINE(misc-use-internal-linkage)
-volatile int PointerAssignmentsSSAFJSONFormatAnchorSource = 0;
+volatile int PointerFlowSSAFJSONFormatAnchorSource = 0;

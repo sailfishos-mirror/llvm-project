@@ -244,7 +244,7 @@ Expected<EntityPointerLevelSet> clang::ssaf::translateEntityPointerLevel(
 }
 
 /// Create an EntityPointerLevel from a ValueDecl of a pointer type.
-Expected<EntityPointerLevel> clang::ssaf::creatEntityPointerLevel(
+Expected<EntityPointerLevel> clang::ssaf::createEntityPointerLevel(
     const NamedDecl *D, ASTContext &Ctx,
     std::function<EntityId(EntityName EN)> AddEntity, bool IsFunRet) {
   EntityPointerLevelTranslator Translator(AddEntity, Ctx);
@@ -252,7 +252,7 @@ Expected<EntityPointerLevel> clang::ssaf::creatEntityPointerLevel(
 
   if (!EPL)
     return EPL.takeError();
-  return EntityPointerLevelSet{*EPL};
+  return EPL;
 }
 
 EntityPointerLevel

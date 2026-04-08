@@ -5,7 +5,7 @@
         {
           "entity_id": 2,
           "entity_summary": {
-            "PointerAssignments": [
+            "PointerFlow": [
               [
                 [
                   {
@@ -38,7 +38,7 @@
           }
         }
       ],
-      "summary_name": "PointerAssignments"
+      "summary_name": "PointerFlow"
     },
     {
       "summary_data": [

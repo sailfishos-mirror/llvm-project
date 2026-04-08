@@ -1,5 +1,4 @@
-//===- PointerAssignmentsTest.cpp
-//------------------------------------------===//
+//===- PointerFlowTest.cpp ------------------------------------------------===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -7,7 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "clang/ScalableStaticAnalysisFramework/Analyses/PointerAssignments.h"
+#include "clang/ScalableStaticAnalysisFramework/Analyses/PointerFlow/PointerFlow.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclCXX.h"
 #include "clang/AST/DynamicRecursiveASTVisitor.h"
@@ -36,32 +35,32 @@ namespace clang::ssaf {
 /////////////////////////////////////////////////////
 // Declare Proxy functions
 /////////////////////////////////////////////////////
-class PointerAssignmentsTUSummaryExtractor;
+class PointerFlowTUSummaryExtractor;
 
-extern Expected<std::unique_ptr<PointerAssignmentsEntitySummary>>
-extractEntitySummary(PointerAssignmentsTUSummaryExtractor &Extractor,
+extern Expected<std::unique_ptr<PointerFlowEntitySummary>>
+extractEntitySummary(PointerFlowTUSummaryExtractor &Extractor,
                      const NamedDecl *Contributor, ASTContext &Ctx);
 
-extern PointerAssignmentsTUSummaryExtractor *
-createPointerAssignmentsTUSummaryExtractor(TUSummaryBuilder &Builder);
+extern PointerFlowTUSummaryExtractor *
+createPointerFlowTUSummaryExtractor(TUSummaryBuilder &Builder);
 
-extern void deletePointerAssignmentsTUSummaryExtractor(
-    PointerAssignmentsTUSummaryExtractor *);
+extern void deletePointerFlowTUSummaryExtractor(
+    PointerFlowTUSummaryExtractor *);
 
-extern EntityId addEntity(PointerAssignmentsTUSummaryExtractor &Extractor,
+extern EntityId addEntity(PointerFlowTUSummaryExtractor &Extractor,
                           EntityName &EN);
 
-class PointerAssignmentsTUSummaryExtractorProxy {
-  PointerAssignmentsTUSummaryExtractor *Ptr;
+class PointerFlowTUSummaryExtractorProxy {
+  PointerFlowTUSummaryExtractor *Ptr;
 
 public:
-  explicit PointerAssignmentsTUSummaryExtractorProxy(TUSummaryBuilder &Builder)
-      : Ptr(createPointerAssignmentsTUSummaryExtractor(Builder)) {}
-  ~PointerAssignmentsTUSummaryExtractorProxy() {
-    deletePointerAssignmentsTUSummaryExtractor(Ptr);
+  explicit PointerFlowTUSummaryExtractorProxy(TUSummaryBuilder &Builder)
+      : Ptr(createPointerFlowTUSummaryExtractor(Builder)) {}
+  ~PointerFlowTUSummaryExtractorProxy() {
+    deletePointerFlowTUSummaryExtractor(Ptr);
   }
 
-  PointerAssignmentsTUSummaryExtractor &operator*() const { return *Ptr; }
+  PointerFlowTUSummaryExtractor &operator*() const { return *Ptr; }
 };
 } // namespace clang::ssaf
 
@@ -178,21 +177,21 @@ struct EPLPair {
   bool isFunRet;
 };
 
-class PointerAssignmentsTest : public testing::Test {
+class PointerFlowTest : public testing::Test {
 protected:
   TUSummary TUSum;
   TUSummaryBuilder Builder;
-  PointerAssignmentsTUSummaryExtractorProxy ExtractorProxy;
+  PointerFlowTUSummaryExtractorProxy ExtractorProxy;
   std::unique_ptr<ASTUnit> AST;
 
-  PointerAssignmentsTest()
+  PointerFlowTest()
       : TUSum(BuildNamespace(BuildNamespaceKind::CompilationUnit, "Mock.cpp")),
         Builder(TUSum), ExtractorProxy(Builder) {}
 
   template <typename ContributorDecl = NamedDecl,
             typename =
                 std::enable_if_t<std::is_base_of_v<NamedDecl, ContributorDecl>>>
-  std::unique_ptr<PointerAssignmentsEntitySummary>
+  std::unique_ptr<PointerFlowEntitySummary>
   setUpTest(StringRef Code, FindEntityByName ContributorName) {
     AST = tooling::buildASTFromCodeWithArgs(
         Code, {"-Wno-unused-value", "-Wno-int-to-pointer-cast"});
@@ -241,7 +240,7 @@ public:
 // 'ToEPL(Test, Line)' is a lambda that converts a 'EPLPair' to a
 // 'EntityPointerLevel':
 static constexpr auto ToEPL =
-    [](PointerAssignmentsTest *Test,
+    [](PointerFlowTest *Test,
        unsigned Line) -> std::function<EntityPointerLevel(const EPLPair &)> {
   return [Test, Line](const EPLPair &Pair) -> EntityPointerLevel {
     std::optional<EntityId> Entity = Pair.isFunRet
@@ -256,7 +255,7 @@ static constexpr auto ToEPL =
 };
 
 EdgeSet
-PointerAssignmentsTest::makeEdges(unsigned Line,
+PointerFlowTest::makeEdges(unsigned Line,
                                   ArrayRef<std::pair<EPLPair, EPLPair>> Edges) {
   EdgeSet Result;
   for (auto Edge : Edges)
@@ -265,12 +264,12 @@ PointerAssignmentsTest::makeEdges(unsigned Line,
   return Result;
 }
 
-TEST_F(PointerAssignmentsTest, IsExtractorRegisteredTest) {
+TEST_F(PointerFlowTest, IsExtractorRegisteredTest) {
   EXPECT_TRUE(
-      isTUSummaryExtractorRegistered("PointerAssignmentsTUSummaryExtractor"));
+      isTUSummaryExtractorRegistered("PointerFlowTUSummaryExtractor"));
 }
 
-TEST_F(PointerAssignmentsTest, IsJSONFormatRegistered) {
+TEST_F(PointerFlowTest, IsJSONFormatRegistered) {
   std::set<llvm::StringRef> ActualNames;
   for (const auto &Entry :
        llvm::Registry<clang::ssaf::JSONFormat::FormatInfo>::entries()) {
@@ -278,7 +277,7 @@ TEST_F(PointerAssignmentsTest, IsJSONFormatRegistered) {
     EXPECT_TRUE(Inserted);
   }
 
-  EXPECT_TRUE(ActualNames.count("PointerAssignments") == 1);
+  EXPECT_TRUE(ActualNames.count("PointerFlow") == 1);
 }
 
 //////////////////////////////////////////////////////////////
@@ -292,7 +291,7 @@ TEST_F(PointerAssignmentsTest, IsJSONFormatRegistered) {
 //   r = q;
 // }
 constexpr const char *const SerilizationTestOracle = R"cpp({
-  "PointerAssignments": [
+  "PointerFlow": [
     [
       [
         {
@@ -324,7 +323,7 @@ constexpr const char *const SerilizationTestOracle = R"cpp({
   ]
 })cpp";
 
-TEST_F(PointerAssignmentsTest, SerializeTest) {
+TEST_F(PointerFlowTest, SerializeTest) {
   auto Sum = setUpTest(R"cpp(
     void foo(int ***p, int ****q, int x, int ****r) {
       p[5][5][5];
@@ -346,7 +345,7 @@ TEST_F(PointerAssignmentsTest, SerializeTest) {
                                           {*getEntityId("q"), 108},
                                           {*getEntityId("r"), 9}};
 
-  Object JData = PointerAssignmentsEntitySummary::summaryToJSON(
+  Object JData = PointerFlowEntitySummary::summaryToJSON(
       *Sum, [&DummyTable](EntityId Id) {
         return Object{{"@", Value(DummyTable[Id])}};
       });
@@ -355,7 +354,7 @@ TEST_F(PointerAssignmentsTest, SerializeTest) {
             SerilizationTestOracle);
 }
 
-TEST_F(PointerAssignmentsTest, DeserializeTest) {
+TEST_F(PointerFlowTest, DeserializeTest) {
   auto Sum = setUpTest(R"cpp(
     void foo(int ***p, int ****q, int x, int ****r) {
       p[5][5][5];
@@ -382,21 +381,21 @@ TEST_F(PointerAssignmentsTest, DeserializeTest) {
   ASSERT_NE(ParsedJSON->getAsObject(), nullptr);
 
   EntityIdTable Ignored;
-  auto ParsedSum = PointerAssignmentsEntitySummary::summaryFromJSON(
+  auto ParsedSum = PointerFlowEntitySummary::summaryFromJSON(
       *ParsedJSON->getAsObject(), Ignored,
       [&DummyTable](const Object &O) -> Expected<EntityId> {
         return DummyTable.at(O.getInteger("@").value());
       });
 
   ASSERT_THAT_EXPECTED(ParsedSum, llvm::Succeeded());
-  EXPECT_EQ(*static_cast<PointerAssignmentsEntitySummary *>(ParsedSum->get()),
+  EXPECT_EQ(*static_cast<PointerFlowEntitySummary *>(ParsedSum->get()),
             *Sum);
 }
 
 //////////////////////////////////////////////////////////////
 //          Simple Assign Tests                             //
 //////////////////////////////////////////////////////////////
-TEST_F(PointerAssignmentsTest, SimpleAssign) {
+TEST_F(PointerFlowTest, SimpleAssign) {
   auto Sum = setUpTest(R"cpp(
     void foo(int *p, int *q) {
       q = p;
@@ -408,7 +407,7 @@ TEST_F(PointerAssignmentsTest, SimpleAssign) {
   EXPECT_EQ(*Sum, makeEdges(__LINE__, {{{"q", 1U}, {"p", 1U}}}));
 }
 
-TEST_F(PointerAssignmentsTest, AssignWithSubscriptLHS) {
+TEST_F(PointerFlowTest, AssignWithSubscriptLHS) {
   auto Sum = setUpTest(R"cpp(
     void foo(int **q, int *p, int x) {
       q[x] = p;
@@ -420,7 +419,7 @@ TEST_F(PointerAssignmentsTest, AssignWithSubscriptLHS) {
   EXPECT_EQ(*Sum, makeEdges(__LINE__, {{{"q", 2U}, {"p", 1U}}}));
 }
 
-TEST_F(PointerAssignmentsTest, AssignWithPtrArithRHS) {
+TEST_F(PointerFlowTest, AssignWithPtrArithRHS) {
   auto Sum = setUpTest(R"cpp(
     void foo(int *p, int *q) {
       q = p + 5;
@@ -432,7 +431,7 @@ TEST_F(PointerAssignmentsTest, AssignWithPtrArithRHS) {
   EXPECT_EQ(*Sum, makeEdges(__LINE__, {{{"q", 1U}, {"p", 1U}}}));
 }
 
-TEST_F(PointerAssignmentsTest, AssignInSubscript) {
+TEST_F(PointerFlowTest, AssignInSubscript) {
   auto Sum = setUpTest(R"cpp(
     void foo(int *p, int *q) {
       (q = p)[5];
@@ -444,7 +443,7 @@ TEST_F(PointerAssignmentsTest, AssignInSubscript) {
   EXPECT_EQ(*Sum, makeEdges(__LINE__, {{{"q", 1U}, {"p", 1U}}}));
 }
 
-TEST_F(PointerAssignmentsTest, MultipleAssign) {
+TEST_F(PointerFlowTest, MultipleAssign) {
   auto Sum = setUpTest(R"cpp(
     void foo(int *p, int *q, int *r) {
       q = p;
@@ -460,7 +459,7 @@ TEST_F(PointerAssignmentsTest, MultipleAssign) {
                                       }));
 }
 
-TEST_F(PointerAssignmentsTest, ChainedAssign) {
+TEST_F(PointerFlowTest, ChainedAssign) {
   auto Sum = setUpTest(R"cpp(
     void foo(int *p, int *q, int *r) {
       r = q = p;
@@ -475,7 +474,7 @@ TEST_F(PointerAssignmentsTest, ChainedAssign) {
                                       }));
 }
 
-TEST_F(PointerAssignmentsTest, CastToRValue) {
+TEST_F(PointerFlowTest, CastToRValue) {
   auto Sum = setUpTest(R"cpp(
     void foo(int *p, int *q) {
       q = static_cast<int *&&>(p);
@@ -487,7 +486,7 @@ TEST_F(PointerAssignmentsTest, CastToRValue) {
   EXPECT_EQ(*Sum, makeEdges(__LINE__, {{{"q", 1U}, {"p", 1U}}}));
 }
 
-TEST_F(PointerAssignmentsTest, AssignToMember) {
+TEST_F(PointerFlowTest, AssignToMember) {
   auto Sum = setUpTest(R"cpp(
     struct S { int *field; };
     void foo(S s, int *p) {
@@ -500,7 +499,7 @@ TEST_F(PointerAssignmentsTest, AssignToMember) {
   EXPECT_EQ(*Sum, makeEdges(__LINE__, {{{"field", 1U}, {"p", 1U}}}));
 }
 
-TEST_F(PointerAssignmentsTest, AssignToMember2) {
+TEST_F(PointerFlowTest, AssignToMember2) {
   auto Sum = setUpTest(R"cpp(
     struct S { int *field; };
     void foo(S *s, int *p) {
@@ -516,7 +515,7 @@ TEST_F(PointerAssignmentsTest, AssignToMember2) {
 //////////////////////////////////////////////////////////////
 //          Call Expr Tests.                                //
 //////////////////////////////////////////////////////////////
-TEST_F(PointerAssignmentsTest, CallArg) {
+TEST_F(PointerFlowTest, CallArg) {
   auto Sum = setUpTest(R"cpp(
     void bar(int *param);
     void foo(int *p) {
@@ -529,7 +528,7 @@ TEST_F(PointerAssignmentsTest, CallArg) {
   EXPECT_EQ(*Sum, makeEdges(__LINE__, {{{"param", 1U}, {"p", 1U}}}));
 }
 
-TEST_F(PointerAssignmentsTest, CallMultiArgs) {
+TEST_F(PointerFlowTest, CallMultiArgs) {
   auto Sum = setUpTest(R"cpp(
     void bar(int *param1, int y, int *param2);
     void foo(int *p, int x, int *q) {
@@ -545,7 +544,7 @@ TEST_F(PointerAssignmentsTest, CallMultiArgs) {
                                       }));
 }
 
-TEST_F(PointerAssignmentsTest, CallAsCallArg) {
+TEST_F(PointerFlowTest, CallAsCallArg) {
   auto Sum = setUpTest(R"cpp(
 
     int *bar(int * w);
@@ -560,7 +559,7 @@ TEST_F(PointerAssignmentsTest, CallAsCallArg) {
                                        {{"p", 1U}, {"bar", 1U, true}}}));
 }
 
-TEST_F(PointerAssignmentsTest, CXXOperatorCallMultiArgs) {
+TEST_F(PointerFlowTest, CXXOperatorCallMultiArgs) {
   auto Sum = setUpTest(R"cpp(
     struct S {
       int* operator()(int *a, int *b);
@@ -580,7 +579,7 @@ TEST_F(PointerAssignmentsTest, CXXOperatorCallMultiArgs) {
                                       }));
 }
 
-TEST_F(PointerAssignmentsTest, CXXMemberCall) {
+TEST_F(PointerFlowTest, CXXMemberCall) {
   auto Sum = setUpTest(R"cpp(
     struct S {
       int* method(int *a, int *b);
@@ -598,7 +597,7 @@ TEST_F(PointerAssignmentsTest, CXXMemberCall) {
                                        {{"q", 1U}, {"method", 1U, true}}}));
 }
 
-TEST_F(PointerAssignmentsTest, VirtualMethodCall) {
+TEST_F(PointerFlowTest, VirtualMethodCall) {
   auto Sum = setUpTest(R"cpp(
     struct Base {
       virtual void method(int *a);
@@ -613,7 +612,7 @@ TEST_F(PointerAssignmentsTest, VirtualMethodCall) {
   EXPECT_EQ(*Sum, makeEdges(__LINE__, {{{"a", 1U}, {"p", 1U}}}));
 }
 
-TEST_F(PointerAssignmentsTest, StaticMethodCall) {
+TEST_F(PointerFlowTest, StaticMethodCall) {
   auto Sum = setUpTest(R"cpp(
     struct S {
       static void method(int *a, int *b);
@@ -631,7 +630,7 @@ TEST_F(PointerAssignmentsTest, StaticMethodCall) {
                                       }));
 }
 
-TEST_F(PointerAssignmentsTest, DefaultArg) {
+TEST_F(PointerFlowTest, DefaultArg) {
   auto Sum = setUpTest(R"cpp(
     int *g;
     void bar(int *a, int *b = g);
@@ -646,7 +645,7 @@ TEST_F(PointerAssignmentsTest, DefaultArg) {
                             {{{"a", 1U}, {"p", 1U}}, {{"b", 1U}, {"g", 1U}}}));
 }
 
-TEST_F(PointerAssignmentsTest, DefaultArg2) {
+TEST_F(PointerFlowTest, DefaultArg2) {
   auto Sum = setUpTest(R"cpp(
     int *g;
     void bar(int *a, int *b = g);
@@ -666,7 +665,7 @@ TEST_F(PointerAssignmentsTest, DefaultArg2) {
 //////////////////////////////////////////////////////////////
 //          CXX Ctor Tests.                                 //
 //////////////////////////////////////////////////////////////
-TEST_F(PointerAssignmentsTest, CXXCtorCallMultiArgs) {
+TEST_F(PointerFlowTest, CXXCtorCallMultiArgs) {
   auto Sum = setUpTest(R"cpp(
     struct S {
       S(int *a, int *b) {}
@@ -684,7 +683,7 @@ TEST_F(PointerAssignmentsTest, CXXCtorCallMultiArgs) {
                                       }));
 }
 
-TEST_F(PointerAssignmentsTest, CXXCtorCallMultiArgs2) {
+TEST_F(PointerFlowTest, CXXCtorCallMultiArgs2) {
   auto Sum = setUpTest(R"cpp(
     struct S {
       S(int *a, int x, int *b) {}
@@ -702,7 +701,7 @@ TEST_F(PointerAssignmentsTest, CXXCtorCallMultiArgs2) {
                                       }));
 }
 
-TEST_F(PointerAssignmentsTest, CXXCtorCallAsCallArg) {
+TEST_F(PointerFlowTest, CXXCtorCallAsCallArg) {
   auto Sum = setUpTest(R"cpp(
     struct Wrapper {
       Wrapper(int *q) {}
@@ -718,7 +717,7 @@ TEST_F(PointerAssignmentsTest, CXXCtorCallAsCallArg) {
   EXPECT_EQ(*Sum, makeEdges(__LINE__, {{{"q", 1U}, {"p", 1U}}}));
 }
 
-TEST_F(PointerAssignmentsTest, DelegatingCXXCtorCall) {
+TEST_F(PointerFlowTest, DelegatingCXXCtorCall) {
   auto Sum = setUpTest<CXXConstructorDecl>(R"cpp(
     struct S {
       S(int *a, int *b) {}
@@ -734,7 +733,7 @@ TEST_F(PointerAssignmentsTest, DelegatingCXXCtorCall) {
                                       }));
 }
 
-TEST_F(PointerAssignmentsTest, CXXCtorBaseInit) {
+TEST_F(PointerFlowTest, CXXCtorBaseInit) {
   auto Sum = setUpTest<CXXConstructorDecl>(R"cpp(
     struct Base {
       Base(int *a) {}
@@ -752,7 +751,7 @@ TEST_F(PointerAssignmentsTest, CXXCtorBaseInit) {
 //////////////////////////////////////////////////////////////
 //          Initializers Tests.                             //
 //////////////////////////////////////////////////////////////
-TEST_F(PointerAssignmentsTest, LocalVarDeclInit) {
+TEST_F(PointerFlowTest, LocalVarDeclInit) {
   auto Sum = setUpTest(R"cpp(
     void foo(int *p) {
       int *q = p;
@@ -764,7 +763,7 @@ TEST_F(PointerAssignmentsTest, LocalVarDeclInit) {
   EXPECT_EQ(*Sum, makeEdges(__LINE__, {{{"q", 1U}, {"p", 1U}}}));
 }
 
-TEST_F(PointerAssignmentsTest, LocalVarDeclInit2) {
+TEST_F(PointerFlowTest, LocalVarDeclInit2) {
   auto Sum = setUpTest(R"cpp(
     void foo(int (*arr)[10]) {
       int (*p)[10] = arr;
@@ -776,7 +775,7 @@ TEST_F(PointerAssignmentsTest, LocalVarDeclInit2) {
   EXPECT_EQ(*Sum, makeEdges(__LINE__, {{{"p", 1U}, {"arr", 1U}}}));
 }
 
-TEST_F(PointerAssignmentsTest, FieldInit) {
+TEST_F(PointerFlowTest, FieldInit) {
   auto Sum = setUpTest(R"cpp(
     void foo(int *p) {
       struct Bar {
@@ -790,7 +789,7 @@ TEST_F(PointerAssignmentsTest, FieldInit) {
   EXPECT_EQ(*Sum, makeEdges(__LINE__, {{{"field", 1U}, {"p", 1U}}}));
 }
 
-TEST_F(PointerAssignmentsTest, CXXCtorMemberInit) {
+TEST_F(PointerFlowTest, CXXCtorMemberInit) {
   StringRef Code = R"cpp(
     void foo(int *p) {
       struct Bar {
@@ -812,7 +811,7 @@ TEST_F(PointerAssignmentsTest, CXXCtorMemberInit) {
   EXPECT_EQ(*Sum, makeEdges(__LINE__, {{{"q", 1U}, {"p", 1U}}}));
 }
 
-TEST_F(PointerAssignmentsTest, GlobalVarInit) {
+TEST_F(PointerFlowTest, GlobalVarInit) {
   auto Sum = setUpTest<VarDecl>(R"cpp(
     int *q;
     int *g = q;
@@ -823,7 +822,7 @@ TEST_F(PointerAssignmentsTest, GlobalVarInit) {
   EXPECT_EQ(*Sum, makeEdges(__LINE__, {{{"g", 1U}, {"q", 1U}}}));
 }
 
-TEST_F(PointerAssignmentsTest, StaticLocalInit) {
+TEST_F(PointerFlowTest, StaticLocalInit) {
   auto Sum = setUpTest(R"cpp(
     void foo(int *p) {
       static int *s = p;
@@ -835,7 +834,7 @@ TEST_F(PointerAssignmentsTest, StaticLocalInit) {
   EXPECT_EQ(*Sum, makeEdges(__LINE__, {{{"s", 1U}, {"p", 1U}}}));
 }
 
-TEST_F(PointerAssignmentsTest, StaticMemberInit) {
+TEST_F(PointerFlowTest, StaticMemberInit) {
   auto Sum = setUpTest<VarDecl>(R"cpp(
     int *g;
     struct S { static int *member = g; };   
@@ -850,7 +849,7 @@ TEST_F(PointerAssignmentsTest, StaticMemberInit) {
 //              InitList Tests.                               //
 //////////////////////////////////////////////////////////////
 
-TEST_F(PointerAssignmentsTest, ArrayInitList) {
+TEST_F(PointerFlowTest, ArrayInitList) {
   auto Sum = setUpTest(R"cpp(
     void foo(int *p, int *q) {
       int *arr[] = {p, q};
@@ -865,7 +864,7 @@ TEST_F(PointerAssignmentsTest, ArrayInitList) {
                                       }));
 }
 
-TEST_F(PointerAssignmentsTest, StructInitList) {
+TEST_F(PointerFlowTest, StructInitList) {
   auto Sum = setUpTest(R"cpp(
     struct S { int *a; int *b; };
     void foo(int *p, int *q) {
@@ -882,7 +881,7 @@ TEST_F(PointerAssignmentsTest, StructInitList) {
 }
 
 // A union initialized with a brace-enclosed initializer:
-TEST_F(PointerAssignmentsTest, UnionInitList) {
+TEST_F(PointerFlowTest, UnionInitList) {
   auto Sum = setUpTest(R"cpp(
     union U { int *x; int y; };
     void foo(int *p) {
@@ -895,7 +894,7 @@ TEST_F(PointerAssignmentsTest, UnionInitList) {
   EXPECT_EQ(*Sum, makeEdges(__LINE__, {{{"x", 1U}, {"p", 1U}}}));
 }
 
-TEST_F(PointerAssignmentsTest, NestedInitList) {
+TEST_F(PointerFlowTest, NestedInitList) {
   auto Sum = setUpTest(R"cpp(
     struct Inner { int * a; int * b; };
     struct S { Inner c; int * d; };
@@ -913,7 +912,7 @@ TEST_F(PointerAssignmentsTest, NestedInitList) {
                                       }));
 }
 
-TEST_F(PointerAssignmentsTest, NestedInitList2) {
+TEST_F(PointerFlowTest, NestedInitList2) {
   auto Sum = setUpTest(R"cpp(
     union Inner { int * a; int b; };
     struct S { Inner c; int * d; };
@@ -930,7 +929,7 @@ TEST_F(PointerAssignmentsTest, NestedInitList2) {
                                       }));
 }
 
-TEST_F(PointerAssignmentsTest, NestedInitList3) {
+TEST_F(PointerFlowTest, NestedInitList3) {
   auto Sum = setUpTest(R"cpp(
     struct Inner { int * a; int * b; };
     union S { Inner c; int * d; };
@@ -947,7 +946,7 @@ TEST_F(PointerAssignmentsTest, NestedInitList3) {
                                       }));
 }
 
-TEST_F(PointerAssignmentsTest, NestedArrayInitList) {
+TEST_F(PointerFlowTest, NestedArrayInitList) {
   auto Sum = setUpTest(R"cpp(
     void foo(int *p, int *q, int *r, int *s) {
       int *arr[][2] = {{p, q}, {r, s}};
@@ -964,7 +963,7 @@ TEST_F(PointerAssignmentsTest, NestedArrayInitList) {
                                       }));
 }
 
-TEST_F(PointerAssignmentsTest, MixedNestedArrayStructInitList) {
+TEST_F(PointerFlowTest, MixedNestedArrayStructInitList) {
   auto Sum = setUpTest(R"cpp(
     struct T { int *arr[2]; };
     void foo(int *p, int *q, int *r, int *s) {
@@ -982,7 +981,7 @@ TEST_F(PointerAssignmentsTest, MixedNestedArrayStructInitList) {
                                       }));
 }
 
-TEST_F(PointerAssignmentsTest, ArrayOfStructInitList) {
+TEST_F(PointerFlowTest, ArrayOfStructInitList) {
   auto Sum = setUpTest(R"cpp(
     struct S { int *a; int *b; };
     void foo(int *p, int *q, int *r, int *s) {
@@ -1004,7 +1003,7 @@ TEST_F(PointerAssignmentsTest, ArrayOfStructInitList) {
 //              Return Tests.                               //
 //////////////////////////////////////////////////////////////
 
-TEST_F(PointerAssignmentsTest, ReturnEdge) {
+TEST_F(PointerFlowTest, ReturnEdge) {
   auto Sum = setUpTest(R"cpp(
     int *foo(int *p) {
       return p;
@@ -1016,7 +1015,7 @@ TEST_F(PointerAssignmentsTest, ReturnEdge) {
   EXPECT_EQ(*Sum, makeEdges(__LINE__, {{{"foo", 1U, true}, {"p", 1U}}}));
 }
 
-TEST_F(PointerAssignmentsTest, MultipleReturnEdges) {
+TEST_F(PointerFlowTest, MultipleReturnEdges) {
   auto Sum = setUpTest(R"cpp(
     int *foo(int *p, int *q, bool cond) {
       if (cond)
@@ -1033,7 +1032,7 @@ TEST_F(PointerAssignmentsTest, MultipleReturnEdges) {
                                       }));
 }
 
-TEST_F(PointerAssignmentsTest, NoReturnEdgeForNonPointerReturnType) {
+TEST_F(PointerFlowTest, NoReturnEdgeForNonPointerReturnType) {
   auto Sum = setUpTest(R"cpp(
     int foo(int *p, int x) {
       return x;
@@ -1045,7 +1044,7 @@ TEST_F(PointerAssignmentsTest, NoReturnEdgeForNonPointerReturnType) {
   EXPECT_EQ(*Sum, makeEdges(__LINE__, {}));
 }
 
-TEST_F(PointerAssignmentsTest, ReturnEdgeNotFromNestedFunction) {
+TEST_F(PointerFlowTest, ReturnEdgeNotFromNestedFunction) {
   auto *Code = R"cpp(
     int *foo(int *p) {
       struct Inner {
@@ -1065,7 +1064,7 @@ TEST_F(PointerAssignmentsTest, ReturnEdgeNotFromNestedFunction) {
   EXPECT_EQ(*Sum, makeEdges(__LINE__, {{{"bar", 1U, true}, {"q", 1U}}}));
 }
 
-TEST_F(PointerAssignmentsTest, ReturnEdgeInClassMethod) {
+TEST_F(PointerFlowTest, ReturnEdgeInClassMethod) {
   auto Sum = setUpTest(R"cpp(
   void foo() {
     struct S {
@@ -1079,7 +1078,7 @@ TEST_F(PointerAssignmentsTest, ReturnEdgeInClassMethod) {
   EXPECT_EQ(*Sum, makeEdges(__LINE__, {{{"method", 1U, true}, {"p", 1U}}}));
 }
 
-TEST_F(PointerAssignmentsTest, NoEdgeFromIndirectCall) {
+TEST_F(PointerFlowTest, NoEdgeFromIndirectCall) {
   auto Sum = setUpTest(R"cpp(
     void bar(int *param1);
     void baz(int *param2);
@@ -1108,7 +1107,7 @@ TEST_F(PointerAssignmentsTest, NoEdgeFromIndirectCall) {
 //          Lambda Tests.                                   //
 //////////////////////////////////////////////////////////////
 
-TEST_F(PointerAssignmentsTest, ReturnInLambda) {
+TEST_F(PointerFlowTest, ReturnInLambda) {
   StringRef Code = R"cpp(
     int* foo(int *p) {
       auto local = [](int *r) { return r; };
@@ -1129,7 +1128,7 @@ TEST_F(PointerAssignmentsTest, ReturnInLambda) {
                             {{{LambdaOfVar{"local"}, 1U, true}, {"r", 1U}}}));
 }
 
-TEST_F(PointerAssignmentsTest, NestedLambdaAssign) {
+TEST_F(PointerFlowTest, NestedLambdaAssign) {
   StringRef Code = R"cpp(
     void foo() {
       auto outer_lambda = [](int *r, int *s) {

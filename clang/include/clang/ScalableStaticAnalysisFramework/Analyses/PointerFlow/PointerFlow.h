@@ -1,4 +1,4 @@
-//===---------------- PointerAssignments.h ----------------------*- C++ -*-===//
+//===- PointerFlow.h -------------------------------------------*- C++ -*-===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -11,22 +11,24 @@
 //  nodes.
 //
 //===----------------------------------------------------------------------===//
-#ifndef LLVM_CLANG_SCALABLESTATICANALYSISFRAMEWORK_ANALYSES_POINTERASSIGNMENTS_H
-#define LLVM_CLANG_SCALABLESTATICANALYSISFRAMEWORK_ANALYSES_POINTERASSIGNMENTS_H
+#ifndef LLVM_CLANG_SCALABLESTATICANALYSISFRAMEWORK_ANALYSES_POINTERFLOW_POINTERASSIGNMENTS_H
+#define LLVM_CLANG_SCALABLESTATICANALYSISFRAMEWORK_ANALYSES_POINTERFLOW_POINTERASSIGNMENTS_H
 
-#include "clang/ScalableStaticAnalysisFramework/Analyses/EntityPointerLevel.h"
+#include "clang/ScalableStaticAnalysisFramework/Analyses/EntityPointerLevel/EntityPointerLevel.h"
+#include "clang/ScalableStaticAnalysisFramework/Core/Serialization/JSONFormat.h"
+#include "clang/ScalableStaticAnalysisFramework/Core/TUSummary/EntitySummary.h"
 
 namespace clang::ssaf {
 
 /// Maps LHSs to their RHS sets:
 using EdgeSet = std::map<EntityPointerLevel, EntityPointerLevelSet>;
 
-class PointerAssignmentsEntitySummary final : public EntitySummary {
+class PointerFlowEntitySummary final : public EntitySummary {
   EdgeSet Edges;
 
-  friend class PointerAssignmentsTUSummaryExtractor;
+  friend class PointerFlowTUSummaryExtractor;
 
-  PointerAssignmentsEntitySummary(EdgeSet Edges)
+  PointerFlowEntitySummary(EdgeSet Edges)
       : EntitySummary(), Edges(std::move(Edges)) {}
 
 public:
@@ -34,7 +36,7 @@ public:
 
   bool operator==(const EdgeSet &Other) const { return Edges == Other; }
 
-  bool operator==(const PointerAssignmentsEntitySummary &Other) const {
+  bool operator==(const PointerFlowEntitySummary &Other) const {
     return Edges == Other.Edges;
   }
 
@@ -48,17 +50,17 @@ public:
   summaryFromJSON(const llvm::json::Object &Data, EntityIdTable &,
                   JSONFormat::EntityIdFromJSONFn EntityIdFromJSON);
 
-  static SummaryName summaryName() { return SummaryName{"PointerAssignments"}; }
+  static SummaryName summaryName() { return SummaryName{"PointerFlow"}; }
 };
 
-struct PointerAssignmentsJSONFormatInfo : JSONFormat::FormatInfo {
-  PointerAssignmentsJSONFormatInfo()
+struct PointerFlowJSONFormatInfo : JSONFormat::FormatInfo {
+  PointerFlowJSONFormatInfo()
       : JSONFormat::FormatInfo(
-            PointerAssignmentsEntitySummary::summaryName(),
-            PointerAssignmentsEntitySummary::summaryToJSON,
-            PointerAssignmentsEntitySummary::summaryFromJSON) {}
+            PointerFlowEntitySummary::summaryName(),
+            PointerFlowEntitySummary::summaryToJSON,
+            PointerFlowEntitySummary::summaryFromJSON) {}
 };
 
 } // namespace clang::ssaf
 
-#endif // LLVM_CLANG_SCALABLESTATICANALYSISFRAMEWORK_ANALYSES_POINTERASSIGNMENTS_H
+#endif // LLVM_CLANG_SCALABLESTATICANALYSISFRAMEWORK_ANALYSES_POINTERFLOW_POINTERASSIGNMENTS_H

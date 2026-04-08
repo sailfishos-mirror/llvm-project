@@ -1,4 +1,4 @@
-//===---- PointerAssignmentsExtractor.cpp --------------------------------===//
+//===- PointerFlowExtractor.cpp -----------------------------------===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -15,15 +15,15 @@
 #include "clang/AST/ExprCXX.h"
 #include "clang/AST/Stmt.h"
 #include "clang/AST/TypeBase.h"
-#include "clang/ScalableStaticAnalysisFramework/Analyses/EntityPointerLevel.h"
-#include "clang/ScalableStaticAnalysisFramework/Analyses/PointerAssignments.h"
+#include "clang/ScalableStaticAnalysisFramework/Analyses/EntityPointerLevel/EntityPointerLevel.h"
+#include "clang/ScalableStaticAnalysisFramework/Analyses/PointerFlow/PointerFlow.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/ASTEntityMapping.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/Model/EntityId.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/Model/EntityName.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/TUSummary/ExtractorRegistry.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/TUSummary/TUSummaryBuilder.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/TUSummary/TUSummaryExtractor.h"
-#include "clang/ScalableStaticAnalysisFramework/SSAFForceLinker.h" // IWYU pragma: keep
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Error.h"
 #include <functional>
 #include <memory>
@@ -40,7 +40,7 @@ class PointerAssignmentMatcher {
   // Convert a Expr/NamedDecl to an EntityPointerLevel(Set):
   Expected<EntityPointerLevelSet> toEPL(const NamedDecl *N,
                                         bool IsRet = false) {
-    auto Ret = creatEntityPointerLevel(N, Ctx, AddEntity, IsRet);
+    auto Ret = createEntityPointerLevel(N, Ctx, AddEntity, IsRet);
 
     if (Ret)
       return EntityPointerLevelSet{*Ret};
@@ -126,11 +126,14 @@ class PointerAssignmentMatcher {
         return false;
       }
 
-      EntityPointerLevelSet LHS = *Expected;
-
-      for (unsigned I = 0; I < ArrayElementIndirectLevel; ++I)
-        LHS = incrementPointerLevel(LHS);
-      return addEdges(LHS, InitExpr);
+      auto R = llvm::map_range(*Expected, [&ArrayElementIndirectLevel](
+                                              const EntityPointerLevel &EPL) {
+        EntityPointerLevel Result = EPL;
+        for (unsigned I = 0; I < ArrayElementIndirectLevel; ++I)
+          Result = incrementPointerLevel(Result);
+        return Result;
+      });
+      return addEdges(EntityPointerLevelSet{R.begin(), R.end()}, InitExpr);
     }
     // Note that `Base`'s type is NOT the real LHS type when
     // ArrayElementIndirectLevel > 0:
@@ -150,7 +153,7 @@ class PointerAssignmentMatcher {
     if (auto *CXXRD = dyn_cast<CXXRecordDecl>(RecordTy))
       if (CXXRD->getNumBases() != 0) {
         // FIXME: support this:
-        addError(strErrAtNode(
+        addError(makeErrAtNode(
             Ctx, *ILE,
             "attempt to create pointer assignment edges between "
             "CXXRecordDecls with base classes and initializer-lists"));
@@ -290,16 +293,16 @@ public:
 } // namespace
 
 namespace clang::ssaf {
-class PointerAssignmentsTUSummaryExtractor : public TUSummaryExtractor {
+class PointerFlowTUSummaryExtractor : public TUSummaryExtractor {
 public:
-  PointerAssignmentsTUSummaryExtractor(TUSummaryBuilder &Builder)
+  PointerFlowTUSummaryExtractor(TUSummaryBuilder &Builder)
       : TUSummaryExtractor(Builder) {}
 
   EntityId addEntity(const EntityName &EN) {
     return SummaryBuilder.addEntity(EN);
   }
 
-  Expected<std::unique_ptr<PointerAssignmentsEntitySummary>>
+  Expected<std::unique_ptr<PointerFlowEntitySummary>>
   extractEntitySummary(const NamedDecl *Contributor, ASTContext &Ctx) {
     PointerAssignmentMatcher Matcher(
         Ctx, [this](const EntityName &EN) { return addEntity(EN); });
@@ -308,14 +311,14 @@ public:
     Finder.findMatches(const_cast<NamedDecl *>(Contributor));
     if (Matcher.Error)
       return std::move(Matcher.Error);
-    return std::make_unique<PointerAssignmentsEntitySummary>(
-        PointerAssignmentsEntitySummary(std::move(Matcher.Results)));
+    return std::make_unique<PointerFlowEntitySummary>(
+        PointerFlowEntitySummary(std::move(Matcher.Results)));
   }
 
   void HandleTranslationUnit(ASTContext &Ctx) override;
 };
 
-void PointerAssignmentsTUSummaryExtractor::HandleTranslationUnit(
+void PointerFlowTUSummaryExtractor::HandleTranslationUnit(
     ASTContext &Ctx) {
   llvm::Error Errors = llvm::ErrorSuccess();
   auto addError = [&Errors](llvm::Error Err) {
@@ -339,7 +342,7 @@ void PointerAssignmentsTUSummaryExtractor::HandleTranslationUnit(
     auto ContributorName = getEntityName(CD);
 
     if (!ContributorName) {
-      addError(entityNameErrFor(Ctx, *CD));
+      addError(makeEntityNameErr(Ctx, *CD));
       continue;
     }
 
@@ -347,37 +350,38 @@ void PointerAssignmentsTUSummaryExtractor::HandleTranslationUnit(
         addEntity(*ContributorName), std::move(*EntitySummary));
 
     if (!Success)
-      addError(failedToAddEntitySummaryFor(Ctx, CD));
+      addError(makeAddEntitySummaryErr(Ctx, CD));
   }
   // FIXME: handle errors!
   llvm::consumeError(std::move(Errors));
 }
 
 // Proxy functions for unit test:
-extern Expected<std::unique_ptr<PointerAssignmentsEntitySummary>>
-extractEntitySummary(PointerAssignmentsTUSummaryExtractor &Extractor,
+extern Expected<std::unique_ptr<PointerFlowEntitySummary>>
+extractEntitySummary(PointerFlowTUSummaryExtractor &Extractor,
                      const NamedDecl *Contributor, ASTContext &Ctx) {
   return Extractor.extractEntitySummary(Contributor, Ctx);
 }
 
-extern PointerAssignmentsTUSummaryExtractor *
-createPointerAssignmentsTUSummaryExtractor(TUSummaryBuilder &Builder) {
-  return new PointerAssignmentsTUSummaryExtractor(
-      PointerAssignmentsTUSummaryExtractor(Builder));
+extern PointerFlowTUSummaryExtractor *
+createPointerFlowTUSummaryExtractor(TUSummaryBuilder &Builder) {
+  return new PointerFlowTUSummaryExtractor(
+      PointerFlowTUSummaryExtractor(Builder));
 }
 
-extern void deletePointerAssignmentsTUSummaryExtractor(
-    PointerAssignmentsTUSummaryExtractor *Ptr) {
+extern void deletePointerFlowTUSummaryExtractor(
+    PointerFlowTUSummaryExtractor *Ptr) {
   delete Ptr;
 }
 
-extern EntityId addEntity(PointerAssignmentsTUSummaryExtractor &Extractor,
+extern EntityId addEntity(PointerFlowTUSummaryExtractor &Extractor,
                           EntityName &EN) {
   return Extractor.addEntity(EN);
 }
 } // namespace clang::ssaf
 
-volatile int PointerAssignmentsTUSummaryExtractorAnchorSource = 0;
-static TUSummaryExtractorRegistry::Add<PointerAssignmentsTUSummaryExtractor>
-    RegisterExtractor("PointerAssignmentsTUSummaryExtractor",
+// NOLINTNEXTLINE(misc-use-internal-linkage)
+volatile int PointerFlowTUSummaryExtractorAnchorSource = 0;
+static TUSummaryExtractorRegistry::Add<PointerFlowTUSummaryExtractor>
+    RegisterExtractor("PointerFlowTUSummaryExtractor",
                       "The TUSummaryExtractor for pointer assignments");
