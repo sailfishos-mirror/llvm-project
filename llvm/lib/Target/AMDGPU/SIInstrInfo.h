@@ -1736,6 +1736,8 @@ public:
   // regardless.
   void enforceOperandRCAlignment(MachineInstr &MI, AMDGPU::OpName OpName) const;
 
+  /// Get the repeat rate for a VALU instruction from the scheduling model.
+  /// Returns 1 for regular VALU, >1 for long-latency VALU (packed, F64, etc.)
   unsigned getRepeatRate(const MachineInstr &MI) const;
 };
 

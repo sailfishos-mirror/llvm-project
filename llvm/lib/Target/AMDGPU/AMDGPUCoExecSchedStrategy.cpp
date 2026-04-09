@@ -65,8 +65,12 @@ InstructionFlavor llvm::AMDGPU::classifyFlavor(const MachineInstr &MI,
   if (SII.isTRANS(MI))
     return InstructionFlavor::TRANS;
 
-  if (SII.isVALU(MI))
+  if (SII.isVALU(MI)) {
+    if (SII.getRepeatRate(MI) > 1)
+      return InstructionFlavor::MultiCycleVALU;
+
     return InstructionFlavor::SingleCycleVALU;
+  }
 
   if (SII.isDS(MI))
     return InstructionFlavor::DS;
@@ -189,7 +193,8 @@ unsigned CandidateHeuristics::getHWUICyclesForInst(SUnit *SU) {
   for (TargetSchedModel::ProcResIter PI = SchedModel->getWriteProcResBegin(SC),
                                      PE = SchedModel->getWriteProcResEnd(SC);
        PI != PE; ++PI) {
-    ReleaseAtCycle = std::max(ReleaseAtCycle, (unsigned)PI->ReleaseAtCycle);
+    ReleaseAtCycle = std::max({ReleaseAtCycle, (unsigned)PI->ReleaseAtCycle,
+                               (unsigned)PI->RepeatRate});
   }
   return ReleaseAtCycle;
 }
