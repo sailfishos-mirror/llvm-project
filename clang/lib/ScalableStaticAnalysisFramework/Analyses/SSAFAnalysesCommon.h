@@ -145,4 +145,5 @@ public:
   }
 };
 } // namespace clang::ssaf
+
 #endif // LLVM_CLANG_SCALABLESTATICANALYSISFRAMEWORK_ANALYSES_SSAFANALYSESCOMMON_H
