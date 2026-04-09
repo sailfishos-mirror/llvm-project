@@ -29,6 +29,7 @@ jobs:
           cmake -GNinja -DCMAKE_BUILD_TYPE=Release ../llvm
           ninja split-file FileCheck
       - name: Build Package
+        shell: bash
         run: |
           pip3 install --break-system-packages build==1.4.2
           cd ./llvm/utils/llvm-testing-tools
