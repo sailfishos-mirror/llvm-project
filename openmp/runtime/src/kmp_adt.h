@@ -183,7 +183,7 @@ template <typename T, size_t inline_threshold = 8> class kmp_vector final {
       count = other.count;
       capacity = other.capacity;
     }
-    other.reset(false);
+    other.reset(/*free_data=*/false);
   }
 
   void reset(bool free_data) {
@@ -213,7 +213,7 @@ template <typename T, size_t inline_threshold = 8> class kmp_vector final {
   }
 
 public:
-  ~kmp_vector() { reset(true); }
+  ~kmp_vector() { reset(/*free_data=*/true); }
 
   explicit kmp_vector(size_t capacity = 0) { init(capacity, nullptr, 0); }
 
@@ -229,7 +229,7 @@ public:
 
   kmp_vector &operator=(const kmp_vector &other) {
     if (this != &other) {
-      reset(true);
+      reset(/*free_data=*/true);
       init(other.capacity, other.data, other.count);
     }
     return *this;
@@ -237,7 +237,7 @@ public:
 
   kmp_vector &operator=(kmp_vector &&other) noexcept {
     if (this != &other) {
-      reset(true);
+      reset(/*free_data=*/true);
       move_from(std::move(other));
     }
     return *this;
