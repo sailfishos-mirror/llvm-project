@@ -38,12 +38,10 @@ using is_event_info_desc_t = typename is_info_desc<T, event>::return_type;
 class _LIBSYCL_EXPORT event {
 public:
   event(const event &rhs) = default;
-
   event(event &&rhs) = default;
-
   event &operator=(const event &rhs) = default;
-
   event &operator=(event &&rhs) = default;
+  ~event() = default;
 
   friend bool operator==(const event &lhs, const event &rhs) {
     return lhs.impl == rhs.impl;
@@ -53,7 +51,7 @@ public:
     return !(lhs == rhs);
   }
 
-  /// \return the backend associated with this platform.
+  /// \return the backend associated with this event.
   backend get_backend() const noexcept;
 
   /// Blocks until all commands associated with this event and any dependent
@@ -71,7 +69,7 @@ public:
 
   /// Queries this SYCL event for SYCL backend-specific information.
   ///
-  /// \return depends on information being queried.
+  /// \return depends on the information being queried.
   template <typename Param>
   typename Param::return_type get_backend_info() const;
 

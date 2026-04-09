@@ -38,12 +38,12 @@ static inline bool checkFatBinVersion(const __sycl_tgt_bin_desc &FatbinDesc) {
 
 static inline bool
 checkDeviceImageValidity(const __sycl_tgt_device_image &DeviceImage) {
-  return (DeviceImage.Version == SupportedDevicyBinaryVersion) &&
+  return (DeviceImage.Version == SupportedDeviceBinaryVersion) &&
          (DeviceImage.OffloadKind == llvm::object::OFK_SYCL) &&
          (DeviceImage.ImageFormat == llvm::object::IMG_SPIRV);
 }
 
-void ProgramManager::addImages(__sycl_tgt_bin_desc *FatbinDesc) {
+void ProgramAndKernelManager::registerFatBin(__sycl_tgt_bin_desc *FatbinDesc) {
   assert(FatbinDesc && "Device images descriptor can't be nullptr");
 
   if (!checkFatBinVersion(*FatbinDesc))
@@ -53,7 +53,7 @@ void ProgramManager::addImages(__sycl_tgt_bin_desc *FatbinDesc) {
     return;
 
   std::lock_guard<std::mutex> Guard(MImageCollectionMutex);
-  for (int I = 0; I < FatbinDesc->NumDeviceBinaries; ++I) {
+  for (uint16_t I = 0; I < FatbinDesc->NumDeviceBinaries; ++I) {
     const auto &RawDeviceImage = FatbinDesc->DeviceImages[I];
     if (!checkDeviceImageValidity(RawDeviceImage))
       throw sycl::exception(sycl::make_error_code(sycl::errc::runtime),
@@ -89,14 +89,15 @@ void ProgramManager::addImages(__sycl_tgt_bin_desc *FatbinDesc) {
   }
 }
 
-void ProgramManager::removeImages(__sycl_tgt_bin_desc *FatbinDesc) {
+void ProgramAndKernelManager::unregisterFatBin(
+    __sycl_tgt_bin_desc *FatbinDesc) {
   assert(FatbinDesc && "Device images descriptor can't be nullptr");
 
   if (!checkFatBinVersion(*FatbinDesc) || FatbinDesc->NumDeviceBinaries == 0)
     return;
 
   std::scoped_lock Guard{MImageCollectionMutex, MKernelCollectionsMutex};
-  for (int I = 0; I < FatbinDesc->NumDeviceBinaries; ++I) {
+  for (uint16_t I = 0; I < FatbinDesc->NumDeviceBinaries; ++I) {
     const auto &RawDeviceImage = FatbinDesc->DeviceImages[I];
 
     auto DevImageIt = MDeviceImageWrappers.find(&RawDeviceImage);
@@ -125,6 +126,7 @@ void ProgramManager::removeImages(__sycl_tgt_bin_desc *FatbinDesc) {
       }
       MPrograms.erase(ProgramIt);
     }
+
     MDeviceImageWrappers.erase(DevImageIt);
   }
 }
@@ -138,9 +140,11 @@ static bool isImageTargetCompatible(const DeviceImageWrapper &Image,
          (BE == sycl::backend::level_zero);
 }
 
-DeviceImageWrapper *ProgramManager::getDeviceImage(std::string_view KernelName,
-                                                   const kernel_id &KernelID,
-                                                   DeviceImpl &Device) {
+DeviceImageWrapper *
+ProgramAndKernelManager::getDeviceImage(std::string_view KernelName,
+                                        const kernel_id &KernelID,
+                                        DeviceImpl &Device) {
+  std::lock_guard<std::mutex> Guard(MImageCollectionMutex);
   auto [Begin, End] = MKernelIDToDevImageJIT.equal_range(KernelID);
   if (Begin != End) {
     bool IsValid{};
@@ -148,7 +152,7 @@ DeviceImageWrapper *ProgramManager::getDeviceImage(std::string_view KernelName,
     // olIsValidBinary for AOT binaries first.
     for (auto It = Begin; It != End; ++It) {
       if (isImageTargetCompatible(*It->second, Device)) {
-        callAndThrow(olIsValidBinary, Device.getHandle(),
+        callAndThrow(olIsValidBinary, Device.getOLHandle(),
                      It->second->getRawData().ImageStart, It->second->getSize(),
                      &IsValid);
         if (IsValid)
@@ -161,7 +165,7 @@ DeviceImageWrapper *ProgramManager::getDeviceImage(std::string_view KernelName,
                   "No kernel named " + std::string(KernelName) + " was found");
 }
 
-ol_symbol_handle_t ProgramManager::getOrCreateKernel(const char *KernelName,
+ol_symbol_handle_t ProgramAndKernelManager::getOrCreateKernel(const char *KernelName,
                                                      DeviceImpl &Device) {
   std::unique_lock<std::mutex> ImageGuard(MImageCollectionMutex);
 
@@ -190,26 +194,26 @@ ol_symbol_handle_t ProgramManager::getOrCreateKernel(const char *KernelName,
 }
 
 ol_program_handle_t
-ProgramManager::getOrCreateProgram(DeviceImpl &Device,
+ProgramAndKernelManager::getOrCreateProgram(DeviceImpl &Device,
                                    DeviceImageWrapper *DevImage) {
   if (auto DevToProgramIt = MPrograms.find(DevImage);
       DevToProgramIt != MPrograms.end()) {
-    auto ProgramIt = DevToProgramIt->second.find(Device.getHandle());
+    auto ProgramIt = DevToProgramIt->second.find(Device.getOLHandle());
     if (ProgramIt != DevToProgramIt->second.end())
       return ProgramIt->second;
   }
 
   std::unique_ptr<ProgramWrapper> NewProgramWrapper(
-      new ProgramWrapper(Device.getHandle(), *DevImage));
+      new ProgramWrapper(Device.getOLHandle(), *DevImage));
   auto Program = NewProgramWrapper->getHandle();
-  MPrograms[DevImage].insert(std::make_pair(Device.getHandle(), Program));
+  MPrograms[DevImage].insert(std::make_pair(Device.getOLHandle(), Program));
   MProgramWrappers.insert(std::make_pair(NewProgramWrapper->getHandle(),
                                          std::move(NewProgramWrapper)));
 
   return Program;
 }
 
-ol_symbol_handle_t ProgramManager::createKernel(ol_program_handle_t Program,
+ol_symbol_handle_t ProgramAndKernelManager::createKernel(ol_program_handle_t Program,
                                                 const kernel_id &KernelID,
                                                 const char *KernelName,
                                                 DeviceImpl &Device) {
@@ -219,16 +223,16 @@ ol_symbol_handle_t ProgramManager::createKernel(ol_program_handle_t Program,
   callAndThrow(olGetSymbol, Program, KernelName, OL_SYMBOL_KIND_KERNEL,
                &Kernel);
   MKernels.insert(
-      std::make_pair(KernelID, std::make_pair(Device.getHandle(), Kernel)));
+      std::make_pair(KernelID, std::make_pair(Device.getOLHandle(), Kernel)));
   return Kernel;
 }
 
-ol_symbol_handle_t ProgramManager::getKernel(const kernel_id &KernelID,
+ol_symbol_handle_t ProgramAndKernelManager::getKernel(const kernel_id &KernelID,
                                              DeviceImpl &Device) {
   auto Range = MKernels.equal_range(KernelID);
   for (auto Kernels = Range.first; Kernels != Range.second; ++Kernels) {
     auto &[KernelDevice, KernelSymbol] = Kernels->second;
-    if (KernelDevice == Device.getHandle()) {
+    if (KernelDevice == Device.getOLHandle()) {
       assert(KernelSymbol && "Built kernel symbol can't be null");
       return KernelSymbol;
     }
@@ -241,10 +245,12 @@ _LIBSYCL_END_NAMESPACE_SYCL
 
 extern "C" _LIBSYCL_EXPORT void
 __sycl_register_lib(sycl::detail::__sycl_tgt_bin_desc *FatbinDesc) {
-  sycl::detail::ProgramManager::getInstance().addImages(FatbinDesc);
+  sycl::detail::ProgramAndKernelManager::getInstance().registerFatBin(
+      FatbinDesc);
 }
 
 extern "C" _LIBSYCL_EXPORT void
 __sycl_unregister_lib(sycl::detail::__sycl_tgt_bin_desc *FatbinDesc) {
-  sycl::detail::ProgramManager::getInstance().removeImages(FatbinDesc);
+  sycl::detail::ProgramAndKernelManager::getInstance().unregisterFatBin(
+      FatbinDesc);
 }

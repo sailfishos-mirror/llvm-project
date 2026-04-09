@@ -5,6 +5,12 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
+///
+/// \file
+/// This file contains the declaration of the QueueImpl class, which implements
+/// sycl::queue functionality.
+///
+//===----------------------------------------------------------------------===//
 
 #ifndef _LIBSYCL_QUEUE_IMPL
 #define _LIBSYCL_QUEUE_IMPL
@@ -22,8 +28,6 @@ namespace detail {
 class ContextImpl;
 class DeviceImpl;
 class EventImpl;
-
-using EventImplPtr = std::shared_ptr<EventImpl>;
 
 class QueueImpl : public std::enable_shared_from_this<QueueImpl> {
   struct PrivateTag {
@@ -62,7 +66,7 @@ public:
   /// \return true if and only if the queue is in order.
   bool isInOrder() const { return MIsInorder; }
 
-  /// Waits for completion of all kernels submitted to this queue.
+  /// Waits for completion of all commands submitted to this queue.
   void wait();
 
 private:
