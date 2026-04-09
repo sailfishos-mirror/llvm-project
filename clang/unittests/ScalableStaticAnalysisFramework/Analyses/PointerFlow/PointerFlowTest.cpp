@@ -87,8 +87,7 @@ const NamedDecl *matchNamedDeclByFindEntityByName(const FindEntityByName &N,
           [&D](const LambdaOfVar &L) -> const NamedDecl * {
             if (const auto *VD = dyn_cast<VarDecl>(D); VD && VD->getInit()) {
               const Expr *Init = VD->getInit()->IgnoreUnlessSpelledInSource();
-              if (isa<LambdaExpr>(Init) &&
-                  VD->getNameAsString() == L.VarName)
+              if (isa<LambdaExpr>(Init) && VD->getNameAsString() == L.VarName)
                 return cast<LambdaExpr>(Init)->getCallOperator();
             }
             return nullptr;
