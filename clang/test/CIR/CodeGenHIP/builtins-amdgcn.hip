@@ -6,8 +6,8 @@
 // RUN: FileCheck --check-prefix=CIR --input-file=%t.cir %s
 
 // RUN: %clang_cc1 -triple amdgcn-amd-amdhsa -x hip -std=c++11 -fclangir \
-// RUN:            -target-cpu tahiti -fcuda-is-device -emit-llvm %s -o %t.ll
-// RUN: FileCheck --check-prefix=LLVM --input-file=%t.ll %s
+// RUN:            -target-cpu tahiti -fcuda-is-device -emit-llvm %s -o %t-cir.ll
+// RUN: FileCheck --check-prefix=LLVM --input-file=%t-cir.ll %s
 
 // RUN: %clang_cc1 -triple amdgcn-amd-amdhsa -x hip -std=c++11 \
 // RUN:            -target-cpu tahiti -fcuda-is-device -emit-llvm %s -o %t.ll
