@@ -145,11 +145,11 @@ template <> void llvm::GenericUniformityAnalysisImpl<SSAContext>::initialize() {
 
 template <>
 void llvm::GenericUniformityAnalysisImpl<SSAContext>::registerCallbacks() {
-  IRUniformValueCallbackManager *Manager =
-      new IRUniformValueCallbackManager(UniformValues);
+  std::unique_ptr<IRUniformValueCallbackManager> Manager =
+      std::make_unique<IRUniformValueCallbackManager>(UniformValues);
   for (const Value *V : UniformValues)
     Manager->registerValue(V);
-  UniformValueCallbacks.reset(Manager);
+  UniformValueCallbacks = std::move(Manager);
 }
 
 template <>
