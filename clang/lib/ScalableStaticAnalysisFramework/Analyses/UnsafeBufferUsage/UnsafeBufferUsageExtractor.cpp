@@ -24,26 +24,6 @@
 
 using namespace clang;
 using namespace ssaf;
-namespace {
-
-struct UnsafePointerMatcher {
-  std::set<const Expr *> UnsafePointers;
-
-  bool matches(const DynTypedNode &N, ASTContext &Ctx,
-               const NamedDecl *Contributor) {
-    return matchUnsafePointers(N, Ctx, UnsafePointers);
-  }
-};
-
-void findFactsInContributor(const NamedDecl *Contributor, ASTContext &Ctx,
-                            std::set<const Expr *> &UnsafePointers) {
-  UnsafePointerMatcher Matcher;
-  ContributorFactFinder<UnsafePointerMatcher> Finder(Ctx, Matcher);
-
-  Finder.findMatches(Contributor);
-  UnsafePointers.merge(Matcher.UnsafePointers);
-}
-} // namespace
 
 class clang::ssaf::UnsafeBufferUsageTUSummaryExtractor
     : public TUSummaryExtractor {
@@ -58,7 +38,9 @@ public:
     std::set<const Expr *> UnsafePointers;
     EntityPointerLevelSet Results;
 
-    findFactsInContributor(Contributor, Ctx, UnsafePointers);
+    ContributorFactFinder{[&Ctx, &UnsafePointers](const DynTypedNode &Node) {
+      return matchUnsafePointers(Node, Ctx, UnsafePointers);
+    }}.findMatches(Contributor);
     for (const Expr *Ptr : UnsafePointers) {
       Expected<EntityPointerLevelSet> Translation =
           translateEntityPointerLevel(Ptr, Ctx, [this](const EntityName &EN) {

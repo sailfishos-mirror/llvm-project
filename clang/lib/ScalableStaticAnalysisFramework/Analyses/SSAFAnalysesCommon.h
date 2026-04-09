@@ -88,31 +88,30 @@ public:
   }
 };
 
+// FIXME: move this to a .cpp file
+
 /// An AST visitor that skips the root node's strict-descendants that are
 /// callable Decls and record Decls, because those are separate contributors.
 ///
-/// The visitor calls
-/// `MatcherTy::matchFact(DynTypedNode &, ASTContext &, const NamedDecl
-/// *Contributor)` on each visited Decl or Stmt node to collect facts in the
-/// `Contributor`.
-template <typename MatcherTy>
+/// Clients need to implement their own `MatchAction`, which is a function that
+/// takes a `DynTypedNode`, decides if it matches and performs any further
+/// callback actions.
 class ContributorFactFinder : public DynamicRecursiveASTVisitor {
-  ASTContext &Ctx;
-  MatcherTy &Matcher;
-  const NamedDecl *RootDecl;
+  std::function<void(const DynTypedNode &)> MatchAction;
+  const NamedDecl *RootDecl = nullptr;
 
-  template <typename T> bool match(const T &Node) {
-    return Matcher.matches(DynTypedNode::create(Node), Ctx, RootDecl);
+  template <typename NodeTy> void match(const NodeTy &Node) {
+    MatchAction(DynTypedNode::create(Node));
   }
 
 public:
-  ContributorFactFinder(ASTContext &Ctx, MatcherTy &Matcher)
-      : Ctx(Ctx), Matcher(Matcher) {
+  ContributorFactFinder(std::function<void(const DynTypedNode &)> MatchAction)
+      : MatchAction(MatchAction) {
     ShouldVisitTemplateInstantiations = true;
     ShouldVisitImplicitCode = false;
   }
 
-  /// The entry point:
+  // The entry point:
   void findMatches(const NamedDecl *Contributor) {
     RootDecl = Contributor;
     TraverseDecl(const_cast<NamedDecl *>(Contributor));
@@ -141,7 +140,7 @@ public:
     // are currently not tracked. Each capture initializes an implicit closure
     // field from the captured variable, which constitutes a pointer assignment
     // edge that should be recorded here.
-    return true; // skip lambda as it is a callable
+    return true; // Skip lambda as it is a callable.
   }
 };
 } // namespace clang::ssaf

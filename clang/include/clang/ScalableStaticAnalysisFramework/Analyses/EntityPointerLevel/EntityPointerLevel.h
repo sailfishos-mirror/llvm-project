@@ -21,9 +21,9 @@ namespace clang::ssaf {
 /// declared type, a EntityPointerLevel is associated with a '*' (or a '[]`) in
 /// that declaration.
 ///
-/// For example, for 'int *p[10];', there are two EntityPointerLevels. One
-/// is associated with 'int *[10]' of 'p' and the other is associated with 'int
-/// *' of 'p'.
+/// For example, for 'int *p[10];', there are two EntityPointerLevels.
+/// One is associated with 'int *[10]' of 'p' and the other is associated with
+/// 'int *' of 'p'.
 ///
 /// An EntityPointerLevel can be identified by an EntityId and an unsigned
 /// integer indicating the pointer level: '(EntityId, PointerLevel)'.
@@ -33,7 +33,7 @@ namespace clang::ssaf {
 /// For the same example 'int *p[10];', the EntityPointerLevels below are valid:
 /// - '(p, 2)' is associated with the 'int *' part of the declared type of 'p';
 /// - '(p, 1)' is associated with the 'int *[10]' part of the declared type of
-/// 'p'.
+///   'p'.
 class EntityPointerLevel {
   EntityId Entity;
   unsigned PointerLevel;
@@ -42,8 +42,6 @@ class EntityPointerLevel {
   // For unittests:
   friend EntityPointerLevel buildEntityPointerLevel(EntityId, unsigned);
 
-  // EntityPointerLevel(EntityId Entity, unsigned PointerLevel)
-  //     : Entity(Entity), PointerLevel(PointerLevel) {}
   EntityPointerLevel(std::pair<EntityId, unsigned> Pair)
       : Entity(Pair.first), PointerLevel(Pair.second) {}
 
