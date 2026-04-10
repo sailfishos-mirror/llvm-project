@@ -165,8 +165,9 @@ ProgramAndKernelManager::getDeviceImage(std::string_view KernelName,
                   "No kernel named " + std::string(KernelName) + " was found");
 }
 
-ol_symbol_handle_t ProgramAndKernelManager::getOrCreateKernel(const char *KernelName,
-                                                     DeviceImpl &Device) {
+ol_symbol_handle_t
+ProgramAndKernelManager::getOrCreateKernel(const char *KernelName,
+                                           DeviceImpl &Device) {
   std::unique_lock<std::mutex> ImageGuard(MDataCollectionMutex);
 
   auto KernelIDIt = MKernelNameToID.find(KernelName);
@@ -194,7 +195,7 @@ ol_symbol_handle_t ProgramAndKernelManager::getOrCreateKernel(const char *Kernel
 
 ol_program_handle_t
 ProgramAndKernelManager::getOrCreateProgram(DeviceImpl &Device,
-                                   DeviceImageWrapper *DevImage) {
+                                            DeviceImageWrapper *DevImage) {
   if (auto DevToProgramIt = MPrograms.find(DevImage);
       DevToProgramIt != MPrograms.end()) {
     auto ProgramIt = DevToProgramIt->second.find(Device.getOLHandle());
@@ -212,10 +213,9 @@ ProgramAndKernelManager::getOrCreateProgram(DeviceImpl &Device,
   return Program;
 }
 
-ol_symbol_handle_t ProgramAndKernelManager::createKernel(ol_program_handle_t Program,
-                                                const kernel_id &KernelID,
-                                                const char *KernelName,
-                                                DeviceImpl &Device) {
+ol_symbol_handle_t ProgramAndKernelManager::createKernel(
+    ol_program_handle_t Program, const kernel_id &KernelID,
+    const char *KernelName, DeviceImpl &Device) {
   assert((getKernel(KernelID, Device) == nullptr) &&
          "Attempt to create kernel that already exists.");
   ol_symbol_handle_t Kernel{};
@@ -227,7 +227,7 @@ ol_symbol_handle_t ProgramAndKernelManager::createKernel(ol_program_handle_t Pro
 }
 
 ol_symbol_handle_t ProgramAndKernelManager::getKernel(const kernel_id &KernelID,
-                                             DeviceImpl &Device) {
+                                                      DeviceImpl &Device) {
   auto Range = MKernels.equal_range(KernelID);
   for (auto Kernels = Range.first; Kernels != Range.second; ++Kernels) {
     auto &[KernelDevice, KernelSymbol] = Kernels->second;
