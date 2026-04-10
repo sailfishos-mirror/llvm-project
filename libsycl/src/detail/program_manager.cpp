@@ -52,7 +52,7 @@ void ProgramAndKernelManager::registerFatBin(__sycl_tgt_bin_desc *FatbinDesc) {
   if (!FatbinDesc->NumDeviceBinaries)
     return;
 
-  std::lock_guard<std::mutex> Guard(MImageCollectionMutex);
+  std::lock_guard<std::mutex> Guard(MDataCollectionMutex);
   for (uint16_t I = 0; I < FatbinDesc->NumDeviceBinaries; ++I) {
     const auto &RawDeviceImage = FatbinDesc->DeviceImages[I];
     if (!checkDeviceImageValidity(RawDeviceImage))
@@ -96,7 +96,7 @@ void ProgramAndKernelManager::unregisterFatBin(
   if (!checkFatBinVersion(*FatbinDesc) || FatbinDesc->NumDeviceBinaries == 0)
     return;
 
-  std::scoped_lock Guard{MImageCollectionMutex, MKernelCollectionsMutex};
+  std::lock_guard<std::mutex> Guard(MDataCollectionMutex);
   for (uint16_t I = 0; I < FatbinDesc->NumDeviceBinaries; ++I) {
     const auto &RawDeviceImage = FatbinDesc->DeviceImages[I];
 
@@ -144,7 +144,7 @@ DeviceImageWrapper *
 ProgramAndKernelManager::getDeviceImage(std::string_view KernelName,
                                         const kernel_id &KernelID,
                                         DeviceImpl &Device) {
-  std::lock_guard<std::mutex> Guard(MImageCollectionMutex);
+  std::lock_guard<std::mutex> Guard(MDataCollectionMutex);
   auto [Begin, End] = MKernelIDToDevImageJIT.equal_range(KernelID);
   if (Begin != End) {
     bool IsValid{};
@@ -167,7 +167,7 @@ ProgramAndKernelManager::getDeviceImage(std::string_view KernelName,
 
 ol_symbol_handle_t ProgramAndKernelManager::getOrCreateKernel(const char *KernelName,
                                                      DeviceImpl &Device) {
-  std::unique_lock<std::mutex> ImageGuard(MImageCollectionMutex);
+  std::unique_lock<std::mutex> ImageGuard(MDataCollectionMutex);
 
   auto KernelIDIt = MKernelNameToID.find(KernelName);
   if (KernelIDIt == MKernelNameToID.end())
@@ -175,7 +175,7 @@ ol_symbol_handle_t ProgramAndKernelManager::getOrCreateKernel(const char *Kernel
                     "No kernel named " + std::string(KernelName) +
                         " was found");
 
-  std::lock_guard<std::mutex> KernelGuard(MKernelCollectionsMutex);
+  std::lock_guard<std::mutex> KernelGuard(MDataCollectionMutex);
 
   auto Kernel = getKernel(KernelIDIt->second, Device);
   if (Kernel)
@@ -184,10 +184,9 @@ ol_symbol_handle_t ProgramAndKernelManager::getOrCreateKernel(const char *Kernel
   DeviceImageWrapper *DevImage =
       getDeviceImage(KernelName, KernelIDIt->second, Device);
 
-  ImageGuard.unlock();
-
   ol_program_handle_t Program = getOrCreateProgram(Device, DevImage);
   assert(Program);
+
   Kernel = createKernel(Program, KernelIDIt->second, KernelName, Device);
   assert(Kernel);
   return Kernel;

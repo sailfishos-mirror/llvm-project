@@ -118,6 +118,7 @@ private:
 
   /// Searches for a device image that contains the requested kernel and is
   /// compatible with the requested device.
+  /// This call must be protected with MDataCollectionMutex.
   /// \param KernelName a null-terminated string representing the name of the
   /// kernel to obtain a device image for.
   /// \param KernelID a kernel id matching KernelName.
@@ -129,8 +130,8 @@ private:
                                      DeviceImpl &Device);
 
   /// Searches for or creates a program.
-  /// This call must be protected with mutex since it updates MPrograms and
-  /// MProgramWrappers collections.
+  /// This call must be protected with MDataCollectionMutex since it updates
+  /// MPrograms and MProgramWrappers collections.
   /// \param Device a device that program must be created with.
   /// \param DevImage a device image to get or create program with.
   /// \return liboffload program for the requested configuration.
@@ -138,8 +139,8 @@ private:
                                          DeviceImageWrapper *DevImage);
 
   /// Creates kernel from program.
-  /// This call must be protected with mutex since it updates MKernels
-  /// collection.
+  /// This call must be protected with MDataCollectionMutex since it updates
+  /// MKernels collection.
   /// \param Program a program to create kernel with.
   /// \param KernelID an id of kernel to create.
   /// \param KernelName a null-terminated string representing the name of kernel
@@ -151,7 +152,8 @@ private:
                                   const char *KernelName, DeviceImpl &Device);
 
   /// Searches for kernel.
-  /// This call must be protected with mutex since it reads MKernels collection.
+  /// This call must be protected with MDataCollectionMutex since it reads
+  /// MKernels collection.
   /// \param KernelID an id of kernel to look for.
   /// \param Device a device that kernel must be created with.
   /// \return liboffload kernel for the requested configuration or nullptr if
@@ -166,10 +168,7 @@ private:
                      std::unique_ptr<DeviceImageWrapper>>
       MDeviceImageWrappers;
 
-  // All data collections, created from data in __sycl_register_lib, must be
-  // protected with this mutex. Protects data that can be modified only by
-  // modules load/unload.
-  std::mutex MImageCollectionMutex;
+  std::mutex MDataCollectionMutex;
 
   // Filled by getOrCreateKernel and everything it calls inside.
   std::unordered_map<
@@ -183,9 +182,6 @@ private:
   // Controls lifetime of programs.
   std::unordered_map<ol_program_handle_t, std::unique_ptr<ProgramWrapper>>
       MProgramWrappers;
-  // All data collections, used and modified by kernel submissions, must be
-  // protected with this mutex.
-  std::mutex MKernelCollectionsMutex;
 };
 
 } // namespace detail
