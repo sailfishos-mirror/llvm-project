@@ -38,6 +38,7 @@ static llvm::Error makeCreateEntityNameError(const NamedDecl *FailedDecl,
       FailedDecl->getNameAsString().c_str(), LocStr.c_str());
 }
 
+namespace clang::ssaf {
 // Translate a pointer type expression 'E' to a (set of) EntityPointerLevel(s)
 // associated with the declared type of the base address of `E`. If the base
 // address of `E` is not associated with an entity, the translation result is an
@@ -57,7 +58,7 @@ static llvm::Error makeCreateEntityNameError(const NamedDecl *FailedDecl,
 //   Translate(arr[5])             -> {(arr, 2)}
 //   Translate(cond ? p1[5] : p2)  -> {(p1, 2), (p2, 1)}
 //   Translate(&arr[5])            -> {(arr, 1)}
-class ssaf::EntityPointerLevelTranslator
+class EntityPointerLevelTranslator
     : ConstStmtVisitor<EntityPointerLevelTranslator,
                        Expected<EntityPointerLevelSet>> {
   friend class StmtVisitorBase;
@@ -229,6 +230,7 @@ private:
     return Visit(S->getSourceExpr());
   }
 };
+} // namespace clang::ssaf
 
 Expected<EntityPointerLevelSet> clang::ssaf::translateEntityPointerLevel(
     const Expr *E, ASTContext &Ctx,
