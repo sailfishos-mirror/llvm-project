@@ -378,9 +378,15 @@ static LogicalResult checkImplementationStatus(Operation &op) {
       result = todo("num_teams with multi-dimensional values");
   };
   auto checkNumThreads = [&todo](auto op, LogicalResult &result) {
-    // Check that we don't exceed the maximum supported dimensions (3)
-    if (op.getNumThreadsDimsCount() > 3)
+    if (op.getNumThreadsDimsCount() > 3) {
       result = todo("num_threads with more than 3 dimensions");
+      return;
+    }
+
+    if (op.hasNumThreadsMultiDim() &&
+        !op->template getParentOfType<omp::TargetOp>())
+      result = todo(
+          "num_threads with multi-dimensional values outside target region");
   };
 
   auto checkThreadLimit = [&todo](auto op, LogicalResult &result) {
@@ -6538,8 +6544,9 @@ static void extractHostEvalClauses(
                   break;
                 }
               }
-            } else
+            } else {
               llvm_unreachable("unsupported host_eval use");
+            }
           })
           .Case([&](omp::LoopNestOp loopOp) {
             auto processBounds =
