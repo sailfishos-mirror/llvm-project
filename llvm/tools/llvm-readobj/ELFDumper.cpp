@@ -4898,12 +4898,12 @@ template <class ELFT> void GNUELFDumper<ELFT>::printProgramHeaders() {
                      48 + Bias, 56 + Bias, 64 + Bias, 68 + Bias};
   uint32_t PhNum = 0;
   Expected<uint32_t> PhNumOrErr = this->Obj.getPhNum();
-  // Defer error reporting to program_headers() so that we can prevent some
-  // duplications.
+
+  // The caller already performs this check, so failure is impossible.
   if (PhNumOrErr)
     PhNum = *PhNumOrErr;
   else
-    llvm::consumeError(PhNumOrErr.takeError());
+    cantFail(PhNumOrErr.takeError());
 
   OS << "\nElf file type is "
      << enumToString(Header.e_type, ArrayRef(ElfObjectFileType)) << "\n"
