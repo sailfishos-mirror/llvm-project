@@ -6768,7 +6768,7 @@ bool CombinerHelper::matchCombineFSubFpExtFMulToFMadOrFMA(
   Register LHSReg = MI.getOperand(1).getReg();
   Register RHSReg = MI.getOperand(2).getReg();
   LLT DstTy = MRI.getType(MI.getOperand(0).getReg());
-  const auto &TLI = *MI.getMF()->getSubtarget().getTargetLowering();
+  const TargetLowering &TLI = getTargetLowering();
 
   unsigned PreferredFusedOpcode =
       HasFMAD ? TargetOpcode::G_FMAD : TargetOpcode::G_FMA;

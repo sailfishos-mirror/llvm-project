@@ -1354,7 +1354,7 @@ define { float, float } @mul_fsub_and_fneg_fsub_contractable(float %a, float %b,
 ; fpext(%mul) has two users: both fadd.
 ; Should contract -- both uses are contractable fadds.
 ; Expected: fma_mix (or fma after cvt) for both adds, no v_mul_f16.
-define float @fpext_contractable(float %x, float %y, half %u, half %v, float %z) #0 {
+define float @fpext_contractable(float %x, float %y, half %u, half %v, float %z) {
 ; P0-GFX9-SDAG-LABEL: fpext_contractable:
 ; P0-GFX9-SDAG:       ; %bb.0: ; %entry
 ; P0-GFX9-SDAG-NEXT:    s_waitcnt vmcnt(0) expcnt(0) lgkmcnt(0)
@@ -1457,7 +1457,7 @@ entry:
 ; fpext(%mul) has two users: fadd (contractable) and direct return (non-contractable).
 ; Should NOT contract -- one user (direct return) is not contractable.
 ; Expected: v_mul_f16 + v_cvt_f32_f16, no fma_mix fold.
-define { float, float } @fpext_noncontractable(float %x, float %y, half %u, half %v, float %z) #0 {
+define { float, float } @fpext_noncontractable(float %x, float %y, half %u, half %v, float %z) {
 ; P0-GFX9-SDAG-LABEL: fpext_noncontractable:
 ; P0-GFX9-SDAG:       ; %bb.0: ; %entry
 ; P0-GFX9-SDAG-NEXT:    s_waitcnt vmcnt(0) expcnt(0) lgkmcnt(0)
@@ -1559,7 +1559,7 @@ entry:
 ; fmul has two users: fpext (feeding fadd) and direct return (non-contractable).
 ; Should NOT contract -- one user (direct return of half mul) is not contractable.
 ; Expected: v_mul_f16 + v_cvt_f32_f16, no fma_mix fold.
-define { float, half } @fpext_noncontractable_2(float %x, float %y, half %u, half %v, float %z) #0 {
+define { float, half } @fpext_noncontractable_2(float %x, float %y, half %u, half %v, float %z) {
 ; P0-GFX9-SDAG-LABEL: fpext_noncontractable_2:
 ; P0-GFX9-SDAG:       ; %bb.0: ; %entry
 ; P0-GFX9-SDAG-NEXT:    s_waitcnt vmcnt(0) expcnt(0) lgkmcnt(0)
@@ -1651,7 +1651,7 @@ entry:
 ; fpext(%mul) has one user: fadd.
 ; Should contract -- single use, trivially contractable.
 ; Expected: fma_mix (or fma after cvt), no v_mul_f16.
-define float @fpext_contractable_2(float %x, float %y, half %u, half %v, float %z) #0 {
+define float @fpext_contractable_2(float %x, float %y, half %u, half %v, float %z) {
 ; P0-GFX9-SDAG-LABEL: fpext_contractable_2:
 ; P0-GFX9-SDAG:       ; %bb.0: ; %entry
 ; P0-GFX9-SDAG-NEXT:    s_waitcnt vmcnt(0) expcnt(0) lgkmcnt(0)
@@ -1737,7 +1737,7 @@ entry:
 ; fpext(%mul) has two users: both fadd.
 ; Should contract -- both uses are contractable fadds.
 ; Expected: fma_mix (or fma after cvt) for both adds, no v_mul_f16.
-define {float, float} @fpext_contractable_3(float %x, float %y, half %u, half %v, float %z) #0 {
+define {float, float} @fpext_contractable_3(float %x, float %y, half %u, half %v, float %z) {
 ; P0-GFX9-SDAG-LABEL: fpext_contractable_3:
 ; P0-GFX9-SDAG:       ; %bb.0: ; %entry
 ; P0-GFX9-SDAG-NEXT:    s_waitcnt vmcnt(0) expcnt(0) lgkmcnt(0)
@@ -1848,7 +1848,7 @@ entry:
 ; fpext(%mul) has two users: both fsub.
 ; Should contract -- both uses are contractable fsubs.
 ; Expected: fma_mix (or fma after cvt) for both subs, no v_mul_f16.
-define float @fpext_contractable_sub(float %x, float %y, half %u, half %v, float %z) #0 {
+define float @fpext_contractable_sub(float %x, float %y, half %u, half %v, float %z) {
 ; P0-GFX9-SDAG-LABEL: fpext_contractable_sub:
 ; P0-GFX9-SDAG:       ; %bb.0: ; %entry
 ; P0-GFX9-SDAG-NEXT:    s_waitcnt vmcnt(0) expcnt(0) lgkmcnt(0)
@@ -1949,7 +1949,7 @@ entry:
 ; fpext(%mul) has two users: fsub (contractable) and direct return (non-contractable).
 ; Should NOT contract -- one user (direct return) is not contractable.
 ; Expected: v_mul_f16 + v_cvt_f32_f16, no fma_mix fold.
-define { float, float } @fpext_noncontractable_sub(float %x, float %y, half %u, half %v, float %z) #0 {
+define { float, float } @fpext_noncontractable_sub(float %x, float %y, half %u, half %v, float %z) {
 ; P0-GFX9-SDAG-LABEL: fpext_noncontractable_sub:
 ; P0-GFX9-SDAG:       ; %bb.0: ; %entry
 ; P0-GFX9-SDAG-NEXT:    s_waitcnt vmcnt(0) expcnt(0) lgkmcnt(0)
@@ -2051,7 +2051,7 @@ entry:
 ; fmul has two users: fpext (feeding fsub) and direct return (non-contractable).
 ; Should NOT contract -- one user (direct return of half mul) is not contractable.
 ; Expected: v_mul_f16 + v_cvt_f32_f16, no fma_mix fold.
-define { float, half } @fpext_noncontractable_sub_2(float %x, float %y, half %u, half %v, float %z) #0 {
+define { float, half } @fpext_noncontractable_sub_2(float %x, float %y, half %u, half %v, float %z) {
 ; P0-GFX9-SDAG-LABEL: fpext_noncontractable_sub_2:
 ; P0-GFX9-SDAG:       ; %bb.0: ; %entry
 ; P0-GFX9-SDAG-NEXT:    s_waitcnt vmcnt(0) expcnt(0) lgkmcnt(0)
@@ -2143,7 +2143,7 @@ entry:
 ; fpext(%mul) has one user: fsub.
 ; Should contract -- single use, trivially contractable.
 ; Expected: fma_mix (or fma after cvt), no v_mul_f16.
-define float @fpext_contractable_sub_2(float %x, float %y, half %u, half %v, float %z) #0 {
+define float @fpext_contractable_sub_2(float %x, float %y, half %u, half %v, float %z) {
 ; P0-GFX9-SDAG-LABEL: fpext_contractable_sub_2:
 ; P0-GFX9-SDAG:       ; %bb.0: ; %entry
 ; P0-GFX9-SDAG-NEXT:    s_waitcnt vmcnt(0) expcnt(0) lgkmcnt(0)
@@ -2229,7 +2229,7 @@ entry:
 ; fpext(%mul) has two users: both fsub.
 ; Should contract -- both uses are contractable fsubs.
 ; Expected: fma_mix (or fma after cvt) for both subs, no v_mul_f16.
-define {float, float} @fpext_contractable_sub_3(float %x, float %y, half %u, half %v, float %z) #0 {
+define {float, float} @fpext_contractable_sub_3(float %x, float %y, half %u, half %v, float %z) {
 ; P0-GFX9-SDAG-LABEL: fpext_contractable_sub_3:
 ; P0-GFX9-SDAG:       ; %bb.0: ; %entry
 ; P0-GFX9-SDAG-NEXT:    s_waitcnt vmcnt(0) expcnt(0) lgkmcnt(0)
@@ -2340,7 +2340,7 @@ entry:
 ; fmul has two users: fpext (feeding fadd) and fneg (feeding fpext -> fsub).
 ; Should contract -- all paths are contractable.
 ; Expected: fma_mix (or fma after cvt) for both paths, no v_mul_f16.
-define {float, float} @fpext_fneg_fpext_fsub_contractable(float %x, float %y, half %u, half %v, float %z) #0 {
+define {float, float} @fpext_fneg_fpext_fsub_contractable(float %x, float %y, half %u, half %v, float %z) {
 ; P0-GFX9-SDAG-LABEL: fpext_fneg_fpext_fsub_contractable:
 ; P0-GFX9-SDAG:       ; %bb.0: ; %entry
 ; P0-GFX9-SDAG-NEXT:    s_waitcnt vmcnt(0) expcnt(0) lgkmcnt(0)
@@ -2457,7 +2457,7 @@ entry:
 ; fmul has two users: fneg (feeding fpext -> fsub) and direct return (non-contractable).
 ; Should NOT contract -- one user (direct return of half mul) is not contractable.
 ; Expected: v_mul_f16, no fma_mix fold.
-define {float, half} @fpext_fneg_fpext_fsub_noncontractable(float %x, float %y, half %u, half %v, float %z) #0 {
+define {float, half} @fpext_fneg_fpext_fsub_noncontractable(float %x, float %y, half %u, half %v, float %z) {
 ; P0-GFX9-SDAG-LABEL: fpext_fneg_fpext_fsub_noncontractable:
 ; P0-GFX9-SDAG:       ; %bb.0: ; %entry
 ; P0-GFX9-SDAG-NEXT:    s_waitcnt vmcnt(0) expcnt(0) lgkmcnt(0)
@@ -2556,7 +2556,7 @@ entry:
 ; fpext(%mul) has two users: fadd (contractable) and fneg (feeding fsub, contractable).
 ; Should contract -- all paths are contractable.
 ; Expected: fma_mix (or fma after cvt) for both paths, no v_mul_f16.
-define {float, float} @fpext_fneg_fsub_contractable(float %x, float %y, half %u, half %v, float %z) #0 {
+define {float, float} @fpext_fneg_fsub_contractable(float %x, float %y, half %u, half %v, float %z) {
 ; P0-GFX9-SDAG-LABEL: fpext_fneg_fsub_contractable:
 ; P0-GFX9-SDAG:       ; %bb.0: ; %entry
 ; P0-GFX9-SDAG-NEXT:    s_waitcnt vmcnt(0) expcnt(0) lgkmcnt(0)
@@ -2670,7 +2670,7 @@ entry:
 ; fpext(%mul) has two users: fneg (feeding fsub) and direct return (non-contractable).
 ; Should NOT contract -- one user (direct return) is not contractable.
 ; Expected: v_mul_f16 + v_cvt_f32_f16, no fma_mix fold.
-define {float, float} @fpext_fneg_fsub_noncontractable(float %x, float %y, half %u, half %v, float %z) #0 {
+define {float, float} @fpext_fneg_fsub_noncontractable(float %x, float %y, half %u, half %v, float %z) {
 ; P0-GFX9-SDAG-LABEL: fpext_fneg_fsub_noncontractable:
 ; P0-GFX9-SDAG:       ; %bb.0: ; %entry
 ; P0-GFX9-SDAG-NEXT:    s_waitcnt vmcnt(0) expcnt(0) lgkmcnt(0)
@@ -2784,7 +2784,7 @@ entry:
 ; fpext(%mul) has two users: fma (feeding fadd) and fadd.
 ; Should contract -- both paths are contractable (fpext folds aggressively).
 ; Expected: fma_mix (or fma after cvt) for both paths, no v_mul_f16.
-define {float, float} @fma_chain_fpext_contractable(float %x, float %y, half %u, half %v, float %z, float %w) #0 {
+define {float, float} @fma_chain_fpext_contractable(float %x, float %y, half %u, half %v, float %z, float %w) {
 ; P0-GFX9-SDAG-LABEL: fma_chain_fpext_contractable:
 ; P0-GFX9-SDAG:       ; %bb.0: ; %entry
 ; P0-GFX9-SDAG-NEXT:    s_waitcnt vmcnt(0) expcnt(0) lgkmcnt(0)
@@ -2903,7 +2903,7 @@ entry:
 ; fmul has two users: fma (feeding fpext -> fadd) and fadd.
 ; Should contract -- both paths are contractable (fpext on fma result is foldable).
 ; Expected: fma_mix or fma chain, no standalone v_mul_f16.
-define {float, float} @fma_chain_fpext_outer_contractable(half %x, half %y, half %u, half %v, float %z, half %w) #0 {
+define {float, float} @fma_chain_fpext_outer_contractable(half %x, half %y, half %u, half %v, float %z, half %w) {
 ; P0-GFX9-SDAG-LABEL: fma_chain_fpext_outer_contractable:
 ; P0-GFX9-SDAG:       ; %bb.0: ; %entry
 ; P0-GFX9-SDAG-NEXT:    s_waitcnt vmcnt(0) expcnt(0) lgkmcnt(0)
@@ -3034,7 +3034,7 @@ entry:
 ; fpext(%mul) has three users: fma (feeding fadd), fadd, and direct return (non-contractable).
 ; Should NOT contract -- one user (direct return) is not contractable.
 ; Expected: v_mul_f16 + v_cvt_f32_f16, no fma_mix fold for the multiply.
-define {float, float, float} @fma_chain_fpext_noncontractable(float %x, float %y, half %u, half %v, float %z, float %w) #0 {
+define {float, float, float} @fma_chain_fpext_noncontractable(float %x, float %y, half %u, half %v, float %z, float %w) {
 ; P0-GFX9-SDAG-LABEL: fma_chain_fpext_noncontractable:
 ; P0-GFX9-SDAG:       ; %bb.0: ; %entry
 ; P0-GFX9-SDAG-NEXT:    s_waitcnt vmcnt(0) expcnt(0) lgkmcnt(0)
@@ -3169,7 +3169,7 @@ entry:
 ; fpext(%mul) has two users: fma (feeding fsub) and fsub.
 ; Should contract -- both paths are contractable (fpext folds aggressively).
 ; Expected: fma_mix (or fma after cvt) for both paths, no v_mul_f16.
-define {float, float} @fma_chain_fpext_fsub_contractable(float %x, float %y, half %u, half %v, float %z, float %w) #0 {
+define {float, float} @fma_chain_fpext_fsub_contractable(float %x, float %y, half %u, half %v, float %z, float %w) {
 ; P0-GFX9-SDAG-LABEL: fma_chain_fpext_fsub_contractable:
 ; P0-GFX9-SDAG:       ; %bb.0: ; %entry
 ; P0-GFX9-SDAG-NEXT:    s_waitcnt vmcnt(0) expcnt(0) lgkmcnt(0)
@@ -3287,7 +3287,7 @@ entry:
 ; Should NOT contract -- the fma user's consumer (fadd) lacks reassoc, so chain
 ;   reassociation can't fire to eliminate the multiply.
 ; Expected: v_mul + v_fma + v_add + v_add (no contraction, mul shared by both paths).
-define {float, float} @fma_chain_fadd_no_reassoc(float %a, float %b, float %c, float %d, float %e, float %f) #0 {
+define {float, float} @fma_chain_fadd_no_reassoc(float %a, float %b, float %c, float %d, float %e, float %f) {
 ; P0-GFX9-SDAG-F32FLUSH-LABEL: fma_chain_fadd_no_reassoc:
 ; P0-GFX9-SDAG-F32FLUSH:       ; %bb.0: ; %entry
 ; P0-GFX9-SDAG-F32FLUSH-NEXT:    s_waitcnt vmcnt(0) expcnt(0) lgkmcnt(0)
@@ -3376,7 +3376,7 @@ entry:
 ; fmul has three users: fma (feeding fadd), fadd, and direct return (non-contractable).
 ; Should NOT contract -- one user (direct return) is not contractable.
 ; Expected: v_mul shared by all paths, no fma contraction of the multiply.
-define {float, float, float} @fma_direct_use_noncontractable(float %a, float %b, float %c, float %d, float %e, float %f) #0 {
+define {float, float, float} @fma_direct_use_noncontractable(float %a, float %b, float %c, float %d, float %e, float %f) {
 ; P0-GFX9-SDAG-F32FLUSH-LABEL: fma_direct_use_noncontractable:
 ; P0-GFX9-SDAG-F32FLUSH:       ; %bb.0: ; %entry
 ; P0-GFX9-SDAG-F32FLUSH-NEXT:    s_waitcnt vmcnt(0) expcnt(0) lgkmcnt(0)
@@ -3474,7 +3474,7 @@ entry:
 ;   fma chain that eliminates the multiply. GISEL does not perform this transform
 ;   and retains v_mul.
 ; Expected: SDAG: fma/mad chain (no v_mul). GISEL: v_mul + v_fma + v_sub + fma.
-define {float, float} @fma_chain_fsub_contractable(float %a, float %b, float %c, float %d, float %e, float %f) #0 {
+define {float, float} @fma_chain_fsub_contractable(float %a, float %b, float %c, float %d, float %e, float %f) {
 ; P0-GFX9-SDAG-F32FLUSH-LABEL: fma_chain_fsub_contractable:
 ; P0-GFX9-SDAG-F32FLUSH:       ; %bb.0: ; %entry
 ; P0-GFX9-SDAG-F32FLUSH-NEXT:    s_waitcnt vmcnt(0) expcnt(0) lgkmcnt(0)
@@ -3559,7 +3559,7 @@ entry:
 ; fmul has three users: fma (feeding fsub), fadd, and direct return (non-contractable).
 ; Should NOT contract -- one user (direct return) is not contractable.
 ; Expected: v_mul shared by all paths, no fma contraction of the multiply.
-define {float, float, float} @fma_chain_fsub_noncontractable(float %a, float %b, float %c, float %d, float %e, float %f) #0 {
+define {float, float, float} @fma_chain_fsub_noncontractable(float %a, float %b, float %c, float %d, float %e, float %f) {
 ; P0-GFX9-SDAG-F32FLUSH-LABEL: fma_chain_fsub_noncontractable:
 ; P0-GFX9-SDAG-F32FLUSH:       ; %bb.0: ; %entry
 ; P0-GFX9-SDAG-F32FLUSH-NEXT:    s_waitcnt vmcnt(0) expcnt(0) lgkmcnt(0)
@@ -3658,7 +3658,7 @@ entry:
 ;   the multiply. On GFX9-F32FLUSH, fma is not used (mad instead), so chain
 ;   reassociation does not fire and the multiply remains.
 ; Expected: fma chain (no v_mul) on denorm-capable targets; v_mul remains on gfx9-flush.
-define {float, float} @fma_chain_fadd_reassoc(float %a, float %b, float %c, float %d, float %e, float %f) #0 {
+define {float, float} @fma_chain_fadd_reassoc(float %a, float %b, float %c, float %d, float %e, float %f) {
 ; P0-GFX9-SDAG-F32FLUSH-LABEL: fma_chain_fadd_reassoc:
 ; P0-GFX9-SDAG-F32FLUSH:       ; %bb.0: ; %entry
 ; P0-GFX9-SDAG-F32FLUSH-NEXT:    s_waitcnt vmcnt(0) expcnt(0) lgkmcnt(0)
@@ -3742,5 +3742,3 @@ entry:
 
 declare float @llvm.fma.f32(float, float, float)
 declare half @llvm.fma.f16(half, half, half)
-
-attributes #0 = { nounwind "denormal-fp-math-f32"="preserve-sign,preserve-sign" }
