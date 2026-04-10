@@ -81,7 +81,9 @@ parseCachePruningPolicy(StringRef PolicyStr);
 /// As a safeguard against data loss if the user specifies the wrong directory
 /// as their cache directory, this function will ignore files not matching the
 /// pattern "llvmcache-*".
-LLVM_ABI bool
+///
+/// On failure, it returns an Error.
+LLVM_ABI Expected<bool>
 pruneCache(StringRef Path, CachePruningPolicy Policy,
            const std::vector<std::unique_ptr<MemoryBuffer>> &Files = {});
 } // namespace llvm

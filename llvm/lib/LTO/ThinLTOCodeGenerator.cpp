@@ -1210,7 +1210,11 @@ void ThinLTOCodeGenerator::run() {
     }
   }
 
-  pruneCache(CacheOptions.Path, CacheOptions.Policy, ProducedBinaries);
+  auto ErrOrPruned = pruneCache(CacheOptions.Path, CacheOptions.Policy, ProducedBinaries));
+  if (!ErrOrPruned) {
+    errs() << "Error: " << toString(ErrOrPruned.takeError()) << "\n";
+    report_fatal_error("ThinLTO: failure to prune cache");
+  }
 
   // If statistics were requested, print them out now.
   if (llvm::AreStatisticsEnabled())
