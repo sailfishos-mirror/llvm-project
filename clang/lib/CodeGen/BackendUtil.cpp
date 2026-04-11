@@ -1310,7 +1310,10 @@ void EmitAssemblyHelper::RunCodegenPipelineNewPM(
   CGPassBuilderOption Opt = getCGPassBuilderOption();
   MachineModuleInfo MMI(TM.get());
   PassInstrumentationCallbacks PIC;
-  PassBuilder PB(TM.get(), PipelineTuningOptions(), std::nullopt, &PIC);
+  PipelineTuningOptions PTOptions;
+  TargetMachine *TMPointer = TM.get();
+  PassBuilder PB(TMPointer, PTOptions, std::nullopt, &PIC,
+                 CI.getVirtualFileSystemPtr());
   PB.registerModuleAnalyses(MAM);
   PB.registerCGSCCAnalyses(CGAM);
   PB.registerFunctionAnalyses(FAM);
