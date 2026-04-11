@@ -190,13 +190,14 @@ cloneInfo(const doc::Info &Src, llvm::BumpPtrAllocator &Arena) {
     return allocatePtr<FunctionInfo>(
         Arena, static_cast<const FunctionInfo &>(Src), Arena);
   case InfoType::IT_typedef:
-    return allocatePtr<TypedefInfo>(Arena, static_cast<const TypedefInfo &>(Src),
-                                    Arena);
+    return allocatePtr<TypedefInfo>(
+        Arena, static_cast<const TypedefInfo &>(Src), Arena);
   case InfoType::IT_concept:
-    return allocatePtr<ConceptInfo>(Arena, static_cast<const ConceptInfo &>(Src),
-                                    Arena);
+    return allocatePtr<ConceptInfo>(
+        Arena, static_cast<const ConceptInfo &>(Src), Arena);
   case InfoType::IT_variable:
-    return allocatePtr<VarInfo>(Arena, static_cast<const VarInfo &>(Src), Arena);
+    return allocatePtr<VarInfo>(Arena, static_cast<const VarInfo &>(Src),
+                                Arena);
   case InfoType::IT_friend:
     return allocatePtr<FriendInfo>(Arena, static_cast<const FriendInfo &>(Src),
                                    Arena);
@@ -493,7 +494,8 @@ SymbolInfo::SymbolInfo(const SymbolInfo &Other, llvm::BumpPtrAllocator &Arena)
   }
 }
 
-NamespaceInfo::NamespaceInfo(const NamespaceInfo &Other, llvm::BumpPtrAllocator &Arena)
+NamespaceInfo::NamespaceInfo(const NamespaceInfo &Other,
+                             llvm::BumpPtrAllocator &Arena)
     : Info(Other, Arena) {
   for (const auto &N : Other.Children.Namespaces)
     Children.Namespaces.push_back(*allocatePtr<Reference>(Arena, N));
@@ -514,17 +516,21 @@ NamespaceInfo::NamespaceInfo(const NamespaceInfo &Other, llvm::BumpPtrAllocator 
 VarInfo::VarInfo(const VarInfo &Other, llvm::BumpPtrAllocator &Arena)
     : SymbolInfo(Other, Arena), Type(Other.Type) {}
 
-FunctionInfo::FunctionInfo(const FunctionInfo &Other, llvm::BumpPtrAllocator &Arena)
-    : SymbolInfo(Other, Arena), Parent(Other.Parent), ReturnType(Other.ReturnType),
-      Access(Other.Access), IsMethod(Other.IsMethod) {
+FunctionInfo::FunctionInfo(const FunctionInfo &Other,
+                           llvm::BumpPtrAllocator &Arena)
+    : SymbolInfo(Other, Arena), Parent(Other.Parent),
+      ReturnType(Other.ReturnType), Access(Other.Access),
+      IsMethod(Other.IsMethod) {
   Prototype = internString(Other.Prototype);
   Params = allocateArray(Other.Params, Arena);
   if (Other.Template)
     Template = TemplateInfo(*Other.Template, Arena);
 }
 
-TypedefInfo::TypedefInfo(const TypedefInfo &Other, llvm::BumpPtrAllocator &Arena)
-    : SymbolInfo(Other, Arena), Underlying(Other.Underlying), IsUsing(Other.IsUsing) {
+TypedefInfo::TypedefInfo(const TypedefInfo &Other,
+                         llvm::BumpPtrAllocator &Arena)
+    : SymbolInfo(Other, Arena), Underlying(Other.Underlying),
+      IsUsing(Other.IsUsing) {
   TypeDeclaration = internString(Other.TypeDeclaration);
   if (Other.Template)
     Template = TemplateInfo(*Other.Template, Arena);
@@ -536,8 +542,10 @@ EnumInfo::EnumInfo(const EnumInfo &Other, llvm::BumpPtrAllocator &Arena)
   Members = deepCopyArray(Other.Members, Arena);
 }
 
-ConceptInfo::ConceptInfo(const ConceptInfo &Other, llvm::BumpPtrAllocator &Arena)
-    : SymbolInfo(Other, Arena), IsType(Other.IsType), Template(Other.Template, Arena) {
+ConceptInfo::ConceptInfo(const ConceptInfo &Other,
+                         llvm::BumpPtrAllocator &Arena)
+    : SymbolInfo(Other, Arena), IsType(Other.IsType),
+      Template(Other.Template, Arena) {
   ConstraintExpression = internString(Other.ConstraintExpression);
 }
 
