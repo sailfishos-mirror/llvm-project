@@ -365,9 +365,11 @@ PerfReaderBase::create(ProfiledBinary *Binary, PerfInputFile &PerfInput,
 
   PerfInput.Content =
       PerfScriptReader::checkPerfScriptType(PerfInput.InputFile);
-  if (PerfInput.Content == PerfContent::LBRStack) {
-    PerfReader.reset(
-        new HybridPerfReader(Binary, PerfInput.InputFile, PIDFilter));
+  if (PerfInput.Content == PerfContent::LBRStack ||
+      PerfInput.Content == PerfContent::AggLBRStack) {
+    auto *Reader = new HybridPerfReader(Binary, PerfInput.InputFile, PIDFilter);
+    Reader->setIsPreAggregated(PerfInput.Content == PerfContent::AggLBRStack);
+    PerfReader.reset(Reader);
   } else if (PerfInput.Content == PerfContent::LBR) {
     PerfReader.reset(new LBRPerfReader(Binary, PerfInput.InputFile, PIDFilter));
   } else {
@@ -654,6 +656,13 @@ void HybridPerfReader::unwindSamples() {
                      "frame to match.");
 }
 
+/// Parse a hex address from \p Str.
+static bool parseAddress(StringRef Str, uint64_t &Addr, bool HasPrefix = false) {
+  if (Str.consume_front("0x") != HasPrefix)
+    return false;
+  return Str.getAsInteger(16, Addr);
+}
+
 bool PerfScriptReader::extractLBRStack(TraceStream &TraceIt,
                                        SmallVectorImpl<LBREntry> &LBRStack) {
   // The raw format of LBR stack is like:
@@ -672,7 +681,7 @@ bool PerfScriptReader::extractLBRStack(TraceStream &TraceIt,
   size_t Index = 0;
   uint64_t LeadingAddr;
   if (!Records.empty() && !Records[0].contains('/')) {
-    if (Records[0].getAsInteger(16, LeadingAddr)) {
+    if (parseAddress(Records[0], LeadingAddr)) {
       WarnInvalidLBR(TraceIt);
       TraceIt.advance();
       return false;
@@ -694,8 +703,8 @@ bool PerfScriptReader::extractLBRStack(TraceStream &TraceIt,
     uint64_t Dst;
 
     // Stop at broken LBR records.
-    if (Addresses.size() < 2 || Addresses[0].substr(2).getAsInteger(16, Src) ||
-        Addresses[1].substr(2).getAsInteger(16, Dst)) {
+    if (Addresses.size() < 2 || parseAddress(Addresses[0], Src, true) ||
+        parseAddress(Addresses[1], Dst, true)) {
       WarnInvalidLBR(TraceIt);
       break;
     }
@@ -731,7 +740,7 @@ bool PerfScriptReader::extractCallstack(TraceStream &TraceIt,
   while (!TraceIt.isAtEoF() && !TraceIt.getCurrentLine().starts_with(" 0x")) {
     StringRef FrameStr = TraceIt.getCurrentLine().ltrim();
     uint64_t FrameAddr = 0;
-    if (FrameStr.getAsInteger(16, FrameAddr)) {
+    if (parseAddress(FrameStr, FrameAddr)) {
       // We might parse a non-perf sample line like empty line and comments,
       // skip it
       TraceIt.advance();
@@ -1191,21 +1200,22 @@ PerfContent PerfScriptReader::checkPerfScriptType(StringRef FileName) {
   TraceStream TraceIt(FileName);
   uint64_t FrameAddr = 0;
   while (!TraceIt.isAtEoF()) {
-    // Skip the aggregated count
-    if (!TraceIt.getCurrentLine().getAsInteger(10, FrameAddr))
+    // Skip the aggregated count and detect pre-aggregated input.
+    bool HasAggCount = !TraceIt.getCurrentLine().getAsInteger(10, FrameAddr);
+    if (HasAggCount)
       TraceIt.advance();
 
     // Detect sample with call stack
     int32_t Count = 0;
     while (!TraceIt.isAtEoF() &&
-           !TraceIt.getCurrentLine().ltrim().getAsInteger(16, FrameAddr)) {
+           !parseAddress(TraceIt.getCurrentLine().ltrim(), FrameAddr)) {
       Count++;
       TraceIt.advance();
     }
     if (!TraceIt.isAtEoF()) {
       if (isLBRSample(TraceIt.getCurrentLine())) {
         if (Count > 0)
-          return PerfContent::LBRStack;
+          return HasAggCount ? PerfContent::AggLBRStack : PerfContent::LBRStack;
         else
           return PerfContent::LBR;
       }
