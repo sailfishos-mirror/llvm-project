@@ -25,6 +25,7 @@
 #include "llvm/Bitcode/BitcodeReader.h"
 #include "llvm/Bitcode/BitcodeWriter.h"
 #include "llvm/Bitcode/BitcodeWriterPass.h"
+#include "llvm/CodeGen/MachineModuleInfo.h"
 #include "llvm/CodeGen/TargetSubtargetInfo.h"
 #include "llvm/Config/llvm-config.h"
 #include "llvm/Frontend/Driver/CodeGenOptions.h"
@@ -188,6 +189,9 @@ class EmitAssemblyHelper {
   void RunCodegenPipeline(BackendAction Action,
                           std::unique_ptr<raw_pwrite_stream> &OS,
                           std::unique_ptr<llvm::ToolOutputFile> &DwoOS);
+  void RunCodegenPipelineNewPM(BackendAction Action,
+                               std::unique_ptr<raw_pwrite_stream> &OS,
+                               std::unique_ptr<llvm::ToolOutputFile> &DwoOS);
 
   /// Check whether we should emit a module summary for regular LTO.
   /// The module summary should be emitted by default for regular LTO
@@ -1280,6 +1284,51 @@ void EmitAssemblyHelper::RunCodegenPipeline(
   }
 }
 
+void EmitAssemblyHelper::RunCodegenPipelineNewPM(
+    BackendAction Action, std::unique_ptr<raw_pwrite_stream> &OS,
+    std::unique_ptr<llvm::ToolOutputFile> &DwoOS) {
+  if (!actionRequiresCodeGen(Action))
+    return;
+
+  // Normal mode, emit a .s or .o file by running the code generator. Note,
+  // this also adds codegenerator level optimization passes.
+  CodeGenFileType CGFT = getCodeGenFileType(Action);
+
+  // Invoke pre-codegen callback from plugin, which might want to take over the
+  // entire code generation itself.
+  for (const std::unique_ptr<llvm::PassPlugin> &Plugin : CI.getPassPlugins()) {
+    if (Plugin->invokePreCodeGenCallback(*TheModule, *TM, CGFT, *OS))
+      return;
+  }
+
+  ModulePassManager MPM;
+  MachineFunctionAnalysisManager MFAM;
+  LoopAnalysisManager LAM;
+  FunctionAnalysisManager FAM;
+  CGSCCAnalysisManager CGAM;
+  ModuleAnalysisManager MAM;
+  CGPassBuilderOption Opt = getCGPassBuilderOption();
+  MachineModuleInfo MMI(TM.get());
+  PassInstrumentationCallbacks PIC;
+  PipelineTuningOptions PTOptions;
+  TargetMachine *TMPointer = TM.get();
+  PassBuilder PB(TMPointer, PTOptions, std::nullopt, &PIC,
+                 CI.getVirtualFileSystemPtr());
+  PB.registerModuleAnalyses(MAM);
+  PB.registerCGSCCAnalyses(CGAM);
+  PB.registerFunctionAnalyses(FAM);
+  PB.registerLoopAnalyses(LAM);
+  PB.registerMachineFunctionAnalyses(MFAM);
+  PB.crossRegisterProxies(LAM, FAM, CGAM, MAM, &MFAM);
+
+  MAM.registerPass([&] { return MachineModuleAnalysis(MMI); });
+
+  cantFail(TM->buildCodeGenPipeline(MPM, MAM, *OS,
+                                    DwoOS ? &DwoOS->os() : nullptr, CGFT, Opt,
+                                    MMI.getContext(), &PIC));
+  MPM.run(*TheModule, MAM);
+}
+
 void EmitAssemblyHelper::emitAssembly(BackendAction Action,
                                       std::unique_ptr<raw_pwrite_stream> OS,
                                       BackendConsumer *BC) {
@@ -1298,7 +1347,11 @@ void EmitAssemblyHelper::emitAssembly(BackendAction Action,
 
   std::unique_ptr<llvm::ToolOutputFile> ThinLinkOS, DwoOS;
   RunOptimizationPipeline(Action, OS, ThinLinkOS, BC);
-  RunCodegenPipeline(Action, OS, DwoOS);
+  if (CodeGenOpts.EnableNewPMCodeGen) {
+    RunCodegenPipelineNewPM(Action, OS, DwoOS);
+  } else {
+    RunCodegenPipeline(Action, OS, DwoOS);
+  }
 
   if (ThinLinkOS)
     ThinLinkOS->keep();
