@@ -174,39 +174,47 @@ void mergeUnkeyed<OwningVec<CommentInfo>>(OwningVec<CommentInfo> &Target,
   }
 }
 
+static llvm::Expected<doc::OwnedPtr<doc::Info>>
+cloneInfo(const doc::Info &Src, llvm::BumpPtrAllocator &Arena) {
+  switch (Src.IT) {
+  case InfoType::IT_namespace:
+    return allocatePtr<NamespaceInfo>(
+        Arena, static_cast<const NamespaceInfo &>(Src), Arena);
+  case InfoType::IT_record:
+    return allocatePtr<RecordInfo>(Arena, static_cast<const RecordInfo &>(Src),
+                                   Arena);
+  case InfoType::IT_enum:
+    return allocatePtr<EnumInfo>(Arena, static_cast<const EnumInfo &>(Src),
+                                 Arena);
+  case InfoType::IT_function:
+    return allocatePtr<FunctionInfo>(
+        Arena, static_cast<const FunctionInfo &>(Src), Arena);
+  case InfoType::IT_typedef:
+    return allocatePtr<TypedefInfo>(Arena, static_cast<const TypedefInfo &>(Src),
+                                    Arena);
+  case InfoType::IT_concept:
+    return allocatePtr<ConceptInfo>(Arena, static_cast<const ConceptInfo &>(Src),
+                                    Arena);
+  case InfoType::IT_variable:
+    return allocatePtr<VarInfo>(Arena, static_cast<const VarInfo &>(Src), Arena);
+  case InfoType::IT_friend:
+    return allocatePtr<FriendInfo>(Arena, static_cast<const FriendInfo &>(Src),
+                                   Arena);
+  default:
+    return llvm::createStringError(llvm::inconvertibleErrorCode(),
+                                   "unknown info type");
+  }
+}
+
 llvm::Error mergeSingleInfo(doc::OwnedPtr<doc::Info> &Reduced,
                             doc::OwnedPtr<doc::Info> &&NewInfo,
                             llvm::BumpPtrAllocator &Arena) {
   if (!Reduced) {
-    switch (NewInfo->IT) {
-    case InfoType::IT_namespace:
-      Reduced = allocatePtr<NamespaceInfo>(Arena, NewInfo->USR);
-      break;
-    case InfoType::IT_record:
-      Reduced = allocatePtr<RecordInfo>(Arena, NewInfo->USR);
-      break;
-    case InfoType::IT_enum:
-      Reduced = allocatePtr<EnumInfo>(Arena, NewInfo->USR);
-      break;
-    case InfoType::IT_function:
-      Reduced = allocatePtr<FunctionInfo>(Arena, NewInfo->USR);
-      break;
-    case InfoType::IT_typedef:
-      Reduced = allocatePtr<TypedefInfo>(Arena, NewInfo->USR);
-      break;
-    case InfoType::IT_concept:
-      Reduced = allocatePtr<ConceptInfo>(Arena, NewInfo->USR);
-      break;
-    case InfoType::IT_variable:
-      Reduced = allocatePtr<VarInfo>(Arena, NewInfo->USR);
-      break;
-    case InfoType::IT_friend:
-      Reduced = allocatePtr<FriendInfo>(Arena, NewInfo->USR);
-      break;
-    default:
-      return llvm::createStringError(llvm::inconvertibleErrorCode(),
-                                     "unknown info type");
-    }
+    auto Cloned = cloneInfo(*NewInfo, Arena);
+    if (!Cloned)
+      return Cloned.takeError();
+    Reduced = *Cloned;
+    return llvm::Error::success();
   }
 
   if (Reduced->IT != NewInfo->IT)
@@ -485,6 +493,54 @@ SymbolInfo::SymbolInfo(const SymbolInfo &Other, llvm::BumpPtrAllocator &Arena)
   }
 }
 
+NamespaceInfo::NamespaceInfo(const NamespaceInfo &Other, llvm::BumpPtrAllocator &Arena)
+    : Info(Other, Arena) {
+  for (const auto &N : Other.Children.Namespaces)
+    Children.Namespaces.push_back(*allocatePtr<Reference>(Arena, N));
+  for (const auto &R : Other.Children.Records)
+    Children.Records.push_back(*allocatePtr<Reference>(Arena, R));
+  for (const auto &F : Other.Children.Functions)
+    Children.Functions.push_back(*allocatePtr<FunctionInfo>(Arena, F, Arena));
+  for (const auto &E : Other.Children.Enums)
+    Children.Enums.push_back(*allocatePtr<EnumInfo>(Arena, E, Arena));
+  for (const auto &T : Other.Children.Typedefs)
+    Children.Typedefs.push_back(*allocatePtr<TypedefInfo>(Arena, T, Arena));
+  for (const auto &C : Other.Children.Concepts)
+    Children.Concepts.push_back(*allocatePtr<ConceptInfo>(Arena, C, Arena));
+  for (const auto &V : Other.Children.Variables)
+    Children.Variables.push_back(*allocatePtr<VarInfo>(Arena, V, Arena));
+}
+
+VarInfo::VarInfo(const VarInfo &Other, llvm::BumpPtrAllocator &Arena)
+    : SymbolInfo(Other, Arena), Type(Other.Type) {}
+
+FunctionInfo::FunctionInfo(const FunctionInfo &Other, llvm::BumpPtrAllocator &Arena)
+    : SymbolInfo(Other, Arena), Parent(Other.Parent), ReturnType(Other.ReturnType),
+      Access(Other.Access), IsMethod(Other.IsMethod) {
+  Prototype = internString(Other.Prototype);
+  Params = allocateArray(Other.Params, Arena);
+  if (Other.Template)
+    Template = TemplateInfo(*Other.Template, Arena);
+}
+
+TypedefInfo::TypedefInfo(const TypedefInfo &Other, llvm::BumpPtrAllocator &Arena)
+    : SymbolInfo(Other, Arena), Underlying(Other.Underlying), IsUsing(Other.IsUsing) {
+  TypeDeclaration = internString(Other.TypeDeclaration);
+  if (Other.Template)
+    Template = TemplateInfo(*Other.Template, Arena);
+}
+
+EnumInfo::EnumInfo(const EnumInfo &Other, llvm::BumpPtrAllocator &Arena)
+    : SymbolInfo(Other, Arena), Scoped(Other.Scoped) {
+  BaseType = Other.BaseType;
+  Members = deepCopyArray(Other.Members, Arena);
+}
+
+ConceptInfo::ConceptInfo(const ConceptInfo &Other, llvm::BumpPtrAllocator &Arena)
+    : SymbolInfo(Other, Arena), IsType(Other.IsType), Template(Other.Template, Arena) {
+  ConstraintExpression = internString(Other.ConstraintExpression);
+}
+
 void SymbolInfo::merge(SymbolInfo &&Other) {
   assert(mergeable(Other));
   if (!DefLoc)
@@ -530,6 +586,8 @@ RecordInfo::RecordInfo(const RecordInfo &Other, llvm::BumpPtrAllocator &Arena)
   VirtualParents = allocateArray(Other.VirtualParents, Arena);
   Bases = deepCopyArray(Other.Bases, Arena);
   Friends = deepCopyArray(Other.Friends, Arena);
+  if (Other.Template)
+    Template = TemplateInfo(*Other.Template, Arena);
 }
 
 MemberTypeInfo::MemberTypeInfo(const MemberTypeInfo &Other,
