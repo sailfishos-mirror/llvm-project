@@ -98,11 +98,10 @@ static llvm::Expected<OwnedPtr<Info>> reduce(OwningPtrArray<Info> &Values) {
   if (Values.empty() || !Values[0])
     return llvm::createStringError(llvm::inconvertibleErrorCode(),
                                    "no value to reduce");
-  OwnedPtr<Info> Merged = allocatePtr<T>(Values[0]->USR);
-  T *Tmp = static_cast<T *>(getPtr(Merged));
-  for (auto &I : Values)
-    Tmp->merge(std::move(*static_cast<T *>(getPtr(I))));
-  return std::move(Merged);
+  T *Merged = allocatePtr<T>(*static_cast<T *>(Values[0]), TransientArena);
+  for (const auto &I : llvm::ArrayRef<OwnedPtr<Info>>(Values).drop_front(1))
+    Merged->merge(std::move(*static_cast<T *>(I)));
+  return Merged;
 }
 
 template <typename T>
@@ -115,8 +114,8 @@ static void reduceChildren(llvm::simple_ilist<T> &Children,
     auto It = llvm::find_if(
         Children, [&](const T &C) { return C.USR == ChildToMerge->USR; });
     if (It == Children.end()) {
-      T *NewChild = allocatePtr<T>(PersistentArena, ChildToMerge->USR);
-      NewChild->merge(std::move(*ChildToMerge));
+      T *NewChild =
+          allocatePtr<T>(PersistentArena, *ChildToMerge, PersistentArena);
       Children.push_back(*NewChild);
     } else {
       It->merge(std::move(*ChildToMerge));
@@ -494,24 +493,27 @@ SymbolInfo::SymbolInfo(const SymbolInfo &Other, llvm::BumpPtrAllocator &Arena)
   }
 }
 
+ScopeChildren::ScopeChildren(const ScopeChildren &Other,
+                             llvm::BumpPtrAllocator &Arena) {
+  for (const auto &N : Other.Namespaces)
+    Namespaces.push_back(*allocatePtr<Reference>(Arena, N));
+  for (const auto &R : Other.Records)
+    Records.push_back(*allocatePtr<Reference>(Arena, R));
+  for (const auto &F : Other.Functions)
+    Functions.push_back(*allocatePtr<FunctionInfo>(Arena, F, Arena));
+  for (const auto &E : Other.Enums)
+    Enums.push_back(*allocatePtr<EnumInfo>(Arena, E, Arena));
+  for (const auto &T : Other.Typedefs)
+    Typedefs.push_back(*allocatePtr<TypedefInfo>(Arena, T, Arena));
+  for (const auto &C : Other.Concepts)
+    Concepts.push_back(*allocatePtr<ConceptInfo>(Arena, C, Arena));
+  for (const auto &V : Other.Variables)
+    Variables.push_back(*allocatePtr<VarInfo>(Arena, V, Arena));
+}
+
 NamespaceInfo::NamespaceInfo(const NamespaceInfo &Other,
                              llvm::BumpPtrAllocator &Arena)
-    : Info(Other, Arena) {
-  for (const auto &N : Other.Children.Namespaces)
-    Children.Namespaces.push_back(*allocatePtr<Reference>(Arena, N));
-  for (const auto &R : Other.Children.Records)
-    Children.Records.push_back(*allocatePtr<Reference>(Arena, R));
-  for (const auto &F : Other.Children.Functions)
-    Children.Functions.push_back(*allocatePtr<FunctionInfo>(Arena, F, Arena));
-  for (const auto &E : Other.Children.Enums)
-    Children.Enums.push_back(*allocatePtr<EnumInfo>(Arena, E, Arena));
-  for (const auto &T : Other.Children.Typedefs)
-    Children.Typedefs.push_back(*allocatePtr<TypedefInfo>(Arena, T, Arena));
-  for (const auto &C : Other.Children.Concepts)
-    Children.Concepts.push_back(*allocatePtr<ConceptInfo>(Arena, C, Arena));
-  for (const auto &V : Other.Children.Variables)
-    Children.Variables.push_back(*allocatePtr<VarInfo>(Arena, V, Arena));
-}
+    : Info(Other, Arena), Children(Other.Children, Arena) {}
 
 VarInfo::VarInfo(const VarInfo &Other, llvm::BumpPtrAllocator &Arena)
     : SymbolInfo(Other, Arena), Type(Other.Type) {}
@@ -581,14 +583,9 @@ void NamespaceInfo::merge(NamespaceInfo &&Other) {
 RecordInfo::RecordInfo(SymbolID USR, StringRef Name, StringRef Path)
     : SymbolInfo(InfoType::IT_record, USR, Name, Path) {}
 
-// FIXME: This constructor is currently unsafe for cross-arena copies of
-// populated records. Because a default copy of ScopeChildren will shallow-copy
-// the intrusive pointers, leading to a use-after-free when the TransientArena
-// is reset. Subsequent patches will address this by deep-copying children
-// individually via reduceChildren.
 RecordInfo::RecordInfo(const RecordInfo &Other, llvm::BumpPtrAllocator &Arena)
     : SymbolInfo(Other, Arena), TagType(Other.TagType),
-      IsTypeDef(Other.IsTypeDef) {
+      IsTypeDef(Other.IsTypeDef), Children(Other.Children, Arena) {
   Members = deepCopyArray(Other.Members, Arena);
   Parents = allocateArray(Other.Parents, Arena);
   VirtualParents = allocateArray(Other.VirtualParents, Arena);

@@ -325,6 +325,9 @@ struct ScopeChildren {
   OwningVec<ConceptInfo> Concepts;
   OwningVec<VarInfo> Variables;
 
+  ScopeChildren() = default;
+  ScopeChildren(const ScopeChildren &Other, llvm::BumpPtrAllocator &Arena);
+
   void sort();
 };
 
