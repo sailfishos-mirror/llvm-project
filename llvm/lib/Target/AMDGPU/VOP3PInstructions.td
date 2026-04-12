@@ -1752,7 +1752,7 @@ class VOP3PWMMA_Profile<list<ValueType> ArgTy, bit _IsSWMMAC, int _IndexType,
 def WMMAInstInfoTable : GenericTable {
   let FilterClass = "WMMAInstInfo";
   let CppTypeName = "WMMAInstInfo";
-  let Fields = ["Opcode", "is_wmma_xdl"];
+  let Fields = ["Opcode", "is_wmma_xdl", "is_vavdst_ordered_xdl"];
 
   let PrimaryKey = ["Opcode"];
   let PrimaryKeyName = "getWMMAInstInfoHelper";
@@ -1761,12 +1761,15 @@ def WMMAInstInfoTable : GenericTable {
 class WMMAInstInfo {
   Instruction Opcode = !cast<Instruction>(NAME);
   bit is_wmma_xdl = 0;
+  bit is_vavdst_ordered_xdl = 0;
 }
 
 multiclass WMMAInstGFX12<string Instr, VOP3PWMMA_Profile WMMAProfile, string PseudoInstrSuffix, bit DiffVdstSrc2 = 0> {
 
   defvar WMMAConstraints2Addr = !if(DiffVdstSrc2, "@earlyclobber $vdst", "@earlyclobber $vdst,$vdst = $src2");
   defvar WMMAConstraints3Addr = "@earlyclobber $vdst";
+  defvar IsVAVDSTOrderedXDL = !and(!or(WMMAProfile.IsC_F32, WMMAProfile.IsIU),
+                                   !not(!or(WMMAProfile.IsAB_F64, WMMAProfile.IsAB_F32)));
 
   let Mnemonic = Instr, mayRaiseFPException = 0, ReadsModeReg = 0, isConvergent = 1, SubtargetPredicate = HasWMMA128bInsts in {
     let Constraints = WMMAConstraints2Addr, isConvertibleToThreeAddress = 1 in
@@ -1774,6 +1777,7 @@ multiclass WMMAInstGFX12<string Instr, VOP3PWMMA_Profile WMMAProfile, string Pse
         let PseudoInstr = Instr#PseudoInstrSuffix;
         let FixedSize = WMMAProfile.HasMatrixScale;
         let Size = !if(WMMAProfile.HasMatrixScale, 16, 8);
+        let is_vavdst_ordered_xdl = !and(is_wmma_xdl, IsVAVDSTOrderedXDL);
       }
 
     let Constraints = WMMAConstraints3Addr, SchedRW = [Write32Bit, Write32Bit] in
@@ -1781,6 +1785,7 @@ multiclass WMMAInstGFX12<string Instr, VOP3PWMMA_Profile WMMAProfile, string Pse
         let PseudoInstr = Instr#PseudoInstrSuffix;
         let FixedSize = WMMAProfile.HasMatrixScale;
         let Size = !if(WMMAProfile.HasMatrixScale, 16, 8);
+        let is_vavdst_ordered_xdl = !and(is_wmma_xdl, IsVAVDSTOrderedXDL);
       }
 
   }
@@ -1797,6 +1802,10 @@ multiclass SWMMACInstGFX12<string Instr, VOP3PWMMA_Profile WMMAProfile, string P
     let AsmMatchConverter = "cvtSWMMAC";
     let isConvergent = 1;
     let Constraints = "@earlyclobber $vdst,$vdst = $srcTiedDef";
+    let is_vavdst_ordered_xdl =
+        !and(is_wmma_xdl,
+             !or(WMMAProfile.IsC_F32, WMMAProfile.IsIU),
+             !not(!or(WMMAProfile.IsAB_F64, WMMAProfile.IsAB_F32)));
   }
 }
 

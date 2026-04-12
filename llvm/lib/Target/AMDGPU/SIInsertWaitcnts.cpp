@@ -158,6 +158,7 @@ static constexpr VMEMID toVMEMID(MCRegUnit RU) {
   DECL(VGPR_DPMACC_WRITE)        /* write VGPR dest in DPMACC VALU */          \
   DECL(VGPR_TRANS_WRITE)         /* write VGPR dest in TRANS VALU */           \
   DECL(VGPR_XDL_WRITE)           /* write VGPR dest in XDL VALU */             \
+  DECL(VGPR_XDL_ORDERED_WRITE)   /* XDL ordered w/ Core/Side-MACC for VaVdst */\
   DECL(VGPR_LDS_READ)            /* read VGPR source in LDS */                 \
   DECL(VGPR_FLAT_READ)           /* read VGPR source in FLAT */                \
   DECL(VGPR_VMEM_READ)           /* read VGPR source in other VMEM */          \
@@ -471,7 +472,7 @@ protected:
           WaitEventSet({VMEM_GROUP, SMEM_GROUP}),
           WaitEventSet({ASYNC_ACCESS}),
           WaitEventSet({VGPR_CSMACC_WRITE, VGPR_DPMACC_WRITE, VGPR_TRANS_WRITE,
-                        VGPR_XDL_WRITE}),
+                        VGPR_XDL_WRITE, VGPR_XDL_ORDERED_WRITE}),
           WaitEventSet({VGPR_LDS_READ, VGPR_FLAT_READ, VGPR_VMEM_READ})};
 
 public:
@@ -966,7 +967,10 @@ private:
   unsigned LastFlatLoadCnt = 0;
   // Remember the last GDS operation.
   unsigned LastGDS = 0;
-
+  // VA_VDST score of the most recent XDL with 32-bit accumulators. Used to
+  // prevent re-promoting register scores that were already collapsed by a
+  // prior XDL fence.
+  unsigned LastXDLOrderedVAVDSTScore = 0;
   // The score tracking logic is fragmented as follows:
   // - VMem: VGPR RegUnits and LDS DMA IDs, see the VMEMID encoding.
   // - SGPRs: SGPR RegUnits
@@ -1109,6 +1113,26 @@ void WaitcntBrackets::updateByEvent(WaitEventType E, MachineInstr &Inst) {
   // Examples including vm_cnt when buffer-store or lgkm_cnt when send-message.
   PendingEvents.insert(E);
   setScoreUB(T, CurrScore);
+
+  // A 32-bit accumulator XDL (WMMA/SWMMAC) acts as a fence: all prior VALU
+  // results across all pipes are guaranteed written back before it completes.
+  // Promote pending VA_VDST register scores to the XDL's score so the normal
+  // UB - ScoreToWait computation produces a relaxed (non-zero) wait instead
+  // of the conservative wait(0). Only promote scores that haven't already
+  // been collapsed by a prior XDL fence to avoid repeatedly pulling scores
+  // up to UB (which would yield wait 0). Also clear prior out-of-order event
+  // types since they are subsumed by the fence's completion guarantee.
+  if (E == VGPR_XDL_ORDERED_WRITE) {
+    for (auto &[ID, Info] : VMem) {
+      unsigned &Score = Info.Scores[AMDGPU::VA_VDST];
+      if (Score > LastXDLOrderedVAVDSTScore && Score < CurrScore)
+        Score = CurrScore;
+    }
+    LastXDLOrderedVAVDSTScore = CurrScore;
+    PendingEvents.remove(VGPR_TRANS_WRITE);
+    PendingEvents.remove(VGPR_DPMACC_WRITE);
+    PendingEvents.remove(VGPR_XDL_WRITE);
+  }
 
   const SIRegisterInfo &TRI = Context->TRI;
   const MachineRegisterInfo &MRI = Context->MRI;
@@ -1713,6 +1737,25 @@ bool WaitcntBrackets::counterOutOfOrder(AMDGPU::InstCounterType T) const {
     Events.remove(GLOBAL_INV_ACCESS);
     // Return true only if there are still multiple event types after removing
     // GLOBAL_INV
+    return Events.twoOrMore();
+  }
+
+  // 32-bit accumulator XDL (VGPR_XDL_ORDERED_WRITE) acts as a fence: its
+  // completion guarantees all prior VALU results are written back. It never
+  // contributes to out-of-order completion on the VA_VDST counter. Remove it
+  // from the event set, but if no other event type remains, substitute CSMACC
+  // so that any pending TRANS/DPMACC events are still detected as OOO.
+  // TODO: Per-pipe tracking would allow computing tighter va_vdst values when
+  // mixed pipe types are pending (e.g. CSMACC write + TRANS without XDL
+  // currently forces wait(0) but only TRANS instructions can jump ahead).
+  if (T == AMDGPU::VA_VDST) {
+    WaitEventSet Events = PendingEvents & Context->getWaitEvents(T);
+    if (Events.contains(VGPR_XDL_ORDERED_WRITE)) {
+      Events.remove(VGPR_XDL_ORDERED_WRITE);
+      if (!Events.contains(VGPR_CSMACC_WRITE) &&
+          !Events.contains(VGPR_XDL_WRITE))
+        Events.insert(VGPR_CSMACC_WRITE);
+    }
     return Events.twoOrMore();
   }
 
@@ -2792,8 +2835,11 @@ SIInsertWaitcnts::getExpertSchedulingEventType(const MachineInstr &Inst) const {
     // out-of-order with respect to each other, so each of these classes
     // has its own event.
 
-    if (TII.isXDL(Inst))
+    if (TII.isXDL(Inst)) {
+      if (AMDGPU::getWMMAIsVAVDSTOrderedXDL(Inst.getOpcode()))
+        return VGPR_XDL_ORDERED_WRITE;
       return VGPR_XDL_WRITE;
+    }
 
     if (TII.isTRANS(Inst))
       return VGPR_TRANS_WRITE;
@@ -3117,6 +3163,10 @@ bool WaitcntBrackets::merge(const WaitcntBrackets &Other) {
 
     if (T == AMDGPU::LOAD_CNT)
       StrictDom |= mergeScore(M, LastFlatLoadCnt, Other.LastFlatLoadCnt);
+
+    if (T == AMDGPU::VA_VDST)
+      StrictDom |= mergeScore(M, LastXDLOrderedVAVDSTScore,
+                              Other.LastXDLOrderedVAVDSTScore);
 
     if (T == AMDGPU::DS_CNT) {
       StrictDom |= mergeScore(M, LastFlatDsCnt, Other.LastFlatDsCnt);
