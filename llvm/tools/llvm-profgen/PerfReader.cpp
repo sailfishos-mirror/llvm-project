@@ -676,7 +676,7 @@ static bool parseAddress(StringRef Str, uint64_t &Addr, bool HasPrefix,
     }
   }
   if (Str.consume_front("0x") != HasPrefix)
-    return false;
+    return true;
   return Str.getAsInteger(16, Addr);
 }
 
