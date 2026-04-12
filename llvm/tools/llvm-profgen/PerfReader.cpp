@@ -747,9 +747,9 @@ bool PerfScriptReader::extractLBRStack(TraceStream &TraceIt,
     // For pre-aggregated input, filter by build ID.
     if (IsPreAggregated) {
       StringRef BinaryBuildID = getFilterBuildID(Binary);
-      if (!SrcBuildID.empty() && SrcBuildID != BinaryBuildID)
+      if (SrcBuildID != BinaryBuildID)
         SrcIsInternal = false;
-      if (!DstBuildID.empty() && DstBuildID != BinaryBuildID)
+      if (DstBuildID != BinaryBuildID)
         DstIsInternal = false;
     }
     if (!SrcIsInternal)
@@ -775,8 +775,7 @@ bool PerfScriptReader::extractCallstack(TraceStream &TraceIt,
   // It's in bottom-up order with each frame in one line.
 
   // Extract stack frames from sample
-  while (!TraceIt.isAtEoF() &&
-         !isLBRSample(TraceIt.getCurrentLine(), true, IsPreAggregated)) {
+  while (!TraceIt.isAtEoF() && !isLBRSample(TraceIt.getCurrentLine(), true)) {
     StringRef FrameStr = TraceIt.getCurrentLine().ltrim();
     uint64_t FrameAddr = 0;
     StringRef FrameBuildID;
@@ -830,8 +829,7 @@ bool PerfScriptReader::extractCallstack(TraceStream &TraceIt,
   // Skip other unrelated line, find the next valid LBR line
   // Note that even for empty call stack, we should skip the address at the
   // bottom, otherwise the following pass may generate a truncated callstack
-  while (!TraceIt.isAtEoF() &&
-         !isLBRSample(TraceIt.getCurrentLine(), true, IsPreAggregated)) {
+  while (!TraceIt.isAtEoF() && !isLBRSample(TraceIt.getCurrentLine(), true)) {
     TraceIt.advance();
   }
   // Filter out broken stack sample. We may not have complete frame info
@@ -876,16 +874,14 @@ void HybridPerfReader::parseSample(TraceStream &TraceIt, uint64_t Count) {
   // Parsing call stack and populate into PerfSample.CallStack
   if (!extractCallstack(TraceIt, Sample->CallStack)) {
     // Skip the next LBR line matched current call stack
-    if (!TraceIt.isAtEoF() &&
-        isLBRSample(TraceIt.getCurrentLine(), true, IsPreAggregated))
+    if (!TraceIt.isAtEoF() && isLBRSample(TraceIt.getCurrentLine(), true))
       TraceIt.advance();
     return;
   }
 
   warnIfMissingMMap();
 
-  if (!TraceIt.isAtEoF() &&
-      isLBRSample(TraceIt.getCurrentLine(), true, IsPreAggregated)) {
+  if (!TraceIt.isAtEoF() && isLBRSample(TraceIt.getCurrentLine(), true)) {
     // Parsing LBR stack and populate into PerfSample.LBRStack
     if (extractLBRStack(TraceIt, Sample->LBRStack)) {
       if (IgnoreStackSamples) {
@@ -1225,6 +1221,10 @@ bool PerfScriptReader::isLBRSample(StringRef Line, bool CheckLineStart,
   if (Token.starts_with("0x"))
     return true;
   return IsPreAggregated && Token.contains(":0x");
+}
+
+bool PerfScriptReader::isLBRSample(StringRef Line, bool CheckLineStart) {
+  return isLBRSample(Line, CheckLineStart, IsPreAggregated);
 }
 
 bool PerfScriptReader::isMMapEvent(StringRef Line) {

@@ -634,6 +634,9 @@ public:
 
   void setIsPreAggregated(bool V) { IsPreAggregated = V; }
 
+  // Check whether a given line is LBR sample
+  bool isLBRSample(StringRef Line, bool CheckLineStart);
+
 protected:
   // Check whether a given line is LBR sample
   static bool isLBRSample(StringRef Line, bool CheckLineStart,
