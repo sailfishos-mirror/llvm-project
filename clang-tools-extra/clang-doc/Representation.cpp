@@ -174,32 +174,40 @@ void mergeUnkeyed<OwningVec<CommentInfo>>(OwningVec<CommentInfo> &Target,
 }
 
 static llvm::Expected<doc::OwnedPtr<doc::Info>>
-cloneInfo(const doc::Info &Src, llvm::BumpPtrAllocator &Arena) {
-  switch (Src.IT) {
-  case InfoType::IT_namespace:
-    return allocatePtr<NamespaceInfo>(
-        Arena, static_cast<const NamespaceInfo &>(Src), Arena);
-  case InfoType::IT_record:
-    return allocatePtr<RecordInfo>(Arena, static_cast<const RecordInfo &>(Src),
-                                   Arena);
-  case InfoType::IT_enum:
-    return allocatePtr<EnumInfo>(Arena, static_cast<const EnumInfo &>(Src),
-                                 Arena);
-  case InfoType::IT_function:
-    return allocatePtr<FunctionInfo>(
-        Arena, static_cast<const FunctionInfo &>(Src), Arena);
-  case InfoType::IT_typedef:
-    return allocatePtr<TypedefInfo>(
-        Arena, static_cast<const TypedefInfo &>(Src), Arena);
-  case InfoType::IT_concept:
-    return allocatePtr<ConceptInfo>(
-        Arena, static_cast<const ConceptInfo &>(Src), Arena);
-  case InfoType::IT_variable:
-    return allocatePtr<VarInfo>(Arena, static_cast<const VarInfo &>(Src),
-                                Arena);
-  case InfoType::IT_friend:
-    return allocatePtr<FriendInfo>(Arena, static_cast<const FriendInfo &>(Src),
-                                   Arena);
+cloneInfo(const doc::Info *Src, llvm::BumpPtrAllocator &Arena) {
+  switch (Src->IT) {
+  case InfoType::IT_namespace: {
+    const auto *I = static_cast<const NamespaceInfo *>(Src);
+    return allocatePtr<NamespaceInfo>(Arena, *I, Arena);
+  }
+  case InfoType::IT_record: {
+    const auto *I = static_cast<const RecordInfo *>(Src);
+    return allocatePtr<RecordInfo>(Arena, *I, Arena);
+  }
+  case InfoType::IT_enum: {
+    const auto *I = static_cast<const EnumInfo *>(Src);
+    return allocatePtr<EnumInfo>(Arena, *I, Arena);
+  }
+  case InfoType::IT_function: {
+    const auto *I = static_cast<const FunctionInfo *>(Src);
+    return allocatePtr<FunctionInfo>(Arena, *I, Arena);
+  }
+  case InfoType::IT_typedef: {
+    const auto *I = static_cast<const TypedefInfo *>(Src);
+    return allocatePtr<TypedefInfo>(Arena, *I, Arena);
+  }
+  case InfoType::IT_concept: {
+    const auto *I = static_cast<const ConceptInfo *>(Src);
+    return allocatePtr<ConceptInfo>(Arena, *I, Arena);
+  }
+  case InfoType::IT_variable: {
+    const auto *I = static_cast<const VarInfo *>(Src);
+    return allocatePtr<VarInfo>(Arena, *I, Arena);
+  }
+  case InfoType::IT_friend: {
+    const auto *I = static_cast<const FriendInfo *>(Src);
+    return allocatePtr<FriendInfo>(Arena, *I, Arena);
+  }
   default:
     return llvm::createStringError(llvm::inconvertibleErrorCode(),
                                    "unknown info type");
@@ -210,7 +218,7 @@ llvm::Error mergeSingleInfo(doc::OwnedPtr<doc::Info> &Reduced,
                             doc::OwnedPtr<doc::Info> &&NewInfo,
                             llvm::BumpPtrAllocator &Arena) {
   if (!Reduced) {
-    auto Cloned = cloneInfo(*NewInfo, Arena);
+    auto Cloned = cloneInfo(NewInfo, Arena);
     if (!Cloned)
       return Cloned.takeError();
     Reduced = *Cloned;
