@@ -205,3 +205,9 @@ LLVMErrorTypeId LLVMGetStringErrorTypeId() {
 LLVMErrorRef LLVMCreateStringError(const char *ErrMsg) {
   return wrap(make_error<StringError>(ErrMsg, inconvertibleErrorCode()));
 }
+
+char ContextualizedError::ID = 0;
+
+std::error_code ContextualizedError::convertToErrorCode() const {
+  return Err->convertToErrorCode();
+}

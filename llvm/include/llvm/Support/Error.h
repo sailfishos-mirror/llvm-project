@@ -1497,6 +1497,53 @@ inline Error unwrap(LLVMErrorRef ErrRef) {
       reinterpret_cast<ErrorInfoBase *>(ErrRef)));
 }
 
+class LLVM_ABI ContextualizedError : public ErrorInfo<ContextualizedError> {
+public:
+  ContextualizedError(std::unique_ptr<ErrorInfoBase> E,
+                      const Twine &Prefix = "")
+      : Err(std::move(E)), Context(Prefix.str()) {}
+
+  void log(raw_ostream &OS) const override {
+    assert(Err && "Trying to log after takeError().");
+    if (Context.size())
+      OS << Context << ": ";
+    Err->log(OS);
+  }
+
+  Error takeError() { return Error(std::move(Err)); }
+
+  const std::string &getContext() const { return Context; }
+
+  std::string getMessageWithoutContext() const {
+    std::string Msg;
+    raw_string_ostream OS(Msg);
+    Err->log(OS);
+    return Msg;
+  }
+
+  std::error_code convertToErrorCode() const override;
+
+  static Error build(Error E, const Twine &Prefix) {
+    std::unique_ptr<ErrorInfoBase> Payload;
+    handleAllErrors(std::move(E),
+                    [&](std::unique_ptr<ErrorInfoBase> EIB) -> Error {
+                      Payload = std::move(EIB);
+                      return Error::success();
+                    });
+    return Error(std::unique_ptr<ContextualizedError>(
+        new ContextualizedError(std::move(Payload), Prefix)));
+  }
+
+  static char ID;
+
+private:
+  std::unique_ptr<ErrorInfoBase> Err;
+  std::string Context;
+};
+
+inline Error createContextualizedError(Error E, const Twine &Prefix = "") {
+  return ContextualizedError::build(std::move(E), Prefix);
+}
 } // end namespace llvm
 
 #endif // LLVM_SUPPORT_ERROR_H

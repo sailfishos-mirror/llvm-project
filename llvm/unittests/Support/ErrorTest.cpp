@@ -18,6 +18,8 @@
 #include "gtest/gtest-spi.h"
 #include "gtest/gtest.h"
 #include <memory>
+#include <string>
+#include <unordered_set>
 
 using namespace llvm;
 
@@ -1218,5 +1220,32 @@ TEST(Error, ForwardToExpected) {
   EXPECT_THAT_ERROR(ExpectedReturningFct(true).moveInto(MaybeV), Failed());
   EXPECT_THAT_ERROR(ExpectedReturningFct(false).moveInto(MaybeV), Succeeded());
   EXPECT_EQ(*MaybeV, 42);
+}
+
+TEST(Error, DeduplicateByContextualized) {
+  std::unordered_set<std::string> Visit;
+
+  auto InsertError = [&](Error E) {
+    std::string InnerErrorStr;
+    EXPECT_THAT_ERROR(handleErrors(std::move(E),
+                                   [&](const ContextualizedError &E) {
+                                     InnerErrorStr =
+                                         E.getMessageWithoutContext();
+                                   }),
+                      Succeeded());
+    return Visit.insert(InnerErrorStr).second;
+  };
+  EXPECT_EQ(
+      InsertError(createContextualizedError(
+          createStringError("failed to execute operation A"), "Context A")),
+      true);
+  EXPECT_EQ(
+      InsertError(createContextualizedError(
+          createStringError("failed to execute operation B"), "Context A")),
+      true);
+  EXPECT_EQ(
+      InsertError(createContextualizedError(
+          createStringError("failed to execute operation A"), "Context B")),
+      false);
 }
 } // namespace
