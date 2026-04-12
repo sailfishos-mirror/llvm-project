@@ -836,7 +836,8 @@ def CIR_ReturnOp : CIR_Op<"return", [
 
 def CIR_IfOp : CIR_Op<"if", [
   DeclareOpInterfaceMethods<RegionBranchOpInterface, ["getSuccessorInputs"]>,
-  RecursivelySpeculatable, AutomaticAllocationScope, NoRegionArguments
+  RecursivelySpeculatable, AutomaticAllocationScope, NoRegionArguments,
+  ImplicitDefaultTerminator<"cir::YieldOp">
 ]> {
   let summary = "the if-then-else operation";
   let description = [{
@@ -872,7 +873,9 @@ def CIR_IfOp : CIR_Op<"if", [
   }];
   let arguments = (ins CIR_BoolType:$condition);
   let regions = (region AnyRegion:$thenRegion, AnyRegion:$elseRegion);
-  let hasCustomAssemblyFormat=1;
+  let assemblyFormat = [{
+    $condition attr-dict-with-keyword $thenRegion (`else` $elseRegion^)?
+  }];
   let skipDefaultBuilders=1;
   let builders = [
     OpBuilder<(ins "mlir::Value":$cond, "bool":$withElseRegion,
@@ -1122,7 +1125,7 @@ def CIR_ResumeFlatOp : CIR_Op<"resume.flat", [
 def CIR_ScopeOp : CIR_Op<"scope", [
   DeclareOpInterfaceMethods<RegionBranchOpInterface, ["getSuccessorInputs"]>,
   RecursivelySpeculatable, AutomaticAllocationScope, NoRegionArguments,
-  RecursiveMemoryEffects
+  RecursiveMemoryEffects, ImplicitDefaultTerminator<"cir::YieldOp">
 ]> {
   let summary = "Represents a C/C++ scope";
   let description = [{
@@ -1153,7 +1156,7 @@ def CIR_ScopeOp : CIR_Op<"scope", [
   let hasVerifier = 1;
   let skipDefaultBuilders = 1;
   let assemblyFormat = [{
-    custom<OmittedTerminatorRegion>($scopeRegion) (`:` type($results)^)? attr-dict
+    $scopeRegion (`:` type($results)^)? attr-dict
   }];
 
   let extraClassDeclaration = [{
@@ -2804,7 +2807,7 @@ def CIR_TLSModel : CIR_I32EnumAttr<"TLS_Model", "TLS model", [
 def CIR_GlobalOp : CIR_Op<"global", [
   DeclareOpInterfaceMethods<RegionBranchOpInterface, ["getSuccessorInputs"]>,
   DeclareOpInterfaceMethods<CIRGlobalValueInterface>,
-  NoRegionArguments
+  NoRegionArguments, ImplicitDefaultTerminator<"cir::YieldOp">
 ]> {
   let summary = "Declare or define a global variable";
   let description = [{
