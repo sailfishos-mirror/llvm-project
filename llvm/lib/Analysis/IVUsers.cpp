@@ -180,7 +180,9 @@ bool IVUsers::AddUsersIfInteresting(Instruction *I) {
     if (isa<PHINode>(User) && Processed.count(User))
       continue;
 
-    // Descend recursively, but not into PHI nodes outside the current loop.
+    // Descend recursively, but not into PHI nodes outside the current loop
+    // with more than a single incoming value. We still recurse through PHI
+    // nodes with a single incoming value to handle values for loops in LCSSA.
     // It's important to see the entire expression outside the loop to get
     // choices that depend on addressing mode use right, although we won't
     // consider references outside the loop in all cases.
@@ -188,8 +190,9 @@ bool IVUsers::AddUsersIfInteresting(Instruction *I) {
     // but do want to record a second reference in the same instruction.
     bool AddUserToIVUsers = false;
     if (LI->getLoopFor(User->getParent()) != L) {
-      if (isa<PHINode>(User) || Processed.count(User) ||
-          !AddUsersIfInteresting(User)) {
+      if ((isa<PHINode>(User) &&
+           cast<PHINode>(User)->getNumIncomingValues() > 1) ||
+          Processed.count(User) || !AddUsersIfInteresting(User)) {
         LLVM_DEBUG(dbgs() << "FOUND USER in other loop: " << *User << '\n'
                           << "   OF SCEV: " << *ISE << '\n');
         AddUserToIVUsers = true;
