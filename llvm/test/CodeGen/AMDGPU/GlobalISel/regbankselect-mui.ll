@@ -427,14 +427,14 @@ exit:
 define amdgpu_ps void @divergent_because_of_temporal_divergent_use(float %val, ptr addrspace(1) %addr) {
 ; OLD_RBS-LABEL: divergent_because_of_temporal_divergent_use:
 ; OLD_RBS:       ; %bb.0: ; %entry
-; OLD_RBS-NEXT:    s_mov_b32 s0, -1
-; OLD_RBS-NEXT:    v_mov_b32_e32 v3, s0
 ; OLD_RBS-NEXT:    s_mov_b32 s0, 0
+; OLD_RBS-NEXT:    v_mov_b32_e32 v4, s0
 ; OLD_RBS-NEXT:  .LBB15_1: ; %loop
 ; OLD_RBS-NEXT:    ; =>This Inner Loop Header: Depth=1
-; OLD_RBS-NEXT:    v_add_nc_u32_e32 v3, 1, v3
+; OLD_RBS-NEXT:    v_mov_b32_e32 v3, v4
 ; OLD_RBS-NEXT:    v_cvt_f32_u32_e32 v4, v3
 ; OLD_RBS-NEXT:    v_cmp_gt_f32_e32 vcc_lo, v4, v0
+; OLD_RBS-NEXT:    v_add_nc_u32_e32 v4, 1, v3
 ; OLD_RBS-NEXT:    s_or_b32 s0, vcc_lo, s0
 ; OLD_RBS-NEXT:    s_andn2_b32 exec_lo, exec_lo, s0
 ; OLD_RBS-NEXT:    s_cbranch_execnz .LBB15_1
@@ -446,14 +446,14 @@ define amdgpu_ps void @divergent_because_of_temporal_divergent_use(float %val, p
 ;
 ; NEW_RBS-LABEL: divergent_because_of_temporal_divergent_use:
 ; NEW_RBS:       ; %bb.0: ; %entry
-; NEW_RBS-NEXT:    s_mov_b32 s1, -1
+; NEW_RBS-NEXT:    s_mov_b32 s1, 0
 ; NEW_RBS-NEXT:    s_mov_b32 s0, 0
 ; NEW_RBS-NEXT:  .LBB15_1: ; %loop
 ; NEW_RBS-NEXT:    ; =>This Inner Loop Header: Depth=1
-; NEW_RBS-NEXT:    s_add_i32 s1, s1, 1
 ; NEW_RBS-NEXT:    v_cvt_f32_u32_e32 v3, s1
 ; NEW_RBS-NEXT:    v_cmp_gt_f32_e32 vcc_lo, v3, v0
 ; NEW_RBS-NEXT:    v_mov_b32_e32 v3, s1
+; NEW_RBS-NEXT:    s_add_i32 s1, s1, 1
 ; NEW_RBS-NEXT:    s_or_b32 s0, vcc_lo, s0
 ; NEW_RBS-NEXT:    s_andn2_b32 exec_lo, exec_lo, s0
 ; NEW_RBS-NEXT:    s_cbranch_execnz .LBB15_1
