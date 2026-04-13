@@ -49,8 +49,7 @@ public:
 
       if (Translation) {
         // Filter out those temporary invalid EntityPointerLevels associated
-        // with
-        // `&E` pointers. They need no transformation of entities:
+        // with `&E` pointers. They need no transformation of entities:
         auto FilteredTranslation = llvm::make_filter_range(
             *Translation, [](const EntityPointerLevel &E) -> bool {
               return E.getPointerLevel() > 0;

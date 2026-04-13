@@ -24,17 +24,14 @@
 using namespace clang;
 
 template <typename NodeTy, typename... Ts>
-static inline llvm::Error makeErrAtNode(ASTContext &Ctx, const NodeTy &N,
-                                        StringRef Fmt, const Ts &...Args) {
+llvm::Error makeErrAtNode(ASTContext &Ctx, const NodeTy &N, StringRef Fmt,
+                          const Ts &...Args) {
   std::string LocStr = N.getBeginLoc().printToString(Ctx.getSourceManager());
-  llvm::SmallVector<char> FmtData;
-
-  (Fmt + " at %s").toStringRef(FmtData);
-  return llvm::createStringError(FmtData.data(), Args..., LocStr.c_str());
+  return llvm::createStringError((Fmt + " at %s").str().c_str(), Args...,
+                                 LocStr.c_str());
 }
 
-static inline llvm::Error makeEntityNameErr(ASTContext &Ctx,
-                                            const NamedDecl &D) {
+llvm::Error makeEntityNameErr(ASTContext &Ctx, const NamedDecl &D) {
   return makeErrAtNode(Ctx, D, "failed to create entity name for %s",
                        D.getNameAsString().data());
 }
@@ -48,19 +45,17 @@ static inline llvm::Error makeAddEntitySummaryErr(ASTContext &Ctx,
 }
 
 template <typename... Ts>
-static inline llvm::Error makeSawButExpectedError(const llvm::json::Value &Saw,
-                                                  llvm::StringRef Expected,
-                                                  const Ts &...ExpectedArgs) {
+llvm::Error makeSawButExpectedError(const llvm::json::Value &Saw,
+                                    llvm::StringRef Expected,
+                                    const Ts &...ExpectedArgs) {
   std::string Fmt = ("saw %s but expected " + Expected).str();
   std::string SawStr = llvm::formatv("{0:2}", Saw).str();
 
   return llvm::createStringError(Fmt.c_str(), SawStr.c_str(), ExpectedArgs...);
 }
 
-template <typename DeclOrExpr>
-static inline bool hasPtrOrArrType(const DeclOrExpr &E) {
-  return llvm::isa<PointerType>(E.getType().getCanonicalType()) ||
-         llvm::isa<ArrayType>(E.getType().getCanonicalType());
+template <typename DeclOrExpr> bool hasPtrOrArrType(const DeclOrExpr *E) {
+  return llvm::isa<PointerType, ArrayType>(E->getType().getCanonicalType());
 }
 
 namespace clang::ssaf {

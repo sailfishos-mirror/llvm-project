@@ -5,17 +5,17 @@
 // Negative tests:
 
 // RUN: not clang-ssaf-format -type=tu %S/Inputs/tu-summary-no-key.json 2>&1 \
-// RUN: | FileCheck %s --check-prefix=CHECK-NO-KEY
-// CHECK-NO-KEY: saw {
-// CHECK-NO-KEY:   "NotUnsafeBuffers": [
-// CHECK-NO-KEY:     [
-// CHECK-NO-KEY:       {
-// CHECK-NO-KEY:         "@": 0
-// CHECK-NO-KEY:       },
-// CHECK-NO-KEY:       1
-// CHECK-NO-KEY:     ]
-// CHECK-NO-KEY:   ]
-// CHECK-NO-KEY: } but expected an Object with a key UnsafeBuffers
+// RUN: | FileCheck %s --check-prefix=CHECK-MISSING-KEY
+// CHECK-MISSING-KEY: saw {
+// CHECK-MISSING-KEY-NEXT:   "NotUnsafeBuffers": [
+// CHECK-MISSING-KEY-NEXT:     [
+// CHECK-MISSING-KEY-NEXT:       {
+// CHECK-MISSING-KEY-NEXT:         "@": 0
+// CHECK-MISSING-KEY-NEXT:       },
+// CHECK-MISSING-KEY-NEXT:       1
+// CHECK-MISSING-KEY-NEXT:     ]
+// CHECK-MISSING-KEY-NEXT:   ]
+// CHECK-MISSING-KEY-NEXT: } but expected an Object with a key UnsafeBuffers
 
 // RUN: not clang-ssaf-format -type=tu %S/Inputs/tu-summary-bad-element.json 2>&1 \
 // RUN: | FileCheck %s --check-prefix=CHECK-BAD-ELEMENT
