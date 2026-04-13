@@ -17,7 +17,6 @@
 #include "clang/AST/DeclObjC.h"
 #include "clang/AST/DynamicRecursiveASTVisitor.h"
 #include "clang/Basic/SourceLocation.h"
-#include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/JSON.h"
 
@@ -29,19 +28,6 @@ llvm::Error makeErrAtNode(ASTContext &Ctx, const NodeTy &N, StringRef Fmt,
   std::string LocStr = N.getBeginLoc().printToString(Ctx.getSourceManager());
   return llvm::createStringError((Fmt + " at %s").str().c_str(), Args...,
                                  LocStr.c_str());
-}
-
-llvm::Error makeEntityNameErr(ASTContext &Ctx, const NamedDecl &D) {
-  return makeErrAtNode(Ctx, D, "failed to create entity name for %s",
-                       D.getNameAsString().data());
-}
-
-static inline llvm::Error makeAddEntitySummaryErr(ASTContext &Ctx,
-                                                  const NamedDecl *D) {
-  std::string LocStr = D->getBeginLoc().printToString(Ctx.getSourceManager());
-
-  return llvm::createStringError("failed to add entity summary for %s at %s",
-                                 D->getNameAsString().data(), LocStr.c_str());
 }
 
 template <typename... Ts>
@@ -56,6 +42,19 @@ llvm::Error makeSawButExpectedError(const llvm::json::Value &Saw,
 
 template <typename DeclOrExpr> bool hasPtrOrArrType(const DeclOrExpr *E) {
   return llvm::isa<PointerType, ArrayType>(E->getType().getCanonicalType());
+}
+
+inline llvm::Error makeEntityNameErr(ASTContext &Ctx, const NamedDecl &D) {
+  return makeErrAtNode(Ctx, D, "failed to create entity name for %s",
+                       D.getNameAsString().data());
+}
+
+inline llvm::Error makeAddEntitySummaryErr(ASTContext &Ctx,
+                                           const NamedDecl *D) {
+  std::string LocStr = D->getBeginLoc().printToString(Ctx.getSourceManager());
+
+  return llvm::createStringError("failed to add entity summary for %s at %s",
+                                 D->getNameAsString().data(), LocStr.c_str());
 }
 
 namespace clang::ssaf {
