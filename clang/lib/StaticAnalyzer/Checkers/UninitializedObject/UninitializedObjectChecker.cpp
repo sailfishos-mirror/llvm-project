@@ -374,9 +374,9 @@ bool FindUninitializedFields::isNonUnionUninit(const TypedValueRegion *R,
 bool FindUninitializedFields::isUnionUninit(const TypedValueRegion *R) {
   assert(R->getValueType()->isUnionType() &&
          "This method only checks union objects!");
-    
+
   const RecordDecl *RD = R->getValueType()->getAsRecordDecl()->getDefinition();
-   
+
   if (!RD)
     return false;
 
@@ -387,7 +387,8 @@ bool FindUninitializedFields::isUnionUninit(const TypedValueRegion *R) {
     if (FD->isUnnamedBitField())
       continue;
 
-    const auto FieldVal = State->getLValue(FD, loc::MemRegionVal(R)).castAs<loc::MemRegionVal>();
+    const auto FieldVal =
+        State->getLValue(FD, loc::MemRegionVal(R)).castAs<loc::MemRegionVal>();
     SVal V = State->getSVal(FieldVal);
 
     // If any field has a defined value, the union is initialized.
