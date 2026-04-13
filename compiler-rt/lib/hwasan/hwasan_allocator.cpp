@@ -46,6 +46,9 @@ enum {
 // Initialized in HwasanAllocatorInit, an never changed.
 alignas(16) static u8 tail_magic[kShadowAlignment - 1];
 static uptr max_malloc_size;
+static unsigned hwasan_tag_bits;
+static tag_t fallback_alloc_tag;
+static tag_t free_bits;
 
 bool HwasanChunkView::IsAllocated() const {
   return metadata_ && metadata_->IsAllocated();
@@ -145,15 +148,31 @@ uptr GetAliasRegionStart() {
 #endif
 }
 
+unsigned HwasanTagBits() { return hwasan_tag_bits; }
+
 void HwasanAllocatorInit() {
   atomic_store_relaxed(&hwasan_allocator_tagging_enabled,
                        !flags()->disable_allocator_tagging);
+  int flags_tag_bits = flags()->tag_bits;
+  if (flags_tag_bits < static_cast<int>(kTagBits) && flags_tag_bits > 0)
+    hwasan_tag_bits = flags_tag_bits;
+  else
+    hwasan_tag_bits = kTagBits;
+  if (hwasan_tag_bits < 8)
+    free_bits = 1 << 7;
+  else
+    free_bits = 0;
+  // With flags_tag_bits we want to restrict the number of bits in the
+  // pointer. That's why we don't need to mask out the kFallbackFreeTag,
+  // because that one is only used for the memory tag, never the pointer
+  // tag.
+  fallback_alloc_tag = kFallbackAllocTag & ((1 << hwasan_tag_bits) - 1);
   SetAllocatorMayReturnNull(common_flags()->allocator_may_return_null);
   allocator.InitLinkerInitialized(
       common_flags()->allocator_release_to_os_interval_ms,
       GetAliasRegionStart());
   for (uptr i = 0; i < sizeof(tail_magic); i++)
-    tail_magic[i] = GetCurrentThread()->GenerateRandomTag();
+    tail_magic[i] = GetCurrentThread()->GenerateRandomTag(hwasan_tag_bits);
   if (common_flags()->max_allocation_size_mb) {
     max_malloc_size = common_flags()->max_allocation_size_mb << 20;
     max_malloc_size = Min(max_malloc_size, kMaxAllowedMallocSize);
@@ -237,7 +256,7 @@ static void *HwasanAllocate(StackTrace *stack, uptr orig_size, uptr alignment,
   if (InTaggableRegion(reinterpret_cast<uptr>(user_ptr)) &&
       atomic_load_relaxed(&hwasan_allocator_tagging_enabled) &&
       flags()->tag_in_malloc && malloc_bisect(stack, orig_size)) {
-    tag_t tag = t ? t->GenerateRandomTag() : kFallbackAllocTag;
+    tag_t tag = t ? t->GenerateRandomTag(hwasan_tag_bits) : fallback_alloc_tag;
     uptr tag_size = orig_size ? orig_size : 1;
     uptr full_granule_size = RoundDownTo(tag_size, kShadowAlignment);
     user_ptr = (void *)TagMemoryAligned((uptr)user_ptr, full_granule_size, tag);
@@ -350,13 +369,13 @@ static void HwasanDeallocate(StackTrace *stack, void *tagged_ptr) {
       // would make us attempt to read the memory on a UaF.
       // The tag can be zero if tagging is disabled on this thread.
       do {
-        tag = t->GenerateRandomTag(/*num_bits=*/8);
+        tag = t->GenerateRandomTag(/*num_bits=*/8) | free_bits;
       } while (
           UNLIKELY((tag < kShadowAlignment || tag == pointer_tag) && tag != 0));
     } else {
       static_assert(kFallbackFreeTag >= kShadowAlignment,
                     "fallback tag must not be a short granule tag.");
-      tag = kFallbackFreeTag;
+      tag = kFallbackFreeTag | free_bits;
     }
     TagMemoryAligned(reinterpret_cast<uptr>(aligned_ptr), TaggedSize(orig_size),
                      tag);
