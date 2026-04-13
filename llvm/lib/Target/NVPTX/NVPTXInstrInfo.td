@@ -2422,6 +2422,8 @@ let isTerminator=1 in {
     def CBranch : NVPTXInst<(outs), (ins B1:$a, brtarget:$target),
                               "@$a bra \t$target;",
                               [(brcond i1:$a, bb:$target)]>;
+    def CBranchOther : NVPTXInst<(outs), (ins B1:$a, brtarget:$target),
+                              "@!$a bra \t$target;", []>;
 
     let isBarrier=1 in
       def GOTO : BasicNVPTXInst<(outs), (ins brtarget:$target),
