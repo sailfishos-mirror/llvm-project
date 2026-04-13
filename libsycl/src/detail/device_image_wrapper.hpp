@@ -19,22 +19,57 @@
 
 #include <detail/device_binary_structures.hpp>
 
+#include <OffloadAPI.h>
+
+#include <map>
+
 _LIBSYCL_BEGIN_NAMESPACE_SYCL
 namespace detail {
 
-/// A wrapper of __sycl_tgt_device_image structure to help with its fields
-/// parsing, iteration over data and data transformation.
-class DeviceImageWrapper {
+class DeviceImageManager;
+
+/// A wrapper of liboffload program handle to manage its lifetime.
+class ProgramWrapper {
 public:
-  DeviceImageWrapper(const __sycl_tgt_device_image &Bin) : MBin(&Bin) {}
+  /// Constructs ProgramWrapper by creating liboffload program with the provided
+  /// arguments.
+  ///
+  /// \param Device is a device to use for program creation.
+  /// \param DevImage is a device image (wrapped __sycl_tgt_device_image) to use
+  /// for program creation.
+  /// \throw sycl::exception with sycl::errc::runtime when failed to create
+  /// program.
+  ProgramWrapper(ol_device_handle_t Device, DeviceImageManager &DevImage);
+
+  /// Releases the corresponding liboffload program handle by calling
+  /// olDestroyProgram.
+  ~ProgramWrapper();
+
+  ProgramWrapper(const ProgramWrapper &) = delete;
+  ProgramWrapper &operator=(const ProgramWrapper &) = delete;
+  ProgramWrapper(ProgramWrapper &&) = delete;
+  ProgramWrapper &operator=(ProgramWrapper &&) = delete;
+
+  /// \return the corresponding liboffload program handle.
+  ol_program_handle_t getHandle() { return MProgram; }
+
+private:
+  ol_program_handle_t MProgram{};
+};
+
+/// This class manages all work with device images: from data parsing to program
+/// creation.
+class DeviceImageManager {
+public:
+  DeviceImageManager(const __sycl_tgt_device_image &Bin) : MBin(&Bin) {}
   // Explicitly delete copy constructor/operator= to avoid unintentional copies.
-  DeviceImageWrapper(const DeviceImageWrapper &) = delete;
-  DeviceImageWrapper &operator=(const DeviceImageWrapper &) = delete;
+  DeviceImageManager(const DeviceImageManager &) = delete;
+  DeviceImageManager &operator=(const DeviceImageManager &) = delete;
 
-  DeviceImageWrapper(DeviceImageWrapper &&) = default;
-  DeviceImageWrapper &operator=(DeviceImageWrapper &&) = default;
+  DeviceImageManager(DeviceImageManager &&) = default;
+  DeviceImageManager &operator=(DeviceImageManager &&) = default;
 
-  ~DeviceImageWrapper() = default;
+  ~DeviceImageManager() = default;
 
   /// \return a reference to the corresponding raw __sycl_tgt_device_image
   /// object.
@@ -45,7 +80,21 @@ public:
     return static_cast<size_t>(MBin->ImageEnd - MBin->ImageStart);
   }
 
+  ol_program_handle_t getOrCreateProgram(ol_device_handle_t DeviceHandle) {
+    auto ProgramIt = MPrograms.find(DeviceHandle);
+    if (ProgramIt == MPrograms.end()) {
+      ProgramIt =
+          MPrograms.emplace_hint(ProgramIt, std::piecewise_construct,
+                                 std::forward_as_tuple(DeviceHandle),
+                                 std::forward_as_tuple(DeviceHandle, *this));
+    }
+
+    return ProgramIt->second.getHandle();
+  }
+
 protected:
+  std::unordered_map<ol_device_handle_t, ProgramWrapper> MPrograms;
+
   const __sycl_tgt_device_image *get() const { return MBin; }
 
   __sycl_tgt_device_image const *MBin{};
