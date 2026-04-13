@@ -259,6 +259,7 @@ void FactsGenerator::VisitMemberExpr(const MemberExpr *ME) {
     assert(Dst && "Field member should have an origin list as it is GL value");
     OriginList *Src = getOriginsList(*ME->getBase());
     assert(Src && "Base expression should be a pointer/reference type");
+    handleUse(ME);
     // The field's glvalue (outermost origin) holds the same loans as the base
     // expression.
     CurrentBlockFacts.push_back(FactMgr.createFact<OriginFlowFact>(
