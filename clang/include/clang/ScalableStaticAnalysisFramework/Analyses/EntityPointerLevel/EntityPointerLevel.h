@@ -12,6 +12,7 @@
 #include "clang/AST/Expr.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/Model/EntityId.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/Model/EntityName.h"
+#include "llvm/ADT/STLFunctionalExtras.h"
 #include <set>
 
 namespace clang::ssaf {
@@ -92,23 +93,22 @@ using EntityPointerLevelSet =
 /// \param Ctx the AST context of `E`
 /// \param AddEntity the callback provided by the caller to convert EntityNames
 /// to EntityIds.
-llvm::Expected<EntityPointerLevelSet>
-translateEntityPointerLevel(const Expr *E, ASTContext &Ctx,
-                            std::function<EntityId(EntityName EN)> AddEntity);
+llvm::Expected<EntityPointerLevelSet> translateEntityPointerLevel(
+    const Expr *E, ASTContext &Ctx,
+    llvm::function_ref<EntityId(EntityName EN)> AddEntity);
 
 EntityPointerLevel buildEntityPointerLevel(EntityId, unsigned);
 
 /// Create an EntityPointerLevel (EPL) from a NamedDecl of a pointer/array type.
 ///
-/// \param E the pointer expression to be translated
-/// \param Ctx the AST context of `E`
+/// \param ND the NamedDecl of a pointer/array type.
 /// \param AddEntity the callback provided by the caller to convert EntityNames
 /// to EntityIds.
 /// \param IsFunRet true iff the created EPL is associated with the return type
 /// of a function entity.
 llvm::Expected<EntityPointerLevel>
-creatEntityPointerLevel(const NamedDecl *ND, ASTContext &Ctx,
-                        std::function<EntityId(EntityName EN)> AddEntity,
+creatEntityPointerLevel(const NamedDecl *ND,
+                        llvm::function_ref<EntityId(EntityName EN)> AddEntity,
                         bool IsFunRet = false);
 
 /// Creates a new EntityPointerLevel (EPL) from `E` by incrementing `E`'s
