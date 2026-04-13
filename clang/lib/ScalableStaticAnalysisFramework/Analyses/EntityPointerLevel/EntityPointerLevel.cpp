@@ -27,7 +27,8 @@ template <typename NodeTy, typename... Ts>
 llvm::Error makeErrAtNode(ASTContext &Ctx, const NodeTy &N, StringRef Fmt,
                           const Ts &...Args) {
   std::string LocStr = N.getBeginLoc().printToString(Ctx.getSourceManager());
-  return llvm::createStringError((Fmt + " at %s").str().c_str(), Args..., LocStr.c_str());
+  return llvm::createStringError((Fmt + " at %s").str().c_str(), Args...,
+                                 LocStr.c_str());
 }
 
 llvm::Error makeEntityNameErr(ASTContext &Ctx, const NamedDecl &D) {

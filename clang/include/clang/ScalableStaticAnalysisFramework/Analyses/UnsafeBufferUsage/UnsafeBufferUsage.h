@@ -14,14 +14,8 @@
 #include "clang/ScalableStaticAnalysisFramework/Core/TUSummary/EntitySummary.h"
 
 namespace clang::ssaf {
-<<<<<<< users/ziqingluo/PR-172429193-pre-2
 /// An UnsafeBufferUsageEntitySummary contains a set of EntityPointerLevels
 /// extracted from unsafe buffer pointers contributed by an entity.
-=======
-
-/// An UnsafeBufferUsageEntitySummary is an immutable set of unsafe buffers, in
-/// the form of EntityPointerLevel.
->>>>>>> main
 class UnsafeBufferUsageEntitySummary final : public EntitySummary {
   const EntityPointerLevelSet UnsafeBuffers;
 
