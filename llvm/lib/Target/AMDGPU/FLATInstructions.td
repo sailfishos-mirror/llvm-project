@@ -3339,13 +3339,13 @@ defm GLOBAL_LOAD_SSHORT         : GLOBAL_Real_AllAddr_gfx11<0x013, "global_load_
 defm GLOBAL_LOAD_DWORD          : GLOBAL_Real_AllAddr_gfx11<0x014, "global_load_b32">;
 defm GLOBAL_LOAD_DWORDX2        : GLOBAL_Real_AllAddr_gfx11<0x015, "global_load_b64">;
 defm GLOBAL_LOAD_DWORDX3        : GLOBAL_Real_AllAddr_gfx11<0x016, "global_load_b96">;
-defm GLOBAL_LOAD_DWORDX4        : GLOBAL_Real_AllAddr_gfx11<0x017, "av_global_load_b128">;
+defm GLOBAL_LOAD_DWORDX4        : GLOBAL_Real_AllAddr_gfx11<0x017, "global_load_b128">;
 defm GLOBAL_STORE_BYTE          : GLOBAL_Real_AllAddr_gfx11<0x018, "global_store_b8">;
 defm GLOBAL_STORE_SHORT         : GLOBAL_Real_AllAddr_gfx11<0x019, "global_store_b16">;
 defm GLOBAL_STORE_DWORD         : GLOBAL_Real_AllAddr_gfx11<0x01a, "global_store_b32">;
 defm GLOBAL_STORE_DWORDX2       : GLOBAL_Real_AllAddr_gfx11<0x01b, "global_store_b64">;
 defm GLOBAL_STORE_DWORDX3       : GLOBAL_Real_AllAddr_gfx11<0x01c, "global_store_b96">;
-defm GLOBAL_STORE_DWORDX4       : GLOBAL_Real_AllAddr_gfx11<0x01d, "av_global_store_b128">;
+defm GLOBAL_STORE_DWORDX4       : GLOBAL_Real_AllAddr_gfx11<0x01d, "global_store_b128">;
 defm GLOBAL_LOAD_UBYTE_D16      : GLOBAL_Real_AllAddr_gfx11<0x01e, "global_load_d16_u8">;
 defm GLOBAL_LOAD_SBYTE_D16      : GLOBAL_Real_AllAddr_gfx11<0x01f, "global_load_d16_i8">;
 defm GLOBAL_LOAD_SHORT_D16      : GLOBAL_Real_AllAddr_gfx11<0x020, "global_load_d16_b16">;
@@ -3548,13 +3548,13 @@ defm GLOBAL_LOAD_SSHORT            : VFLAT_Real_AllAddr_gfx12<0x013, "global_loa
 defm GLOBAL_LOAD_DWORD             : VFLAT_Real_AllAddr_gfx12<0x014, "global_load_b32">;
 defm GLOBAL_LOAD_DWORDX2           : VFLAT_Real_AllAddr_gfx12<0x015, "global_load_b64">;
 defm GLOBAL_LOAD_DWORDX3           : VFLAT_Real_AllAddr_gfx12<0x016, "global_load_b96">;
-defm GLOBAL_LOAD_DWORDX4           : VFLAT_Real_AllAddr_gfx12<0x017, "av_global_load_b128">;
+defm GLOBAL_LOAD_DWORDX4           : VFLAT_Real_AllAddr_gfx12<0x017, "global_load_b128">;
 defm GLOBAL_STORE_BYTE             : VFLAT_Real_AllAddr_gfx12<0x018, "global_store_b8">;
 defm GLOBAL_STORE_SHORT            : VFLAT_Real_AllAddr_gfx12<0x019, "global_store_b16">;
 defm GLOBAL_STORE_DWORD            : VFLAT_Real_AllAddr_gfx12<0x01a, "global_store_b32">;
 defm GLOBAL_STORE_DWORDX2          : VFLAT_Real_AllAddr_gfx12<0x01b, "global_store_b64">;
 defm GLOBAL_STORE_DWORDX3          : VFLAT_Real_AllAddr_gfx12<0x01c, "global_store_b96">;
-defm GLOBAL_STORE_DWORDX4          : VFLAT_Real_AllAddr_gfx12<0x01d, "av_global_store_b128">;
+defm GLOBAL_STORE_DWORDX4          : VFLAT_Real_AllAddr_gfx12<0x01d, "global_store_b128">;
 defm GLOBAL_LOAD_UBYTE_D16         : VFLAT_Real_AllAddr_gfx12<0x01e, "global_load_d16_u8">;
 defm GLOBAL_LOAD_SBYTE_D16         : VFLAT_Real_AllAddr_gfx12<0x01f, "global_load_d16_i8">;
 defm GLOBAL_LOAD_SHORT_D16         : VFLAT_Real_AllAddr_gfx12<0x020, "global_load_d16_b16">;
@@ -3722,7 +3722,7 @@ defm GLOBAL_LOAD_TR4_B64              : VFLAT_Real_AllAddr_gfx1250<0x073>;
 defm GLOBAL_LOAD_TR6_B96              : VFLAT_Real_AllAddr_gfx1250<0x074>;
 
 // Additional aliases for global load transpose instructions.
-def : MnemonicAlias<"av_global_load_b128_tr_b16", "global_load_tr16_b128">, Requires<[isGFX125xOnly]>;
+def : MnemonicAlias<"global_load_b128_tr_b16", "global_load_tr16_b128">, Requires<[isGFX125xOnly]>;
 def : MnemonicAlias<"global_load_b64_tr_b8", "global_load_tr8_b64">, Requires<[isGFX125xOnly]>;
 def : MnemonicAlias<"global_load_b64_tr_b4", "global_load_tr4_b64">, Requires<[isGFX125xOnly]>;
 def : MnemonicAlias<"global_load_b96_tr_b6", "global_load_tr6_b96">, Requires<[isGFX125xOnly]>;
@@ -3865,7 +3865,7 @@ defm GLOBAL_LOAD_USHORT               : VFLAT_Real_AllAddr_gfx13<0x0a, "global_l
 defm GLOBAL_LOAD_SSHORT               : VFLAT_Real_AllAddr_gfx13<0x0b, "global_load_i16">;
 defm GLOBAL_LOAD_DWORD                : VFLAT_Real_AllAddr_gfx13<0x0c, "global_load_b32">;
 defm GLOBAL_LOAD_DWORDX2              : VFLAT_Real_AllAddr_gfx13<0x0d, "global_load_b64">;
-defm GLOBAL_LOAD_DWORDX4              : VFLAT_Real_AllAddr_gfx13<0x0e, "av_global_load_b128">;
+defm GLOBAL_LOAD_DWORDX4              : VFLAT_Real_AllAddr_gfx13<0x0e, "global_load_b128">;
 defm GLOBAL_LOAD_DWORDX3              : VFLAT_Real_AllAddr_gfx13<0x0f, "global_load_b96">;
 defm GLOBAL_LOAD_DWORD_ADDTID         : VFLAT_Real_AllAddr_gfx13<0x16, "global_load_addtid_b32">;
 defm GLOBAL_STORE_DWORD_ADDTID        : VFLAT_Real_AllAddr_gfx13<0x17, "global_store_addtid_b32">;
@@ -3875,7 +3875,7 @@ defm GLOBAL_STORE_SHORT               : VFLAT_Real_AllAddr_gfx13<0x1a, "global_s
 defm GLOBAL_STORE_SHORT_D16_HI        : VFLAT_Real_AllAddr_gfx13<0x1b, "global_store_d16_hi_b16">;
 defm GLOBAL_STORE_DWORD               : VFLAT_Real_AllAddr_gfx13<0x1c, "global_store_b32">;
 defm GLOBAL_STORE_DWORDX2             : VFLAT_Real_AllAddr_gfx13<0x1d, "global_store_b64">;
-defm GLOBAL_STORE_DWORDX4             : VFLAT_Real_AllAddr_gfx13<0x1e, "av_global_store_b128">;
+defm GLOBAL_STORE_DWORDX4             : VFLAT_Real_AllAddr_gfx13<0x1e, "global_store_b128">;
 defm GLOBAL_STORE_DWORDX3             : VFLAT_Real_AllAddr_gfx13<0x1f, "global_store_b96">;
 defm GLOBAL_LOAD_UBYTE_D16            : VFLAT_Real_AllAddr_gfx13<0x20, "global_load_d16_u8">;
 defm GLOBAL_LOAD_UBYTE_D16_HI         : VFLAT_Real_AllAddr_gfx13<0x21, "global_load_d16_hi_u8">;

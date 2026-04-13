@@ -1801,9 +1801,9 @@ The AMDGPU backend implements the following LLVM IR intrinsics.
 
                                                    gfx11*         ``global_load_dwordx4``                                                  ``glc``                    ``glc``                    ``glc``
 
-                                                   gfx120*        ``av_global_load_b128``                             (CU)    ``scope:SCOPE_SE`` (SE)  ``scope:SCOPE_DEV`` (DEV)  ``scope:SCOPE_SYS`` (SYS)
+                                                   gfx120*        ``global_load_b128``                             (CU)    ``scope:SCOPE_SE`` (SE)  ``scope:SCOPE_DEV`` (DEV)  ``scope:SCOPE_SYS`` (SYS)
 
-                                                   gfx125*        ``av_global_load_b128``                             (CU)                             ``scope:SCOPE_DEV`` (DEV)  ``scope:SCOPE_SYS`` (SYS)
+                                                   gfx125*        ``global_load_b128``                             (CU)                             ``scope:SCOPE_DEV`` (DEV)  ``scope:SCOPE_SYS`` (SYS)
                                                    ============== ========================== ========================== ========================== ========================== ==========================
 
                                                    For gfx90*, see "GLC Bit Explained" in the appropriate instruction set reference
@@ -1855,9 +1855,9 @@ The AMDGPU backend implements the following LLVM IR intrinsics.
 
                                                    gfx11*         ``global_store_dwordx4``
 
-                                                   gfx120*        ``av_global_store_b128``                            (CU)    ``scope:SCOPE_SE`` (SE)  ``scope:SCOPE_DEV`` (DEV)  ``scope:SCOPE_SYS`` (SYS)
+                                                   gfx120*        ``global_store_b128``                            (CU)    ``scope:SCOPE_SE`` (SE)  ``scope:SCOPE_DEV`` (DEV)  ``scope:SCOPE_SYS`` (SYS)
 
-                                                   gfx125*        ``av_global_store_b128``                            (CU)                             ``scope:SCOPE_DEV`` (DEV)  ``scope:SCOPE_SYS`` (SYS)
+                                                   gfx125*        ``global_store_b128``                            (CU)                             ``scope:SCOPE_DEV`` (DEV)  ``scope:SCOPE_SYS`` (SYS)
                                                    ============== ========================== ========================== ========================== ========================== ==========================
 
                                                    For gfx90*, see "GLC Bit Explained" in the appropriate instruction set reference
