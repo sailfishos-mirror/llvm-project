@@ -21,4 +21,7 @@ void test_range_0_1() {
   // expected-error-re@+1 {{argument value {{[0-9]+}} is outside the valid range [0, 1]}}
   SVE_ACLE_FUNC(svluti6_lane, _f16_x2)(svcreate2_f16(svundef_f16(), svundef_f16()),
                                         svundef_u8(), -1);
+  // expected-error-re@+1 {{argument value {{[0-9]+}} is outside the valid range [0, 1]}}
+  SVE_ACLE_FUNC(svluti6_lane, _bf16_x2)(svcreate2_bf16(svundef_bf16(), svundef_bf16()),
+                                         svundef_u8(), 2);
 }
