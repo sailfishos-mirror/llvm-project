@@ -435,10 +435,16 @@ class ContainsSimpleUnionTest2 {
     float uf;
     int ui;
     char uc;
-  } u; // expected-note{{uninitialized field 'this->u'}}
+  } u;
+#ifdef PEDANTIC
+  // expected-note@-1{{uninitialized field 'this->u'}}
+#endif
 
 public:
-  ContainsSimpleUnionTest2() {} // expected-warning{{1 uninitialized field at the end of the constructor call}}
+  ContainsSimpleUnionTest2() {}
+#ifdef PEDANTIC
+  // expected-warning@-1{{1 uninitialized field at the end of the constructor call}}
+#endif
 };
 
 void fContainsSimpleUnionTest2() {
@@ -477,10 +483,16 @@ public:
   };
 
 private:
-  SimpleUnion *uptr; // expected-note{{uninitialized pointee 'this->uptr'}}
+  SimpleUnion *uptr;
+#ifdef PEDANTIC
+  // expected-note@-1{{uninitialized pointee 'this->uptr'}}
+#endif
 
 public:
-  UnionPointerTest2(SimpleUnion *uptr, char) : uptr(uptr) {} // expected-warning{{1 uninitialized field at the end of the constructor call}}
+  UnionPointerTest2(SimpleUnion *uptr, char) : uptr(uptr) {}
+#ifdef PEDANTIC
+  // expected-warning@-1{{1 uninitialized field at the end of the constructor call}}
+#endif
 };
 
 void fUnionPointerTest2() {
