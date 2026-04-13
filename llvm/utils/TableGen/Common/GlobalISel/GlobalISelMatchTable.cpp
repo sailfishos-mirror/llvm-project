@@ -1493,11 +1493,11 @@ Error OperandMatcher::addTypeCheckPredicate(const TypeSetByHwMode &VTy,
     return Error::success();
   }
 
-  llvm::MVT::SimpleValueType STy = VTy.getMachineValueType().SimpleTy;
-  if (STy == MVT::Metadata) {
-    addPredicate<MachineOperandTypeMatcher>(MachineOperand::MO_Metadata);
+  // Metadata operands have no LLT representation and no runtime type check is
+  // needed — they are guaranteed to be MO_Metadata by the IRTranslator. This
+  // mirrors how srcvalue is handled in importChildMatcher.
+  if (VTy.getMachineValueType() == MVT::Metadata)
     return Error::success();
-  }
 
   auto OpTyOrNone = MVTToLLT(VTy.getMachineValueType().SimpleTy);
   if (!OpTyOrNone)
@@ -1962,17 +1962,6 @@ bool InstructionOperandMatcher::isHigherPriorityThan(
     if (InsnMatcher->isHigherPriorityThan(*BP->InsnMatcher))
       return true;
   return false;
-}
-
-//===- MachineOperandTypeMatcher -----------------------------------------===//
-
-void MachineOperandTypeMatcher::emitPredicateOpcodes(MatchTable &Table,
-                                                     RuleMatcher &Rule) const {
-  Table << MatchTable::Opcode("GIM_CheckMachineOperandType")
-        << MatchTable::Comment("MI") << MatchTable::ULEB128Value(InsnVarID)
-        << MatchTable::Comment("Op") << MatchTable::ULEB128Value(OpIdx)
-        << MatchTable::Comment("Ty") << MatchTable::ULEB128Value(MOTy)
-        << MatchTable::LineBreak;
 }
 
 //===- OperandRenderer ----------------------------------------------------===//
