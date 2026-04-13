@@ -36,6 +36,7 @@ public:
   void VisitDeclStmt(const DeclStmt *DS);
   void VisitDeclRefExpr(const DeclRefExpr *DRE);
   void VisitCXXConstructExpr(const CXXConstructExpr *CCE);
+  void VisitCXXDefaultInitExpr(const CXXDefaultInitExpr *DIE);
   void VisitCXXMemberCallExpr(const CXXMemberCallExpr *MCE);
   void VisitMemberExpr(const MemberExpr *ME);
   void VisitCallExpr(const CallExpr *CE);
@@ -50,14 +51,21 @@ public:
   void VisitInitListExpr(const InitListExpr *ILE);
   void VisitCXXBindTemporaryExpr(const CXXBindTemporaryExpr *BTE);
   void VisitMaterializeTemporaryExpr(const MaterializeTemporaryExpr *MTE);
+  void VisitLambdaExpr(const LambdaExpr *LE);
+  void VisitArraySubscriptExpr(const ArraySubscriptExpr *ASE);
 
 private:
   OriginList *getOriginsList(const ValueDecl &D);
   OriginList *getOriginsList(const Expr &E);
 
+  bool hasOrigins(QualType QT) const;
+  bool hasOrigins(const Expr *E) const;
+
   void flow(OriginList *Dst, OriginList *Src, bool Kill);
 
   void handleAssignment(const Expr *LHSExpr, const Expr *RHSExpr);
+
+  void handlePointerArithmetic(const BinaryOperator *BO);
 
   void handleCXXCtorInitializer(const CXXCtorInitializer *CII);
 
@@ -111,6 +119,8 @@ private:
 
   void markUseAsWrite(const DeclRefExpr *DRE);
 
+  bool escapesViaReturn(OriginID OID) const;
+
   llvm::SmallVector<Fact *> issuePlaceholderLoans();
   FactManager &FactMgr;
   AnalysisDeclContext &AC;
@@ -125,6 +135,7 @@ private:
   // corresponding to the left-hand side is updated to be a "write", thereby
   // exempting it from the check.
   llvm::DenseMap<const Expr *, UseFact *> UseFacts;
+  const CFGBlock *CurrentBlock;
 };
 
 } // namespace clang::lifetimes::internal
