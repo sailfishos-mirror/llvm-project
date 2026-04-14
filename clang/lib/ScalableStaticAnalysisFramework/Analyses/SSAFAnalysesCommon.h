@@ -12,6 +12,7 @@
 #ifndef LLVM_CLANG_SCALABLESTATICANALYSISFRAMEWORK_ANALYSES_SSAFANALYSESCOMMON_H
 #define LLVM_CLANG_SCALABLESTATICANALYSISFRAMEWORK_ANALYSES_SSAFANALYSESCOMMON_H
 
+#include "clang/AST/ASTTypeTraits.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclObjC.h"
 #include "clang/AST/DynamicRecursiveASTVisitor.h"
@@ -46,5 +47,16 @@ inline llvm::Error makeEntityNameErr(ASTContext &Ctx, const NamedDecl *D) {
   return makeErrAtNode(Ctx, D, "failed to create entity name for %s",
                        D->getNameAsString().data());
 }
+
+namespace clang::ssaf {
+
+/// Find all contributors in an AST.
+void findContributors(ASTContext &Ctx,
+                      std::vector<const NamedDecl *> &Contributors);
+/// Perform `MatchAction` on each Stmt and Decl belonging to the `Contributor`.
+void findMatchesIn(const NamedDecl *Contributor,
+                   llvm::function_ref<void(const DynTypedNode &)> MatchAction);
+
+} // namespace clang::ssaf
 
 #endif // LLVM_CLANG_SCALABLESTATICANALYSISFRAMEWORK_ANALYSES_SSAFANALYSESCOMMON_H
