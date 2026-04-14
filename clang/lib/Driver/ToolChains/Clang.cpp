@@ -2802,6 +2802,7 @@ static void RenderFloatingPointOptions(const ToolChain &TC, const Driver &D,
   bool TrappingMathPresent = false; // Is trapping-math in args, and not
                                     // overriden by ffp-exception-behavior?
   bool RoundingFPMath = false;
+  std::optional<bool> SignalingNaNs;
   // -ffp-model values: strict, fast, precise
   StringRef FPModel = "";
   // -ffp-exception-behavior options: strict, maytrap, ignore
@@ -2853,6 +2854,7 @@ static void RenderFloatingPointOptions(const ToolChain &TC, const Driver &D,
     FPExceptionBehavior = "";
     FPContract = "fast";
     SeenUnsafeMathModeOption = true;
+    SignalingNaNs = false;
   };
 
   // Lambda to consolidate common handling for fp-contract
@@ -3015,6 +3017,12 @@ static void RenderFloatingPointOptions(const ToolChain &TC, const Driver &D,
       TrappingMath = true;
       TrappingMathPresent = true;
       FPExceptionBehavior = "strict";
+      break;
+    case options::OPT_fsignaling_nans:
+      SignalingNaNs = true;
+      break;
+    case options::OPT_fno_signaling_nans:
+      SignalingNaNs = false;
       break;
     case options::OPT_fveclib:
       VecLibArg = A;
@@ -3306,6 +3314,12 @@ static void RenderFloatingPointOptions(const ToolChain &TC, const Driver &D,
   if (!BFloat16ExcessPrecision.empty())
     CmdArgs.push_back(Args.MakeArgString("-fbfloat16-excess-precision=" +
                                          BFloat16ExcessPrecision));
+  if (SignalingNaNs) {
+    if (*SignalingNaNs)
+      CmdArgs.push_back(Args.MakeArgString("-fsignaling-nans"));
+    else
+      CmdArgs.push_back(Args.MakeArgString("-fno-signaling-nans"));
+  }
 
   StringRef Recip = parseMRecipOption(D.getDiags(), Args);
   if (!Recip.empty())
@@ -3315,7 +3329,8 @@ static void RenderFloatingPointOptions(const ToolChain &TC, const Driver &D,
   // individual features enabled by -ffast-math instead of the option itself as
   // that's consistent with gcc's behaviour.
   if (!HonorINFs && !HonorNaNs && !MathErrno && AssociativeMath && ApproxFunc &&
-      ReciprocalMath && !SignedZeros && !TrappingMath && !RoundingFPMath)
+      ReciprocalMath && !SignedZeros && !TrappingMath && !RoundingFPMath &&
+      (SignalingNaNs.has_value() && !SignalingNaNs.value()))
     CmdArgs.push_back("-ffast-math");
 
   // Handle __FINITE_MATH_ONLY__ similarly.
