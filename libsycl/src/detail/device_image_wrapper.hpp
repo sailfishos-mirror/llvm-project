@@ -7,8 +7,8 @@
 //===----------------------------------------------------------------------===//
 ///
 /// \file
-/// This file contains the declaration of the helper for raw device image
-/// parsing and iteration.
+/// This file contains the declaration of the helpers for device images and
+/// programs.
 ///
 //===----------------------------------------------------------------------===//
 
@@ -51,7 +51,7 @@ public:
   ProgramWrapper &operator=(ProgramWrapper &&) = delete;
 
   /// \return the corresponding liboffload program handle.
-  ol_program_handle_t getHandle() { return MProgram; }
+  ol_program_handle_t getOLHandle() { return MProgram; }
 
 private:
   ol_program_handle_t MProgram{};
@@ -80,6 +80,11 @@ public:
     return static_cast<size_t>(MBin->ImageEnd - MBin->ImageStart);
   }
 
+  ///  Returns liboffload program handle by lookup of existing programs or by
+  ///  creation of a new one from this image.
+  /// \param DeviceHandle liboffload handle of device the program must be
+  /// compatible with.
+  /// \return liboffload handle of the program compatible with specified device.
   ol_program_handle_t getOrCreateProgram(ol_device_handle_t DeviceHandle) {
     auto ProgramIt = MPrograms.find(DeviceHandle);
     if (ProgramIt == MPrograms.end()) {
@@ -89,7 +94,7 @@ public:
                                  std::forward_as_tuple(DeviceHandle, *this));
     }
 
-    return ProgramIt->second.getHandle();
+    return ProgramIt->second.getOLHandle();
   }
 
 protected:

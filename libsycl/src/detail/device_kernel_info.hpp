@@ -7,7 +7,9 @@
 //===----------------------------------------------------------------------===//
 ///
 /// \file
-/// to add
+/// This file contains the declaration of the class that aggregates information
+/// specific to device kernels (i.e. information that is uniform between
+/// different submissions of the same kernel).
 ///
 //===----------------------------------------------------------------------===//
 
@@ -21,35 +23,54 @@
 _LIBSYCL_BEGIN_NAMESPACE_SYCL
 namespace detail {
 
-// This class aggregates information specific to device kernels (i.e.
-// information that is uniform between different submissions of the same
-// kernel). Pointers to instances of this class are stored in header function
-// templates as a static variable to avoid repeated runtime lookup overhead.
+class ProgramAndKernelManager;
+
+// Pointers to instances of this class are stored in header function templates
+// as a static variable to avoid repeated runtime lookup overhead.
 class DeviceKernelInfo {
 public:
+  /// Constructs device kernel info instance.
+  ///
+  /// \param KernelName a name of kernel.
+  /// \param DeviceImage a device image containing device code of this kernel.
   DeviceKernelInfo(std::string_view KernelName, DeviceImageManager &DeviceImage)
       : MName(KernelName), MDeviceImage(DeviceImage) {}
 
-  ol_symbol_handle_t getKernel(ol_device_handle_t Device) {
-    if (auto KernelIt = MBuiltKernels.find(Device);
-        KernelIt != MBuiltKernels.end())
-      return KernelIt->second;
-    return nullptr;
-  }
-
-  DeviceImageManager &getDeviceImage() { return MDeviceImage; }
+  /// \return the name of this kernel.
   std::string_view getName() { return MName; }
-
-  void addKernel(ol_device_handle_t Device, ol_symbol_handle_t Kernel) {
-    assert(MBuiltKernels.find(Device) != MBuiltKernels.end());
-    MBuiltKernels.insert({Device, Kernel});
-  }
 
 private:
   std::unordered_map<ol_device_handle_t, ol_symbol_handle_t> MBuiltKernels;
 
   std::string_view MName;
   DeviceImageManager &MDeviceImage;
+
+  /// Searches for the existing kernel handle compatible with the specified
+  /// device.
+  /// \param Device a device the kernel must be compatible with.
+  /// \return a liboffload kernel handle if and only if built kernel was found,
+  /// otherwise returns nullptr.
+  ol_symbol_handle_t getKernel(ol_device_handle_t Device) const {
+    if (auto KernelIt = MBuiltKernels.find(Device);
+        KernelIt != MBuiltKernels.end())
+      return KernelIt->second;
+    return nullptr;
+  }
+
+  /// \return device image which contains device code of this kernel.
+  DeviceImageManager &getDeviceImage() const { return MDeviceImage; }
+
+  /// Attaches liboffload kernel handle to this device kernel info object.
+  /// \param Device the device the kernel symbol was created for.
+  /// \param Kernel the liboffload kernel symbol to attach..
+  void addKernel(ol_device_handle_t Device, ol_symbol_handle_t Kernel) {
+    assert(Kernel && Device &&
+           MBuiltKernels.find(Device) == MBuiltKernels.end());
+    MBuiltKernels.insert({Device, Kernel});
+  }
+
+  /// Kernel info update is intended to be done only by ProgramAndKernelManager.
+  friend class ProgramAndKernelManager;
 };
 
 } // namespace detail

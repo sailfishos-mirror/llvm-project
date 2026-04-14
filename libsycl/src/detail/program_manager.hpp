@@ -97,10 +97,8 @@ private:
                      std::unique_ptr<DeviceImageManager>>
       MDeviceImageManagers;
 
-  // Controls lifetime of programs.
-  std::unordered_map<ol_program_handle_t, std::unique_ptr<ProgramWrapper>>
-      MProgramWrappers;
-
+  // All work with device images and data related to it must be wrapped with a
+  // lock of this mutex.
   std::mutex MDataCollectionMutex;
 };
 

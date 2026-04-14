@@ -109,7 +109,7 @@ void ProgramAndKernelManager::unregisterFatBin(
     for (auto EntriesIt = EntriesB; EntriesIt != EntriesE; ++EntriesIt) {
       if (auto KernelIt = MDeviceKernelInfoMap.find(EntriesIt->SymbolName);
           KernelIt != MDeviceKernelInfoMap.end()) {
-        // Programs are attached to image and will be release with image
+        // Programs are attached to image and will be released with image
         // destruction. Clear only kernel specific data by destroying its kernel
         // info object.
         MDeviceKernelInfoMap.erase(KernelIt);
