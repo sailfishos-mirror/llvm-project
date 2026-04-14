@@ -1760,6 +1760,8 @@ for more details.
 
    * ``-f[no-]math-errno``
 
+   * ``-fno-signaling-nans``
+
    There is ambiguity about how ``-ffp-contract``, ``-ffast-math``,
    and ``-fno-fast-math`` behave when combined. To keep the value of
    ``-ffp-contract`` consistent, we define this set of rules:
@@ -1986,7 +1988,33 @@ for more details.
    - The option ``-frounding-math`` forces the compiler to honor the dynamically-set rounding mode.  This prevents optimizations which might affect results if the rounding mode changes or is different from the default; for example, it prevents floating-point operations from being reordered across most calls and prevents constant-folding when the result is not exactly representable.
 ```
 
-```{eval-rst}
+.. option:: -f[no-]signaling-nans
+
+   Informs the compiler whether signaling NaNs behave according to IEEE 754.
+
+   IEEE 754 defines signaling NaNs (SNaNs) as a subset of Not-a-Numbers (NaNs),
+   which possesses following properties:
+
+   * Floating-point operations, in which an SNaN is an operand, raise the
+     ``Invalid`` exception,
+   * Floating-point operations do not produce SNaNs, only quiet NaN can be a
+     result. Some target architectures do not support SNaNs; only a quiet NaN
+     can be a result.
+
+   The option ``-fsignaling-nans`` specifies IEEE 754 compliant behavior for
+   signaling NaNs. It has no effect if the target architecture does not
+   implements IEEE 754 signaling NaN behavior. This option causes the
+   preprocessor macro ``__SUPPORT_SNAN__`` to be defined.
+
+   The option ``-fno-signaling-nans`` specifies that signaling NaNs are treated
+   in the same way as quiet NaNs. This is the only option allowed if the target
+   architecture does not implement signaling NaNs according to IEEE-754. On
+   supporting architectures, it can enable additional optimization opportunities.
+
+   If more than one option is specified, the last one takes effect. If none is
+   specified, the compiler assumes ``-fno-signaling-nans``, unless the code is
+   compiled as strictfp functions, in which case ``-fsignaling-nans`` is assumed.
+
 .. option:: -ffp-model=<value>
 
    Specify floating point behavior. ``-ffp-model`` is an umbrella
