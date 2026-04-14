@@ -233,11 +233,7 @@ def Float16Type : DialectType<(type)>;
 
 // Stage the addition of new floating point types so that readers can be updated
 // first.
-#ifdef MLIRBC_DISABLE_FLOAT_ADD_JUNE
 class EnableFloatPrintingJune2026<dag d> : DialectTypeNoPrint<d>;
-#else
-class EnableFloatPrintingJune2026<dag d> : DialectType<d>;
-#endif
 
 def FloatTF32Type : EnableFloatPrintingJune2026<(type)>;
 
