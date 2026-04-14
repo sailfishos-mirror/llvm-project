@@ -32,8 +32,6 @@ uptr TagMemory(uptr p, uptr size, tag_t tag) {
 namespace __lsan {
 bool WordIsPoisoned(uptr addr) {
   tag_t Tag = GetTagFromPointer(addr);
-  return Tag >= (1 << __hwasan::HwasanTagBits());
-  // Fixme: implement actual tag checking.
-  return false;
+  return Tag >= (1U << __hwasan::HwasanTagBits());
 }
 }  // namespace __lsan
