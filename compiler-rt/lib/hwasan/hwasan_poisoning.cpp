@@ -12,7 +12,6 @@
 
 #include "hwasan_poisoning.h"
 
-#include "hwasan.h"
 #include "hwasan_mapping.h"
 #include "interception/interception.h"
 #include "sanitizer_common/sanitizer_common.h"
@@ -31,10 +30,7 @@ uptr TagMemory(uptr p, uptr size, tag_t tag) {
 // --- Implementation of LSan-specific functions --- {{{1
 namespace __lsan {
 bool WordIsPoisoned(uptr addr) {
-  if (!InTaggableRegion(addr))
-    return false;
-  tag_t Tag =
-      *reinterpret_cast<tag_t*>(__hwasan::MemToShadow(addr)) return Tag >=
-      (1U << __hwasan::HwasanTagBits());
+  // Fixme: implement actual tag checking.
+  return false;
 }
 }  // namespace __lsan
