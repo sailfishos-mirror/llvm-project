@@ -69,6 +69,9 @@ Changes to the LLVM IR
 * The `"nooutline"` attribute is now writen as `nooutline`. Existing IR and
   bitcode will be automatically updated.
 
+* The function attribute "signaling-nans" was added to control the support of
+  signaling NaNs.
+
 Changes to LLVM infrastructure
 ------------------------------
 

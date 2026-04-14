@@ -209,6 +209,8 @@ New Compiler Flags
   reduced BMI only for a C++20 importable module unit. Previously the users
   can only generate the reduced BMI as a by-product, e.g, an object files or
   a full BMI.
+- New option ``-f[no-]signaling-nans`` added to control yhe support of
+  signaling NaNs.
 
 - New ``-cc1`` option ``-fexperimental-overflow-behavior-types`` added to
   enable parsing of the experimental ``overflow_behavior`` type attribute and
