@@ -26,25 +26,6 @@
 using namespace clang;
 using namespace ssaf;
 
-static std::set<const Expr *>
-findUnsafePointersInContributor(const DynTypedNode &Node) {
-  const Decl *D = Node.get<Decl>();
-
-  if (!D)
-    return {};
-  if (isa<FunctionDecl>(D) || isa<VarDecl>(D))
-    return findUnsafePointers(D);
-  if (auto *RD = dyn_cast<RecordDecl>(D)) {
-    std::set<const Expr *> Result;
-
-    for (const FieldDecl *FD : RD->fields()) {
-      Result.merge(findUnsafePointers(FD));
-    }
-    return Result;
-  }
-  return {};
-}
-
 class clang::ssaf::UnsafeBufferUsageTUSummaryExtractor
     : public TUSummaryExtractor {
 public:
@@ -57,9 +38,8 @@ public:
   extractEntitySummary(const NamedDecl *Contributor, ASTContext &Ctx) {
     std::set<const Expr *> UnsafePointers;
 
-    auto MatchAction = [&UnsafePointers](const DynTypedNode &Node) {
-      auto Result = findUnsafePointersInContributor(Node);
-      UnsafePointers.insert(Result.begin(), Result.end());
+    auto MatchAction = [&Ctx, &UnsafePointers](const DynTypedNode &Node) {
+      return matchUnsafePointers(Node, Ctx, UnsafePointers);
     };
     findMatchesIn(Contributor, MatchAction);
 
