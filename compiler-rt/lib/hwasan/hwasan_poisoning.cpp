@@ -31,7 +31,9 @@ uptr TagMemory(uptr p, uptr size, tag_t tag) {
 // --- Implementation of LSan-specific functions --- {{{1
 namespace __lsan {
 bool WordIsPoisoned(uptr addr) {
-  tag_t Tag = GetTagFromPointer(addr);
+  if (!InTaggableRegion(addr))
+    return false;
+  tag_t Tag = *reinterpret_cast<tag_t *>(__hwasan::MemToShadow(addr))
   return Tag >= (1U << __hwasan::HwasanTagBits());
 }
 }  // namespace __lsan
