@@ -4840,8 +4840,8 @@ let Predicates = [HasSVE2p3_or_SME2p3] in {
   defm SQSHRUN_Z2ZI_StoH  : sve_multi_vec_shift_narrow<"sqshrun",  0b100, null_frag>;
   defm SQSHRN_Z2ZI_StoH   : sve_multi_vec_shift_narrow<"sqshrn",   0b000, null_frag>;
   defm UQSHRN_Z2ZI_StoH   : sve_multi_vec_shift_narrow<"uqshrn",   0b010, null_frag>;
-  defm LUTI6_Z2ZZI        : sve2_luti6_vector_index<"luti6">;
 
+  defm LUTI6_Z2ZZI        : sve2_luti6_vector_index<"luti6">;
 } // End HasSME2p3orSVE2p3
 
 //===----------------------------------------------------------------------===//
