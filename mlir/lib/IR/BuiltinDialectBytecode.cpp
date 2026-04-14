@@ -54,7 +54,7 @@ enum class AffineExprBytecodeKind : uint64_t {
 };
 
 static FailureOr<AffineExpr> readAffineExpr(DialectBytecodeReader &reader,
-                                             MLIRContext *context) {
+                                            MLIRContext *context) {
   uint64_t kind;
   if (failed(reader.readVarInt(kind)))
     return failure();
@@ -111,9 +111,6 @@ static FailureOr<AffineExpr> readAffineExpr(DialectBytecodeReader &reader,
     }
     return getAffineBinaryOpExpr(exprKind, *lhs, *rhs);
   }
-  default:
-    reader.emitError() << "unknown AffineExpr kind: " << kind;
-    return failure();
   }
 }
 
@@ -160,8 +157,7 @@ static void writeAffineExpr(DialectBytecodeWriter &writer, AffineExpr expr) {
 }
 
 static LogicalResult readAffineMap(DialectBytecodeReader &reader,
-                                   MLIRContext *context,
-                                   AffineMap &map) {
+                                   MLIRContext *context, AffineMap &map) {
   uint64_t numDims, numSymbols, numResults;
   if (failed(reader.readVarInt(numDims)) ||
       failed(reader.readVarInt(numSymbols)) ||
@@ -180,8 +176,7 @@ static LogicalResult readAffineMap(DialectBytecodeReader &reader,
   return success();
 }
 
-static void writeAffineMap(DialectBytecodeWriter &writer,
-                           AffineMapAttr attr) {
+static void writeAffineMap(DialectBytecodeWriter &writer, AffineMapAttr attr) {
   AffineMap map = attr.getValue();
   writer.writeVarInt(map.getNumDims());
   writer.writeVarInt(map.getNumSymbols());
@@ -195,8 +190,8 @@ static void writeAffineMap(DialectBytecodeWriter &writer,
 //===----------------------------------------------------------------------===//
 
 // Returns the bitwidth if known, else return 0.
-static std::optional<unsigned> getIntegerBitWidth(
-    DialectBytecodeReader &reader, Type type) {
+static std::optional<unsigned> getIntegerBitWidth(DialectBytecodeReader &reader,
+                                                  Type type) {
   if (auto intType = dyn_cast<IntegerType>(type))
     return intType.getWidth();
   if (llvm::isa<IndexType>(type))
