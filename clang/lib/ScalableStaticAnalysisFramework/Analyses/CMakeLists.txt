@@ -8,6 +8,7 @@ add_clang_library(clangScalableStaticAnalysisFrameworkAnalyses
   EntityPointerLevel/EntityPointerLevel.cpp
   PointerFlow/PointerFlow.cpp
   PointerFlow/PointerFlowExtractor.cpp  
+  SSAFAnalysesCommon.cpp
   UnsafeBufferUsage/UnsafeBufferUsage.cpp
   UnsafeBufferUsage/UnsafeBufferUsageExtractor.cpp
 

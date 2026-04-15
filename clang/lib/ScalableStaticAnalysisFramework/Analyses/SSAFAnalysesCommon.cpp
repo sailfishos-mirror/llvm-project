@@ -1,0 +1,106 @@
+//===- SSAFAnalysesCommon.cpp ---------------------------------------------===//
+//
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+
+#include "SSAFAnalysesCommon.h"
+
+namespace {
+// Traverses the AST and finds contributors.
+class ContributorFinder : public DynamicRecursiveASTVisitor {
+public:
+  std::vector<const NamedDecl *> Contributors;
+
+  bool VisitFunctionDecl(FunctionDecl *D) override {
+    Contributors.push_back(D);
+    return true;
+  }
+
+  bool VisitRecordDecl(RecordDecl *D) override {
+    Contributors.push_back(D);
+    return true;
+  }
+
+  bool VisitVarDecl(VarDecl *D) override {
+    DeclContext *DC = D->getDeclContext();
+
+    if (DC->isFileContext() || DC->isNamespace())
+      Contributors.push_back(D);
+    return true;
+  }
+};
+
+// An AST visitor that skips the root node's strict-descendants that are
+// callable Decls and record Decls, because those are separate contributors.
+//
+// Clients need to implement their own `MatchAction`, which is a function that
+// takes a `DynTypedNode`, decides if it matches and performs any further
+// callback actions.
+class ContributorFactFinder : public DynamicRecursiveASTVisitor {
+  llvm::function_ref<void(const DynTypedNode &)> MatchAction;
+  const NamedDecl *RootDecl = nullptr;
+
+  template <typename NodeTy> void match(const NodeTy &Node) {
+    MatchAction(DynTypedNode::create(Node));
+  }
+
+public:
+  ContributorFactFinder(
+      llvm::function_ref<void(const DynTypedNode &)> MatchAction)
+      : MatchAction(MatchAction) {
+    ShouldVisitTemplateInstantiations = true;
+    ShouldVisitImplicitCode = false;
+  }
+
+  // The entry point:
+  void findMatches(const NamedDecl *Contributor) {
+    RootDecl = Contributor;
+    TraverseDecl(const_cast<NamedDecl *>(Contributor));
+  }
+
+  bool TraverseDecl(Decl *Node) override {
+    if (!Node)
+      return true;
+    // To skip callables:
+    if (Node != RootDecl && isa<FunctionDecl, CXXConstructorDecl, BlockDecl,
+                                ObjCMethodDecl, RecordDecl>(Node))
+      return true;
+    match(*Node);
+    return DynamicRecursiveASTVisitor::TraverseDecl(Node);
+  }
+
+  bool TraverseStmt(Stmt *Node) override {
+    if (!Node)
+      return true;
+    match(*Node);
+    return DynamicRecursiveASTVisitor::TraverseStmt(Node);
+  }
+
+  bool TraverseLambdaExpr(LambdaExpr *L) override {
+    // TODO: lambda captures of pointer variables (by copy or by reference)
+    // are currently not tracked. Each capture initializes an implicit closure
+    // field from the captured variable, which constitutes a pointer assignment
+    // edge that should be recorded here.
+    return true; // Skip lambda as it is a callable.
+  }
+};
+} // namespace
+
+namespace clang::ssaf {
+
+void findContributors(ASTContext &Ctx,
+                      std::vector<const NamedDecl *> &Contributors) {
+  ContributorFinder Finder;
+  Finder.TraverseAST(Ctx);
+  Contributors = std::move(Finder.Contributors);
+}
+
+void findMatchesIn(const NamedDecl *Contributor,
+                   llvm::function_ref<void(const DynTypedNode &)> MatchAction) {
+  ContributorFactFinder{MatchAction}.findMatches(Contributor);
+}
+
+} // namespace clang::ssaf

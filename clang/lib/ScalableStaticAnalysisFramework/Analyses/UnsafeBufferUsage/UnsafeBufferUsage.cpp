@@ -54,8 +54,9 @@ deserializeImpl(const Object &Data, JSONFormat::EntityIdFromJSONFn Fn) {
 
   EntityPointerLevelSet EPLs;
 
-  for (auto &EPLData : *UnsafeBuffersData) {
-    auto EPL = entityPointerLevelFromJSON(EPLData, Fn);
+  for (const auto &EltData : *UnsafeBuffersData) {
+    llvm::Expected<EntityPointerLevel> EPL =
+        entityPointerLevelFromJSON(EltData, Fn);
 
     if (!EPL)
       return EPL.takeError();

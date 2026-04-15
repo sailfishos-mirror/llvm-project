@@ -20,4 +20,5 @@ Expected<EntityPointerLevel>
 entityPointerLevelFromJSON(const llvm::json::Value &EPLData,
                            JSONFormat::EntityIdFromJSONFn EntityIdFromJSON);
 } // namespace clang::ssaf
+
 #endif // LLVM_CLANG_SCALABLESTATICANALYSISFRAMEWORK_ANALYSES_ENTITYPOINTERLEVEL_ENTITYPOINTERLEVELFORMAT_H
