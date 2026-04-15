@@ -70,8 +70,8 @@ static std::set<const Expr *> findUnsafePointersInContributor(const Decl *D) {
 }
 } // namespace
 
-class clang::ssaf::UnsafeBufferUsageTUSummaryExtractor
-    : public TUSummaryExtractor {
+namespace clang::ssaf {
+class UnsafeBufferUsageTUSummaryExtractor : public TUSummaryExtractor {
 public:
   UnsafeBufferUsageTUSummaryExtractor(TUSummaryBuilder &Builder)
       : TUSummaryExtractor(Builder) {}
@@ -79,66 +79,74 @@ public:
   EntityId addEntity(EntityName EN) { return SummaryBuilder.addEntity(EN); }
 
   Expected<std::unique_ptr<UnsafeBufferUsageEntitySummary>>
-  extractEntitySummary(const Decl *Contributor, ASTContext &Ctx) {
-    auto AddEntity = [this](EntityName EN) { return addEntity(EN); };
-    Expected<EntityPointerLevelSet> EPLs = buildEntityPointerLevels(
-        findUnsafePointersInContributor(Contributor), Ctx, AddEntity);
+  extractEntitySummary(const Decl *Contributor, ASTContext &Ctx);
 
-    if (EPLs)
-      return std::make_unique<UnsafeBufferUsageEntitySummary>(
-          UnsafeBufferUsageEntitySummary(std::move(*EPLs)));
-    return EPLs.takeError();
-  }
-
-  void HandleTranslationUnit(ASTContext &Ctx) override {
-
-    // FIXME: I suppose finding contributor Decls is commonly needed by all/many
-    // extractors
-    class ContributorFinder : public DynamicRecursiveASTVisitor {
-    public:
-      std::vector<const NamedDecl *> Contributors;
-
-      bool VisitFunctionDecl(FunctionDecl *D) override {
-        Contributors.push_back(D);
-        return true;
-      }
-
-      bool VisitRecordDecl(RecordDecl *D) override {
-        Contributors.push_back(D);
-        return true;
-      }
-
-      bool VisitVarDecl(VarDecl *D) override {
-        DeclContext *DC = D->getDeclContext();
-
-        if (DC->isFileContext() || DC->isNamespace())
-          Contributors.push_back(D);
-        return true;
-      }
-    } ContributorFinder;
-
-    ContributorFinder.TraverseAST(Ctx);
-    for (auto *CD : ContributorFinder.Contributors) {
-      auto EntitySummary = extractEntitySummary(CD, Ctx);
-
-      if (!EntitySummary)
-        llvm::reportFatalInternalError(EntitySummary.takeError());
-      assert(*EntitySummary);
-      if ((*EntitySummary)->empty())
-        continue;
-
-      auto ContributorName = getEntityName(CD);
-
-      if (!ContributorName)
-        llvm::reportFatalInternalError(makeEntityNameErr(Ctx, CD));
-
-      auto [Ignored, InsertionSucceeded] = SummaryBuilder.addSummary(
-          addEntity(*ContributorName), std::move(*EntitySummary));
-
-      assert(InsertionSucceeded && "duplicated contributor extraction");
-    }
-  }
+  void HandleTranslationUnit(ASTContext &Ctx) override;
 };
+} // namespace clang::ssaf
+
+Expected<std::unique_ptr<UnsafeBufferUsageEntitySummary>>
+clang::ssaf::UnsafeBufferUsageTUSummaryExtractor::extractEntitySummary(
+    const Decl *Contributor, ASTContext &Ctx) {
+  auto AddEntity = [this](EntityName EN) { return addEntity(EN); };
+  Expected<EntityPointerLevelSet> EPLs = buildEntityPointerLevels(
+      findUnsafePointersInContributor(Contributor), Ctx, AddEntity);
+
+  if (EPLs)
+    return std::make_unique<UnsafeBufferUsageEntitySummary>(
+        UnsafeBufferUsageEntitySummary(std::move(*EPLs)));
+  return EPLs.takeError();
+}
+
+void clang::ssaf::UnsafeBufferUsageTUSummaryExtractor::HandleTranslationUnit(
+    ASTContext &Ctx) {
+
+  // FIXME: I suppose finding contributor Decls is commonly needed by all/many
+  // extractors
+  class ContributorFinder : public DynamicRecursiveASTVisitor {
+  public:
+    std::vector<const NamedDecl *> Contributors;
+
+    bool VisitFunctionDecl(FunctionDecl *D) override {
+      Contributors.push_back(D);
+      return true;
+    }
+
+    bool VisitRecordDecl(RecordDecl *D) override {
+      Contributors.push_back(D);
+      return true;
+    }
+
+    bool VisitVarDecl(VarDecl *D) override {
+      DeclContext *DC = D->getDeclContext();
+
+      if (DC->isFileContext() || DC->isNamespace())
+        Contributors.push_back(D);
+      return true;
+    }
+  } ContributorFinder;
+
+  ContributorFinder.TraverseAST(Ctx);
+  for (auto *CD : ContributorFinder.Contributors) {
+    auto EntitySummary = extractEntitySummary(CD, Ctx);
+
+    if (!EntitySummary)
+      llvm::reportFatalInternalError(EntitySummary.takeError());
+    assert(*EntitySummary);
+    if ((*EntitySummary)->empty())
+      continue;
+
+    auto ContributorName = getEntityName(CD);
+
+    if (!ContributorName)
+      llvm::reportFatalInternalError(makeEntityNameErr(Ctx, CD));
+
+    auto [Ignored, InsertionSucceeded] = SummaryBuilder.addSummary(
+        addEntity(*ContributorName), std::move(*EntitySummary));
+
+    assert(InsertionSucceeded && "duplicated contributor extraction");
+  }
+}
 
 // NOLINTNEXTLINE(misc-use-internal-linkage)
 volatile int UnsafeBufferUsageTUSummaryExtractorAnchorSource = 0;
