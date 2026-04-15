@@ -2951,9 +2951,7 @@ template <typename NodeTy> struct CompareNode {
 //   FunctionDecl
 //   BlockDecl
 //   ObjCMethodDecl
-//
-// return false iff `D` is not any one above.
-static bool populateStmtsForFindingGadgets(SmallVector<const Stmt *> &Stmts,
+static void populateStmtsForFindingGadgets(SmallVector<const Stmt *> &Stmts,
                                            const Decl *D) {
   auto AddStmt = [&Stmts](const Stmt *S) {
     if (S)
@@ -2968,21 +2966,13 @@ static bool populateStmtsForFindingGadgets(SmallVector<const Stmt *> &Stmts,
       llvm::append_range(
           Stmts, llvm::map_range(CtorD->inits(),
                                  std::mem_fn(&CXXCtorInitializer::getInit)));
-    return true;
-  }
-  if (isa<BlockDecl>(D) || isa<ObjCMethodDecl>(D)) {
+  } else if (isa<BlockDecl>(D) || isa<ObjCMethodDecl>(D)) {
     AddStmt(D->getBody());
-    return true;
-  }
-  if (const auto *VD = dyn_cast<VarDecl>(D)) {
-    AddStmt(VD->getInit());
-    return true;
-  }
-  if (const auto *FD = dyn_cast<FieldDecl>(D)) {
+  } else if (const auto *VD = dyn_cast<VarDecl>(D)) {
+    AddStmt(VD->getInit()); // FIXME: default arg for ParmVarDecl?
+  } else if (const auto *FD = dyn_cast<FieldDecl>(D)) {
     AddStmt(FD->getInClassInitializer());
-    return true;
   }
-  return false;
 }
 
 struct WarningGadgetSets {
