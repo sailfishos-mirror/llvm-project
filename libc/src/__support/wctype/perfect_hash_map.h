@@ -154,16 +154,14 @@ LIBC_INLINE constexpr size_t get_slots_per_part(size_t keys_per_part) {
 
 template <size_t n> class PtrhashConfig {
 public:
-  LIBC_INLINE_VAR static constexpr size_t PARTS = get_parts(n);
-  LIBC_INLINE_VAR static constexpr size_t KEYS_PER_PART = n / PARTS;
-  LIBC_INLINE_VAR static constexpr size_t PARTS_PER_SHARD = PARTS / SHARDS;
-  LIBC_INLINE_VAR static constexpr size_t SLOTS_PER_PART =
-      get_slots_per_part(KEYS_PER_PART);
-  LIBC_INLINE_VAR static constexpr size_t SLOTS_TOTAL = PARTS * SLOTS_PER_PART;
-  LIBC_INLINE_VAR static constexpr size_t BUCKETS_PER_PART =
+  static constexpr size_t PARTS = get_parts(n);
+  static constexpr size_t KEYS_PER_PART = n / PARTS;
+  static constexpr size_t PARTS_PER_SHARD = PARTS / SHARDS;
+  static constexpr size_t SLOTS_PER_PART = get_slots_per_part(KEYS_PER_PART);
+  static constexpr size_t SLOTS_TOTAL = PARTS * SLOTS_PER_PART;
+  static constexpr size_t BUCKETS_PER_PART =
       math::ceil(KEYS_PER_PART / 3.0) + 3;
-  LIBC_INLINE_VAR static constexpr size_t BUCKETS_TOTAL =
-      PARTS * BUCKETS_PER_PART;
+  static constexpr size_t BUCKETS_TOTAL = PARTS * BUCKETS_PER_PART;
 };
 
 // fxhash algorithm constant used in hashing numbers
