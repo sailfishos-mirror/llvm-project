@@ -52,50 +52,38 @@ class PointerAssignmentMatcher {
   }
 
   template <typename T1, typename T2>
-  bool addEdges(const T1 *LHS, const T2 *RHS) {
+  llvm::Error addEdges(const T1 *LHS, const T2 *RHS) {
     return addEdges(toEPL(LHS), RHS, false);
   }
 
   template <typename T>
-  bool addEdges(Expected<EntityPointerLevelSet> &&LHS, const T *RHS,
-                bool IsRHSRet = false) {
+  llvm::Error addEdges(Expected<EntityPointerLevelSet> &&LHS, const T *RHS,
+                       bool IsRHSRet = false) {
     auto Rs = toEPL(RHS, IsRHSRet);
-    bool Error = false;
 
-    if (!Rs) {
-      addError(Rs.takeError());
-      Error = true;
-    }
-    if (!LHS) {
-      addError(LHS.takeError());
-      Error = true;
-    }
-    if (Error)
-      return false;
+    if (!Rs)
+      return Rs.takeError();
+    if (!LHS)
+      return LHS.takeError();
     for (auto L : *LHS)
       Results[L].insert(Rs->begin(), Rs->end());
-    return true;
+    return llvm::Error::success();
   }
 
   template <typename ParmsProvider, typename ArgsProvider>
-  bool matchArgsWithParams(unsigned ArgIdxStart, ParmsProvider *PP,
-                           ArgsProvider *AP) {
-    bool Matched = false;
+  llvm::Error matchArgsWithParams(unsigned ArgIdxStart, ParmsProvider *PP,
+                                  ArgsProvider *AP) {
     unsigned ArgIdx = ArgIdxStart;
 
     for (unsigned ParmIdx = 0; ParmIdx < PP->getNumParams();
          ++ArgIdx, ++ParmIdx) {
       if (const ParmVarDecl *PD = PP->getParamDecl(ParmIdx);
           PD && hasPtrOrArrType(PD)) {
-        addEdges(PD, AP->getArg(ArgIdx));
-        Matched = true;
+        if (auto Err = addEdges(PD, AP->getArg(ArgIdx)))
+          return Err;
       }
     }
-    return Matched;
-  }
-
-  void addError(llvm::Error &&E) {
-    Error = llvm::joinErrors(std::move(Error), std::move(E));
+    return llvm::Error::success();
   }
 
   // Match initializer lists of the form 'Var = {a, b, c, ...}':
@@ -111,20 +99,18 @@ class PointerAssignmentMatcher {
   //
   // The process is recursive: 'a', 'b', 'c', etc. may themselves be
   // initializer lists.  We therefore use `ArrayIndirectLevel` to keep track.
-  bool matchInitializerList(const ValueDecl *Base, const Expr *InitExpr,
-                            unsigned ArrayElementIndirectLevel = 0) {
+  llvm::Error matchInitializerList(const ValueDecl *Base, const Expr *InitExpr,
+                                   unsigned ArrayElementIndirectLevel = 0) {
     const InitListExpr *ILE = dyn_cast<InitListExpr>(InitExpr);
 
     if (!ILE) {
       if (!hasPtrOrArrType(InitExpr))
-        return false;
+        return llvm::Error::success();
 
       auto Expected = toEPL(Base);
 
-      if (!Expected) {
-        addError(Expected.takeError());
-        return false;
-      }
+      if (!Expected)
+        return Expected.takeError();
 
       auto R = llvm::map_range(*Expected, [&ArrayElementIndirectLevel](
                                               const EntityPointerLevel &EPL) {
@@ -148,23 +134,22 @@ class PointerAssignmentMatcher {
   }
 
   // Helper function for matchInitializerList that handles record:
-  bool matchInitializerListForRecordDecl(const RecordDecl *RecordTy,
-                                         const InitListExpr *ILE) {
+  llvm::Error matchInitializerListForRecordDecl(const RecordDecl *RecordTy,
+                                                const InitListExpr *ILE) {
     if (auto *CXXRD = dyn_cast<CXXRecordDecl>(RecordTy))
       if (CXXRD->getNumBases() != 0) {
         // FIXME: support this:
-        addError(makeErrAtNode(
+        return makeErrAtNode(
             Ctx, ILE,
             "attempt to create pointer assignment edges between "
-            "CXXRecordDecls with base classes and initializer-lists"));
-        return false;
+            "CXXRecordDecls with base classes and initializer-lists");
       }
     // Handle union:
     if (RecordTy->isUnion()) {
       auto *InitField = ILE->getInitializedFieldInUnion();
 
       if (!InitField)
-        return false;
+        return llvm::Error::success();
       assert(!ILE->inits().empty());
       return matchInitializerList(InitField, ILE->getInit(0));
     }
@@ -172,35 +157,30 @@ class PointerAssignmentMatcher {
     ILE = ILE->getSemanticForm() ? ILE->getSemanticForm() : ILE;
 
     auto FieldIter = RecordTy->field_begin();
-    bool Matched = false;
 
     assert(RecordTy->getNumFields() >= ILE->getNumInits());
-    for (auto *Init : ILE->inits()) {
-      if (matchInitializerList(*(FieldIter++), Init))
-        Matched = true;
-    }
-    return Matched;
+    for (auto *Init : ILE->inits())
+      if (auto Err = matchInitializerList(*(FieldIter++), Init))
+        return Err;
+    return llvm::Error::success();
   }
 
   // Helper function for matchInitializerList that handles array:
-  bool matchInitializerListForArray(const ValueDecl *Array,
-                                    const InitListExpr *ILE,
-                                    unsigned ArrayIndirectLevel = 0) {
-    bool Matched = false;
-
+  llvm::Error matchInitializerListForArray(const ValueDecl *Array,
+                                           const InitListExpr *ILE,
+                                           unsigned ArrayIndirectLevel = 0) {
     for (auto *E : ILE->inits())
-      if (matchInitializerList(Array, E, ArrayIndirectLevel + 1))
-        Matched = true;
-    return Matched;
+      if (auto Err = matchInitializerList(Array, E, ArrayIndirectLevel + 1))
+        return Err;
+    return llvm::Error::success();
   }
 
 public:
-  llvm::Error Error;
   EdgeSet Results;
 
   PointerAssignmentMatcher(
       ASTContext &Ctx, std::function<EntityId(const EntityName &)> AddEntity)
-      : Ctx(Ctx), AddEntity(AddEntity), Error(llvm::Error::success()) {}
+      : Ctx(Ctx), AddEntity(AddEntity) {}
 
   // Match and extract assignments.
   // The extraction function 'XF' can be described by the following rules:
@@ -215,7 +195,7 @@ public:
   //                            ctor's body will be visited later.
   // XF(T var = e)           => XF(Var = e)
   // XF(T var = init-list)   => see `matchInitializerList`
-  bool matches(const DynTypedNode &DynNode, const NamedDecl *RootDecl) {
+  llvm::Error matches(const DynTypedNode &DynNode, const NamedDecl *RootDecl) {
     if (const Stmt *S = DynNode.get<Stmt>()) {
       // Match 'p = q' whenever it has pointer or array type:
       if (const auto *BO = dyn_cast<BinaryOperator>(S);
@@ -228,7 +208,7 @@ public:
         const FunctionDecl *FD = CE->getDirectCallee();
 
         if (!FD)
-          return false;
+          return llvm::Error::success();
 
         unsigned ArgIdx = 0;
 
@@ -247,7 +227,7 @@ public:
       if (const auto *RS = dyn_cast<ReturnStmt>(S)) {
         const Expr *RetExpr = RS->getRetValue();
         if (!hasPtrOrArrType(RetExpr))
-          return false;
+          return llvm::Error::success();
         return addEdges(toEPL(RootDecl, true), RetExpr, false);
       }
     }
@@ -272,20 +252,18 @@ public:
 
       // Match C++ constructor member-initializers:
       if (const auto *CtorD = dyn_cast<CXXConstructorDecl>(D)) {
-        bool Matched = false;
-
         for (auto *E : CtorD->inits()) {
           if (E->isDelegatingInitializer())
             return matches(DynTypedNode::create(*E->getInit()), RootDecl);
           if (const FieldDecl *FD = E->getMember(); FD && hasPtrOrArrType(FD)) {
-            addEdges(E->getMember(), E->getInit());
-            Matched = true;
+            if (auto Err = addEdges(E->getMember(), E->getInit()))
+              return Err;
           }
         }
-        return Matched;
+        return llvm::Error::success();
       }
     }
-    return false;
+    return llvm::Error::success();
   }
 };
 } // namespace
@@ -305,12 +283,13 @@ public:
     PointerAssignmentMatcher Matcher(
         Ctx, [this](const EntityName &EN) { return addEntity(EN); });
     auto MatchAction = [&Matcher, &Contributor](const DynTypedNode &Node) {
-      Matcher.matches(Node, Contributor);
+      auto Err = Matcher.matches(Node, Contributor);
+
+      if (Err)
+        llvm::report_fatal_error(std::move(Err));
     };
 
     findMatchesIn(Contributor, MatchAction);
-    if (Matcher.Error)
-      return std::move(Matcher.Error);
     return std::make_unique<PointerFlowEntitySummary>(
         PointerFlowEntitySummary(std::move(Matcher.Results)));
   }

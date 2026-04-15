@@ -36,7 +36,7 @@ public:
   }
 
   bool VisitLambdaExpr(LambdaExpr *L) override {
-    // TraversetLambdaExpr directly visits the body stmt, but we need to collect
+    // TraverseLambdaExpr directly visits the body stmt, but we need to collect
     // the CXXMethodDecl as a contributor:
     VisitFunctionDecl(L->getCallOperator());
     return true;

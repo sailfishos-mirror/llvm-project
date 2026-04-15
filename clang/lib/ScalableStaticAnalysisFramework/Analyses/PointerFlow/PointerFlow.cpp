@@ -8,9 +8,11 @@
 
 #include "clang/ScalableStaticAnalysisFramework/Analyses/PointerFlow/PointerFlow.h"
 #include "SSAFAnalysesCommon.h"
+#include "clang/ScalableStaticAnalysisFramework/Analyses/EntityPointerLevel/EntityPointerLevel.h"
 #include "clang/ScalableStaticAnalysisFramework/Analyses/EntityPointerLevel/EntityPointerLevelFormat.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/Model/EntityId.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/iterator_range.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/JSON.h"
 
@@ -77,7 +79,7 @@ summaryFromJSON(const Object &Data, EntityIdTable &,
 
   if (!EdgesDataAsArr)
     return makeSawButExpectedError(
-        *EdgesData, "a JSON array of arary of EntityPointerLevels");
+        *EdgesData, "a JSON array of array of EntityPointerLevels");
   for (const auto &EdgesEntryData : *EdgesDataAsArr) {
     const auto *EPLArray = EdgesEntryData.getAsArray();
 
@@ -86,19 +88,18 @@ summaryFromJSON(const Object &Data, EntityIdTable &,
           EdgesEntryData, "a JSON array of EntityPointerLevels with a size "
                           "greater than 1: [lhs, rhs, rhs, ...]");
 
-    llvm::Error Err = llvm::Error::success();
-    auto EPLs = llvm::map_range(
-        *EPLArray, [&Err, &EntityIdFromJSON](const auto &EPLData) {
-          auto EPL = entityPointerLevelFromJSON(EPLData, EntityIdFromJSON);
+    auto SrcEPL =
+        entityPointerLevelFromJSON(*EPLArray->begin(), EntityIdFromJSON);
 
-          if (!EPL)
-            Err = llvm::joinErrors(std::move(Err), EPL.takeError());
-          return *EPL;
-        });
-
-    if (Err)
-      return Err;
-    Edges[*EPLs.begin()].insert(EPLs.begin() + 1, EPLs.end());
+    if (!SrcEPL)
+      return SrcEPL.takeError();
+    for (const auto &EPLData :
+         llvm::make_range(EPLArray->begin() + 1, EPLArray->end())) {
+      auto EPL = entityPointerLevelFromJSON(EPLData, EntityIdFromJSON);
+      if (!EPL)
+        return EPL.takeError();
+      Edges[*SrcEPL].insert(*EPL);
+    }
   }
   return std::make_unique<PointerFlowEntitySummary>(
       buildPointerFlowEntitySummary(std::move(Edges)));

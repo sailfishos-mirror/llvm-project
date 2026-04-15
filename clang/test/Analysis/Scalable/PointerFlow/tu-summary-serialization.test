@@ -13,7 +13,7 @@
 
 // RUN: not clang-ssaf-format -type=tu %S/Inputs/tu-summary-bad-summary.json 2>&1 \
 // RUN: | FileCheck %s --check-prefix=CHECK-BAD-SUMMARY
-// CHECK-BAD-SUMMARY: saw {} but expected a JSON array of arary of EntityPointerLevels
+// CHECK-BAD-SUMMARY: saw {} but expected a JSON array of array of EntityPointerLevels
 
 // RUN: not clang-ssaf-format -type=tu %S/Inputs/tu-summary-bad-array.json 2>&1 \
 // RUN:   | FileCheck %s --check-prefix=CHECK-BAD-ARRAY

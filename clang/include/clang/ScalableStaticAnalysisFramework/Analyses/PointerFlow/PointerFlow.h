@@ -44,7 +44,7 @@ public:
     return Edges == Other.Edges;
   }
 
-  bool empty() const { return Edges.empty() && Edges.empty(); }
+  bool empty() const { return Edges.empty(); }
 
   static SummaryName summaryName() { return SummaryName{Name.str()}; }
 };
