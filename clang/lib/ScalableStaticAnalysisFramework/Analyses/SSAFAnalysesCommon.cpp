@@ -8,6 +8,8 @@
 
 #include "SSAFAnalysesCommon.h"
 
+using namespace clang;
+
 namespace {
 // Traverses the AST and finds contributors.
 class ContributorFinder : public DynamicRecursiveASTVisitor {
@@ -95,7 +97,8 @@ void findContributors(ASTContext &Ctx,
                       std::vector<const NamedDecl *> &Contributors) {
   ContributorFinder Finder;
   Finder.TraverseAST(Ctx);
-  Contributors = std::move(Finder.Contributors);
+  Contributors.insert(Contributors.end(), Finder.Contributors.begin(),
+                      Finder.Contributors.end());
 }
 
 void findMatchesIn(const NamedDecl *Contributor,
