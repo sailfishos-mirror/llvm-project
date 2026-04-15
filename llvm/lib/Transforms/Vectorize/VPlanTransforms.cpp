@@ -6411,11 +6411,9 @@ void VPlanTransforms::makeScalarizationDecisions(VPlan &Plan, VFRange &Range) {
           [&](ElementCount VF) { return VF.isScalar(); }, Range))
     return;
 
-  VPRegionBlock *LoopRegion = Plan.getVectorLoopRegion();
-  VPBasicBlock *HeaderVPBB = LoopRegion->getEntryBasicBlock();
-
   // Extend lifetime per `llvm::PostOrderTraversal` documentation:
-  auto PO = vp_post_order_shallow(HeaderVPBB);
+  auto PO =
+      vp_post_order_shallow(Plan.getVectorLoopRegion()->getEntryBasicBlock());
 
   for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(PO)) {
     for (VPRecipeBase &R : make_early_inc_range(reverse(*VPBB))) {
@@ -6432,6 +6430,8 @@ void VPlanTransforms::makeScalarizationDecisions(VPlan &Plan, VFRange &Range) {
         if (VPI->mayHaveSideEffects())
           return false;
 
+        // We want to drop the mask operand, doing that for integer division
+        // isn't safe.
         if (is_contained({Instruction::SDiv, Instruction::UDiv,
                           Instruction::SRem, Instruction::URem},
                          VPI->getOpcode()) &&
@@ -6450,15 +6450,15 @@ void VPlanTransforms::makeScalarizationDecisions(VPlan &Plan, VFRange &Range) {
         return true;
       }();
 
-      if (CanTransformToFirstLaneOnly) {
-        auto *Recipe =
-            new VPReplicateRecipe(I, VPI->operandsWithoutMask(), true, nullptr,
-                                  *VPI, *VPI, VPI->getDebugLoc());
-        Recipe->insertBefore(VPI);
-        VPI->replaceAllUsesWith(Recipe);
-        VPI->eraseFromParent();
+      if (!CanTransformToFirstLaneOnly)
         continue;
-      }
+
+      auto *Recipe =
+          new VPReplicateRecipe(I, VPI->operandsWithoutMask(), true, nullptr,
+                                *VPI, *VPI, VPI->getDebugLoc());
+      Recipe->insertBefore(VPI);
+      VPI->replaceAllUsesWith(Recipe);
+      VPI->eraseFromParent();
     }
   }
 }
