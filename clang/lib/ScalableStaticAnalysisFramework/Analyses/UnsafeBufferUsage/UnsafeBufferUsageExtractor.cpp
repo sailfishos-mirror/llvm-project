@@ -39,7 +39,7 @@ public:
     std::set<const Expr *> UnsafePointers;
 
     auto MatchAction = [&Ctx, &UnsafePointers](const DynTypedNode &Node) {
-      return matchUnsafePointers(Node, Ctx, UnsafePointers);
+      matchUnsafePointers(Node, Ctx, UnsafePointers);
     };
     findMatchesIn(Contributor, MatchAction);
 

@@ -2982,10 +2982,7 @@ static bool populateStmtsForFindingGadgets(SmallVector<const Stmt *> &Stmts,
     AddStmt(FD->getInClassInitializer());
     return true;
   }
-<<<<<<< HEAD
   return false;
-=======
->>>>>>> users/ziqingluo/PR-172429193-2-split-4
 }
 
 struct WarningGadgetSets {
@@ -4750,15 +4747,12 @@ bool clang::matchUnsafePointers(const DynTypedNode &N, ASTContext &Ctx,
   WarningGadgetList WarningGadgets;
   bool Matched = false;
 
-<<<<<<< HEAD
-=======
   // FIXME: By design, we don't need MockReporter, and we are supposed to
   // only define WARNING_GADGET when we want to treat WARNING_OPTIONAL_GADGET
   // the same as WARNING_GADGET. The reason we have to do it this way now is
   // that some WARNING_OPTIONAL_GADGETs do not have the 3-argument `matches`
   // overload. We need to fix this problem in a separate patch.
 
->>>>>>> users/ziqingluo/PR-172429193-2-split-4
 #define WARNING_GADGET(name)                                                   \
   if (name##Gadget::matches(S, Ctx, Result))                                   \
     WarningGadgets.push_back(std::make_unique<name##Gadget>(Result));

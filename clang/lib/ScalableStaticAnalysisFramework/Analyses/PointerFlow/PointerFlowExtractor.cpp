@@ -24,8 +24,8 @@
 #include "clang/ScalableStaticAnalysisFramework/Core/TUSummary/TUSummaryBuilder.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/TUSummary/TUSummaryExtractor.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/STLFunctionalExtras.h"
 #include "llvm/Support/Error.h"
-#include <functional>
 #include <memory>
 #include <optional>
 
@@ -40,7 +40,7 @@ class PointerAssignmentMatcher {
   // Convert a Expr/NamedDecl to an EntityPointerLevel(Set):
   Expected<EntityPointerLevelSet> toEPL(const NamedDecl *N,
                                         bool IsRet = false) {
-    auto Ret = createEntityPointerLevel(N, Ctx, AddEntity, IsRet);
+    auto Ret = createEntityPointerLevel(N, AddEntity, IsRet);
 
     if (Ret)
       return EntityPointerLevelSet{*Ret};
@@ -86,7 +86,7 @@ class PointerAssignmentMatcher {
     for (unsigned ParmIdx = 0; ParmIdx < PP->getNumParams();
          ++ArgIdx, ++ParmIdx) {
       if (const ParmVarDecl *PD = PP->getParamDecl(ParmIdx);
-          PD && hasPtrOrArrType(*PD)) {
+          PD && hasPtrOrArrType(PD)) {
         addEdges(PD, AP->getArg(ArgIdx));
         Matched = true;
       }
@@ -116,7 +116,7 @@ class PointerAssignmentMatcher {
     const InitListExpr *ILE = dyn_cast<InitListExpr>(InitExpr);
 
     if (!ILE) {
-      if (!hasPtrOrArrType(*InitExpr))
+      if (!hasPtrOrArrType(InitExpr))
         return false;
 
       auto Expected = toEPL(Base);
@@ -154,7 +154,7 @@ class PointerAssignmentMatcher {
       if (CXXRD->getNumBases() != 0) {
         // FIXME: support this:
         addError(makeErrAtNode(
-            Ctx, *ILE,
+            Ctx, ILE,
             "attempt to create pointer assignment edges between "
             "CXXRecordDecls with base classes and initializer-lists"));
         return false;
@@ -215,12 +215,11 @@ public:
   //                            ctor's body will be visited later.
   // XF(T var = e)           => XF(Var = e)
   // XF(T var = init-list)   => see `matchInitializerList`
-  bool matches(const DynTypedNode &DynNode, ASTContext &Ctx,
-               const NamedDecl *RootDecl) {
+  bool matches(const DynTypedNode &DynNode, const NamedDecl *RootDecl) {
     if (const Stmt *S = DynNode.get<Stmt>()) {
       // Match 'p = q' whenever it has pointer or array type:
       if (const auto *BO = dyn_cast<BinaryOperator>(S);
-          BO && BO->getOpcode() == BO_Assign && hasPtrOrArrType(*BO)) {
+          BO && BO->getOpcode() == BO_Assign && hasPtrOrArrType(BO)) {
         return addEdges(BO->getLHS(), BO->getRHS());
       }
 
@@ -247,7 +246,7 @@ public:
       }
       if (const auto *RS = dyn_cast<ReturnStmt>(S)) {
         const Expr *RetExpr = RS->getRetValue();
-        if (!hasPtrOrArrType(*RetExpr))
+        if (!hasPtrOrArrType(RetExpr))
           return false;
         return addEdges(toEPL(RootDecl, true), RetExpr, false);
       }
@@ -267,7 +266,7 @@ public:
           return matchInitializerList(VD, InitLst);
 
         // Match initializers to variables/fields of a pointer type:
-        if (InitExpr && hasPtrOrArrType(*VD))
+        if (InitExpr && hasPtrOrArrType(VD))
           return addEdges(VD, InitExpr);
       }
 
@@ -277,9 +276,8 @@ public:
 
         for (auto *E : CtorD->inits()) {
           if (E->isDelegatingInitializer())
-            return matches(DynTypedNode::create(*E->getInit()), Ctx, RootDecl);
-          if (const FieldDecl *FD = E->getMember();
-              FD && hasPtrOrArrType(*FD)) {
+            return matches(DynTypedNode::create(*E->getInit()), RootDecl);
+          if (const FieldDecl *FD = E->getMember(); FD && hasPtrOrArrType(FD)) {
             addEdges(E->getMember(), E->getInit());
             Matched = true;
           }
@@ -306,9 +304,11 @@ public:
   extractEntitySummary(const NamedDecl *Contributor, ASTContext &Ctx) {
     PointerAssignmentMatcher Matcher(
         Ctx, [this](const EntityName &EN) { return addEntity(EN); });
-    ContributorFactFinder<PointerAssignmentMatcher> Finder(Ctx, Matcher);
+    auto MatchAction = [&Matcher, &Contributor](const DynTypedNode &Node) {
+      Matcher.matches(Node, Contributor);
+    };
 
-    Finder.findMatches(const_cast<NamedDecl *>(Contributor));
+    findMatchesIn(Contributor, MatchAction);
     if (Matcher.Error)
       return std::move(Matcher.Error);
     return std::make_unique<PointerFlowEntitySummary>(
@@ -316,10 +316,10 @@ public:
   }
 
   void HandleTranslationUnit(ASTContext &Ctx) override {
-    ContributorFinder ContributorFinder;
+    std::vector<const NamedDecl *> Contributors;
 
-    ContributorFinder.TraverseAST(Ctx);
-    for (auto *CD : ContributorFinder.Contributors) {
+    findContributors(Ctx, Contributors);
+    for (auto *CD : Contributors) {
       auto EntitySummary = extractEntitySummary(CD, Ctx);
 
       if (!EntitySummary)
@@ -331,7 +331,7 @@ public:
       auto ContributorName = getEntityName(CD);
 
       if (!ContributorName)
-        llvm::reportFatalInternalError(makeEntityNameErr(Ctx, *CD));
+        llvm::reportFatalInternalError(makeEntityNameErr(Ctx, CD));
 
       auto [Ignored, InsertionSucceeded] = SummaryBuilder.addSummary(
           addEntity(*ContributorName), std::move(*EntitySummary));
@@ -344,6 +344,7 @@ public:
 
 // NOLINTNEXTLINE(misc-use-internal-linkage)
 volatile int PointerFlowTUSummaryExtractorAnchorSource = 0;
+
 static TUSummaryExtractorRegistry::Add<PointerFlowTUSummaryExtractor>
     RegisterExtractor(PointerFlowEntitySummary::Name,
                       "The TUSummaryExtractor for pointer assignments");

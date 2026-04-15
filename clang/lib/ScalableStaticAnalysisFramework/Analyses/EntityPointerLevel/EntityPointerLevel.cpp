@@ -68,12 +68,12 @@ class EntityPointerLevelTranslator
     return EntityPointerLevelSet{Incremented.begin(), Incremented.end()};
   }
 
-  std::function<EntityId(EntityName EN)> AddEntity;
+  llvm::function_ref<EntityId(EntityName EN)> AddEntity;
   ASTContext &Ctx;
 
 public:
-  EntityPointerLevelTranslator(std::function<EntityId(EntityName EN)> AddEntity,
-                               ASTContext &Ctx)
+  EntityPointerLevelTranslator(
+      llvm::function_ref<EntityId(EntityName EN)> AddEntity, ASTContext &Ctx)
       : AddEntity(AddEntity), Ctx(Ctx) {}
 
   Expected<EntityPointerLevelSet> translate(const Expr *E) { return Visit(E); }
@@ -244,7 +244,7 @@ Expected<EntityPointerLevelSet> clang::ssaf::translateEntityPointerLevel(
 }
 
 /// Create an EntityPointerLevel from a ValueDecl of a pointer type.
-Expected<EntityPointerLevel> clang::ssaf::creatEntityPointerLevel(
+Expected<EntityPointerLevel> clang::ssaf::createEntityPointerLevel(
     const NamedDecl *ND, llvm::function_ref<EntityId(EntityName EN)> AddEntity,
     bool IsFunRet) {
   EntityPointerLevelTranslator Translator(AddEntity, ND->getASTContext());
