@@ -156,7 +156,7 @@ private:
     }
   }
 
-  // Translate((T*)base) -> Translate(p) if p has pointer type
+  // Translate((T*)base) -> Translate(base) if base has pointer type
   //                     -> {} otherwise
   Expected<EntityPointerLevelSet> VisitCastExpr(const CastExpr *E) {
     if (hasPtrOrArrType(E->getSubExpr()))

@@ -11,7 +11,6 @@
 #include "clang/AST/DynamicRecursiveASTVisitor.h"
 #include "clang/Frontend/ASTUnit.h"
 #include "clang/ScalableStaticAnalysisFramework/Analyses/EntityPointerLevel/EntityPointerLevel.h"
-#include "clang/ScalableStaticAnalysisFramework/Analyses/UnsafeBufferUsage/UnsafeBufferUsage.h"
 #include "clang/ScalableStaticAnalysisFramework/Analyses/UnsafeBufferUsage/UnsafeBufferUsageTest.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/ASTEntityMapping.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/Model/EntityId.h"
@@ -458,7 +457,7 @@ TEST_F(UnsafeBufferUsageTest, FunctionCall) {
   const auto *Sum = getEntitySummary("foo");
 
   EXPECT_NE(Sum, nullptr);
-  // No (foo, 2) becasue indirect calls are ignored.
+  // No (foo, 2) because indirect calls are ignored.
   EXPECT_EQ(*Sum, makeSet(__LINE__, {{"foo", 1U, true}}));
 }
 

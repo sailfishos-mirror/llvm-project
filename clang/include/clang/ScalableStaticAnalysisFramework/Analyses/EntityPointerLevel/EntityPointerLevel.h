@@ -110,13 +110,13 @@ EntityPointerLevel buildEntityPointerLevel(EntityId, unsigned);
 /// of a function entity.
 llvm::Expected<EntityPointerLevel>
 createEntityPointerLevel(const NamedDecl *ND,
-                        llvm::function_ref<EntityId(EntityName EN)> AddEntity,
-                        bool IsFunRet = false);
+                         llvm::function_ref<EntityId(EntityName EN)> AddEntity,
+                         bool IsFunRet = false);
 
 /// Creates a new EntityPointerLevel (EPL) from `E` by incrementing `E`'s
 /// pointer level.
 /// \return the EPL that is associated with the pointee (or array element) type
-/// of `E`'s associated pointer/array tyoe of the same entity.
+/// of `E`'s associated pointer/array type of the same entity.
 EntityPointerLevel incrementPointerLevel(const EntityPointerLevel &E);
 } // namespace clang::ssaf
 

@@ -33,13 +33,13 @@ extern volatile int SSAFAnalysisRegistryAnchorSource;
     SSAFAnalysisRegistryAnchorSource;
 
 // This anchor is used to force the linker to link the UnsafeBufferUsage
-// JSONFormat registration:
+// JSON format.
 extern volatile int UnsafeBufferUsageSSAFJSONFormatAnchorSource;
 [[maybe_unused]] static int UnsafeBufferUsageSSAFJSONFormatAnchorDestination =
     UnsafeBufferUsageSSAFJSONFormatAnchorSource;
 
-// This anchor is used to force the linker to link the UnsafeBufferUsage
-// JSONFormat registration:
+// This anchor is used to force the linker to link the
+// UnsafeBufferUsageTUSummaryExtractor.
 extern volatile int UnsafeBufferUsageTUSummaryExtractorAnchorSource;
 [[maybe_unused]] static int
     UnsafeBufferUsageTUSummaryExtractorAnchorDestination =
