@@ -35,9 +35,10 @@ define ptr @test(ptr %dst, i64 %v4, i64 %v5, i64 %v6, i64 %v7)  {
 ; CHECK-NEXT:    [[SCEVGEP5]] = getelementptr i8, ptr [[LSR_IV4]], i64 [[TMP4]]
 ; CHECK-NEXT:    br i1 [[C]], label [[EXIT:%.*]], label [[LOOP]]
 ; CHECK:       exit:
+; CHECK-NEXT:    [[SCEVGEP1_LCSSA:%.*]] = phi ptr [ [[SCEVGEP1]], [[LOOP]] ]
 ; CHECK-NEXT:    [[TMP12:%.*]] = mul i64 [[V5]], [[V4]]
 ; CHECK-NEXT:    [[TMP13:%.*]] = shl i64 [[TMP12]], 4
-; CHECK-NEXT:    [[SCEVGEP2:%.*]] = getelementptr i8, ptr [[SCEVGEP1]], i64 [[TMP13]]
+; CHECK-NEXT:    [[SCEVGEP2:%.*]] = getelementptr i8, ptr [[SCEVGEP1_LCSSA]], i64 [[TMP13]]
 ; CHECK-NEXT:    ret ptr [[SCEVGEP2]]
 ;
 entry:
