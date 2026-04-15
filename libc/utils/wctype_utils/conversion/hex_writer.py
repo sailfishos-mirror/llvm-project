@@ -43,11 +43,14 @@ def fetch_params(file_path: str, mappings: dict):
 
 
 def write_content(file_path, file, data_var_name, mappings, var_name_suffix=""):
+    seed, (pilots, pilots_size), (remap, remap_size) = fetch_params(file_path, mappings)
     file.write(
-        f"LIBC_INLINE_VAR constexpr cpp::array<cpp::array<wint_t, 2>, {len(mappings)}>"
-        + f"""
-    {data_var_name}{var_name_suffix} = """
+        f"LIBC_INLINE_VAR constexpr PerfectHashMap<{len(mappings)}> "
+        + data_var_name[:-5]
+        + f"_MAP{var_name_suffix}"
+        + "{\n"
     )
+    file.write(f"cpp::array<cpp::array<wint_t, 2>, {len(mappings)}>")
     file.write("{{\n")
     for i, key in enumerate(mappings):
         file.write("{")
@@ -56,20 +59,9 @@ def write_content(file_path, file, data_var_name, mappings, var_name_suffix=""):
             file.write("}\n")
         else:
             file.write("},\n")
-    file.write("}};\n\n")
-
-    seed, (pilots, pilots_size), (remap, remap_size) = fetch_params(file_path, mappings)
+    file.write("}},")
     file.write(
-        f"LIBC_INLINE_VAR constexpr auto {data_var_name[:-5]}_HASHER{var_name_suffix} = ptrhash::init_hasher<{len(mappings)}>({seed}, cpp::array<uint8_t, {pilots_size}>{pilots}, cpp::array<uint32_t, {remap_size}>{remap});\n\n"
-    )
-    file.write(
-        f"LIBC_INLINE_VAR constexpr PerfectHashMap<{len(mappings)}, decltype({data_var_name[:-5]}_HASHER{var_name_suffix})> "
-        + data_var_name[:-5]
-        + f"_MAP{var_name_suffix}"
-        + "{\n"
-    )
-    file.write(
-        f"{data_var_name}{var_name_suffix}, {data_var_name[:-5]}_HASHER{var_name_suffix}"
+        f" ptrhash::PtrHash<{len(mappings)}>({seed}, cpp::array<uint8_t, {pilots_size}>{pilots}, cpp::array<uint32_t, {remap_size}>{remap})"
     )
     file.write("};")
 
@@ -113,9 +105,9 @@ namespace wctype_internal {'{'}
         for key in mappings32:
             mappings.pop(key)
         write_content(file_path, file, data_var_name, mappings)
-        file.write("\n\n#if WINT_MAX > 65535\n\n")
+        file.write("\n\n#if WINT_MAX > 0xFFFF\n\n")
         write_content(file_path, file, data_var_name, mappings32, "_32")
-        file.write("\n\n#endif // WINT_MAX > 65535")
+        file.write("\n\n#endif // WINT_MAX > 0xFFFF")
         file.write(
             "\n\n} // namespace wctype_internal\n} // namespace LIBC_NAMESPACE_DECL\n\n"
         )

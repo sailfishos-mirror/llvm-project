@@ -25,7 +25,7 @@
 #include "src/__support/math/log.h"
 #include "src/__support/uint128.h"
 
-#ifdef _DEBUG
+#ifdef DEBUGDEBUG
 #include "src/__support/OSUtil/io.h"
 #endif
 
@@ -169,9 +169,13 @@ public:
 // fxhash algorithm constant used in hashing numbers
 LIBC_INLINE_VAR constexpr uint64_t FXHASH_SEED = 0x517cc1b727220a95;
 
-template <size_t n_, size_t parts_, size_t parts_per_shard_,
-          size_t slots_total_, size_t buckets_total_, size_t slots_,
-          size_t buckets_, typename Key = uint64_t,
+template <size_t n_, typename Key = wint_t,
+          size_t parts_ = PtrhashConfig<n_>::PARTS,
+          size_t parts_per_shard_ = PtrhashConfig<n_>::PARTS_PER_SHARD,
+          size_t slots_total_ = PtrhashConfig<n_>::SLOTS_TOTAL,
+          size_t buckets_total_ = PtrhashConfig<n_>::BUCKETS_TOTAL,
+          size_t slots_ = PtrhashConfig<n_>::SLOTS_PER_PART,
+          size_t buckets_ = PtrhashConfig<n_>::BUCKETS_PER_PART,
           typename F = cpp::array<uint32_t, slots_total_ - n_>,
           typename PilotsTypeV = cpp::array<uint8_t, buckets_total_>>
 class PtrHash {
@@ -184,6 +188,7 @@ public:
   LIBC_INLINE constexpr PtrHash(uint64_t seed_, PilotsTypeV pilots_, F remap_)
       : seed(seed_), pilots(pilots_), remap(remap_) {}
 
+  LIBC_INLINE constexpr PtrHash() = default;
   LIBC_INLINE constexpr PtrHash(const PtrHash &) = default;
   LIBC_INLINE constexpr PtrHash(PtrHash &&) = default;
 
@@ -322,7 +327,7 @@ public:
     }
 
     if (acc != slots_total_ - n_) {
-#ifdef _DEBUG
+#ifdef DEBUGDEBUG
       write_to_stderr("Not the right number of free slots left!\n");
       write_to_stderr(" total slots ");
       write_to_stderr(cpp::to_string(slots_total_));
@@ -373,7 +378,7 @@ public:
 
   LIBC_INLINE constexpr cpp::array<cpp::array<uint64_t, n_>, 1>
   no_sharding(const cpp::array<Key, n_> &keys) const {
-    cpp::array<uint64_t, n_> ret;
+    cpp::array<uint64_t, n_> ret{};
     for (size_t i = 0; i < keys.size(); i++) {
       ret[i] = this->hash_key(keys[i]);
     }
@@ -411,7 +416,7 @@ public:
     }
 
     if (!distinct) {
-#ifdef _DEBUG
+#ifdef DEBUGDEBUG
       write_to_stderr("Hashes are not distinct\n");
 #endif
       return cpp::nullopt;
@@ -807,18 +812,9 @@ private:
   F remap;
 };
 
-template <size_t n, typename Key = uint64_t>
+template <size_t n, typename Key = wint_t>
 LIBC_INLINE constexpr auto get_params(const cpp::array<Key, n> &keys) {
-  using F = cpp::array<uint32_t, PtrhashConfig<n>::SLOTS_TOTAL - n>;
-  using PilotsTypeV = cpp::array<uint8_t, PtrhashConfig<n>::BUCKETS_TOTAL>;
-
-  auto p =
-      PtrHash<n, PtrhashConfig<n>::PARTS, PtrhashConfig<n>::PARTS_PER_SHARD,
-              PtrhashConfig<n>::SLOTS_TOTAL, PtrhashConfig<n>::BUCKETS_TOTAL,
-              PtrhashConfig<n>::SLOTS_PER_PART,
-              PtrhashConfig<n>::BUCKETS_PER_PART, Key, F, PilotsTypeV>(
-          0, PilotsTypeV(), F());
-  auto result = p.compute_pilots(keys);
+  auto result = PtrHash<n>().compute_pilots(keys);
 
   LIBC_ASSERT(result &&
               "Unable to construct PtrHash after 10 tries. Try using a "
@@ -827,25 +823,13 @@ LIBC_INLINE constexpr auto get_params(const cpp::array<Key, n> &keys) {
   return result.value();
 }
 
-template <
-    size_t n,
-    typename PilotsTypeV = cpp::array<uint8_t, PtrhashConfig<n>::BUCKETS_TOTAL>,
-    typename F = cpp::array<uint32_t, PtrhashConfig<n>::SLOTS_TOTAL - n>>
-LIBC_INLINE constexpr auto init_hasher(size_t seed, PilotsTypeV pilots,
-                                       F remap) {
-  return PtrHash<n, PtrhashConfig<n>::PARTS, PtrhashConfig<n>::PARTS_PER_SHARD,
-                 PtrhashConfig<n>::SLOTS_TOTAL, PtrhashConfig<n>::BUCKETS_TOTAL,
-                 PtrhashConfig<n>::SLOTS_PER_PART,
-                 PtrhashConfig<n>::BUCKETS_PER_PART>(seed, pilots, remap);
-}
-
 } // namespace ptrhash
 
-template <size_t Capacity, class Hasher> class PerfectHashMap {
+template <size_t Capacity> class PerfectHashMap {
 public:
   struct Entry {
-    wint_t key;
-    wint_t value;
+    wint_t key{};
+    wint_t value{};
     LIBC_INLINE constexpr Entry() = default;
     LIBC_INLINE constexpr Entry(wint_t key, wint_t value)
         : key(key), value(value) {}
@@ -853,7 +837,7 @@ public:
 
   LIBC_INLINE constexpr PerfectHashMap(
       const cpp::array<cpp::array<wint_t, 2>, Capacity> &pairs,
-      const Hasher &hasher)
+      ptrhash::PtrHash<Capacity> &&hasher)
       : hasher(hasher) {
     for (const auto &pair : pairs) {
       const auto &key = pair[0];
@@ -884,7 +868,7 @@ public:
 
 private:
   Entry entries[Capacity];
-  const Hasher &hasher;
+  ptrhash::PtrHash<Capacity> hasher;
 };
 
 } // namespace wctype_internal
