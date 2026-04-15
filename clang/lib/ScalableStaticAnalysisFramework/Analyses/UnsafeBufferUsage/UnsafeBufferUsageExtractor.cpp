@@ -14,7 +14,6 @@
 #include "clang/ScalableStaticAnalysisFramework/Analyses/EntityPointerLevel/EntityPointerLevel.h"
 #include "clang/ScalableStaticAnalysisFramework/Analyses/UnsafeBufferUsage/UnsafeBufferUsage.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/ASTEntityMapping.h"
-#include "clang/ScalableStaticAnalysisFramework/Core/Model/EntityId.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/Model/EntityName.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/TUSummary/ExtractorRegistry.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/TUSummary/TUSummaryBuilder.h"
@@ -26,73 +25,78 @@
 using namespace clang;
 using namespace ssaf;
 
-class clang::ssaf::UnsafeBufferUsageTUSummaryExtractor
-    : public TUSummaryExtractor {
+namespace clang::ssaf {
+class UnsafeBufferUsageTUSummaryExtractor : public TUSummaryExtractor {
 public:
   UnsafeBufferUsageTUSummaryExtractor(TUSummaryBuilder &Builder)
       : TUSummaryExtractor(Builder) {}
 
-  EntityId addEntity(EntityName EN) { return SummaryBuilder.addEntity(EN); }
-
   Expected<std::unique_ptr<UnsafeBufferUsageEntitySummary>>
-  extractEntitySummary(const NamedDecl *Contributor, ASTContext &Ctx) {
-    std::set<const Expr *> UnsafePointers;
-
-    auto MatchAction = [&Ctx, &UnsafePointers](const DynTypedNode &Node) {
-      return matchUnsafePointers(Node, Ctx, UnsafePointers);
-    };
-    findMatchesIn(Contributor, MatchAction);
-
-    EntityPointerLevelSet Results;
-
-    for (const Expr *Ptr : UnsafePointers) {
-      Expected<EntityPointerLevelSet> Translation =
-          translateEntityPointerLevel(Ptr, Ctx, [this](const EntityName &EN) {
-            return SummaryBuilder.addEntity(EN);
-          });
-
-      if (Translation) {
-        // Filter out those temporary invalid EntityPointerLevels associated
-        // with `&E` pointers. They need no transformation of entities:
-        auto FilteredTranslation = llvm::make_filter_range(
-            *Translation, [](const EntityPointerLevel &E) -> bool {
-              return E.getPointerLevel() > 0;
-            });
-        Results.insert(FilteredTranslation.begin(), FilteredTranslation.end());
-        continue;
-      }
-      return Translation.takeError();
-    }
-
-    return std::make_unique<UnsafeBufferUsageEntitySummary>(
-        UnsafeBufferUsageEntitySummary(std::move(Results)));
-  }
-
-  void HandleTranslationUnit(ASTContext &Ctx) override {
-    std::vector<const NamedDecl *> Contributors;
-
-    findContributors(Ctx, Contributors);
-    for (auto *CD : Contributors) {
-      auto EntitySummary = extractEntitySummary(CD, Ctx);
-
-      if (!EntitySummary)
-        llvm::reportFatalInternalError(EntitySummary.takeError());
-      assert(*EntitySummary);
-      if ((*EntitySummary)->empty())
-        continue;
-
-      auto ContributorName = getEntityName(CD);
-
-      if (!ContributorName)
-        llvm::reportFatalInternalError(makeEntityNameErr(Ctx, CD));
-
-      auto [Ignored, InsertionSucceeded] = SummaryBuilder.addSummary(
-          addEntity(*ContributorName), std::move(*EntitySummary));
-
-      assert(InsertionSucceeded && "duplicated contributor extraction");
-    }
-  }
+  extractEntitySummary(const NamedDecl *Contributor, ASTContext &Ctx);
+  void HandleTranslationUnit(ASTContext &Ctx) override;
 };
+} // namespace clang::ssaf
+
+Expected<std::unique_ptr<UnsafeBufferUsageEntitySummary>>
+clang::ssaf::UnsafeBufferUsageTUSummaryExtractor::extractEntitySummary(
+    const NamedDecl *Contributor, ASTContext &Ctx) {
+  std::set<const Expr *> UnsafePointers;
+
+  auto MatchAction = [&UnsafePointers, &Ctx](const DynTypedNode &Node) {
+    matchUnsafePointers(Node, Ctx, UnsafePointers);
+  };
+  findMatchesIn(Contributor, MatchAction);
+
+  EntityPointerLevelSet Results;
+
+  for (const Expr *Ptr : UnsafePointers) {
+    Expected<EntityPointerLevelSet> Translation =
+        translateEntityPointerLevel(Ptr, Ctx, [this](const EntityName &EN) {
+          return SummaryBuilder.addEntity(EN);
+        });
+
+    if (Translation) {
+      // Filter out those temporary invalid EntityPointerLevels associated
+      // with `&E` pointers. They need no transformation of entities:
+      auto FilteredTranslation = llvm::make_filter_range(
+          *Translation, [](const EntityPointerLevel &E) -> bool {
+            return E.getPointerLevel() > 0;
+          });
+      Results.insert(FilteredTranslation.begin(), FilteredTranslation.end());
+      continue;
+    }
+    return Translation.takeError();
+  }
+
+  return std::make_unique<UnsafeBufferUsageEntitySummary>(
+      UnsafeBufferUsageEntitySummary(std::move(Results)));
+}
+
+void clang::ssaf::UnsafeBufferUsageTUSummaryExtractor::HandleTranslationUnit(
+    ASTContext &Ctx) {
+  std::vector<const NamedDecl *> Contributors;
+
+  findContributors(Ctx, Contributors);
+  for (auto *CD : Contributors) {
+    auto EntitySummary = extractEntitySummary(CD, Ctx);
+
+    if (!EntitySummary)
+      llvm::reportFatalInternalError(EntitySummary.takeError());
+    assert(*EntitySummary);
+    if ((*EntitySummary)->empty())
+      continue;
+
+    auto ContributorName = getEntityName(CD);
+
+    if (!ContributorName)
+      llvm::reportFatalInternalError(makeEntityNameErr(Ctx, CD));
+
+    auto [Ignored, InsertionSucceeded] = SummaryBuilder.addSummary(
+        SummaryBuilder.addEntity(*ContributorName), std::move(*EntitySummary));
+
+    assert(InsertionSucceeded && "duplicated contributor extraction");
+  }
+}
 
 // NOLINTNEXTLINE(misc-use-internal-linkage)
 volatile int UnsafeBufferUsageTUSummaryExtractorAnchorSource = 0;
