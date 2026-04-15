@@ -108,8 +108,8 @@ EntityPointerLevel buildEntityPointerLevel(EntityId, unsigned);
 /// of a function entity.
 llvm::Expected<EntityPointerLevel>
 createEntityPointerLevel(const NamedDecl *ND,
-                        llvm::function_ref<EntityId(EntityName EN)> AddEntity,
-                        bool IsFunRet = false);
+                         llvm::function_ref<EntityId(EntityName EN)> AddEntity,
+                         bool IsFunRet = false);
 
 /// Creates a new EntityPointerLevel (EPL) from `E` by incrementing `E`'s
 /// pointer level.
