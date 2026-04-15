@@ -13,16 +13,11 @@
 #define LLVM_CLANG_SCALABLESTATICANALYSISFRAMEWORK_ANALYSES_SSAFANALYSESCOMMON_H
 
 #include "clang/AST/Decl.h"
-#include "clang/AST/DeclObjC.h"
-#include "clang/AST/DynamicRecursiveASTVisitor.h"
-#include "llvm/ADT/Twine.h"
 #include "llvm/Support/JSON.h"
 
-using namespace clang;
-
 template <typename NodeTy, typename... Ts>
-llvm::Error makeErrAtNode(ASTContext &Ctx, const NodeTy *N, StringRef Fmt,
-                          const Ts &...Args) {
+llvm::Error makeErrAtNode(clang::ASTContext &Ctx, const NodeTy *N,
+                          llvm::StringRef Fmt, const Ts &...Args) {
   std::string LocStr = N->getBeginLoc().printToString(Ctx.getSourceManager());
   return llvm::createStringError((Fmt + " at %s").str().c_str(), Args...,
                                  LocStr.c_str());
@@ -39,10 +34,12 @@ llvm::Error makeSawButExpectedError(const llvm::json::Value &Saw,
 }
 
 template <typename DeclOrExpr> bool hasPtrOrArrType(const DeclOrExpr *E) {
-  return llvm::isa<PointerType, ArrayType>(E->getType().getCanonicalType());
+  return llvm::isa<clang::PointerType, clang::ArrayType>(
+      E->getType().getCanonicalType());
 }
 
-inline llvm::Error makeEntityNameErr(ASTContext &Ctx, const NamedDecl *D) {
+inline llvm::Error makeEntityNameErr(clang::ASTContext &Ctx,
+                                     const clang::NamedDecl *D) {
   return makeErrAtNode(Ctx, D, "failed to create entity name for %s",
                        D->getNameAsString().data());
 }

@@ -117,8 +117,6 @@ public:
       }
     } ContributorFinder;
 
-    ContributorFinder.VisitTranslationUnitDecl(Ctx.getTranslationUnitDecl());
-
     ContributorFinder.TraverseAST(Ctx);
     for (auto *CD : ContributorFinder.Contributors) {
       auto EntitySummary = extractEntitySummary(CD, Ctx);
