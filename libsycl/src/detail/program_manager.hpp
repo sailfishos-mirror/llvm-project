@@ -71,12 +71,12 @@ public:
   /// data passed to registerFatBin.
   void unregisterFatBin(__sycl_tgt_bin_desc *FatbinDesc);
 
-  /// Creates liboffload kernel that is ready for execution.
+  /// Creates a liboffload kernel that is ready for execution.
   /// Thread-safe.
   /// \param KernelInfo a set of kernel specific data: name, corresponding
   /// device image, etc.
-  /// \param Device a device for which this kernel must be compiled.
-  /// \return liboffload kernel handle that is ready to be passed to kernel
+  /// \param Device the device for which this kernel must be compiled.
+  /// \return a liboffload kernel handle that is ready to be passed to kernel
   /// execution methods.
   ol_symbol_handle_t getOrCreateKernel(DeviceKernelInfo &KernelInfo,
                                        DeviceImpl &Device);

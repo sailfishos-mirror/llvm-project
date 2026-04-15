@@ -25,14 +25,15 @@ namespace detail {
 
 class ProgramAndKernelManager;
 
-// Pointers to instances of this class are stored in header function templates
-// as a static variable to avoid repeated runtime lookup overhead.
+// TODO: Pointers to instances of this class are supported to be stored in
+// header function templates as a static variable to avoid repeated runtime
+// lookup overhead.
 class DeviceKernelInfo {
 public:
-  /// Constructs device kernel info instance.
+  /// Constructs a device kernel info instance.
   ///
-  /// \param KernelName a name of kernel.
-  /// \param DeviceImage a device image containing device code of this kernel.
+  /// \param KernelName the name of the kernel.
+  /// \param DeviceImage the device image containing device code of this kernel.
   DeviceKernelInfo(std::string_view KernelName, DeviceImageManager &DeviceImage)
       : MName(KernelName), MDeviceImage(DeviceImage) {}
 
@@ -47,9 +48,9 @@ private:
 
   /// Searches for the existing kernel handle compatible with the specified
   /// device.
-  /// \param Device a device the kernel must be compatible with.
-  /// \return a liboffload kernel handle if and only if built kernel was found,
-  /// otherwise returns nullptr.
+  /// \param Device the device the kernel must be compatible with.
+  /// \return a liboffload kernel handle if a built kernel was found; otherwise
+  /// returns nullptr.
   ol_symbol_handle_t getKernel(ol_device_handle_t Device) const {
     if (auto KernelIt = MBuiltKernels.find(Device);
         KernelIt != MBuiltKernels.end())
@@ -57,12 +58,12 @@ private:
     return nullptr;
   }
 
-  /// \return device image which contains device code of this kernel.
+  /// \return the device image containing the device code of this kernel.
   DeviceImageManager &getDeviceImage() const { return MDeviceImage; }
 
-  /// Attaches liboffload kernel handle to this device kernel info object.
+  /// Attaches a liboffload kernel handle to this device kernel info object.
   /// \param Device the device the kernel symbol was created for.
-  /// \param Kernel the liboffload kernel symbol to attach..
+  /// \param Kernel the liboffload kernel symbol to attach.
   void addKernel(ol_device_handle_t Device, ol_symbol_handle_t Kernel) {
     assert(Kernel && Device &&
            MBuiltKernels.find(Device) == MBuiltKernels.end());

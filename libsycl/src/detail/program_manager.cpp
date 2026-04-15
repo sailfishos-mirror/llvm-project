@@ -18,20 +18,6 @@
 _LIBSYCL_BEGIN_NAMESPACE_SYCL
 namespace detail {
 
-ProgramWrapper::ProgramWrapper(ol_device_handle_t Device,
-                               DeviceImageManager &DevImage) {
-  assert(Device);
-
-  callAndThrow(olCreateProgram, Device, DevImage.getRawData().ImageStart,
-               DevImage.getSize(), &MProgram);
-}
-
-ProgramWrapper::~ProgramWrapper() {
-  assert(MProgram);
-  std::ignore = olDestroyProgram(MProgram);
-  // TODO: define a way to report errors from dtors.
-}
-
 static inline bool checkFatBinVersion(const __sycl_tgt_bin_desc &FatbinDesc) {
   return FatbinDesc.Version == SupportedOffloadBinaryVersion;
 }
@@ -74,9 +60,11 @@ void ProgramAndKernelManager::registerFatBin(__sycl_tgt_bin_desc *FatbinDesc) {
       auto It = MDeviceKernelInfoMap.find(std::string_view(Name));
       if (It == MDeviceKernelInfoMap.end()) {
 
-        std::ignore = MDeviceKernelInfoMap.emplace_hint(
-            It, std::piecewise_construct, std::forward_as_tuple(Name),
-            std::forward_as_tuple(Name, *NewImageWrapper));
+        [[maybe_unused]] auto [Iterator, EmplaceSucceeded] =
+            MDeviceKernelInfoMap.emplace(
+                std::piecewise_construct, std::forward_as_tuple(Name),
+                std::forward_as_tuple(Name, *NewImageWrapper));
+        assert(EmplaceSucceeded && "Kernel name found in multiple images");
       }
     }
 
@@ -125,8 +113,8 @@ static bool isImageCompatible(const DeviceImageManager &Image,
   sycl::backend BE = Device.getBackend();
   const char *Target = Image.getRawData().TripleString;
 
-  if (!(strcmp(Target, DeviceBinaryTripleSPIRV64) == 0) &&
-      (BE == sycl::backend::level_zero))
+  if (!(strcmp(Target, DeviceBinaryTripleSPIRV64) == 0 &&
+        BE == sycl::backend::level_zero))
     return false;
 
   bool IsValid{};
