@@ -14,7 +14,6 @@
 #include "clang/ScalableStaticAnalysisFramework/Analyses/EntityPointerLevel/EntityPointerLevel.h"
 #include "clang/ScalableStaticAnalysisFramework/Analyses/UnsafeBufferUsage/UnsafeBufferUsage.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/ASTEntityMapping.h"
-#include "clang/ScalableStaticAnalysisFramework/Core/Model/EntityId.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/Model/EntityName.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/TUSummary/ExtractorRegistry.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/TUSummary/TUSummaryBuilder.h"
@@ -27,13 +26,13 @@ using namespace clang;
 using namespace ssaf;
 
 namespace {
-static std::set<const Expr *>
+std::set<const Expr *>
 findUnsafePointersInContributor(const DynTypedNode &Node) {
   const Decl *D = Node.get<Decl>();
 
   if (!D)
     return {};
-  if (isa<FunctionDecl>(D) || isa<VarDecl>(D))
+  if (isa<FunctionDecl, VarDecl>(D))
     return findUnsafePointers(D);
   if (auto *RD = dyn_cast<RecordDecl>(D)) {
     std::set<const Expr *> Result;
@@ -52,8 +51,6 @@ class UnsafeBufferUsageTUSummaryExtractor : public TUSummaryExtractor {
 public:
   UnsafeBufferUsageTUSummaryExtractor(TUSummaryBuilder &Builder)
       : TUSummaryExtractor(Builder) {}
-
-  EntityId addEntity(EntityName EN) { return SummaryBuilder.addEntity(EN); }
 
   Expected<std::unique_ptr<UnsafeBufferUsageEntitySummary>>
   extractEntitySummary(const NamedDecl *Contributor, ASTContext &Ctx);
@@ -118,7 +115,7 @@ void clang::ssaf::UnsafeBufferUsageTUSummaryExtractor::HandleTranslationUnit(
       llvm::reportFatalInternalError(makeEntityNameErr(Ctx, CD));
 
     auto [Ignored, InsertionSucceeded] = SummaryBuilder.addSummary(
-        addEntity(*ContributorName), std::move(*EntitySummary));
+        SummaryBuilder.addEntity(*ContributorName), std::move(*EntitySummary));
 
     assert(InsertionSucceeded && "duplicated contributor extraction");
   }

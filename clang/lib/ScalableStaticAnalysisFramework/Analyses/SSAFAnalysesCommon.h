@@ -42,7 +42,7 @@ template <typename DeclOrExpr> bool hasPtrOrArrType(const DeclOrExpr *E) {
 inline llvm::Error makeEntityNameErr(clang::ASTContext &Ctx,
                                      const clang::NamedDecl *D) {
   return makeErrAtNode(Ctx, D, "failed to create entity name for %s",
-                       D->getNameAsString().data());
+                       D->getNameAsString().c_str());
 }
 
 namespace clang::ssaf {

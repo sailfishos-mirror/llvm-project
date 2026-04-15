@@ -67,8 +67,8 @@ public:
     if (!Node)
       return true;
     // To skip callables:
-    if (Node != RootDecl && isa<FunctionDecl, CXXConstructorDecl, BlockDecl,
-                                ObjCMethodDecl, RecordDecl>(Node))
+    if (Node != RootDecl &&
+        isa<FunctionDecl, BlockDecl, ObjCMethodDecl, RecordDecl>(Node))
       return true;
     match(*Node);
     return DynamicRecursiveASTVisitor::TraverseDecl(Node);
