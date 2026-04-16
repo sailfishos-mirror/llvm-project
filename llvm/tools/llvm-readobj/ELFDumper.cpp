@@ -984,9 +984,9 @@ static std::string maybeDemangle(StringRef Name) {
 template <typename ELFT>
 std::string ELFDumper<ELFT>::getStaticSymbolName(uint32_t Index) const {
   auto Warn = [&](Error E) -> std::string {
-    reportUniqueWarning(toString(std::move(E)),
-                        "unable to read the name of symbol with index " +
-                            Twine(Index));
+    reportUniqueWarning(createError(
+        std::move(E),
+        "unable to read the name of symbol with index " + Twine(Index)));
     return "<?>";
   };
 
@@ -2967,9 +2967,8 @@ void ELFDumper<ELFT>::printAttributes(
     W.printHex("FormatVersion", Contents[0]);
 
     if (Error E = AttrParser->parse(Contents, Endianness))
-      reportUniqueWarning(toString(std::move(E)),
-                          "unable to dump attributes from the " +
-                              describe(Sec));
+      reportUniqueWarning(createError(
+          std::move(E), "unable to dump attributes from the " + describe(Sec)));
   }
 }
 
@@ -3476,9 +3475,9 @@ template <class ELFT> void ELFDumper<ELFT>::printStackMap() const {
     return;
 
   auto Warn = [&](Error &&E) {
-    this->reportUniqueWarning(toString(std::move(E)),
-                              "unable to read the stack map from " +
-                                  describe(*StackMapSection));
+    this->reportUniqueWarning(
+        createError(std::move(E), "unable to read the stack map from " +
+                                      describe(*StackMapSection)));
   };
 
   Expected<ArrayRef<uint8_t>> ContentOrErr =
@@ -6375,16 +6374,15 @@ static void processNotesHelper(
       size_t I = 0;
       for (const typename ELFT::Note Note : Obj.notes(S, Err)) {
         if (Error E = ProcessNoteFn(Note, IsCoreFile))
-          Dumper.reportUniqueWarning(toString(std::move(E)),
-                                     "unable to read note with index " +
-                                         Twine(I) + " from the " +
-                                         describe(Obj, S));
+          Dumper.reportUniqueWarning(createError(
+              std::move(E), "unable to read note with index " + Twine(I) +
+                                " from the " + describe(Obj, S)));
         ++I;
       }
       if (Err)
-        Dumper.reportUniqueWarning(toString(std::move(Err)),
-                                   "unable to read notes from the " +
-                                       describe(Obj, S));
+        Dumper.reportUniqueWarning(
+            createError(std::move(Err),
+                        "unable to read notes from the " + describe(Obj, S)));
       FinishNotesFn();
     }
     return;
@@ -6407,17 +6405,17 @@ static void processNotesHelper(
     size_t Index = 0;
     for (const typename ELFT::Note Note : Obj.notes(P, Err)) {
       if (Error E = ProcessNoteFn(Note, IsCoreFile))
-        Dumper.reportUniqueWarning(
-            toString(std::move(E)),
-            "unable to read note with index " + Twine(Index) +
-                " from the PT_NOTE segment with index " + Twine(I));
+        Dumper.reportUniqueWarning(createError(
+            std::move(E), "unable to read note with index " + Twine(Index) +
+                              " from the PT_NOTE segment with index " +
+                              Twine(I)));
       ++Index;
     }
     if (Err)
-      Dumper.reportUniqueWarning(
-          toString(std::move(Err)),
+      Dumper.reportUniqueWarning(createError(
+          std::move(Err),
           "unable to read notes from the PT_NOTE segment with index " +
-              Twine(I));
+              Twine(I)));
     FinishNotesFn();
   }
 }
@@ -6536,9 +6534,9 @@ ELFDumper<ELFT>::getMemtagGlobalsSectionContents(uint64_t ExpectedAddr) {
     }
     Expected<ArrayRef<uint8_t>> Contents = Obj.getSectionContents(Sec);
     if (auto E = Contents.takeError()) {
-      reportUniqueWarning(
-          toString(std::move(E)),
-          "couldn't get SHT_AARCH64_MEMTAG_GLOBALS_DYNAMIC section contents");
+      reportUniqueWarning(createError(
+          std::move(E),
+          "couldn't get SHT_AARCH64_MEMTAG_GLOBALS_DYNAMIC section contents"));
       return ArrayRef<uint8_t>();
     }
     return Contents.get();
@@ -6898,8 +6896,8 @@ void ELFDumper<ELFT>::forEachRelocationDo(
         RelRelaFn) {
   auto Warn = [&](Error &&E,
                   const Twine &Prefix = "unable to read relocations from") {
-    this->reportUniqueWarning(toString(std::move(E)),
-                              Prefix + " " + describe(Sec));
+    this->reportUniqueWarning(
+        createError(std::move(E), Prefix + " " + describe(Sec)));
   };
 
   // SHT_RELR/SHT_ANDROID_RELR/SHT_AARCH64_AUTH_RELR sections do not have an
@@ -7106,9 +7104,9 @@ bool ELFDumper<ELFT>::printFunctionStackSize(
   Error Err = Error::success();
   uint64_t StackSize = Data.getULEB128(Offset, &Err);
   if (Err) {
-    reportUniqueWarning(toString(std::move(Err)),
-                        "could not extract a valid stack size from " +
-                            describe(StackSizeSec));
+    reportUniqueWarning(createError(
+        std::move(Err),
+        "could not extract a valid stack size from " + describe(StackSizeSec)));
     return false;
   }
 
@@ -7462,9 +7460,9 @@ getMipsAbiFlagsSection(const ELFDumper<ELFT> &Dumper) {
     return createError(DataOrErr.takeError(), ErrPrefix);
 
   if (DataOrErr->size() != sizeof(Elf_Mips_ABIFlags<ELFT>))
-    return createError(std::move(createError("it has a wrong size (" +
-                                             Twine(DataOrErr->size()) + ")")),
-                       ErrPrefix);
+    return createError(
+        createError("it has a wrong size (" + Twine(DataOrErr->size()) + ")"),
+        ErrPrefix);
   return reinterpret_cast<const Elf_Mips_ABIFlags<ELFT> *>(DataOrErr->data());
 }
 
@@ -8260,8 +8258,7 @@ template <class ELFT> void LLVMELFDumper<ELFT>::printCallGraphInfo() {
     return;
   }
   if (MapOrErr->empty()) {
-    reportWarning(createError(MapOrErr.takeError(),
-                              "no SHT_LLVM_CALL_GRAPH section found"),
+    reportWarning(createError("no SHT_LLVM_CALL_GRAPH section found"),
                   this->FileName);
     return;
   }
