@@ -7,8 +7,8 @@ add_libc_test(
   SRCS
     wctype_perfect_hash_test.cpp
   COMPILE_OPTIONS
-    $<$<CXX_COMPILER_ID:Clang>:-Xclang -fconstexpr-steps=1000000>
-    $<$<CXX_COMPILER_ID:GNU>:-fconstexpr-ops-limit=1000000>
+    $<$<CXX_COMPILER_ID:Clang>:-Xclang -fconstexpr-steps=10000000>
+    $<$<CXX_COMPILER_ID:GNU>:-fconstexpr-ops-limit=10000000>
   DEPENDS
     libc.src.__support.wctype.lower_to_upper
     libc.src.__support.wctype.upper_to_lower
