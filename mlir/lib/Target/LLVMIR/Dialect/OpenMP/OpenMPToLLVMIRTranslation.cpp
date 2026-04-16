@@ -6524,13 +6524,13 @@ extractHostEvalClauses(omp::TargetOp targetOp,
     for (Operation *user : blockArg.getUsers()) {
       llvm::TypeSwitch<Operation *>(user)
           .Case([&](omp::TeamsOp teamsOp) {
-            if (teamsOp.getNumTeamsLower() == blockArg)
+            if (teamsOp.getNumTeamsLower() == blockArg) {
               numTeamsLower = hostEvalVar;
-            else if (llvm::is_contained(teamsOp.getNumTeamsUpperVars(),
-                                        blockArg))
+            } else if (llvm::is_contained(teamsOp.getNumTeamsUpperVars(),
+                                          blockArg)) {
               numTeamsUpper = hostEvalVar;
-            else if (llvm::is_contained(teamsOp.getThreadLimitVars(),
-                                        blockArg)) {
+            } else if (llvm::is_contained(teamsOp.getThreadLimitVars(),
+                                          blockArg)) {
               for (auto [i, limitVar] :
                    llvm::enumerate(teamsOp.getThreadLimitVars())) {
                 if (limitVar == blockArg) {
@@ -6540,8 +6540,9 @@ extractHostEvalClauses(omp::TargetOp targetOp,
                   break;
                 }
               }
-            } else
+            } else {
               llvm_unreachable("unsupported host_eval use");
+            }
           })
           .Case([&](omp::ParallelOp parallelOp) {
             if (llvm::is_contained(parallelOp.getNumThreadsVars(), blockArg)) {
@@ -6859,8 +6860,7 @@ initTargetRuntimeAttrs(llvm::IRBuilderBase &builder,
                     });
   }
 
-  // Ensure TargetThreadLimit and TeamsThreadLimit have matching sizes
-  // for zip_equal in OMPIRBuilder.
+  // Ensure TargetThreadLimit and TeamsThreadLimit have matching sizes.
   size_t maxDims =
       std::max(attrs.TargetThreadLimit.size(), attrs.TeamsThreadLimit.size());
   attrs.TargetThreadLimit.resize(maxDims);
