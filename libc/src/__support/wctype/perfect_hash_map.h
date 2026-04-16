@@ -54,9 +54,9 @@ public:
     constexpr uint64_t WY_CONST_0 = 0x2d35'8dcc'aa6c'78a5;
     constexpr uint64_t WY_CONST_1 = 0x8bb8'4b93'962e'acc9;
 
-    auto s = wrapping_add(seed, WY_CONST_0);
+    const uint64_t s = wrapping_add(seed, WY_CONST_0);
     seed = s;
-    const auto t =
+    const UInt128 t =
         static_cast<UInt128>(s) * static_cast<UInt128>(s ^ WY_CONST_1);
     return static_cast<uint64_t>(t) ^ static_cast<uint64_t>(t >> 64);
   }
@@ -135,10 +135,11 @@ template <typename T> LIBC_INLINE constexpr bool is_power_of_two(T x) {
 // (1-alpha)/2, so that on average we still have some room to play with.
 LIBC_INLINE constexpr size_t get_parts(size_t n) {
   size_t parts = 0;
-  auto eps = 0.01 / 2.0; // alpha here is 0.99 for linear configuration
-  auto x = static_cast<double>(n) * eps * eps / 2.0;
-  auto target_parts = static_cast<size_t>(x / math::log(x));
-  auto parts_per_shard = target_parts / SHARDS;
+  const double eps = 0.01 / 2.0; // alpha here is 0.99 for linear configuration
+  const double x = static_cast<double>(n) * eps * eps / 2.0;
+  const size_t target_parts = static_cast<size_t>(x / math::log(x));
+  // could be double or size_t depending on SHARDS value, so kept as auto.
+  const auto parts_per_shard = target_parts / SHARDS;
   parts = ((parts_per_shard > 1) ? parts_per_shard : 1) * SHARDS;
   return parts;
 }
@@ -164,7 +165,8 @@ public:
   static constexpr size_t BUCKETS_TOTAL = PARTS * BUCKETS_PER_PART;
 };
 
-// fxhash algorithm constant used in hashing numbers
+// fxhash algorithm constant used in hashing numbers. Chosen for good randomness
+// properties and to ensure stable, deterministic, and well-distributed outputs.
 LIBC_INLINE_VAR constexpr uint64_t FXHASH_SEED = 0x517cc1b727220a95;
 
 template <size_t n_, typename Key = wint_t,
@@ -238,8 +240,8 @@ public:
         0x4415d98c0c03a79f, 0xa36bfbcfddf4d5e6, 0x154aef1f436d8e98,
         0xd21f78471475f18e};
 
-    while (true) {
-      bool contd = false;
+    bool contd = true;
+    while (contd) {
       tries += 1;
       if (tries > MAX_TRIES) {
         return {};
@@ -254,56 +256,15 @@ public:
 
       auto shard_hashes = this->shards(keys);
 
-      const size_t pilots_chunk_size =
-          cpp::max(buckets_ * parts_per_shard_, static_cast<size_t>(1));
-      const size_t taken_chunk_size = parts_per_shard_;
-      const size_t num_pilots_chunks =
-          (pilots.size() + pilots_chunk_size - 1) / pilots_chunk_size;
-      const size_t num_taken_chunks =
-          (taken.size() + taken_chunk_size - 1) / taken_chunk_size;
-
-      for (size_t shard = 0;
-           shard < cpp::min(shard_hashes.size(),
-                            cpp::min(num_pilots_chunks, num_taken_chunks));
-           shard++) {
-        cpp::array<uint64_t, n_> hashes = shard_hashes[shard];
-
-        size_t pilots_begin = shard * pilots_chunk_size;
-        size_t pilots_end =
-            cpp::min(pilots_begin + pilots_chunk_size, pilots.size());
-
-        size_t taken_begin = shard * taken_chunk_size;
-        size_t taken_end =
-            cpp::min(taken_begin + taken_chunk_size, taken.size());
-
-        cpp::optional<cpp::tuple<cpp::array<uint64_t, n_>,
-                                 cpp::array<uint32_t, parts_per_shard_ + 1>>>
-            sorted_parts = this->sort_parts(shard, hashes);
-        if (!sorted_parts) {
-          contd = true;
-          break;
-        }
-
-        auto &[new_hashes, part_starts] = sorted_parts.value();
-
-        if (!this->build_shard(shard, new_hashes, part_starts, pilots,
-                               pilots_begin, pilots_end, taken_begin, taken_end,
-                               taken)) {
-          contd = true;
-          break;
-        }
+      if (!this->try_build_shards(shard_hashes, pilots, taken)) {
+        contd = true;
+      } else {
+        contd = !this->remap_free_slots(taken);
       }
-      if (contd) {
-        continue;
-      }
-
-      if (!this->remap_free_slots(taken)) {
-        continue;
-      }
-
-      this->pilots = pilots;
-      return {{this->seed, this->pilots, this->remap}};
     }
+
+    this->pilots = pilots;
+    return {{this->seed, this->pilots, this->remap}};
   }
 
   LIBC_INLINE constexpr bool
@@ -348,7 +309,7 @@ public:
 
     size_t p = 0;
     for (const auto &t : taken) {
-      const auto offset = p * slots_;
+      const size_t offset = p * slots_;
       for (size_t idx = 0; idx < t.size(); idx++) {
         if (!t[idx]) {
           auto result = offset + idx;
@@ -457,6 +418,50 @@ public:
   }
 
   LIBC_INLINE constexpr bool
+  try_build_shards(const cpp::array<cpp::array<uint64_t, n_>, 1> &shard_hashes,
+                   PilotsTypeV &pilots,
+                   cpp::array<cpp::array<bool, slots_>, parts_> &taken) const {
+    const size_t pilots_chunk_size =
+        cpp::max(buckets_ * parts_per_shard_, static_cast<size_t>(1));
+    const size_t taken_chunk_size = parts_per_shard_;
+    const size_t num_pilots_chunks =
+        (pilots.size() + pilots_chunk_size - 1) / pilots_chunk_size;
+    const size_t num_taken_chunks =
+        (taken.size() + taken_chunk_size - 1) / taken_chunk_size;
+
+    for (size_t shard = 0;
+         shard < cpp::min(shard_hashes.size(),
+                          cpp::min(num_pilots_chunks, num_taken_chunks));
+         shard++) {
+      cpp::array<uint64_t, n_> hashes = shard_hashes[shard];
+
+      size_t pilots_begin = shard * pilots_chunk_size;
+      size_t pilots_end =
+          cpp::min(pilots_begin + pilots_chunk_size, pilots.size());
+
+      size_t taken_begin = shard * taken_chunk_size;
+      size_t taken_end = cpp::min(taken_begin + taken_chunk_size, taken.size());
+
+      cpp::optional<cpp::tuple<cpp::array<uint64_t, n_>,
+                               cpp::array<uint32_t, parts_per_shard_ + 1>>>
+          sorted_parts = this->sort_parts(shard, hashes);
+      if (!sorted_parts) {
+        return false;
+      }
+
+      auto &[new_hashes, part_starts] = sorted_parts.value();
+
+      if (!this->build_shard(shard, new_hashes, part_starts, pilots,
+                             pilots_begin, pilots_end, taken_begin, taken_end,
+                             taken)) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  LIBC_INLINE constexpr bool
   build_shard(size_t shard, cpp::array<uint64_t, n_> &hashes,
               cpp::array<uint32_t, parts_per_shard_ + 1> &part_starts,
               PilotsTypeV &pilots, size_t pilots_begin, size_t pilots_end,
@@ -465,7 +470,7 @@ public:
 
     size_t pilots_chunk_size = pilots_end - pilots_begin;
 
-    auto part_in_shard = 0;
+    size_t part_in_shard = 0;
     for (size_t taken_idx = taken_begin; taken_idx < taken_end; ++taken_idx) {
       const auto num_chunks = pilots_chunk_size / buckets_;
       for (size_t i = 0; i < num_chunks; ++i) {
@@ -551,7 +556,7 @@ public:
         pilots[new_b] = 0;
         continue;
       }
-      const auto new_b_len = new_bucket.size();
+      const size_t new_b_len = new_bucket.size();
       size_t evictions = 0;
 
       heap.push({new_b_len, new_b});
@@ -567,7 +572,7 @@ public:
         if (evictions > slots_ && is_power_of_two((evictions)) &&
             evictions >= 10 * slots_) {
           // evictions from previous iteration must be smaller than 10 times the
-          // available slots to not expload the remap array in a single
+          // available slots to not explode the remap array in a single
           // partition or shard
           return cpp::nullopt;
         }
@@ -665,7 +670,7 @@ public:
     return total_evictions;
   }
 
-  LIBC_INLINE constexpr cpp::optional<cpp::tuple<uint64_t, uint64_t>>
+  LIBC_INLINE constexpr cpp::optional<cpp::tuple<size_t, uint64_t>>
   find_pilot(uint16_t kmax, cpp::span<uint64_t> bucket,
              cpp::array<bool, slots_> &taken) const {
     const size_t r = bucket.size() >> 2 << 2; // round down to magnitude of 4

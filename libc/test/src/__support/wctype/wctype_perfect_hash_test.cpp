@@ -803,6 +803,7 @@ TEST(LlvmLibcWctypePerfectHashTest, LowerToUpperKeyCheck) {
   EXPECT_EQ(true, LOWER_TO_UPPER_MAP.contains(0xE7));
   EXPECT_EQ(true, LOWER_TO_UPPER_MAP.contains(0x111));
   EXPECT_EQ(true, LOWER_TO_UPPER_MAP.contains(0x29E));
+
   EXPECT_EQ(false, LOWER_TO_UPPER_MAP.contains(0x0));
   EXPECT_EQ(false, LOWER_TO_UPPER_MAP.contains(0x1));
   EXPECT_EQ(false, LOWER_TO_UPPER_MAP.contains(0x2));
@@ -822,11 +823,13 @@ TEST(LlvmLibcWctypePerfectHashTest, LowerToUpperKeyCheck) {
   EXPECT_EQ(false, LOWER_TO_UPPER_MAP.contains(0x3FE));
   EXPECT_EQ(false, LOWER_TO_UPPER_MAP.contains(0xFFF));
   EXPECT_EQ(false, LOWER_TO_UPPER_MAP.contains(0xFFFF));
+
 #if WINT_MAX > 0xFFFF
   EXPECT_EQ(true, LOWER_TO_UPPER_MAP_32.contains(0x10428));
   EXPECT_EQ(true, LOWER_TO_UPPER_MAP_32.contains(0x104DD));
   EXPECT_EQ(true, LOWER_TO_UPPER_MAP_32.contains(0x1E940));
   EXPECT_EQ(true, LOWER_TO_UPPER_MAP_32.contains(0x1E932));
+
   EXPECT_EQ(false, LOWER_TO_UPPER_MAP_32.contains(0x0));
   EXPECT_EQ(false, LOWER_TO_UPPER_MAP_32.contains(0x20));
   EXPECT_EQ(false, LOWER_TO_UPPER_MAP_32.contains(0x40));
@@ -871,6 +874,7 @@ TEST(LlvmLibcWctypePerfectHashTest, UpperToLowerKeyCheck) {
   EXPECT_EQ(true, UPPER_TO_LOWER_MAP.contains(0x55));
   EXPECT_EQ(true, UPPER_TO_LOWER_MAP.contains(0x3FF));
   EXPECT_EQ(true, UPPER_TO_LOWER_MAP.contains(0x3FE));
+
   EXPECT_EQ(false, UPPER_TO_LOWER_MAP.contains(0x61));
   EXPECT_EQ(false, UPPER_TO_LOWER_MAP.contains(0x62));
   EXPECT_EQ(false, UPPER_TO_LOWER_MAP.contains(0x63));
@@ -888,11 +892,13 @@ TEST(LlvmLibcWctypePerfectHashTest, UpperToLowerKeyCheck) {
   EXPECT_EQ(false, UPPER_TO_LOWER_MAP.contains(0x23));
   EXPECT_EQ(false, UPPER_TO_LOWER_MAP.contains(0xFFF));
   EXPECT_EQ(false, UPPER_TO_LOWER_MAP.contains(0xFFFF));
+
 #if WINT_MAX > 0xFFFF
   EXPECT_EQ(true, UPPER_TO_LOWER_MAP_32.contains(0x1E91C));
   EXPECT_EQ(true, UPPER_TO_LOWER_MAP_32.contains(0x1E91F));
   EXPECT_EQ(true, UPPER_TO_LOWER_MAP_32.contains(0x118A1));
   EXPECT_EQ(true, UPPER_TO_LOWER_MAP_32.contains(0x10D5A));
+
   EXPECT_EQ(false, UPPER_TO_LOWER_MAP_32.contains(0x10428));
   EXPECT_EQ(false, UPPER_TO_LOWER_MAP_32.contains(0x104DD));
   EXPECT_EQ(false, UPPER_TO_LOWER_MAP_32.contains(0x1E940));
