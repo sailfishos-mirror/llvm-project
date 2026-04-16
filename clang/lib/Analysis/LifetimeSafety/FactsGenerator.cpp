@@ -387,31 +387,36 @@ void FactsGenerator::handleAssignment(const Expr *LHSExpr,
   // assigned.
   RHSList = getRValueOrigins(RHSExpr, RHSList);
 
-  if (const auto *DRE_LHS = dyn_cast<DeclRefExpr>(LHSExpr)) {
-    QualType QT = DRE_LHS->getDecl()->getType();
+  const ValueDecl *VD = nullptr;
+  if (const auto *DRE = dyn_cast<DeclRefExpr>(LHSExpr))
+    VD = DRE->getDecl();
+  else if (const auto *ME = dyn_cast<MemberExpr>(LHSExpr))
+    VD = ME->getMemberDecl();
+
+  if (VD) {
+    QualType QT = VD->getType();
     if (QT->isReferenceType()) {
       if (hasOrigins(QT->getPointeeType())) {
         // Writing through a reference uses the binding but overwrites the
         // pointee. Model this as a Read of the outer origin (keeping the
         // binding live) and a Write of the inner origins (killing the pointee's
         // liveness).
-        if (UseFact *UF = UseFacts.lookup(DRE_LHS)) {
+        if (UseFact *UF = UseFacts.lookup(LHSExpr)) {
           const OriginList *FullList = UF->getUsedOrigins();
           assert(FullList);
           UF->setUsedOrigins(FactMgr.getOriginMgr().createSingleOriginList(
               FullList->getOuterOriginID()));
           if (const OriginList *InnerList = FullList->peelOuterOrigin()) {
-            UseFact *WriteUF = FactMgr.createFact<UseFact>(DRE_LHS, InnerList);
+            UseFact *WriteUF = FactMgr.createFact<UseFact>(LHSExpr, InnerList);
             WriteUF->markAsWritten();
             CurrentBlockFacts.push_back(WriteUF);
           }
         }
       }
-    } else
-      markUseAsWrite(DRE_LHS);
+    } else {
+      markUseAsWrite(LHSExpr);
+    }
   }
-  if (isa<MemberExpr>(LHSExpr))
-    markUseAsWrite(LHSExpr);
   if (!RHSList) {
     // RHS has no tracked origins (e.g., assigning a callable without origins
     // to std::function). Clear loans of the destination.
