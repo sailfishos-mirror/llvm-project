@@ -80,8 +80,9 @@ public:
     return static_cast<size_t>(MBin->ImageEnd - MBin->ImageStart);
   }
 
-  /// Returns a liboffload program handle by looking up existing programs or
-  /// creating a new one from this image.
+  /// Returns a liboffload program which is compatible with the specified
+  /// device. Searches among existing programs and creates a new one if no
+  /// compatible image is found.
   /// \param DeviceHandle the liboffload handle of the device the program must
   /// be compatible with.
   /// \return the liboffload handle of the program compatible with the specified

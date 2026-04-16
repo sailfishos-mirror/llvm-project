@@ -52,10 +52,10 @@ private:
   /// \return a liboffload kernel handle if a built kernel was found; otherwise
   /// returns nullptr.
   ol_symbol_handle_t getKernel(ol_device_handle_t Device) const {
-    if (auto KernelIt = MBuiltKernels.find(Device);
-        KernelIt != MBuiltKernels.end())
-      return KernelIt->second;
-    return nullptr;
+    auto KernelIt = MBuiltKernels.find(Device);
+    if (KernelIt == MBuiltKernels.end())
+      return nullptr;
+    return KernelIt->second;
   }
 
   /// \return the device image containing the device code of this kernel.
@@ -65,8 +65,10 @@ private:
   /// \param Device the device the kernel symbol was created for.
   /// \param Kernel the liboffload kernel symbol to attach.
   void addKernel(ol_device_handle_t Device, ol_symbol_handle_t Kernel) {
-    assert(Kernel && Device &&
-           MBuiltKernels.find(Device) == MBuiltKernels.end());
+    assert(Kernel && "Invalid liboffload kernel handle");
+    assert(Device && "Invalid liboffload device handle");
+    assert((MBuiltKernels.find(Device) == MBuiltKernels.end()) &&
+           "Kernel is being managed already");
     MBuiltKernels.insert({Device, Kernel});
   }
 
