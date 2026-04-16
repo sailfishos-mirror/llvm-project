@@ -7,6 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "SSAFAnalysesCommon.h"
+#include "clang/AST/ASTContext.h"
 
 using namespace clang;
 
