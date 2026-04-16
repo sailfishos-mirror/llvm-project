@@ -68,6 +68,11 @@ struct CtorRefField {
   CtorRefField(Dummy<1> ok, const std::string& s, const std::string_view& v): str(s), view(v) {}
 };
 
+struct CtorRefFieldTemporary {
+  const std::string& str; // expected-note {{this field dangles}}
+  CtorRefFieldTemporary(): str(std::vector<std::string>{"abcd"}[0]) {} // expected-warning {{address of stack memory escapes to a field}}
+};
+
 struct CtorPointerField {
   const char* ptr; // expected-note {{this field dangles}}
   CtorPointerField(std::string s) : ptr(s.data()) {}  // expected-warning {{address of stack memory escapes to a field}}
