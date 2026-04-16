@@ -1354,7 +1354,28 @@ TEST(ValueTracking, canCreatePoisonOrUndef) {
       {{false, false},
        "call {i32, i1} @llvm.usub.with.overflow.i32(i32 %x, i32 %y)"},
       {{false, false},
-       "call {i32, i1} @llvm.umul.with.overflow.i32(i32 %x, i32 %y)"}};
+       "call {i32, i1} @llvm.umul.with.overflow.i32(i32 %x, i32 %y)"},
+      {{false, false}, "call i32 @llvm.vector.reduce.or.v4i32(<4 x i32> %vx)"},
+      {{false, false}, "call i32 @llvm.vector.reduce.and.v4i32(<4 x i32> %vx)"},
+      {{false, false}, "call i32 @llvm.vector.reduce.xor.v4i32(<4 x i32> %vx)"},
+      {{false, false}, "call i32 @llvm.vector.reduce.add.v4i32(<4 x i32> %vx)"},
+      {{false, false}, "call i32 @llvm.vector.reduce.mul.v4i32(<4 x i32> %vx)"},
+      {{false, false},
+       "call i32 @llvm.vector.reduce.smax.v4i32(<4 x i32> %vx)"},
+      {{false, false},
+       "call i32 @llvm.vector.reduce.smin.v4i32(<4 x i32> %vx)"},
+      {{false, false},
+       "call i32 @llvm.vector.reduce.umax.v4i32(<4 x i32> %vx)"},
+      {{false, false},
+       "call i32 @llvm.vector.reduce.umin.v4i32(<4 x i32> %vx)"},
+      {{false, false},
+       "call i32 @llvm.vector.reduce.fmax.v4i32(<4 x i32> %vx)"},
+      {{false, false},
+       "call i32 @llvm.vector.reduce.fmin.v4i32(<4 x i32> %vx)"},
+      {{false, false},
+       "call i32 @llvm.vector.reduce.fmaximum.v4i32(<4 x i32> %vx)"},
+      {{false, false},
+       "call i32 @llvm.vector.reduce.fmaximum.v4i32(<4 x i32> %vx)"}};
 
   std::string AssemblyStr = AsmHead;
   for (auto &Itm : Data)
@@ -1890,6 +1911,74 @@ TEST_F(ComputeKnownFPClassTest, MaximumNumSignBit) {
   expectKnownFPClass(fcPositive, false, A5);
   expectKnownFPClass(~fcNan, std::nullopt, A6);
   expectKnownFPClass(fcPositive, false, A7);
+}
+
+TEST_F(ComputeKnownFPClassTest, PowiInfFirst) {
+  parseAssembly(
+      "declare float @llvm.powi.f32.i32(float, i32)\n"
+      "define float @test(i1 %cond, i32 %x, float %unknown,\n"
+      "                   float nofpclass(inf) %finite,\n"
+      "                   float nofpclass(zero sub inf) %normal,\n"
+      "                   float nofpclass(zero inf) %finite.may.sub,\n"
+      "                   float nofpclass(inf norm sub) %zero.or.nan) {\n"
+      "  %small = zext i1 %cond to i32\n"
+      "  %nonneg = and i32 %x, 2147483647\n"
+      "  %A = call float @llvm.powi.f32.i32(float %finite, i32 1)\n"
+      "  %A2 = call float @llvm.powi.f32.i32(float %finite, i32 2)\n"
+      "  %A3 = call float @llvm.powi.f32.i32(float %normal, i32 -1)\n"
+      "  %A4 = call float @llvm.powi.f32.i32(float %finite, i32 %small)\n"
+      "  %A5 = call float @llvm.powi.f32.i32(float %unknown, i32 %small)\n"
+      "  %A6 = call float @llvm.powi.f32.i32(float %finite.may.sub, i32 -1)\n"
+      "  %A7 = call float @llvm.powi.f32.i32(float %zero.or.nan, i32 %nonneg)\n"
+      "  ret float %A\n"
+      "}\n");
+  expectKnownFPClass(~fcInf, std::nullopt, A);
+  expectKnownFPClass(fcPositive | fcNan, std::nullopt, A2);
+  expectKnownFPClass(~fcInf, std::nullopt, A3);
+  expectKnownFPClass(~fcInf, std::nullopt, A4);
+  expectKnownFPClass(fcAllFlags, std::nullopt, A5);
+  expectKnownFPClass(fcAllFlags, std::nullopt, A6);
+  expectKnownFPClass(~fcInf, std::nullopt, A7);
+
+  auto ExpectKnownNeverInf = [&](Instruction *I, bool Expected) {
+    KnownFPClass Known = computeKnownFPClass(I, M->getDataLayout(), fcInf);
+    EXPECT_EQ(Expected, Known.isKnownNeverInfinity());
+  };
+
+  ExpectKnownNeverInf(A, true);
+  ExpectKnownNeverInf(A2, false);
+  ExpectKnownNeverInf(A3, true);
+  ExpectKnownNeverInf(A4, true);
+  ExpectKnownNeverInf(A5, false);
+  ExpectKnownNeverInf(A6, false);
+  ExpectKnownNeverInf(A7, true);
+}
+
+TEST_F(ComputeKnownFPClassTest, PowiInfSecond) {
+  parseAssembly(
+      "declare float @llvm.powi.f32.i32(float, i32)\n"
+      "define float @test(i32 %x, float %unknown,\n"
+      "                   float nofpclass(inf) %finite,\n"
+      "                   float nofpclass(inf norm sub) %zero.or.nan,\n"
+      "                   float nofpclass(zero norm sub) %inf.or.nan) {\n"
+      "  %neg = or i32 %x, -2147483648\n"
+      "  %nonneg = and i32 %x, 2147483647\n"
+      "  %A = call float @llvm.powi.f32.i32(float %unknown, i32 0)\n"
+      "  %A2 = call float @llvm.powi.f32.i32(float %finite, i32 -2)\n"
+      "  %A3 = call float @llvm.powi.f32.i32(float %zero.or.nan, i32 -1)\n"
+      "  %A4 = call float @llvm.powi.f32.i32(float %inf.or.nan, i32 -1)\n"
+      "  %A5 = call float @llvm.powi.f32.i32(float %inf.or.nan, i32 %neg)\n"
+      "  %A6 = call float @llvm.powi.f32.i32(float %finite, i32 %nonneg)\n"
+      "  %A7 = call float @llvm.powi.f32.i32(float %zero.or.nan, i32 %neg)\n"
+      "  ret float %A\n"
+      "}\n");
+  expectKnownFPClass(fcPosNormal | fcNan, std::nullopt, A);
+  expectKnownFPClass(fcPositive | fcNan, std::nullopt, A2);
+  expectKnownFPClass(fcAllFlags, std::nullopt, A3);
+  expectKnownFPClass(~fcInf, std::nullopt, A4);
+  expectKnownFPClass(~fcInf, std::nullopt, A5);
+  expectKnownFPClass(fcAllFlags, std::nullopt, A6);
+  expectKnownFPClass(fcAllFlags, std::nullopt, A7);
 }
 
 TEST_F(ComputeKnownFPClassTest, Phi) {
