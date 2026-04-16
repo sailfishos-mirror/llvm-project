@@ -142,9 +142,9 @@ struct MemberSetters {
       std::string local;
       view = local;     // expected-warning {{object whose reference is captured does not live long enough}}
       p = local.data(); // expected-warning {{object whose reference is captured does not live long enough}}
-    } // expected-note 2 {{destroyed here}}
-    (void)view; // expected-note {{later used here}}
-    (void)p;    // expected-note {{later used here}}
+    }                   // expected-note 2 {{destroyed here}}
+    (void)view;         // expected-note {{later used here}}
+    (void)p;            // expected-note {{later used here}}
   }
 
   void use_after_scope_saved_after_reassignment() {
@@ -152,9 +152,9 @@ struct MemberSetters {
       std::string local;
       view = local;     // expected-warning {{object whose reference is captured does not live long enough}}
       p = local.data(); // expected-warning {{object whose reference is captured does not live long enough}}
-    } // expected-note 2 {{destroyed here}}
-    (void)view; // expected-note {{later used here}}
-    (void)p;    // expected-note {{later used here}}
+    }                   // expected-note 2 {{destroyed here}}
+    (void)view;         // expected-note {{later used here}}
+    (void)p;            // expected-note {{later used here}}
 
     view = kGlobal;
     p = kGlobal.data();
