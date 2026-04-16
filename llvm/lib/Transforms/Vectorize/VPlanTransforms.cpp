@@ -6421,36 +6421,35 @@ void VPlanTransforms::makeScalarizationDecisions(VPlan &Plan, VFRange &Range) {
       if (!VPI)
         continue;
 
+      // For now we (effectively) only scalarize to first-lane-only address
+      // computation chain for the memory operations such that
+      // MemOp->usesFirstLaneOnly(MemOpAddressOperand).
+
       auto *I = cast_or_null<Instruction>(VPI->getUnderlyingValue());
       if (!I)
         // Wouldn't be able to create a `VPReplicateRecipe` anyway.
         continue;
 
-      bool CanTransformToFirstLaneOnly = [&]() {
-        if (VPI->mayHaveSideEffects())
-          return false;
+      // If "executing" other lanes produces side-effects we can't avoid them.
+      if (VPI->mayHaveSideEffects())
+        continue;
 
-        // We want to drop the mask operand, doing that for integer division
-        // isn't safe.
-        if (is_contained({Instruction::SDiv, Instruction::UDiv,
-                          Instruction::SRem, Instruction::URem},
-                         VPI->getOpcode()) &&
-            VPI->getMask())
-          return false;
+      // We want to drop the mask operand, doing that for integer division
+      // isn't safe if it's predicated.
+      if (is_contained({Instruction::SDiv, Instruction::UDiv, Instruction::SRem,
+                        Instruction::URem},
+                       VPI->getOpcode()) &&
+          VPI->isMasked())
+        continue;
 
-        // Avoid rewriting IV increment as that interferes with
-        // `removeRedundantCanonicalIVs`.
-        if (VPI->getOpcode() == Instruction::Add &&
-            any_of(VPI->operands(), IsaPred<VPWidenInductionRecipe>))
-          return false;
+      // Avoid rewriting IV increment as that interferes with
+      // `removeRedundantCanonicalIVs`.
+      if (VPI->getOpcode() == Instruction::Add &&
+          any_of(VPI->operands(), IsaPred<VPWidenInductionRecipe>))
+        continue;
 
-        if (!vputils::onlyFirstLaneUsed(VPI))
-          return false;
-
-        return true;
-      }();
-
-      if (!CanTransformToFirstLaneOnly)
+      // Other lanes are needed - can't drop them.
+      if (!vputils::onlyFirstLaneUsed(VPI))
         continue;
 
       auto *Recipe =
