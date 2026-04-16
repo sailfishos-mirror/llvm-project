@@ -88,6 +88,18 @@ static cl::opt<bool> Fix16BitCopies(
   cl::init(true),
   cl::ReallyHidden);
 
+static cl::opt<SIInstrInfo::DSLatencyMode> DSLatency(
+    "amdgpu-ds-latency-mode",
+    cl::desc("DS load/store latency mode for gfx1250 (models LDS contention)"),
+    cl::values(
+        clEnumValN(SIInstrInfo::DSLatencyMode::Fast, "fast",
+                   "Use default/fast latency (no contention)"),
+        clEnumValN(SIInstrInfo::DSLatencyMode::Loaded, "loaded",
+                   "Use loaded latency (moderate contention, 60 cycles)"),
+        clEnumValN(SIInstrInfo::DSLatencyMode::Overloaded, "overloaded",
+                   "Use overloaded latency (high contention, 100 cycles)")),
+    cl::init(SIInstrInfo::DSLatencyMode::Fast), cl::Hidden);
+
 SIInstrInfo::SIInstrInfo(const GCNSubtarget &ST)
     : AMDGPUGenInstrInfo(ST, RI, AMDGPU::ADJCALLSTACKUP,
                          AMDGPU::ADJCALLSTACKDOWN),
@@ -10732,6 +10744,12 @@ unsigned SIInstrInfo::getInstrLatency(const InstrItineraryData *ItinData,
     return Lat + Count - 1;
   }
 
+  // DS load/store latency is variable depending on LDS contention.
+  if (ST.hasGFX1250Insts() && isDS(MI)) {
+    if (auto Latency = getDSLatencyMode())
+      return *Latency;
+  }
+
   return SchedModel.computeInstrLatency(&MI);
 }
 
@@ -11411,6 +11429,23 @@ MachineInstr *SIInstrInfo::getNextRealInstr(MachineInstr *MI) {
       return Next;
   }
   return nullptr;
+}
+
+void SIInstrInfo::setDSLatencyMode(DSLatencyMode Mode) {
+  if (DSLatency.getNumOccurrences() == 0)
+    DSLatency = Mode;
+}
+
+std::optional<unsigned> SIInstrInfo::getDSLatencyMode() {
+  switch (DSLatency) {
+  case DSLatencyMode::Fast:
+    return std::nullopt; // Use default scheduling model latency
+  case DSLatencyMode::Loaded:
+    return 60;
+  case DSLatencyMode::Overloaded:
+    return 100;
+  }
+  llvm_unreachable("Unknown DS latency mode");
 }
 
 unsigned SIInstrInfo::getRepeatRate(const MachineInstr &MI) const {

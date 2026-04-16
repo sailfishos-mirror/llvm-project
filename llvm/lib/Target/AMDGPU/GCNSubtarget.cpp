@@ -656,6 +656,14 @@ void GCNSubtarget::adjustSchedDependency(
   MachineInstr *DefI = Def->getInstr();
   MachineInstr *UseI = Use->getInstr();
 
+  // DS load/store latency is variable depending on LDS contention.
+  if (hasGFX1250Insts() && InstrInfo.isDS(*DefI)) {
+    if (auto Latency = SIInstrInfo::getDSLatencyMode()) {
+      Dep.setLatency(*Latency);
+      return;
+    }
+  }
+
   if (DefI->isBundle()) {
     const SIRegisterInfo *TRI = getRegisterInfo();
     auto Reg = Dep.getReg();

@@ -1186,6 +1186,23 @@ public:
     return Opcode == AMDGPU::SCHED_GROUP_BARRIER || Opcode == AMDGPU::IGLP_OPT;
   }
 
+  /// DS latency modes. The latency of DS load/store instructions
+  /// is variable depending on LDS contention.
+  enum class DSLatencyMode {
+    Fast,      ///< Use default/fast latency (no contention)
+    Loaded,    ///< Use loaded latency (moderate contention, 60 cycles)
+    Overloaded ///< Use overloaded latency (high contention, 100 cycles)
+  };
+
+  /// \p returns the DS instruction latency based on the selected
+  /// --amdgpu-ds-latency-mode. \p returns std::nullopt if the default
+  /// scheduling model latency should be used (fast mode).
+  static std::optional<unsigned> getDSLatencyMode();
+
+  /// Sets the default DS latency mode if the user hasn't explicitly specified
+  /// a mode via --amdgpu-ds-latency-mode.
+  static void setDSLatencyMode(DSLatencyMode Mode);
+
   static unsigned getNonSoftWaitcntOpcode(unsigned Opcode) {
     switch (Opcode) {
     case AMDGPU::S_WAITCNT_soft:

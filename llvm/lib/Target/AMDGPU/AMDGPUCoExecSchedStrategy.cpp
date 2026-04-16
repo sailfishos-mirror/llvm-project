@@ -13,6 +13,7 @@
 
 #include "AMDGPUCoExecSchedStrategy.h"
 #include "GCNHazardRecognizer.h"
+#include "GCNSubtarget.h"
 #include "llvm/Support/Debug.h"
 
 using namespace llvm;
@@ -188,6 +189,13 @@ CandidateHeuristics::getHWUIFromFlavor(InstructionFlavor Flavor) {
 
 unsigned CandidateHeuristics::getHWUICyclesForInst(SUnit *SU) {
   assert(SchedModel && SchedModel->hasInstrSchedModel());
+
+  // DS load/store latency is variable depending on LDS contention.
+  if (SII->getSubtarget().hasGFX1250Insts() && SII->isDS(*SU->getInstr())) {
+    if (auto Latency = SIInstrInfo::getDSLatencyMode())
+      return *Latency;
+  }
+
   unsigned ReleaseAtCycle = 0;
   const MCSchedClassDesc *SC = DAG->getSchedClass(SU);
   for (TargetSchedModel::ProcResIter PI = SchedModel->getWriteProcResBegin(SC),
@@ -723,6 +731,10 @@ ScheduleDAGInstrs *
 llvm::createGCNCoExecMachineScheduler(MachineSchedContext *C) {
   LLVM_DEBUG(dbgs() << "AMDGPU coexec preRA scheduler selected for "
                     << C->MF->getName() << '\n');
+
+  // CoExecScheduler defaults to Loaded DS latency mode.
+  SIInstrInfo::setDSLatencyMode(SIInstrInfo::DSLatencyMode::Loaded);
+
   return new GCNScheduleDAGMILive(
       C, std::make_unique<AMDGPUCoExecSchedStrategy>(C));
 }
