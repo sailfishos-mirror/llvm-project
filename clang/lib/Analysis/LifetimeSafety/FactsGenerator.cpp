@@ -410,6 +410,8 @@ void FactsGenerator::handleAssignment(const Expr *LHSExpr,
     } else
       markUseAsWrite(DRE_LHS);
   }
+  if (isa<MemberExpr>(LHSExpr))
+    markUseAsWrite(LHSExpr);
   if (!RHSList) {
     // RHS has no tracked origins (e.g., assigning a callable without origins
     // to std::function). Clear loans of the destination.
@@ -926,9 +928,9 @@ void FactsGenerator::handleUse(const Expr *E) {
   }
 }
 
-void FactsGenerator::markUseAsWrite(const DeclRefExpr *DRE) {
-  if (UseFacts.contains(DRE))
-    UseFacts[DRE]->markAsWritten();
+void FactsGenerator::markUseAsWrite(const Expr *E) {
+  if (UseFacts.contains(E))
+    UseFacts[E]->markAsWritten();
 }
 
 // Creates an IssueFact for a new placeholder loan for each pointer or reference
