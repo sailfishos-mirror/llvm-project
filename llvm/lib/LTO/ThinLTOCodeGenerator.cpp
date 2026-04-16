@@ -1210,7 +1210,7 @@ void ThinLTOCodeGenerator::run() {
     }
   }
 
-  auto ErrOrPruned =
+  Expected<bool> ErrOrPruned =
       pruneCache(CacheOptions.Path, CacheOptions.Policy, ProducedBinaries);
   if (!ErrOrPruned) {
     errs() << "Error: " << toString(ErrOrPruned.takeError()) << "\n";
