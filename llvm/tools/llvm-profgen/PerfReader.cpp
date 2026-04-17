@@ -1170,10 +1170,7 @@ bool PerfScriptReader::isLBRSample(StringRef Line, bool CheckLineStart) {
   Line.split(Records, " ", 2, CheckLineStart);
   if (Records.size() < 2)
     return false;
-  StringRef Token = Records[1];
-  if (!Token.contains('/'))
-    return false;
-  if (Token.starts_with("0x"))
+  if (Records[1].starts_with("0x") && Records[1].contains('/'))
     return true;
   return false;
 }
