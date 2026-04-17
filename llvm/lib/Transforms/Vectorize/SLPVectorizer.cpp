@@ -18850,16 +18850,26 @@ InstructionCost BoUpSLP::getTreeCost(InstructionCost TreeCost,
     const bool AnyRootKeptAsScalar = any_of(RootEntry.Scalars, [&](Value *V) {
       return ExternalUsesAsOriginalScalar.contains(V);
     });
-    if (!AnyRootKeptAsScalar) {
+    const Value *CommonBase = nullptr;
+    bool HaveCommonBase = true;
+    for (const Value *P : Pointers) {
+      const Value *Op = cast<GetElementPtrInst>(P)->getPointerOperand();
+      if (!CommonBase)
+        CommonBase = Op;
+      else if (CommonBase != Op) {
+        HaveCommonBase = false;
+        break;
+      }
+    }
+    if (!AnyRootKeptAsScalar && HaveCommonBase) {
       TTI::TargetCostKind CostKind = TTI::TCK_RecipThroughput;
-      Type *RootScalarTy = RootEntry.Scalars.front()->getType();
       auto *VecTy = getWidenedType(UserScalarTy, RootEntry.Scalars.size());
       InstructionCost ScalarGEPCost = TTI->getPointersChainCost(
-          Pointers, Pointers.front(), TTI::PointersChainInfo::getUnitStride(),
-          RootScalarTy, CostKind);
+          Pointers, CommonBase, TTI::PointersChainInfo::getUnitStride(),
+          UserScalarTy, CostKind);
       InstructionCost VectorGEPCost = TTI->getPointersChainCost(
-          Pointers, Pointers.front(),
-          TTI::PointersChainInfo::getUnknownStride(), VecTy, CostKind);
+          Pointers, CommonBase, TTI::PointersChainInfo::getUnknownStride(),
+          VecTy, CostKind);
       ExtractCost += ScaleCost(VectorGEPCost - ScalarGEPCost, RootEntry);
     }
   }
