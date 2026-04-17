@@ -491,8 +491,8 @@ public:
 
     // - Declare all functions that have definitions so that definition
     //   signatures prevail over call site signatures.
-    // - Define module variables and OpenMP/OpenACC declarative constructs so
-    //   they are available before lowering any function that may use them.
+    // - Module variables are lowered once all the function declarations are
+    // available.
     bool hasMainProgram = false;
     llvm::SmallVector<const Fortran::semantics::Symbol *>
         globalOmpRequiresSymbols;
@@ -507,7 +507,6 @@ public:
                   globalOmpRequiresSymbols.push_back(f.getScope().symbol());
                 },
                 [&](Fortran::lower::pft::ModuleLikeUnit &m) {
-                  lowerModuleDeclScope(m);
                   for (Fortran::lower::pft::ContainedUnit &unit :
                        m.containedUnitList)
                     if (auto *f =
@@ -526,6 +525,15 @@ public:
                 [&](Fortran::lower::pft::OpenACCDirectiveUnit &d) {},
             },
             u);
+      }
+    });
+
+    // Lower module declaration scopes now that all function
+    // declarations are available with their final signatures.
+    createBuilderOutsideOfFuncOpAndDo([&]() {
+      for (Fortran::lower::pft::Program::Units &u : pft.getUnits()) {
+        if (auto *m = std::get_if<Fortran::lower::pft::ModuleLikeUnit>(&u))
+          lowerModuleDeclScope(*m);
       }
     });
 
@@ -6895,8 +6903,14 @@ private:
         if (sym.name() == "numeric_storage_size" && owner.IsModule() &&
             DEREF(owner.symbol()).name() == "iso_fortran_env")
           continue;
-      }
 
+        if (Fortran::evaluate::IsCoarray(sym) &&
+            !Fortran::semantics::IsAllocatable(sym) &&
+            Fortran::semantics::IsSaved(sym)) {
+          mlir::Location loc = toLocation();
+          TODO(loc, "non-ALLOCATABLE SAVE Coarray outside the main program.");
+        }
+      }
       Fortran::lower::defineModuleVariable(*this, var);
     }
     for (auto &eval : mod.evaluationList)
