@@ -275,10 +275,10 @@ Expected<std::string> getCachedOrDownloadArtifact(
     if (!PruningPolicyOrErr)
       return PruningPolicyOrErr.takeError();
 
-    Expected<bool> ErrOrPruned =
+    Expected<bool> PrunedOrErr =
         pruneCache(CacheDirectoryPath, *PruningPolicyOrErr);
-    if (!ErrOrPruned)
-      return ErrOrPruned.takeError();
+    if (!PrunedOrErr)
+      return PrunedOrErr.takeError();
 
     // Return the path to the artifact on disk.
     return std::string(AbsCachedArtifactPath);
