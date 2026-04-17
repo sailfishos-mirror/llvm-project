@@ -16,6 +16,22 @@
 #include "clang/AST/Decl.h"
 #include "llvm/Support/JSON.h"
 
+inline std::string describeJSONValue(const llvm::json::Value &V) {
+  return llvm::formatv("{0:2}", V).str();
+}
+
+/// Return a short description of a JSON array suitable for
+/// diagnostics.
+inline std::string describeJSONValue(const llvm::json::Array &A) {
+  return llvm::formatv("array of size {0}", A.size()).str();
+}
+
+/// Return a short description of a JSON object suitable for
+/// diagnostics.
+inline std::string describeJSONValue(const llvm::json::Object &O) {
+  return llvm::formatv("an object of {0} key(s)", O.size()).str();
+}
+
 template <typename NodeTy, typename... Ts>
 llvm::Error makeErrAtNode(clang::ASTContext &Ctx, const NodeTy *N,
                           llvm::StringRef Fmt, const Ts &...Args) {
@@ -24,12 +40,11 @@ llvm::Error makeErrAtNode(clang::ASTContext &Ctx, const NodeTy *N,
                                  LocStr.c_str());
 }
 
-template <typename... Ts>
-llvm::Error makeSawButExpectedError(const llvm::json::Value &Saw,
-                                    llvm::StringRef Expected,
+template <typename JSONTy, typename... Ts>
+llvm::Error makeSawButExpectedError(const JSONTy &Saw, llvm::StringRef Expected,
                                     const Ts &...ExpectedArgs) {
   std::string Fmt = ("saw %s but expected " + Expected).str();
-  std::string SawStr = llvm::formatv("{0:2}", Saw).str();
+  std::string SawStr = describeJSONValue(Saw);
 
   return llvm::createStringError(Fmt.c_str(), SawStr.c_str(), ExpectedArgs...);
 }

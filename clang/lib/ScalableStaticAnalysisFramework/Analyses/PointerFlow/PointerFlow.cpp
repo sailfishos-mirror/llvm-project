@@ -8,10 +8,9 @@
 
 #include "clang/ScalableStaticAnalysisFramework/Analyses/PointerFlow/PointerFlow.h"
 #include "SSAFAnalysesCommon.h"
-#include "clang/ScalableStaticAnalysisFramework/Analyses/EntityPointerLevel/EntityPointerLevel.h"
 #include "clang/ScalableStaticAnalysisFramework/Analyses/EntityPointerLevel/EntityPointerLevelFormat.h"
+#include "clang/ScalableStaticAnalysisFramework/Analyses/PointerFlow/PointerFlowFormat.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/Model/EntityId.h"
-#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/iterator_range.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/JSON.h"
@@ -36,51 +35,27 @@ ssaf::getEdges(const PointerFlowEntitySummary &Sum) {
   return Sum.Edges;
 }
 
-// Writes the 'Edges' map as an array of array of EntityPointerLevels:
-// Array [
-//    Array [ [lhs-node], [rhs-node], [rhs-node], ...]
-//    Array [ [lhs-node], [rhs-node], [rhs-node], ...]
-//    ...
-// ]
-static llvm::json::Object
-summaryToJSON(const EntitySummary &ES,
-              JSONFormat::EntityIdToJSONFn EntityId2JSON) {
+Array ssaf::edgeSetToJSON(
+    const llvm::iterator_range<EdgeSet::const_iterator> &Edges,
+    JSONFormat::EntityIdToJSONFn EntityId2JSON) {
   Array EdgesData;
 
-  for (const auto &Entry :
-       getEdges(static_cast<const PointerFlowEntitySummary &>(ES))) {
-    Array EdgesEntryData;
-    EntityPointerLevel LHS = Entry.first;
-
-    EdgesEntryData.push_back(entityPointerLevelToJSON(LHS, EntityId2JSON));
-    // Add to nodes:
-    for (const auto &RHS : Entry.second)
-      EdgesEntryData.push_back(entityPointerLevelToJSON(RHS, EntityId2JSON));
-    EdgesData.push_back(Value(std::move(EdgesEntryData)));
+  for (const auto &[LHS, RHSSet] : Edges) {
+    Array EdgeEntry;
+    EdgeEntry.push_back(entityPointerLevelToJSON(LHS, EntityId2JSON));
+    for (const auto &RHS : RHSSet)
+      EdgeEntry.push_back(entityPointerLevelToJSON(RHS, EntityId2JSON));
+    EdgesData.push_back(Value(std::move(EdgeEntry)));
   }
-
-  Object Data;
-
-  Data[PointerFlowKey] = Value(std::move(EdgesData));
-  return Data;
+  return EdgesData;
 }
 
-static llvm::Expected<std::unique_ptr<EntitySummary>>
-summaryFromJSON(const Object &Data, EntityIdTable &,
-                JSONFormat::EntityIdFromJSONFn EntityIdFromJSON) {
-  const Value *EdgesData = Data.get(PointerFlowKey);
-
-  if (!EdgesData)
-    return makeSawButExpectedError(
-        Object(Data), "a JSON object with the key: %s", PointerFlowKey);
-
+llvm::Expected<EdgeSet>
+ssaf::edgeSetFromJSON(const Array &EdgesData,
+                      JSONFormat::EntityIdFromJSONFn EntityIdFromJSON) {
   EdgeSet Edges;
-  const auto *EdgesDataAsArr = EdgesData->getAsArray();
 
-  if (!EdgesDataAsArr)
-    return makeSawButExpectedError(
-        *EdgesData, "a JSON array of array of EntityPointerLevels");
-  for (const auto &EdgesEntryData : *EdgesDataAsArr) {
+  for (const auto &EdgesEntryData : EdgesData) {
     const auto *EPLArray = EdgesEntryData.getAsArray();
 
     if (!EPLArray || EPLArray->size() <= 1)
@@ -101,8 +76,46 @@ summaryFromJSON(const Object &Data, EntityIdTable &,
       Edges[*SrcEPL].insert(*EPL);
     }
   }
+  return Edges;
+}
+
+// Writes the 'Edges' map as an array of array of EntityPointerLevels:
+// Array [
+//    Array [ [lhs-node], [rhs-node], [rhs-node], ...]
+//    Array [ [lhs-node], [rhs-node], [rhs-node], ...]
+//    ...
+// ]
+static llvm::json::Object
+summaryToJSON(const EntitySummary &ES,
+              JSONFormat::EntityIdToJSONFn EntityId2JSON) {
+  Object Data;
+  Data[PointerFlowKey] = Value(
+      edgeSetToJSON(getEdges(static_cast<const PointerFlowEntitySummary &>(ES)),
+                    EntityId2JSON));
+  return Data;
+}
+
+static llvm::Expected<std::unique_ptr<EntitySummary>>
+summaryFromJSON(const Object &Data, EntityIdTable &,
+                JSONFormat::EntityIdFromJSONFn EntityIdFromJSON) {
+  const Value *EdgesData = Data.get(PointerFlowKey);
+
+  if (!EdgesData)
+    return makeSawButExpectedError(Data, "a JSON object with the key: %s",
+                                   PointerFlowKey);
+
+  const auto *EdgesDataAsArr = EdgesData->getAsArray();
+
+  if (!EdgesDataAsArr)
+    return makeSawButExpectedError(
+        *EdgesData, "a JSON array of array of EntityPointerLevels");
+
+  auto Edges = edgeSetFromJSON(*EdgesDataAsArr, EntityIdFromJSON);
+
+  if (!Edges)
+    return Edges.takeError();
   return std::make_unique<PointerFlowEntitySummary>(
-      buildPointerFlowEntitySummary(std::move(Edges)));
+      buildPointerFlowEntitySummary(std::move(*Edges)));
 }
 
 struct PointerFlowJSONFormatInfo : JSONFormat::FormatInfo {
