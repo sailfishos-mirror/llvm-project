@@ -70,7 +70,7 @@ struct CachePruningPolicy {
 LLVM_ABI Expected<CachePruningPolicy>
 parseCachePruningPolicy(StringRef PolicyStr);
 
-/// Peform pruning using the supplied policy, returns true if pruning
+/// Perform pruning using the supplied policy, returns true if pruning
 /// occurred, i.e. if Policy.Interval was expired.
 ///
 /// Check whether cache pruning happens using the supplied policy, adds a
