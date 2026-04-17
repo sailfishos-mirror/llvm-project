@@ -496,33 +496,98 @@ inline CoExecInfo getCoExecInfo(const MachineInstr &MI,
 
     if (BothF4) {
       // f4×f4: 4-cycle occupancy, 6-cycle window
-      return CoExecInfo::build(4, 6, "0EEIVV", 3, HasScaling);
+      return CoExecInfo::build(4, 6, "0EEIVV", 3, HasScaling)
+          .preferring(1, flavorBit(InstructionFlavor::DS))
+          .avoiding(2, flavorBit(InstructionFlavor::DS))
+          .preferring(3, HasScaling
+                             ? FlavorMasks::None
+                             : flavorBit(InstructionFlavor::SingleCycleVALU))
+          .avoiding(3, HasScaling ? FlavorMasks::All : FlavorMasks::None)
+          .preferring(4, flavorBit(InstructionFlavor::WMMA))
+          .preferring(5, flavorBit(InstructionFlavor::WMMA));
     }
     // f8×*, f6×*, or mixed: 8-cycle occupancy, 10-cycle window
-    return CoExecInfo::build(8, 10, "0EEIEEIIVV", 7, HasScaling);
+    return CoExecInfo::build(8, 10, "0EEIEEIIVV", 7, HasScaling)
+        .preferring(1, flavorBit(InstructionFlavor::DS))
+        .avoiding(2, flavorBit(InstructionFlavor::DS))
+        .preferring(3, flavorBit(InstructionFlavor::TRANS))
+        .preferring(4, flavorBit(InstructionFlavor::DS))
+        .avoiding(5, flavorBit(InstructionFlavor::DS))
+        .preferring(6, flavorBit(InstructionFlavor::SingleCycleVALU))
+        .avoiding(6, HasScaling ? flavorBit(InstructionFlavor::TRANS)
+                                : FlavorMasks::None)
+        .preferring(7, HasScaling
+                           ? FlavorMasks::None
+                           : flavorBit(InstructionFlavor::SingleCycleVALU))
+        .avoiding(7, HasScaling ? FlavorMasks::All : FlavorMasks::None)
+        .preferring(8, flavorBit(InstructionFlavor::WMMA))
+        .preferring(9, flavorBit(InstructionFlavor::WMMA));
   }
 
   // FP8/BF8 16x16x64: 4-cycle occupancy, 6-cycle window
   if (Name.contains_insensitive("16x16x64_fp8") ||
       Name.contains_insensitive("16x16x64_bf8")) {
-    return CoExecInfo::build(4, 6, "0EEIVV", 3, HasScaling);
+    return CoExecInfo::build(4, 6, "0EEIVV", 3, HasScaling)
+        .preferring(1, flavorBit(InstructionFlavor::DS))
+        .avoiding(2, flavorBit(InstructionFlavor::DS))
+        .preferring(3, HasScaling
+                           ? FlavorMasks::None
+                           : flavorBit(InstructionFlavor::SingleCycleVALU))
+        .avoiding(3, HasScaling ? FlavorMasks::All : FlavorMasks::None)
+        .preferring(4, flavorBit(InstructionFlavor::WMMA))
+        .preferring(5, flavorBit(InstructionFlavor::WMMA));
   }
 
   // F16/BF16 16x16x32: 8-cycle occupancy, 9-cycle window
   if (Name.contains_insensitive("16x16x32_f16") ||
       Name.contains_insensitive("16x16x32_bf16")) {
-    return CoExecInfo::build(8, 9, "0EIIEEIIV", 7, HasScaling);
+    return CoExecInfo::build(8, 9, "0EIIEEIIV", 7, HasScaling)
+        .avoiding(1, flavorBit(InstructionFlavor::DS))
+        .preferring(2, flavorBit(InstructionFlavor::SingleCycleVALU))
+        .preferring(3, flavorBit(InstructionFlavor::TRANS))
+        .preferring(4, flavorBit(InstructionFlavor::DS))
+        .avoiding(5, flavorBit(InstructionFlavor::DS))
+        .preferring(6, flavorBit(InstructionFlavor::SingleCycleVALU))
+        .avoiding(6, HasScaling ? flavorBit(InstructionFlavor::TRANS)
+                                : FlavorMasks::None)
+        .preferring(7, HasScaling
+                           ? FlavorMasks::None
+                           : flavorBit(InstructionFlavor::SingleCycleVALU))
+        .avoiding(7, HasScaling ? FlavorMasks::All : FlavorMasks::None)
+        .preferring(8, flavorBit(InstructionFlavor::WMMA));
   }
 
   // FP8/BF8 16x16x128: 8-cycle occupancy, 10-cycle window
   if (Name.contains_insensitive("16x16x128_fp8") ||
       Name.contains_insensitive("16x16x128_bf8")) {
-    return CoExecInfo::build(8, 10, "0EEIEEIIVV", 7, HasScaling);
+    return CoExecInfo::build(8, 10, "0EEIEEIIVV", 7, HasScaling)
+        .preferring(1, flavorBit(InstructionFlavor::DS))
+        .avoiding(2, flavorBit(InstructionFlavor::DS))
+        .preferring(3, flavorBit(InstructionFlavor::TRANS))
+        .preferring(4, flavorBit(InstructionFlavor::DS))
+        .avoiding(5, flavorBit(InstructionFlavor::DS))
+        .preferring(6, flavorBit(InstructionFlavor::SingleCycleVALU))
+        .avoiding(6, HasScaling ? flavorBit(InstructionFlavor::TRANS)
+                                : FlavorMasks::None)
+        .preferring(7, HasScaling
+                           ? FlavorMasks::None
+                           : flavorBit(InstructionFlavor::SingleCycleVALU))
+        .avoiding(7, HasScaling ? FlavorMasks::All : FlavorMasks::None)
+        .preferring(8, flavorBit(InstructionFlavor::WMMA))
+        .preferring(9, flavorBit(InstructionFlavor::WMMA));
   }
 
   // 32x16x128 F4 variants
   if (Name.contains_insensitive("32x16x128_f4")) {
-    return CoExecInfo::build(4, 6, "0EEIVV", 3, HasScaling);
+    return CoExecInfo::build(4, 6, "0EEIVV", 3, HasScaling)
+        .preferring(1, flavorBit(InstructionFlavor::DS))
+        .avoiding(2, flavorBit(InstructionFlavor::DS))
+        .preferring(3, HasScaling
+                           ? FlavorMasks::None
+                           : flavorBit(InstructionFlavor::SingleCycleVALU))
+        .avoiding(3, HasScaling ? FlavorMasks::All : FlavorMasks::None)
+        .preferring(4, flavorBit(InstructionFlavor::WMMA))
+        .preferring(5, flavorBit(InstructionFlavor::WMMA));
   }
 
   // Default fallback: permissive 8-cycle pattern

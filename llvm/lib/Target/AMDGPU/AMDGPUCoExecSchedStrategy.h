@@ -39,6 +39,7 @@ enum class AMDGPUSchedReason : uint8_t {
   None,
   Stall,
   MemoryPipeline,
+  CoexecSlot,
   CritResourceBalance, // tryCriticalResource chose based on resource pressure
   CritResourceDep,     // tryCriticalResourceDependency chose based on enabling
   ShadowMix,           // tryShadowMix deferred/prioritized for co-exec filling
@@ -53,6 +54,8 @@ inline StringRef getReasonName(AMDGPUSchedReason R) {
     return "Stall";
   case AMDGPUSchedReason::MemoryPipeline:
     return "MemoryPipeline";
+  case AMDGPUSchedReason::CoexecSlot:
+    return "CoexecSlot";
   case AMDGPUSchedReason::CritResourceBalance:
     return "CritResource";
   case AMDGPUSchedReason::CritResourceDep:
@@ -370,6 +373,18 @@ protected:
   /// Next window — populated for lookahead when CurrentWindow is satisfied.
   CoexecWindow NextWindow;
 
+  // Treat structural, latency, buffer-full, carried-latency, and fence stalls
+  // as a single scheduling cost for the current cycle.
+  struct StallCosts {
+    unsigned Ready = 0;
+    unsigned Structural = 0;
+    unsigned Latency = 0;
+    unsigned Carried = 0;
+    unsigned Buffer = 0;
+    unsigned Fence = 0;
+    unsigned Effective = 0;
+  };
+
   /// Walk over the region and collect characteristics for the various
   /// heuristics.
   void collectRegionSummary();
@@ -437,9 +452,17 @@ public:
 
   unsigned getStructuralStallCycles(SchedBoundary &Zone, SUnit *SU);
 
+  unsigned getStallCosts(SUnit *SU, SchedBoundary &Zone, StallCosts &Costs);
+
   bool tryEffectiveStall(GenericSchedulerBase::SchedCandidate &TryCand,
                          GenericSchedulerBase::SchedCandidate &Cand,
                          SchedBoundary &Zone);
+  /// If we are in an active coexecution slot that has preferences and / or
+  /// avoidances tryCoexecSlot will try to honor that by prefering the
+  /// preferences and avoiding the avoidances.
+  bool tryCoexecSlot(GenericSchedulerBase::SchedCandidate &TryCand,
+                     GenericSchedulerBase::SchedCandidate &Cand,
+                     SchedBoundary *Zone);
 
   /// Prioritize instructions involved the memory pipeline. Currently we don't have
   /// any modelling of pipelined loads, so we control the layout of the pipeline

@@ -860,12 +860,11 @@ unsigned CandidateHeuristics::getStructuralStallCycles(SchedBoundary &Zone,
   return Stall;
 }
 
-bool CandidateHeuristics::tryEffectiveStall(
-    GenericSchedulerBase::SchedCandidate &TryCand,
-    GenericSchedulerBase::SchedCandidate &Cand, SchedBoundary &Zone) {
+unsigned CandidateHeuristics::getStallCosts(SUnit *SU, SchedBoundary &Zone,
+                                            StallCosts &Costs) {
   // Only implemented for top-down scheduling currently.
   if (!Zone.isTop())
-    return false;
+    return 0;
 
   auto getBufferFullStalls = [this, &Zone](SUnit *SU) -> unsigned {
     InstructionFlavor Flavor = classifyFlavor(*SU->getInstr(), *SII);
@@ -912,35 +911,28 @@ bool CandidateHeuristics::tryEffectiveStall(
     return FenceStallFinish <= CurrCycle ? 0 : FenceStallFinish - CurrCycle;
   };
 
-  // Treat stalls as a single scheduling cost for the current cycle.
-  struct StallCosts {
-    unsigned Ready = 0;
-    unsigned Structural = 0;
-    unsigned Latency = 0;
-    unsigned Carried = 0;
-    unsigned Buffer = 0;
-    unsigned Fence = 0;
-    unsigned Effective = 0;
-  };
+  unsigned ReadyCycle = Zone.isTop() ? SU->TopReadyCycle : SU->BotReadyCycle;
+  Costs.Ready = ReadyCycle > CurrCycle ? ReadyCycle - CurrCycle : 0;
+  Costs.Structural = getStructuralStallCycles(Zone, SU);
+  Costs.Latency = Zone.getLatencyStallCycles(SU);
+  unsigned CarriedLatency = CarriedLatencies.lookup_or(SU->getInstr(), 0);
+  Costs.Carried =
+      CarriedLatency > CurrCycle ? CarriedLatency - CurrCycle : 0;
+  Costs.Buffer = getBufferFullStalls(SU);
+  Costs.Fence = getFenceStalls(SU);
+  Costs.Effective = std::max({Costs.Ready, Costs.Structural, Costs.Latency,
+                              Costs.Carried, Costs.Buffer, Costs.Fence});
+  return Costs.Effective;
+}
 
-  auto GetStallCosts = [&](SUnit *SU) {
-    unsigned ReadyCycle = Zone.isTop() ? SU->TopReadyCycle : SU->BotReadyCycle;
-    StallCosts Costs;
-    Costs.Ready = ReadyCycle > CurrCycle ? ReadyCycle - CurrCycle : 0;
-    Costs.Structural = getStructuralStallCycles(Zone, SU);
-    Costs.Latency = Zone.getLatencyStallCycles(SU);
-    unsigned CarriedLatency = CarriedLatencies.lookup_or(SU->getInstr(), 0);
-    Costs.Carried =
-        CarriedLatency > CurrCycle ? CarriedLatency - CurrCycle : 0;
-    Costs.Buffer = getBufferFullStalls(SU);
-    Costs.Fence = getFenceStalls(SU);
-    Costs.Effective = std::max({Costs.Ready, Costs.Structural, Costs.Latency,
-                                Costs.Carried, Costs.Buffer, Costs.Fence});
-    return Costs;
-  };
+bool CandidateHeuristics::tryEffectiveStall(
+    GenericSchedulerBase::SchedCandidate &TryCand,
+    GenericSchedulerBase::SchedCandidate &Cand, SchedBoundary &Zone) {
 
-  StallCosts TryCosts = GetStallCosts(TryCand.SU);
-  StallCosts CandCosts = GetStallCosts(Cand.SU);
+  StallCosts TryCosts;
+  StallCosts CandCosts;
+  getStallCosts(TryCand.SU, Zone, TryCosts);
+  getStallCosts(Cand.SU, Zone, CandCosts);
 
   LLVM_DEBUG(if (TryCosts.Effective || CandCosts.Effective) {
     dbgs() << "Effective stalls: try=" << TryCosts.Effective
@@ -984,6 +976,37 @@ bool CandidateHeuristics::tryMemoryPipeline(
 
   TryCand.Reason = GenericSchedulerBase::RegCritical;
   return true;
+}
+bool CandidateHeuristics::tryCoexecSlot(
+    GenericSchedulerBase::SchedCandidate &Cand,
+    GenericSchedulerBase::SchedCandidate &TryCand, SchedBoundary *Zone) {
+  auto HazardRec = static_cast<GCNHazardRecognizer *>(Zone->HazardRec);
+  std::optional<unsigned> Stage = HazardRec->getCurrentCoExecStage();
+  if (!Stage.has_value())
+    return false;
+
+  const CoExecInfo &Info = HazardRec->getActiveCoExecInfo();
+
+  InstructionFlavor TryFlavor = classifyFlavor(*TryCand.SU->getInstr(), *SII);
+  InstructionFlavor CandFlavor = classifyFlavor(*Cand.SU->getInstr(), *SII);
+
+  StallCosts TryStallCost;
+  StallCosts CandStallCost;
+
+  unsigned TryStall = getStallCosts(TryCand.SU, *Zone, TryStallCost);
+  unsigned CandStall = getStallCosts(TryCand.SU, *Zone, CandStallCost);
+
+  if (tryLess(Info.avoidsFlavor(*Stage + TryStall, TryFlavor),
+              Info.avoidsFlavor(*Stage + CandStall, CandFlavor), TryCand, Cand,
+              GenericSchedulerBase::CandReason::RegCritical))
+    return true;
+
+  if (tryGreater(Info.prefersFlavor(*Stage + TryStall, TryFlavor),
+                 Info.prefersFlavor(*Stage + CandStall, CandFlavor), TryCand,
+                 Cand, GenericSchedulerBase::CandReason::RegCritical))
+    return true;
+
+  return false;
 }
 
 bool CandidateHeuristics::tryCriticalResourceDependency(
@@ -1612,6 +1635,11 @@ bool AMDGPUCoExecSchedStrategy::tryCandidateCoexec(SchedCandidate &Cand,
 
     if (Heurs.tryMemoryPipeline(TryCand, Cand)) {
       LastAMDGPUReason = AMDGPUSchedReason::MemoryPipeline;
+      return TryCand.Reason != NoCand;
+    }
+
+    if (Heurs.tryCoexecSlot(Cand, TryCand, Zone)) {
+      LastAMDGPUReason = AMDGPUSchedReason::CoexecSlot;
       return TryCand.Reason != NoCand;
     }
 

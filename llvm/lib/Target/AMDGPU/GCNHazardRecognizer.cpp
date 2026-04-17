@@ -352,7 +352,6 @@ GCNHazardRecognizer::checkWMMACoexecSlot(const MachineInstr &MI) const {
 
   unsigned Stage = *CurrentCoExecStage;
   uint8_t InstMask = getCoExecMaskForMI(MI, TII);
-
   // Check if the instruction can co-execute at the current stage.
   if (ActiveCoExecInfo.canCoExec(InstMask, Stage))
     return 0;
