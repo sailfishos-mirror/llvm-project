@@ -16,6 +16,10 @@
 #include "clang/AST/Decl.h"
 #include "llvm/Support/JSON.h"
 
+std::string describeJSONValue(const llvm::json::Value &V);
+std::string describeJSONValue(const llvm::json::Array &A);
+std::string describeJSONValue(const llvm::json::Object &O);
+
 template <typename NodeTy, typename... Ts>
 llvm::Error makeErrAtNode(clang::ASTContext &Ctx, const NodeTy *N,
                           llvm::StringRef Fmt, const Ts &...Args) {
@@ -24,12 +28,11 @@ llvm::Error makeErrAtNode(clang::ASTContext &Ctx, const NodeTy *N,
                                  LocStr.c_str());
 }
 
-template <typename... Ts>
-llvm::Error makeSawButExpectedError(const llvm::json::Value &Saw,
-                                    llvm::StringRef Expected,
+template <typename JSONTy, typename... Ts>
+llvm::Error makeSawButExpectedError(const JSONTy &Saw, llvm::StringRef Expected,
                                     const Ts &...ExpectedArgs) {
   std::string Fmt = ("saw %s but expected " + Expected).str();
-  std::string SawStr = llvm::formatv("{0:2}", Saw).str();
+  std::string SawStr = describeJSONValue(Saw);
 
   return llvm::createStringError(Fmt.c_str(), SawStr.c_str(), ExpectedArgs...);
 }

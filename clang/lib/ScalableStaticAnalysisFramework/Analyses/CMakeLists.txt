@@ -7,9 +7,11 @@ add_clang_library(clangScalableStaticAnalysisFrameworkAnalyses
   CallGraph/CallGraphJSONFormat.cpp
   EntityPointerLevel/EntityPointerLevel.cpp
   PointerFlow/PointerFlow.cpp
-  PointerFlow/PointerFlowExtractor.cpp  
+  PointerFlow/PointerFlowAnalysis.cpp
+  PointerFlow/PointerFlowExtractor.cpp
   SSAFAnalysesCommon.cpp
   UnsafeBufferUsage/UnsafeBufferUsage.cpp
+  UnsafeBufferUsage/UnsafeBufferUsageAnalysis.cpp
   UnsafeBufferUsage/UnsafeBufferUsageExtractor.cpp
 
   LINK_LIBS

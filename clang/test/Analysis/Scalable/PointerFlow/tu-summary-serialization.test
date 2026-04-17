@@ -5,11 +5,8 @@
 // Negative tests:
 
 // RUN: not clang-ssaf-format -type=tu %S/Inputs/tu-summary-no-key.json 2>&1 \
-// RUN: | FileCheck %s --check-prefix=CHECK-NO-KEY
-// CHECK-NO-KEY: saw {
-// CHECK-NO-KEY:   "NoPointerFlow": [
-// CHECK-NO-KEY:     [
-// CHECK-NO-KEY: } but expected a JSON object with the key: PointerFlow
+// RUN: | FileCheck %s --check-prefix=CHECK-MISSING-KEY
+// CHECK-MISSING-KEY: saw an object of 1 key(s) but expected a JSON object with the key: PointerFlow
 
 // RUN: not clang-ssaf-format -type=tu %S/Inputs/tu-summary-bad-summary.json 2>&1 \
 // RUN: | FileCheck %s --check-prefix=CHECK-BAD-SUMMARY
