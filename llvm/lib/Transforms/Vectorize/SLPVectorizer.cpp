@@ -18543,9 +18543,29 @@ InstructionCost BoUpSLP::getTreeCost(InstructionCost TreeCost,
   // On AArch64, this helps in fusing a mov instruction, associated with
   // extractelement, with fmul in the backend so that extractelement is free.
   SmallVector<std::tuple<Value *, User *, int>, 4> ScalarUserAndIdx;
+  bool AllUsersGEPSWithStoresLoads = true;
+  SmallBitVector UsedLanes(VectorizableTree.front()->getVectorFactor());
+  SmallVector<const Value *> Pointers;
+  Type *UserScalarTy = nullptr;
   for (ExternalUser &EU : ExternalUses) {
     ScalarUserAndIdx.emplace_back(EU.Scalar, EU.User, EU.Lane);
+    if (EU.E.Idx == 0) {
+      UsedLanes.set(EU.Lane);
+      auto *User = dyn_cast_if_present<GetElementPtrInst>(EU.User);
+      if (User && User->hasOneUse() &&
+          isa<LoadInst, StoreInst>(User->user_back())) {
+        Type *LocalTy = getValueType(User->user_back());
+        if (!UserScalarTy)
+          UserScalarTy = LocalTy;
+        else if (UserScalarTy != LocalTy)
+          AllUsersGEPSWithStoresLoads = false;
+        Pointers.push_back(User);
+      } else {
+        AllUsersGEPSWithStoresLoads = false;
+      }
+    }
   }
+  AllUsersGEPSWithStoresLoads &= UsedLanes.all();
   SmallDenseSet<std::pair<Value *, Value *>, 8> CheckedScalarUser;
   for (ExternalUser &EU : ExternalUses) {
     LLVM_DEBUG(dbgs() << "SLP: Computing cost for external use of TreeEntry "
@@ -18817,6 +18837,31 @@ InstructionCost BoUpSLP::getTreeCost(InstructionCost TreeCost,
                           cast_or_null<Instruction>(EU.User));
 
     ExtractCost += ExtraCost;
+  }
+  // Charge the pointer-chain cost difference once for the root entry when
+  // every external use of its scalars is a GEP feeding a single load/store
+  // (see the detection loop above). Vectorizing the root in this pattern
+  // forces lane extracts (or a vector GEP with unknown stride) to drive the
+  // address computation, which is typically more expensive than keeping the
+  // indices scalar in a unit-stride address chain. Add the delta once rather
+  // than per external use.
+  if (AllUsersGEPSWithStoresLoads && !Pointers.empty()) {
+    const TreeEntry &RootEntry = *VectorizableTree.front();
+    const bool AnyRootKeptAsScalar = any_of(RootEntry.Scalars, [&](Value *V) {
+      return ExternalUsesAsOriginalScalar.contains(V);
+    });
+    if (!AnyRootKeptAsScalar) {
+      TTI::TargetCostKind CostKind = TTI::TCK_RecipThroughput;
+      Type *RootScalarTy = RootEntry.Scalars.front()->getType();
+      auto *VecTy = getWidenedType(UserScalarTy, RootEntry.Scalars.size());
+      InstructionCost ScalarGEPCost = TTI->getPointersChainCost(
+          Pointers, Pointers.front(), TTI::PointersChainInfo::getUnitStride(),
+          RootScalarTy, CostKind);
+      InstructionCost VectorGEPCost = TTI->getPointersChainCost(
+          Pointers, Pointers.front(),
+          TTI::PointersChainInfo::getUnknownStride(), VecTy, CostKind);
+      ExtractCost += ScaleCost(VectorGEPCost - ScalarGEPCost, RootEntry);
+    }
   }
   // Insert externals for extract of operands of casts to be emitted as scalars
   // instead of extractelement.

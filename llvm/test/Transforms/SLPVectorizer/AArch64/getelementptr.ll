@@ -30,15 +30,7 @@
 ; YAML-NEXT:   - String:          ' and with tree size '
 ; YAML-NEXT:   - TreeSize:        '1'
 
-; YAML:      --- !Passed
-; YAML-NEXT: Pass:            slp-vectorizer
-; YAML-NEXT: Name:            VectorizedList
-; YAML-NEXT: Function:        getelementptr_4x32
-; YAML-NEXT: Args:
-; YAML-NEXT:   - String:          'SLP vectorized with cost '
-; YAML-NEXT:   - Cost:            '12'
-; YAML-NEXT:   - String:          ' and with tree size '
-; YAML-NEXT:   - TreeSize:        '3'
+; YAML:      --- !Missed
 
 define i32 @getelementptr_4x32(ptr nocapture readonly %g, i32 %n, i32 %x, i32 %y, i32 %z) {
 ; CHECK-LABEL: @getelementptr_4x32(
@@ -46,7 +38,6 @@ define i32 @getelementptr_4x32(ptr nocapture readonly %g, i32 %n, i32 %x, i32 %y
 ; CHECK-NEXT:    [[CMP31:%.*]] = icmp sgt i32 [[N:%.*]], 0
 ; CHECK-NEXT:    br i1 [[CMP31]], label [[FOR_BODY_PREHEADER:%.*]], label [[FOR_COND_CLEANUP:%.*]]
 ; CHECK:       for.body.preheader:
-; CHECK-NEXT:    [[TMP0:%.*]] = insertelement <2 x i32> <i32 0, i32 poison>, i32 [[X:%.*]], i32 1
 ; CHECK-NEXT:    br label [[FOR_BODY:%.*]]
 ; CHECK:       for.cond.cleanup.loopexit:
 ; CHECK-NEXT:    br label [[FOR_COND_CLEANUP]]
@@ -57,13 +48,10 @@ define i32 @getelementptr_4x32(ptr nocapture readonly %g, i32 %n, i32 %x, i32 %y
 ; CHECK-NEXT:    [[TMP15:%.*]] = phi i32 [ 0, [[FOR_BODY_PREHEADER]] ], [ [[INDVARS_IV_NEXT:%.*]], [[FOR_BODY]] ]
 ; CHECK-NEXT:    [[SUM_032:%.*]] = phi i32 [ 0, [[FOR_BODY_PREHEADER]] ], [ [[ADD16]], [[FOR_BODY]] ]
 ; CHECK-NEXT:    [[T4:%.*]] = shl nsw i32 [[TMP15]], 1
-; CHECK-NEXT:    [[TMP1:%.*]] = insertelement <2 x i32> poison, i32 [[T4]], i32 0
-; CHECK-NEXT:    [[TMP2:%.*]] = shufflevector <2 x i32> [[TMP1]], <2 x i32> poison, <2 x i32> zeroinitializer
-; CHECK-NEXT:    [[TMP3:%.*]] = add nsw <2 x i32> [[TMP2]], [[TMP0]]
-; CHECK-NEXT:    [[TMP12:%.*]] = extractelement <2 x i32> [[TMP3]], i32 0
+; CHECK-NEXT:    [[TMP12:%.*]] = add nsw i32 [[T4]], 0
 ; CHECK-NEXT:    [[ARRAYIDX:%.*]] = getelementptr inbounds i32, ptr [[G:%.*]], i32 [[TMP12]]
 ; CHECK-NEXT:    [[T6:%.*]] = load i32, ptr [[ARRAYIDX]], align 4
-; CHECK-NEXT:    [[TMP11:%.*]] = extractelement <2 x i32> [[TMP3]], i32 1
+; CHECK-NEXT:    [[TMP11:%.*]] = add nsw i32 [[T4]], [[X:%.*]]
 ; CHECK-NEXT:    [[ARRAYIDX5:%.*]] = getelementptr inbounds i32, ptr [[G]], i32 [[TMP11]]
 ; CHECK-NEXT:    [[T8:%.*]] = load i32, ptr [[ARRAYIDX5]], align 4
 ; CHECK-NEXT:    [[TMP13:%.*]] = add nsw i32 [[T4]], [[Y:%.*]]
