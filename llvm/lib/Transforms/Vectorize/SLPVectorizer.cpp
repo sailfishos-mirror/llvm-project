@@ -15995,19 +15995,32 @@ uint64_t BoUpSLP::getGatherNodeEffectiveScale(const TreeEntry &TE) {
   // lanes), which matches the LICM hoisting performed by
   // optimizeGatherSequence(). Cap per-lane contributions by BaseScale so a
   // refinement can never raise the cost above the whole-entry scale.
+  // Each lane contributes at most BaseScale, so Sum is bounded above by
+  // N * BaseScale. If BaseScale is near uint64_t max (saturated by
+  // getLoopNestScale on a deep nest) Sum can still overflow uint64_t,
+  // which would silently wrap and produce a wrong average. Use
+  // SaturatingAdd and bail out to BaseScale on overflow: the true average
+  // is bounded above by BaseScale anyway, so this preserves the
+  // refinement's invariant that it can never raise cost.
   uint64_t Sum = 0;
   unsigned N = 0;
+  bool Overflow = false;
   for (Value *V : TE.Scalars) {
     if (isConstant(V))
       continue;
     ++N;
-    uint64_t LaneScale = getScaleToLoopIterations(TE, V);
-    Sum += std::min(LaneScale, BaseScale);
+    uint64_t LaneScale = std::min(getScaleToLoopIterations(TE, V), BaseScale);
+    Sum = SaturatingAdd(Sum, LaneScale, &Overflow);
+    if (Overflow)
+      return BaseScale;
   }
   if (N == 0)
     return BaseScale;
   // Ceil-divide so we never round the effective scale down below 1.
-  uint64_t Avg = (Sum + N - 1) / N;
+  uint64_t Numerator = SaturatingAdd(Sum, uint64_t(N - 1), &Overflow);
+  if (Overflow)
+    return BaseScale;
+  uint64_t Avg = Numerator / N;
   return std::clamp<uint64_t>(Avg, 1, BaseScale);
 }
 
