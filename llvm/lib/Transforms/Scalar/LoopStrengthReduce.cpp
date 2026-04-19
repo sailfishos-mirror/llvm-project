@@ -5936,7 +5936,7 @@ void LSRInstance::RewriteForPHI(PHINode *PN, const LSRUse &LU,
               for (const Use &U : cast<PHINode>(I).incoming_values()) {
                 if (!isa<Instruction>(U.get()))
                   continue;
-                if (L->contains(cast<Instruction>(U.get())->getParent())) {
+                if (LI.getLoopFor(cast<Instruction>(U.get())->getParent())) {
                   // This phi node references a value inside the loop. We will need
                   // to update LCSSA maybe.
                   InsertedNonLCSSAInsts.insert(cast<Instruction>(U.get()));

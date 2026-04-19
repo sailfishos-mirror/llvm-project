@@ -48,59 +48,112 @@ exit:                                              ; preds = %loop2
   br label %loop1.header
 }
 
-define void @barney() {
-; CHECK-LABEL: define void @barney() {
-; CHECK-NEXT:  [[BB:.*:]]
-; CHECK-NEXT:    br label %[[BB1:.*]]
-; CHECK:       [[BB1]]:
-; CHECK-NEXT:    switch i8 0, label %[[BB1_BACKEDGE:.*]] [
-; CHECK-NEXT:      i8 63, label %[[BB2_PREHEADER:.*]]
-; CHECK-NEXT:      i8 43, label %[[BB2_PREHEADER]]
-; CHECK-NEXT:      i8 42, label %[[BB2_PREHEADER]]
+define void @regression2() {
+; CHECK-LABEL: define void @regression2() {
+; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    br label %[[LOOP1_HEADER:.*]]
+; CHECK:       [[LOOP1_HEADER]]:
+; CHECK-NEXT:    switch i8 0, label %[[LOOP1_HEADER_BACKEDGE:.*]] [
+; CHECK-NEXT:      i8 63, label %[[LOOP1_LATCH1_PREHEADER:.*]]
+; CHECK-NEXT:      i8 43, label %[[LOOP1_LATCH1_PREHEADER]]
+; CHECK-NEXT:      i8 42, label %[[LOOP1_LATCH1_PREHEADER]]
 ; CHECK-NEXT:    ]
-; CHECK:       [[BB1_BACKEDGE]]:
-; CHECK-NEXT:    br label %[[BB1]]
-; CHECK:       [[BB2_PREHEADER]]:
-; CHECK-NEXT:    br label %[[BB2:.*]]
-; CHECK:       [[BB2]]:
-; CHECK-NEXT:    [[PHI:%.*]] = phi i32 [ [[ADD4:%.*]], %[[BB3:.*]] ], [ 0, %[[BB2_PREHEADER]] ]
-; CHECK-NEXT:    br i1 false, label %[[BB3]], label %[[BB2_BB5_CRIT_EDGE:.*]]
-; CHECK:       [[BB3]]:
+; CHECK:       [[LOOP1_HEADER_BACKEDGE]]:
+; CHECK-NEXT:    br label %[[LOOP1_HEADER]]
+; CHECK:       [[LOOP1_LATCH1_PREHEADER]]:
+; CHECK-NEXT:    br label %[[LOOP1_LATCH1:.*]]
+; CHECK:       [[LOOP1_LATCH1]]:
+; CHECK-NEXT:    [[PHI:%.*]] = phi i32 [ [[ADD4:%.*]], %[[LOOP1_LATCH2:.*]] ], [ 0, %[[LOOP1_LATCH1_PREHEADER]] ]
+; CHECK-NEXT:    br i1 false, label %[[LOOP1_LATCH2]], label %[[LOOP1_LATCH1_LOOP1_LATCH3_CRIT_EDGE:.*]]
+; CHECK:       [[LOOP1_LATCH2]]:
 ; CHECK-NEXT:    [[ADD:%.*]] = add i32 0, 0
 ; CHECK-NEXT:    [[ADD4]] = add i32 [[PHI]], 1
-; CHECK-NEXT:    br i1 false, label %[[BB2]], label %[[BB5SPLIT:.*]]
-; CHECK:       [[BB5SPLIT]]:
-; CHECK-NEXT:    [[ADD_LCSSA:%.*]] = phi i32 [ [[ADD]], %[[BB3]] ]
-; CHECK-NEXT:    br label %[[BB5:.*]]
-; CHECK:       [[BB2_BB5_CRIT_EDGE]]:
-; CHECK-NEXT:    [[PHI_LCSSA:%.*]] = phi i32 [ [[PHI]], %[[BB2]] ]
-; CHECK-NEXT:    br label %[[BB5]]
-; CHECK:       [[BB5]]:
-; CHECK-NEXT:    [[PHI6:%.*]] = phi i32 [ 0, %[[BB2_BB5_CRIT_EDGE]] ], [ [[ADD_LCSSA]], %[[BB5SPLIT]] ]
-; CHECK-NEXT:    [[PHI7:%.*]] = phi i32 [ [[PHI_LCSSA]], %[[BB2_BB5_CRIT_EDGE]] ], [ 0, %[[BB5SPLIT]] ]
-; CHECK-NEXT:    br label %[[BB1_BACKEDGE]]
+; CHECK-NEXT:    br i1 false, label %[[LOOP1_LATCH1]], label %[[LOOP1_LATCH3SPLIT:.*]]
+; CHECK:       [[LOOP1_LATCH3SPLIT]]:
+; CHECK-NEXT:    [[ADD_LCSSA:%.*]] = phi i32 [ [[ADD]], %[[LOOP1_LATCH2]] ]
+; CHECK-NEXT:    br label %[[LOOP1_LATCH3:.*]]
+; CHECK:       [[LOOP1_LATCH1_LOOP1_LATCH3_CRIT_EDGE]]:
+; CHECK-NEXT:    [[PHI_LCSSA:%.*]] = phi i32 [ [[PHI]], %[[LOOP1_LATCH1]] ]
+; CHECK-NEXT:    br label %[[LOOP1_LATCH3]]
+; CHECK:       [[LOOP1_LATCH3]]:
+; CHECK-NEXT:    [[PHI6:%.*]] = phi i32 [ 0, %[[LOOP1_LATCH1_LOOP1_LATCH3_CRIT_EDGE]] ], [ [[ADD_LCSSA]], %[[LOOP1_LATCH3SPLIT]] ]
+; CHECK-NEXT:    [[PHI7:%.*]] = phi i32 [ [[PHI_LCSSA]], %[[LOOP1_LATCH1_LOOP1_LATCH3_CRIT_EDGE]] ], [ 0, %[[LOOP1_LATCH3SPLIT]] ]
+; CHECK-NEXT:    br label %[[LOOP1_HEADER_BACKEDGE]]
 ;
-bb:
-  br label %bb1
+entry:
+  br label %loop1.header
 
-bb1:                                              ; preds = %bb5, %bb1, %bb
-  switch i8 0, label %bb1 [
-  i8 63, label %bb2
-  i8 43, label %bb2
-  i8 42, label %bb2
+loop1.header:                                              ; preds = %loop1.latch3, %loop1.header, %entry
+  switch i8 0, label %loop1.header [
+  i8 63, label %loop1.latch1
+  i8 43, label %loop1.latch1
+  i8 42, label %loop1.latch1
   ]
 
-bb2:                                              ; preds = %bb3, %bb1, %bb1, %bb1
-  %phi = phi i32 [ %add4, %bb3 ], [ 0, %bb1 ], [ 0, %bb1 ], [ 0, %bb1 ]
-  br i1 false, label %bb3, label %bb5
+loop1.latch1:                                              ; preds = %loop1.latch2, %loop1.header, %loop1.header, %loop1.header
+  %phi = phi i32 [ %add4, %loop1.latch2 ], [ 0, %loop1.header ], [ 0, %loop1.header ], [ 0, %loop1.header ]
+  br i1 false, label %loop1.latch2, label %loop1.latch3
 
-bb3:                                              ; preds = %bb2
+loop1.latch2:                                              ; preds = %loop1.latch1
   %add = add i32 0, 0
   %add4 = add i32 %phi, 1
-  br i1 false, label %bb2, label %bb5
+  br i1 false, label %loop1.latch1, label %loop1.latch3
 
-bb5:                                              ; preds = %bb3, %bb2
-  %phi6 = phi i32 [ %add, %bb3 ], [ 0, %bb2 ]
-  %phi7 = phi i32 [ 0, %bb3 ], [ %phi, %bb2 ]
-  br label %bb1
+loop1.latch3:                                              ; preds = %loop1.latch2, %loop1.latch1
+  %phi6 = phi i32 [ %add, %loop1.latch2 ], [ 0, %loop1.latch1 ]
+  %phi7 = phi i32 [ 0, %loop1.latch2 ], [ %phi, %loop1.latch1 ]
+  br label %loop1.header
+}
+
+define i64 @regression3() {
+; CHECK-LABEL: define i64 @regression3() {
+; CHECK-NEXT:  [[ENTRY:.*]]:
+; CHECK-NEXT:    [[ASHR:%.*]] = ashr i64 0, 1
+; CHECK-NEXT:    br label %[[LOOP2_HEADER:.*]]
+; CHECK:       [[FUNCEXITSPLIT:.*]]:
+; CHECK-NEXT:    [[PHI6_LCSSA:%.*]] = phi i64 [ [[PHI6:%.*]], %[[LOOP1_HEADER:.*]] ]
+; CHECK-NEXT:    br label %[[FUNCEXIT:.*]]
+; CHECK:       [[FUNCEXIT]]:
+; CHECK-NEXT:    [[PHI:%.*]] = phi i64 [ [[ASHR]], %[[LOOP1_LATCH_FUNCEXIT_CRIT_EDGE:.*]] ], [ [[PHI6_LCSSA]], %[[FUNCEXITSPLIT]] ]
+; CHECK-NEXT:    ret i64 [[PHI]]
+; CHECK:       [[LOOP2_HEADER]]:
+; CHECK-NEXT:    [[LSR_IV:%.*]] = phi i64 [ [[LSR_IV_NEXT:%.*]], %[[LOOP2_LATCH:.*]] ], [ [[ASHR]], %[[ENTRY]] ]
+; CHECK-NEXT:    br i1 false, label %[[LOOP2_LATCH]], label %[[LOOP1_HEADER_PREHEADER:.*]]
+; CHECK:       [[LOOP1_HEADER_PREHEADER]]:
+; CHECK-NEXT:    br label %[[LOOP1_HEADER]]
+; CHECK:       [[LOOP2_LATCH]]:
+; CHECK-NEXT:    [[ICMP:%.*]] = icmp eq i64 [[LSR_IV]], 0
+; CHECK-NEXT:    [[LSR_IV_NEXT]] = add nuw nsw i64 [[LSR_IV]], -1
+; CHECK-NEXT:    br label %[[LOOP2_HEADER]]
+; CHECK:       [[LOOP1_HEADER]]:
+; CHECK-NEXT:    [[PHI6]] = phi i64 [ 0, %[[LOOP1_LATCH:.*]] ], [ 1, %[[LOOP1_HEADER_PREHEADER]] ]
+; CHECK-NEXT:    br i1 false, label %[[LOOP1_LATCH]], label %[[FUNCEXITSPLIT]]
+; CHECK:       [[LOOP1_LATCH]]:
+; CHECK-NEXT:    br i1 false, label %[[LOOP1_LATCH_FUNCEXIT_CRIT_EDGE]], label %[[LOOP1_HEADER]]
+; CHECK:       [[LOOP1_LATCH_FUNCEXIT_CRIT_EDGE]]:
+; CHECK-NEXT:    br label %[[FUNCEXIT]]
+;
+entry:
+  %ashr = ashr i64 0, 1
+  br label %loop2.header
+
+funcexit:                                              ; preds = %loop1.latch, %loop1.header
+  %phi = phi i64 [ %phi6, %loop1.header ], [ %ashr, %loop1.latch ]
+  ret i64 %phi
+
+loop2.header:                                              ; preds = %loop2.latch, %entry
+  %phi3 = phi i64 [ 0, %entry ], [ %add, %loop2.latch ]
+  br i1 false, label %loop2.latch, label %loop1.header
+
+loop2.latch:                                              ; preds = %loop2.header
+  %add = add i64 %phi3, 1
+  %icmp = icmp eq i64 %phi3, %ashr
+  br label %loop2.header
+
+loop1.header:                                              ; preds = %loop1.latch, %loop2.header
+  %phi6 = phi i64 [ 0, %loop1.latch ], [ 1, %loop2.header ]
+  br i1 false, label %loop1.latch, label %funcexit
+
+loop1.latch:                                              ; preds = %loop1.header
+  br i1 false, label %funcexit, label %loop1.header
 }
