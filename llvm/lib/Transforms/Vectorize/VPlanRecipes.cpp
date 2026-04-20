@@ -225,6 +225,22 @@ bool VPRecipeBase::mayHaveSideEffects() const {
   }
 }
 
+bool VPRecipeBase::isSafeToSpeculativelyExecute() const {
+  if (mayHaveSideEffects())
+    return false;
+
+  auto *VPI = dyn_cast<VPInstruction>(this);
+  if (!VPI)
+    return true;
+
+  if (is_contained({Instruction::SDiv, Instruction::UDiv, Instruction::SRem,
+                    Instruction::URem},
+                   VPI->getOpcode()))
+    return false;
+
+  return true;
+}
+
 void VPRecipeBase::insertBefore(VPRecipeBase *InsertPos) {
   assert(!Parent && "Recipe already in some VPBasicBlock");
   assert(InsertPos->getParent() &&

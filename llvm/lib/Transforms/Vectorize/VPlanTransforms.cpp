@@ -6432,12 +6432,8 @@ void VPlanTransforms::makeScalarizationDecisions(VPlan &Plan, VFRange &Range) {
       if (VPI->mayHaveSideEffects())
         continue;
 
-      // We want to drop the mask operand, doing that for integer division
-      // isn't safe if it's predicated.
-      if (is_contained({Instruction::SDiv, Instruction::UDiv, Instruction::SRem,
-                        Instruction::URem},
-                       VPI->getOpcode()) &&
-          VPI->isMasked())
+      // We want to drop the mask operand, verify we can safely do that.
+      if (VPI->isMasked() && !VPI->isSafeToSpeculativelyExecute())
         continue;
 
       // Avoid rewriting IV increment as that interferes with
