@@ -1,21 +1,3 @@
-# Check whether the build environment supports building Fortran modules
-# flang-rt and openmp are the only runtimes that contain Fortran modules.
-
-
-# Whether building modules for Fortran is supported in the current build environment.
-# Also initializes RUNTIMES_ENABLE_FLANG_MODULES.
-# This is currently not intended to be a user-configuration but derived from CMAKE_Fortran_COMPILER.
-set(RUNTIMES_ENABLE_FORTRAN OFF)
-
-# List of targets that must be built by artifacts that compile using the Fortran compiler
-set(RUNTIMES_FORTRAN_BUILD_DEPS "")
-
-# Currently we hardcode which runtimes make use of Fortran
-set(request_fortran_support OFF)
-if ("flang-rt" IN_LIST LLVM_ENABLE_RUNTIMES OR "openmp" IN_LIST LLVM_ENABLE_RUNTIMES)
-  set(request_fortran_support ON)
-endif ()
-
 
 # Check whether the Fortran compiler already has access to builtin modules. Sets
 # HAVE_FORTRAN_INTRINSIC_MODS when returning.
