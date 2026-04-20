@@ -61,9 +61,9 @@ Expected<std::unique_ptr<AnalysisResult>> deserializePointerFlowAnalysisResult(
                                    PointerFlowAnalysisResultName.data());
 
   if (Content->size() % 2 != 0)
-    return makeSawButExpectedError(
-        *Content, "an even number of elements, got %lu",
-        static_cast<unsigned long>(Content->size()));
+    return makeSawButExpectedError(*Content,
+                                   "an even number of elements, got %lu",
+                                   static_cast<unsigned long>(Content->size()));
 
   std::map<EntityId, EdgeSet> Edges;
 
