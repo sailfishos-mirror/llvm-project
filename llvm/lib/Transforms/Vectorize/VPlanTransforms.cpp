@@ -6412,8 +6412,8 @@ void VPlanTransforms::makeScalarizationDecisions(VPlan &Plan, VFRange &Range) {
     return;
 
   // Extend lifetime per `llvm::PostOrderTraversal` documentation:
-  auto PO =
-      vp_post_order_shallow(Plan.getVectorLoopRegion()->getEntryBasicBlock());
+  auto PO = post_order<VPBlockShallowTraversalWrapper<VPBlockBase *>>(
+      Plan.getVectorLoopRegion()->getEntryBasicBlock());
 
   for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(PO)) {
     for (VPRecipeBase &R : make_early_inc_range(reverse(*VPBB))) {
