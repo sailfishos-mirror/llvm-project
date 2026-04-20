@@ -6445,7 +6445,7 @@ void VPlanTransforms::makeScalarizationDecisions(VPlan &Plan, VFRange &Range) {
       // Avoid rewriting IV increment as that interferes with
       // `removeRedundantCanonicalIVs`.
       if (VPI->getOpcode() == Instruction::Add &&
-          any_of(VPI->operands(), IsaPred<VPWidenInductionRecipe>))
+          any_of(VPI->operands(), IsaPred<VPWidenIntOrFpInductionRecipe>))
         continue;
 
       // Other lanes are needed - can't drop them.
