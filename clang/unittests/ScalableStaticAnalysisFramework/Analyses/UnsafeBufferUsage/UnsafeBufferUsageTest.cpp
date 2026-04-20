@@ -74,7 +74,7 @@ protected:
 
   UnsafeBufferUsageTest()
       : TUSum(BuildNamespace(BuildNamespaceKind::CompilationUnit, "Mock.cpp")),
-        Builder(TUSum), Extractor(nullptr) {}
+        Builder(TUSum) {}
 
   bool setUpTest(StringRef Code) {
     AST = tooling::buildASTFromCodeWithArgs(
