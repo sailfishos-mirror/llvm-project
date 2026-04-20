@@ -6411,11 +6411,9 @@ void VPlanTransforms::makeScalarizationDecisions(VPlan &Plan, VFRange &Range) {
           [&](ElementCount VF) { return VF.isScalar(); }, Range))
     return;
 
-  // Extend lifetime per `llvm::PostOrderTraversal` documentation:
-  auto PO = post_order<VPBlockShallowTraversalWrapper<VPBlockBase *>>(
-      Plan.getVectorLoopRegion()->getEntryBasicBlock());
-
-  for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(PO)) {
+  PostOrderTraversal<VPBlockDeepTraversalWrapper<VPBlockBase *>> POT(
+      Plan.getEntry());
+  for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(POT)) {
     for (VPRecipeBase &R : make_early_inc_range(reverse(*VPBB))) {
       auto *VPI = dyn_cast<VPInstruction>(&R);
       if (!VPI)
