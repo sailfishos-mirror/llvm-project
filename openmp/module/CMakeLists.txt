@@ -27,9 +27,7 @@ if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
 endif ()
 
 flang_module_target(libomp-mod PUBLIC)
-if (RUNTIMES_FORTRAN_BUILD_DEPS)
-  add_dependencies(libomp-mod ${RUNTIMES_FORTRAN_BUILD_DEPS})
-endif ()
+add_dependencies(libomp-mod ${RUNTIMES_FORTRAN_BUILD_DEPS})
 
 install(FILES
   "${CMAKE_CURRENT_BINARY_DIR}/../runtime/src/omp_lib.h"
