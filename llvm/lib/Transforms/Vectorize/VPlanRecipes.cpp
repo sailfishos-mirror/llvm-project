@@ -226,19 +226,28 @@ bool VPRecipeBase::mayHaveSideEffects() const {
 }
 
 bool VPRecipeBase::isSafeToSpeculativelyExecute() const {
-  if (mayHaveSideEffects())
+  switch (getVPRecipeID()) {
+  default:
     return false;
+  case VPInstructionSC: {
+    unsigned Opcode = cast<VPInstruction>(this)->getOpcode();
+    if (Instruction::isCast(Opcode))
+      return true;
 
-  auto *VPI = dyn_cast<VPInstruction>(this);
-  if (!VPI)
+    switch (Opcode) {
+    default:
+      return false;
+    case Instruction::Add:
+    case Instruction::Sub:
+    case Instruction::Mul:
+    case Instruction::GetElementPtr:
+      return true;
+    }
+  }
+  case VPVectorPointerSC:
+  case VPVectorEndPointerSC:
     return true;
-
-  if (is_contained({Instruction::SDiv, Instruction::UDiv, Instruction::SRem,
-                    Instruction::URem},
-                   VPI->getOpcode()))
-    return false;
-
-  return true;
+  }
 }
 
 void VPRecipeBase::insertBefore(VPRecipeBase *InsertPos) {
