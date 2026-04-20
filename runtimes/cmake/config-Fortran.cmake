@@ -1,3 +1,29 @@
+# This file sets the following public CMake variables:
+#
+# RUNTIMES_ENABLE_FORTRAN - Whether support for Fortran code is available and
+# enabled. This is currently not intended to be a user-configuration but
+# derived from CMAKE_Fortran_COMPILER. Can also be OFF when Fortran support is
+# not needed or is insufficient, e.g. if intrinsic modules are missing and
+# cannot be compiled on-the-fly.
+#
+# RUNTIMES_FORTRAN_BUILD_DEPS - If RUNTIMES_ENABLE_FORTRAN is true, this is a
+# list of dependencies that must be built before any Fortran source can be
+# compiled. Contains the build targets for intrinsic modules, if necessary.
+# Otherweise, it is empty.
+#
+# RUNTIMES_ENABLE_FLANG_MODULES - Whether to build Flang modules and emit them
+# into Flang's search path. This is a CMake CACHE option defined in
+# config-Fortran.cmake and default to ON iff the Fortran compiler is detected
+# for be a (compatible) version of Flang. In the OFF setting, modules are still
+# built, but not installed or emitted into a default path.
+#
+# RUNTIMES_OUTPUT_RESOURCE_MOD_DIR - Where to emit intrinsic module files in
+# the build directory. Most relevant when RUNTIMES_ENABLE_FLANG_MODULES is ON.
+#
+# RUNTIMES_INSTALL_RESOURCE_MOD_PATH - Where to install intrinsic module files
+# in the install prefix. Relative to CMAKE_INSTALL_PREFIX. Only used when
+# RUNTIMES_ENABLE_FLANG_MODULES is ON.
+
 
 # Check whether the Fortran compiler already has access to builtin modules. Sets
 # HAVE_FORTRAN_INTRINSIC_MODS when returning.
@@ -46,89 +72,97 @@ function (check_fortran_builtins_available)
 endfunction ()
 
 
-# Check whether we can compile Fortran sources
-if (request_fortran_support)
-  # Workarounds for older versions of CMake not recognizing FLang. Hence, we
-  # cannot use CMAKE_Fortran_COMPILER_ID.
-  cmake_path(GET CMAKE_Fortran_COMPILER STEM _Fortran_COMPILER_STEM)
-  if (_Fortran_COMPILER_STEM STREQUAL "flang-new" OR _Fortran_COMPILER_STEM STREQUAL "flang")
-    # CMake 3.24 is the first version of CMake that directly recognizes Flang.
-    # LLVM's requirement is only CMake 3.20, teach CMake 3.20-3.23 how to use Flang, if used.
-    if (CMAKE_VERSION VERSION_LESS "3.24")
-      include(CMakeForceCompiler)
-      CMAKE_FORCE_Fortran_COMPILER("${CMAKE_Fortran_COMPILER}" "LLVMFlang")
+# Workarounds for older versions of CMake not recognizing FLang. Hence, we
+# cannot use CMAKE_Fortran_COMPILER_ID.
+cmake_path(GET CMAKE_Fortran_COMPILER STEM _Fortran_COMPILER_STEM)
+if (_Fortran_COMPILER_STEM STREQUAL "flang-new" OR _Fortran_COMPILER_STEM STREQUAL "flang")
+  # CMake 3.24 is the first version of CMake that directly recognizes Flang.
+  # LLVM's requirement is only CMake 3.20, teach CMake 3.20-3.23 how to use Flang, if used.
+  if (CMAKE_VERSION VERSION_LESS "3.24")
+    include(CMakeForceCompiler)
+    CMAKE_FORCE_Fortran_COMPILER("${CMAKE_Fortran_COMPILER}" "LLVMFlang")
 
-      set(CMAKE_Fortran_COMPILER_ID "LLVMFlang")
-      set(CMAKE_Fortran_COMPILER_VERSION "${LLVM_VERSION_MAJOR}.${LLVM_VERSION_MINOR}")
+    set(CMAKE_Fortran_COMPILER_ID "LLVMFlang")
+    set(CMAKE_Fortran_COMPILER_VERSION "${LLVM_VERSION_MAJOR}.${LLVM_VERSION_MINOR}")
 
-      set(CMAKE_Fortran_SUBMODULE_SEP "-")
-      set(CMAKE_Fortran_SUBMODULE_EXT ".mod")
+    set(CMAKE_Fortran_SUBMODULE_SEP "-")
+    set(CMAKE_Fortran_SUBMODULE_EXT ".mod")
 
-      set(CMAKE_Fortran_PREPROCESS_SOURCE
-          "<CMAKE_Fortran_COMPILER> -cpp <DEFINES> <INCLUDES> <FLAGS> -E <SOURCE> > <PREPROCESSED_SOURCE>")
+    set(CMAKE_Fortran_PREPROCESS_SOURCE
+        "<CMAKE_Fortran_COMPILER> -cpp <DEFINES> <INCLUDES> <FLAGS> -E <SOURCE> > <PREPROCESSED_SOURCE>")
 
-      set(CMAKE_Fortran_FORMAT_FIXED_FLAG "-ffixed-form")
-      set(CMAKE_Fortran_FORMAT_FREE_FLAG "-ffree-form")
+    set(CMAKE_Fortran_FORMAT_FIXED_FLAG "-ffixed-form")
+    set(CMAKE_Fortran_FORMAT_FREE_FLAG "-ffree-form")
 
-      set(CMAKE_Fortran_MODDIR_FLAG "-J")
+    set(CMAKE_Fortran_MODDIR_FLAG "-J")
 
-      set(CMAKE_Fortran_COMPILE_OPTIONS_PREPROCESS_ON "-cpp")
-      set(CMAKE_Fortran_COMPILE_OPTIONS_PREPROCESS_OFF "-nocpp")
-      set(CMAKE_Fortran_POSTPROCESS_FLAG "-ffixed-line-length-72")
+    set(CMAKE_Fortran_COMPILE_OPTIONS_PREPROCESS_ON "-cpp")
+    set(CMAKE_Fortran_COMPILE_OPTIONS_PREPROCESS_OFF "-nocpp")
+    set(CMAKE_Fortran_POSTPROCESS_FLAG "-ffixed-line-length-72")
 
-      set(CMAKE_Fortran_LINKER_WRAPPER_FLAG "-Wl,")
-      set(CMAKE_Fortran_LINKER_WRAPPER_FLAG_SEP ",")
+    set(CMAKE_Fortran_LINKER_WRAPPER_FLAG "-Wl,")
+    set(CMAKE_Fortran_LINKER_WRAPPER_FLAG_SEP ",")
 
-      set(CMAKE_Fortran_VERBOSE_FLAG "-v")
+    set(CMAKE_Fortran_VERBOSE_FLAG "-v")
 
-      set(CMAKE_Fortran_LINK_MODE DRIVER)
-    endif ()
-
-    # Optimization flags are only passed after CMake 3.27.4
-    # https://gitlab.kitware.com/cmake/cmake/-/commit/1140087adea98bd8d8974e4c18979f4949b52c34
-    if (CMAKE_VERSION VERSION_LESS "3.27.4")
-      string(APPEND CMAKE_Fortran_FLAGS_DEBUG_INIT " -O0 -g")
-      string(APPEND CMAKE_Fortran_FLAGS_RELWITHDEBINFO_INIT " -O2 -g")
-      string(APPEND CMAKE_Fortran_FLAGS_RELEASE_INIT " -O3")
-    endif ()
-
-    # Only CMake 3.28+ pass --target= to Flang. But for cross-compiling, including
-    # to nvptx amd amdgpu targets, passing the target triple is essential.
-    # https://gitlab.kitware.com/cmake/cmake/-/commit/e9af7b968756e72553296ecdcde6f36606a0babf
-    if (CMAKE_VERSION VERSION_LESS "3.28")
-      set(CMAKE_Fortran_COMPILE_OPTIONS_TARGET "--target=")
-    endif ()
+    set(CMAKE_Fortran_LINK_MODE DRIVER)
   endif ()
 
-  include(CheckLanguage)
-  check_language(Fortran)
-  if (CMAKE_Fortran_COMPILER)
-    enable_language(Fortran)
-    include(CheckFortranSourceCompiles)
+  # Optimization flags are only passed after CMake 3.27.4
+  # https://gitlab.kitware.com/cmake/cmake/-/commit/1140087adea98bd8d8974e4c18979f4949b52c34
+  if (CMAKE_VERSION VERSION_LESS "3.27.4")
+    string(APPEND CMAKE_Fortran_FLAGS_DEBUG_INIT " -O0 -g")
+    string(APPEND CMAKE_Fortran_FLAGS_RELWITHDEBINFO_INIT " -O2 -g")
+    string(APPEND CMAKE_Fortran_FLAGS_RELEASE_INIT " -O3")
+  endif ()
 
-    if (CMAKE_Fortran_COMPILER_ID STREQUAL "LLVMFlang" AND "flang-rt" IN_LIST LLVM_ENABLE_RUNTIMES)
-      # In a bootstrapping build (or any runtimes-build that includes flang-rt),
-      # the intrinsic modules are not built yet. Targets can depend on
-      # flang-rt-mod to ensure that flang-rt's modules are built first.
-      list(APPEND RUNTIMES_FORTRAN_BUILD_DEPS flang-rt-mod)
-      set(RUNTIMES_ENABLE_FORTRAN ON)
-      message(STATUS "Fortran support enabled using just-built Flang-RT builtin modules")
-    else ()
-      # Check whether building modules works, avoid causing the entire build to
-      # fail because of Fortran. The primary situation we want to support here
-      # is Flang, or its intrinsic modules were built separately in a
-      # non-bootstrapping build.
-      check_fortran_builtins_available()
-      if (HAVE_FORTRAN_INTRINSIC_MODS)
-        set(RUNTIMES_ENABLE_FORTRAN ON)
-        message(STATUS "Fortran support enabled using compiler's own modules")
-      else ()
-        message(STATUS "Fortran support disabled: Not passing smoke check")
-      endif ()
-    endif ()
+  # Only CMake 3.28+ pass --target= to Flang. But for cross-compiling, including
+  # to nvptx amd amdgpu targets, passing the target triple is essential.
+  # https://gitlab.kitware.com/cmake/cmake/-/commit/e9af7b968756e72553296ecdcde6f36606a0babf
+  if (CMAKE_VERSION VERSION_LESS "3.28")
+    set(CMAKE_Fortran_COMPILE_OPTIONS_TARGET "--target=")
+  endif ()
+endif ()
+
+
+set(RUNTIMES_ENABLE_FORTRAN OFF)
+
+# Insert at least one element for
+#
+#    add_dependencies(target ${RUNTIMES_FORTRAN_BUILD_DEPS})
+#
+# to noy fail
+add_custom_target(fortran-dummy-dep)
+set(RUNTIMES_FORTRAN_BUILD_DEPS fortran-dummy-dep)
+
+include(CheckLanguage)
+check_language(Fortran)
+if (CMAKE_Fortran_COMPILER)
+  enable_language(Fortran)
+  include(CheckFortranSourceCompiles)
+
+  if (CMAKE_Fortran_COMPILER_ID STREQUAL "LLVMFlang" AND "flang-rt" IN_LIST LLVM_ENABLE_RUNTIMES)
+    # In a bootstrapping build (or any runtimes-build that includes flang-rt),
+    # the intrinsic modules are not built yet. Targets can depend on
+    # flang-rt-mod to ensure that flang-rt's modules are built first.
+    list(APPEND RUNTIMES_FORTRAN_BUILD_DEPS flang-rt-mod)
+    set(RUNTIMES_ENABLE_FORTRAN ON)
+    message(STATUS "Fortran support enabled using just-built Flang-RT builtin modules")
   else ()
-    message(STATUS "Fortran support disabled: not enabled in CMake; Use CMAKE_Fortran_COMPILER_WORKS=yes if the issues is missing builtin modules")
+    # Check whether building modules works, avoid causing the entire build to
+    # fail because of Fortran. The primary situation we want to support here
+    # is Flang, or its intrinsic modules were built separately in a
+    # non-bootstrapping build.
+    check_fortran_builtins_available()
+    if (HAVE_FORTRAN_INTRINSIC_MODS)
+      set(RUNTIMES_ENABLE_FORTRAN ON)
+      message(STATUS "Fortran support enabled using compiler's own modules")
+    else ()
+      message(STATUS "Fortran support disabled: Not passing smoke check")
+    endif ()
   endif ()
+else ()
+  message(STATUS "Fortran support disabled: not enabled in CMake; Use CMAKE_Fortran_COMPILER_WORKS=yes if the issues is missing builtin modules")
 endif ()
 
 
@@ -143,10 +177,6 @@ option(RUNTIMES_ENABLE_FLANG_MODULES "Make Fortran .mod files available to Flang
 
 
 # Determine the paths for Fortran .mod files.
-#
-# Sets:
-#  * RUNTIMES_OUTPUT_RESOURCE_MOD_DIR   Path for .mod files in build dir
-#  * RUNTIMES_INSTALL_RESOURCE_MOD_PATH Path for .mod files in install dir, relative to CMAKE_INSTALL_PREFIX
 if (RUNTIMES_ENABLE_FLANG_MODULES)
   # Flang expects its builtin modules in Clang's resource directory.
   get_toolchain_module_subdir(toolchain_mod_subdir)
@@ -167,7 +197,7 @@ else ()
   # If Flang modules are disabled (e.g. because the compiler is not Flang), avoid the risk of Flang accidentally picking them up.
   extend_path(RUNTIMES_OUTPUT_RESOURCE_MOD_DIR "${CMAKE_CURRENT_BINARY_DIR}" "finclude-${CMAKE_Fortran_COMPILER_ID}")
 
-  # We don't know how to install non-Flang modules
+  # We don't know how to install modules for other compilers. Do not install them at all.
   set(RUNTIMES_INSTALL_RESOURCE_MOD_PATH "")
 endif ()
 cmake_path(NORMAL_PATH RUNTIMES_OUTPUT_RESOURCE_MOD_DIR)

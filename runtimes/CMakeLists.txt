@@ -272,36 +272,14 @@ cmake_path(NORMAL_PATH RUNTIMES_INSTALL_RESOURCE_LIB_PATH)
 
 # Code for Fortran support.
 #
-# Currently, flang-rt and openmp are the only runtimes that contain Fortran
-# modules which we hardcode here. This code makes use of
+# Currently, only flang-rt and openmp contain Fortran sources. We assume that
+# none of the public CMake variables defined in config-Fortran are used unless
+# we enable one of these runtimes. Other runtimes would make used of undefined
+# variables.
+#
+# config-Fortran.cmake makes use of
 # RUNTIMES_OUTPUT_RESOURCE_DIR, RUNTIMES_INSTALL_RESOURCE_PATH,
-# hence must be included their those variables are defined.
-# Sets the following public CMake variables:
-#
-# RUNTIMES_ENABLE_FORTRAN - Whether support for Fortran code is available and enabled.
-# This is currently not intended to be a user-configuration but derived from CMAKE_Fortran_COMPILER.
-# Can also be OFF when Fortran support is not needed or is insufficient, e.g.
-# if intrinsic modules are missing and cannot be compiled on-the-fly.
-#
-# RUNTIMES_FORTRAN_BUILD_DEPS - If RUNTIMES_ENABLE_FORTRAN is true, this is a
-# list of dependencies that must be built before any Fortran source can be
-# compiled. Contains the build targets for intrinsic modules, if necessary.
-# Otherweise, it is empty.
-#
-# RUNTIMES_ENABLE_FLANG_MODULES - Whether to build Flang modules and emit them into Flang's search path.
-# This is a CMake CACHE option defined in config-Fortran.cmake and default to
-# ON iff the Fortran compiler is detected for be a (compatible) version of Flang.
-# In the OFF setting, modules are still built, but not installed or emitted into a default path.
-#
-# RUNTIMES_OUTPUT_RESOURCE_MOD_DIR - Where to emit intrinsic module files in
-# the build directory. Most relevent when RUNTIMES_ENABLE_FLANG_MODULES is ON.
-#
-# RUNTIMES_INSTALL_RESOURCE_MOD_PATH - Where to install intrinsic module files
-# in the install prefix. Relative to CMAKE_INSTALL_PREFIX. Only used when
-# RUNTIMES_ENABLE_FLANG_MODULES is ON.
-#
-set(RUNTIMES_ENABLE_FORTRAN OFF)
-set(RUNTIMES_FORTRAN_BUILD_DEPS "")
+# hence must be included after those variables are defined.
 if ("flang-rt" IN_LIST LLVM_ENABLE_RUNTIMES OR "openmp" IN_LIST LLVM_ENABLE_RUNTIMES)
   include(config-Fortran)
 endif ()
