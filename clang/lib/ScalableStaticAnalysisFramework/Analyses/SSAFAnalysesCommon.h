@@ -16,21 +16,9 @@
 #include "clang/AST/Decl.h"
 #include "llvm/Support/JSON.h"
 
-inline std::string describeJSONValue(const llvm::json::Value &V) {
-  return llvm::formatv("{0:2}", V).str();
-}
-
-/// Return a short description of a JSON array suitable for
-/// diagnostics.
-inline std::string describeJSONValue(const llvm::json::Array &A) {
-  return llvm::formatv("array of size {0}", A.size()).str();
-}
-
-/// Return a short description of a JSON object suitable for
-/// diagnostics.
-inline std::string describeJSONValue(const llvm::json::Object &O) {
-  return llvm::formatv("an object of {0} key(s)", O.size()).str();
-}
+std::string describeJSONValue(const llvm::json::Value &V);
+std::string describeJSONValue(const llvm::json::Array &A);
+std::string describeJSONValue(const llvm::json::Object &O);
 
 template <typename NodeTy, typename... Ts>
 llvm::Error makeErrAtNode(clang::ASTContext &Ctx, const NodeTy *N,
