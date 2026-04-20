@@ -7,6 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "SSAFAnalysesCommon.h"
+#include "clang/AST/DynamicRecursiveASTVisitor.h"
 
 using namespace clang;
 
