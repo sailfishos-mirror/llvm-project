@@ -270,12 +270,19 @@ cmake_path(NORMAL_PATH RUNTIMES_OUTPUT_RESOURCE_LIB_DIR)
 cmake_path(NORMAL_PATH RUNTIMES_INSTALL_RESOURCE_LIB_PATH)
 
 
-# Handle Fortran code. When a Fortran toolchain is available and required by
-# one or more of the runtimes, enables CMake's Fortran support and sets
-# RUNTIMES_ENABLE_FORTRAN and RUNTIMES_ENABLE_FLANG_MODULES.
-# Makes use of RUNTIMES_OUTPUT_RESOURCE_DIR, RUNTIMES_INSTALL_RESOURCE_PATH,
-# hence must be included their those variables are defined.
-include(config-Fortran)
+# Code for Fortran support.
+#
+# Currently, only flang-rt and openmp contain Fortran sources. We assume that
+# none of the public CMake variables defined in config-Fortran are used unless
+# we enable one of these runtimes. Other runtimes would make used of undefined
+# variables.
+#
+# config-Fortran.cmake makes use of
+# RUNTIMES_OUTPUT_RESOURCE_DIR, RUNTIMES_INSTALL_RESOURCE_PATH,
+# hence must be included after those variables are defined.
+if ("flang-rt" IN_LIST LLVM_ENABLE_RUNTIMES OR "openmp" IN_LIST LLVM_ENABLE_RUNTIMES)
+  include(config-Fortran)
+endif ()
 
 
 option(LLVM_INCLUDE_TESTS "Generate build targets for the runtimes unit tests." ON)
