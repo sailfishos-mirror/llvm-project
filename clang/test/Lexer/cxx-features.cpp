@@ -193,8 +193,7 @@
 #error "wrong value for __cpp_if_constexpr"
 #endif
 
-#if check(deduction_guides, 0, 0, 0, 201703, 201703, 201703, 201703)
-// FIXME: 201907 in C++20
+#if check(deduction_guides, 0, 0, 0, 201907, 201907, 201907, 201907)
 #error "wrong value for __cpp_deduction_guides"
 #endif
 
