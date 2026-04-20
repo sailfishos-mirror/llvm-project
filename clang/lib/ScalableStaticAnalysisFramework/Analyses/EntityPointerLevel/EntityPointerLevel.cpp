@@ -348,7 +348,8 @@ clang::ssaf::entityPointerLevelMapFromJSON(
     JSONFormat::EntityIdFromJSONFn IdFromJSON) {
   if (Content.size() % 2 != 0)
     return makeSawButExpectedError(
-        Content, "an even number of elements, got %zu", Content.size());
+        Content, "an even number of elements, got %lu",
+        static_cast<unsigned long>(Content.size()));
 
   std::map<EntityId, EntityPointerLevelSet> Result;
 

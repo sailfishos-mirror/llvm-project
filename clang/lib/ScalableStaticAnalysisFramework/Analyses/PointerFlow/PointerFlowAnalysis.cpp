@@ -5,27 +5,35 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
-// PointerFlowAnalysis is a noop analysis.
-//
-// PointerFlowAnalysisResult is a map from EntityIds to
-// EdgeSets.
-//===----------------------------------------------------------------------===//
 
-#include "SSAFAnalysesCommon.h"
-#include "clang/ScalableStaticAnalysisFramework/Analyses/PointerFlow/PointerFlow.h"
 #include "clang/ScalableStaticAnalysisFramework/Analyses/PointerFlow/PointerFlowAnalysis.h"
+#include "SSAFAnalysesCommon.h"
+#include "clang/ScalableStaticAnalysisFramework/Analyses/EntityPointerLevel/EntityPointerLevel.h"
+#include "clang/ScalableStaticAnalysisFramework/Analyses/EntityPointerLevel/EntityPointerLevelFormat.h"
+#include "clang/ScalableStaticAnalysisFramework/Analyses/PointerFlow/PointerFlow.h"
 #include "clang/ScalableStaticAnalysisFramework/Analyses/PointerFlow/PointerFlowFormat.h"
+#include "clang/ScalableStaticAnalysisFramework/Analyses/UnsafeBufferUsage/UnsafeBufferUsageAnalysis.h"
+#include "clang/ScalableStaticAnalysisFramework/Core/Model/EntityId.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/Serialization/JSONFormat.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/WholeProgramAnalysis/AnalysisRegistry.h"
+#include "clang/ScalableStaticAnalysisFramework/Core/WholeProgramAnalysis/DerivedAnalysis.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/WholeProgramAnalysis/SummaryAnalysis.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/STLFunctionalExtras.h"
+#include "llvm/ADT/iterator_range.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/JSON.h"
 #include <memory>
+#include <unordered_set>
 
 using namespace clang::ssaf;
 using namespace llvm;
 
 namespace {
+
+//===----------------------------------------------------------------------===//
+// PointerFlowAnalysis---a no-op analysis
+//===----------------------------------------------------------------------===//
 
 // Serialized as a flat array of alternating [EntityId, EdgesArray, ...] pairs.
 json::Object
@@ -54,7 +62,8 @@ Expected<std::unique_ptr<AnalysisResult>> deserializePointerFlowAnalysisResult(
 
   if (Content->size() % 2 != 0)
     return makeSawButExpectedError(
-        *Content, "an even number of elements, got %zu", Content->size());
+        *Content, "an even number of elements, got %lu",
+        static_cast<unsigned long>(Content->size()));
 
   std::map<EntityId, EdgeSet> Edges;
 
@@ -108,6 +117,117 @@ public:
 
 AnalysisRegistry::Add<PointerFlowAnalysis>
     RegisterPointerFlowAnalysis("Whole-program pointer flow analysis");
+
+//===----------------------------------------------------------------------===//
+// PointerFlowReachableAnalysis---computes reachable node
+//===----------------------------------------------------------------------===//
+
+json::Object serializePointerFlowReachableAnalysisResult(
+    const PointerFlowReachableAnalysisResult &R,
+    JSONFormat::EntityIdToJSONFn IdToJSON) {
+  json::Object Result;
+
+  Result[PointerFlowReachableAnalysisResultName] =
+      entityPointerLevelMapToJSON(R.Reachables, IdToJSON);
+  return Result;
+}
+
+Expected<std::unique_ptr<AnalysisResult>>
+deserializePointerFlowReachableAnalysisResult(
+    const json::Object &Obj, JSONFormat::EntityIdFromJSONFn IdFromJSON) {
+  const json::Array *Content =
+      Obj.getArray(PointerFlowReachableAnalysisResultName);
+
+  if (!Content)
+    return makeSawButExpectedError(
+        Obj, "an object with a key %s",
+        PointerFlowReachableAnalysisResultName.data());
+
+  auto Reachables = entityPointerLevelMapFromJSON(*Content, IdFromJSON);
+
+  if (!Reachables)
+    return Reachables.takeError();
+
+  auto Ret = std::make_unique<PointerFlowReachableAnalysisResult>();
+
+  Ret->Reachables = std::move(*Reachables);
+  return Ret;
+}
+
+JSONFormat::AnalysisResultRegistry::Add<PointerFlowReachableAnalysisResult>
+    RegisterPointerFlowReachableResultForJSON(
+        serializePointerFlowReachableAnalysisResult,
+        deserializePointerFlowReachableAnalysisResult);
+
+// For any AnalysisResult that is a set of pointers, it can be the starting set
+// for reachable analysis.
+template <typename AnalysisResultInPointerSet>
+class PointerFlowReachableAnalysis
+    : public DerivedAnalysis<PointerFlowReachableAnalysisResult,
+                             PointerFlowAnalysisResult,
+                             AnalysisResultInPointerSet> {
+  using GraphT = std::map<EntityId, EdgeSet>;
+  const GraphT *Graph = nullptr;
+
+  // Use pointers for efficiency. Both `Graph` and `Reachables` in the result
+  // are tree-based containers that only grow. So pointers to them are stable.
+  using EPLPtr = const EntityPointerLevel *;
+  using EPLPtrSet = std::unordered_set<EPLPtr>;
+  // The analysis needs to track EPLs with their contributor IDs:
+  using EPLPtrSetWithId = std::map<EntityId, std::unordered_set<EPLPtr>>;
+
+  // Find all outgoing edges from `EPL` in the `Graph`, insert their
+  // destination nodes into `Reachables`, and add newly discovered nodes to
+  // `Worklist`:
+  void updateReachablesWithOutgoings(EPLPtr EPL,
+                                     std::vector<EPLPtr> &WorkList) {
+    for (auto &[Id, SubGraph] : *Graph) {
+      auto I = SubGraph.find(*EPL);
+
+      if (I != SubGraph.end()) {
+        for (const auto &EPL : I->second) {
+          auto [Ignored, Inserted] = this->result().Reachables[Id].insert(EPL);
+          if (Inserted)
+            WorkList.push_back(&EPL);
+        }
+      }
+    }
+  }
+
+public:
+  // FIXME: we need a unique analysis name for each instantiation
+
+  llvm::Error initialize(const PointerFlowAnalysisResult &Graph,
+                         const AnalysisResultInPointerSet &Starter) override {
+    this->Graph = &Graph.Edges;
+    assert(this->result().Reachables.empty());
+    this->result().Reachables.insert(Starter.begin(), Starter.end());
+    return llvm::Error::success();
+  }
+
+  llvm::Expected<bool> step() override {
+    auto &Reachables = this->result().Reachables;
+    // Simple DFS:
+    std::vector<EPLPtr> Worklist;
+
+    for (auto &[Id, EPLs] : Reachables)
+      for (auto &EPL : EPLs)
+        Worklist.push_back(&EPL);
+
+    while (!Worklist.empty()) {
+      EPLPtr Node = Worklist.back();
+      Worklist.pop_back();
+
+      updateReachablesWithOutgoings(Node, Worklist);
+    }
+    return false;
+  }
+};
+
+AnalysisRegistry::Add<
+    PointerFlowReachableAnalysis<UnsafeBufferUsageAnalysisResult>>
+    RegisterPointerFlowReachableAnalysis(
+        "Reachable pointers from unsafe buffer usage in pointer flow graph");
 
 } // namespace
 

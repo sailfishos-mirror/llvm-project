@@ -22,7 +22,7 @@ namespace clang::ssaf {
 /// Serialize an EdgeSet as an array of arrays of EntityPointerLevels:
 ///   [ [lhs, rhs, rhs, ...], [lhs, rhs, rhs, ...], ... ]
 llvm::json::Array
-edgeSetToJSON(const llvm::iterator_range<EdgeSet::const_iterator> &Edges,
+edgeSetToJSON(llvm::iterator_range<EdgeSet::const_iterator> Edges,
               JSONFormat::EntityIdToJSONFn IdToJSON);
 
 /// Deserialize an EdgeSet from the array format produced by `edgeSetToJSON`.

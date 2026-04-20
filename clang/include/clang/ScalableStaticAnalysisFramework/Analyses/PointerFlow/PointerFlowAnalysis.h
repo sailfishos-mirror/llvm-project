@@ -1,4 +1,4 @@
-//===- PointerFlowAnalysis.h -------------------------------------*- C++ -*-===//
+//===- PointerFlowAnalysis.h ------------------------------------*- C++-*-===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -6,14 +6,18 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Defines PointerFlowAnalysisResult, the whole-program analysis result type
-// for PointerFlowAnalysis.
+// Defines
+// - PointerFlowAnalysisResult---the plain PointerFlow info collected from
+//   the whole program.
+// - PointerFlowReachableAnalysisResult---the set of reachable pointers
+//   in the pointer flow graph from a provided starting set.
 //
 //===----------------------------------------------------------------------===//
 
 #ifndef LLVM_CLANG_SCALABLESTATICANALYSISFRAMEWORK_ANALYSES_POINTERFLOW_POINTERFLOWANALYSIS_H
 #define LLVM_CLANG_SCALABLESTATICANALYSISFRAMEWORK_ANALYSES_POINTERFLOW_POINTERFLOWANALYSIS_H
 
+#include "clang/ScalableStaticAnalysisFramework/Analyses/EntityPointerLevel/EntityPointerLevel.h"
 #include "clang/ScalableStaticAnalysisFramework/Analyses/PointerFlow/PointerFlow.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/Model/EntityId.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/WholeProgramAnalysis/AnalysisName.h"
@@ -23,16 +27,25 @@
 
 namespace clang::ssaf {
 
-inline constexpr llvm::StringLiteral PointerFlowAnalysisResultName =
+constexpr llvm::StringLiteral PointerFlowAnalysisResultName =
     "PointerFlowAnalysisResult";
+constexpr llvm::StringLiteral PointerFlowReachableAnalysisResultName =
+    "PointerFlowReachableAnalysisResult";
 
 struct PointerFlowAnalysisResult final : AnalysisResult {
   static AnalysisName analysisName() {
     return AnalysisName(PointerFlowAnalysisResultName.str());
   }
 
-  /// Whole-program map from EntityIds to their EdgeSets.
   std::map<EntityId, EdgeSet> Edges;
+};
+
+struct PointerFlowReachableAnalysisResult final : AnalysisResult {
+  static AnalysisName analysisName() {
+    return AnalysisName(PointerFlowReachableAnalysisResultName.str());
+  }
+
+  std::map<EntityId, EntityPointerLevelSet> Reachables;
 };
 
 } // namespace clang::ssaf

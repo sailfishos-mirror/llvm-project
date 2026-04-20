@@ -26,6 +26,7 @@ add_distinct_clang_unittest(ClangScalableAnalysisTests
   TestFixture.cpp
   TUSummaryBuilderTest.cpp
   WholeProgramAnalysis/AnalysisDriverTest.cpp
+  WholeProgramAnalysis/PointerFlowReachableAnalysisTest.cpp
 
   CLANG_LIBS
   clangAST

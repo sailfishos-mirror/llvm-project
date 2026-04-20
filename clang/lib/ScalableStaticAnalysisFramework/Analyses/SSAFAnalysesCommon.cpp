@@ -10,6 +10,18 @@
 
 using namespace clang;
 
+std::string describeJSONValue(const llvm::json::Value &V) {
+  return llvm::formatv("{0:2}", V).str();
+}
+
+std::string describeJSONValue(const llvm::json::Array &A) {
+  return llvm::formatv("array of size {0}", A.size()).str();
+}
+
+std::string describeJSONValue(const llvm::json::Object &O) {
+  return llvm::formatv("an object of {0} key(s)", O.size()).str();
+}
+
 namespace {
 // Traverses the AST and finds contributors.
 class ContributorFinder : public DynamicRecursiveASTVisitor {
