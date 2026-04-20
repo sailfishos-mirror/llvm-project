@@ -831,6 +831,11 @@ unsigned TargetTransformInfo::getMinVectorRegisterBitWidth() const {
   return TTIImpl->getMinVectorRegisterBitWidth();
 }
 
+std::optional<ElementCount>
+TargetTransformInfo::getMaxScalableVF(unsigned MaxWidthInBits) const {
+  return TTIImpl->getMaxScalableVF(MaxWidthInBits);
+}
+
 std::optional<unsigned> TargetTransformInfo::getMaxVScale() const {
   return TTIImpl->getMaxVScale();
 }

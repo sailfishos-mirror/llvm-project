@@ -652,6 +652,11 @@ public:
     return std::nullopt;
   }
 
+  virtual std::optional<ElementCount>
+  getMaxScalableVF(unsigned MaxWidthInBits) const {
+    return std::nullopt;
+  }
+
   virtual bool
   shouldMaximizeVectorBandwidth(TargetTransformInfo::RegisterKind K) const {
     return false;

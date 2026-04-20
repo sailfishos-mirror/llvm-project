@@ -92,6 +92,12 @@ public:
   getIntImmCostIntrin(Intrinsic::ID IID, unsigned Idx, const APInt &Imm,
                       Type *Ty, TTI::TargetCostKind CostKind) const override;
 
+  /// \return The max num of elements of Scalable Vector Type in bits by target
+  /// specific LMUL, divided by /p MaxWidthInBits as the widest type in bits
+  /// discovered for the current loop being evaluated.
+  std::optional<ElementCount>
+  getMaxScalableVF(unsigned MaxWidthInBits) const override;
+
   /// \name EVL Support for predicated vectorization.
   /// Whether the target supports the %evl parameter of VP intrinsic efficiently
   /// in hardware. (see LLVM Language Reference - "Vector Predication

@@ -39,6 +39,14 @@ static cl::opt<unsigned> SLPMaxVF(
         "exclusively by SLP vectorizer."),
     cl::Hidden);
 
+cl::opt<unsigned> VectorPrimaryLMULMaxExp(
+    "riscv-vector-primary-lmul-max",
+    cl::desc("Limit the exponent of maximum primary LMUL used by "
+             "LV autovectorized code."
+             "The default value is 0, it means LMUL=pow(2, 0)=1."
+             "Fractional LMULs are not supported."),
+    cl::init(0), cl::Hidden);
+
 static cl::opt<unsigned>
     RVVMinTripCount("riscv-v-min-trip-count",
                     cl::desc("Set the lower bound of a trip count to decide on "
@@ -338,6 +346,24 @@ TargetTransformInfo::PopcntSupportKind
 RISCVTTIImpl::getPopcntSupport(unsigned TyWidth) const {
   assert(isPowerOf2_32(TyWidth) && "Ty width must be power of 2");
   return ST->hasCPOPLike() ? TTI::PSK_FastHardware : TTI::PSK_Software;
+}
+
+std::optional<ElementCount>
+RISCVTTIImpl::getMaxScalableVF(unsigned MaxWidthInBits) const {
+  if (MaxWidthInBits > ST->getELen() ||
+      (ST->getRealMinVLen() < RISCV::RVVBitsPerBlock))
+    return ElementCount::get(0, false);
+
+  MaxWidthInBits = std::max(8U, MaxWidthInBits);
+  unsigned LMULMax = 1 << std::min<unsigned>(VectorPrimaryLMULMaxExp, 3);
+  if (!VectorPrimaryLMULMaxExp.getNumOccurrences()) {
+    LMULMax = 4;
+    if (ST->getProcFamily() == RISCVSubtarget::SiFive7)
+      LMULMax = 8;
+  }
+
+  return ElementCount::getScalable(LMULMax * RISCV::RVVBitsPerBlock /
+                                   MaxWidthInBits);
 }
 
 InstructionCost RISCVTTIImpl::getPartialReductionCost(

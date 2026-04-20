@@ -3335,6 +3335,13 @@ FixedScalableVFPair LoopVectorizationCostModel::computeFeasibleMaxVF(
   }
   auto MaxSafeFixedVF = ElementCount::getFixed(MaxSafeElementsPowerOf2);
   auto MaxSafeScalableVF = getMaxLegalScalableVF(MaxSafeElementsPowerOf2);
+  auto CollectMaxScalableVF = TTI.getMaxScalableVF(WidestType);
+  if (CollectMaxScalableVF) {
+    ElementCount MaxScalableVF = *CollectMaxScalableVF;
+    MaxSafeScalableVF = ElementCount::getScalable(
+        std::min(MaxScalableVF.getKnownMinValue(),
+                 MaxSafeScalableVF.getKnownMinValue()));
+  }
 
   if (!Legal->isSafeForAnyVectorWidth())
     this->MaxSafeElements = MaxSafeElementsPowerOf2;
