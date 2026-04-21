@@ -16,6 +16,7 @@
 #include "clang/AST/Decl.h"
 #include "llvm/Support/JSON.h"
 
+namespace clang::ssaf {
 template <typename NodeTy, typename... Ts>
 llvm::Error makeErrAtNode(clang::ASTContext &Ctx, const NodeTy *N,
                           llvm::StringRef Fmt, const Ts &...Args) {
@@ -39,10 +40,8 @@ template <typename DeclOrExpr> bool hasPtrOrArrType(const DeclOrExpr *E) {
       E->getType().getCanonicalType());
 }
 
-inline llvm::Error makeEntityNameErr(clang::ASTContext &Ctx,
-                                     const clang::NamedDecl *D) {
-  return makeErrAtNode(Ctx, D, "failed to create entity name for %s",
-                       D->getNameAsString().data());
-}
+llvm::Error makeEntityNameErr(clang::ASTContext &Ctx,
+                              const clang::NamedDecl *D);
+} // namespace clang::ssaf
 
 #endif // LLVM_CLANG_SCALABLESTATICANALYSISFRAMEWORK_ANALYSES_SSAFANALYSESCOMMON_H
