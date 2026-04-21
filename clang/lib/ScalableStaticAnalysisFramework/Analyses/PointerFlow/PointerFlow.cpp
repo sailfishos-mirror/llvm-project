@@ -11,7 +11,6 @@
 #include "clang/ScalableStaticAnalysisFramework/Analyses/EntityPointerLevel/EntityPointerLevel.h"
 #include "clang/ScalableStaticAnalysisFramework/Analyses/EntityPointerLevel/EntityPointerLevelFormat.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/Model/EntityId.h"
-#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/iterator_range.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/JSON.h"
@@ -38,8 +37,8 @@ ssaf::getEdges(const PointerFlowEntitySummary &Sum) {
 
 // Writes the 'Edges' map as an array of array of EntityPointerLevels:
 // Array [
-//    Array [ [lhs-node], [rhs-node], [rhs-node], ...]
-//    Array [ [lhs-node], [rhs-node], [rhs-node], ...]
+//    Array [ [src-node], [dest-node], [dest-node], ...]
+//    Array [ [src-node], [dest-node], [dest-node], ...]
 //    ...
 // ]
 static llvm::json::Object

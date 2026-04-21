@@ -33,72 +33,35 @@ namespace {
 using namespace clang;
 using namespace ssaf;
 
+/// Match and extract assignments.
+/// The extraction function 'XF' can be described by the following rules:
+///
+/// XF(l = r)               := add edge "toEPL(l) -> toEPL(r))"
+/// XF(foo(a, b, ...))      := XF(Param_1 = a), XF(Param_2 = b), ...
+/// XF(return e;)           := XF(Fun = e), where 'Fun' is the enclosing
+///                                         function
+/// XF(ctor(a, ...) : x1(y1), ... {...})
+///                         := XF(Param_1 = a), ...,
+///                            XF(x1 = y1), ...,
+///                            ctor's body will be visited separately.
+/// XF(T var = e)           := XF(Var = e)
+/// XF(T var = init-list)   := see \ref matchInitializerList
 class PointerAssignmentMatcher {
-  ASTContext &Ctx;
-  std::function<EntityId(const EntityName &)> AddEntity;
 
-  // Convert a Expr/NamedDecl to an EntityPointerLevel(Set):
-  Expected<EntityPointerLevelSet> toEPL(const NamedDecl *N,
-                                        bool IsRet = false) {
-    auto Ret = createEntityPointerLevel(N, AddEntity, IsRet);
-
-    if (Ret)
-      return EntityPointerLevelSet{*Ret};
-    return Ret.takeError();
-  }
-
-  Expected<EntityPointerLevelSet> toEPL(const Expr *N, bool IsRet = false) {
-    return translateEntityPointerLevel(N, Ctx, AddEntity);
-  }
-
-  template <typename T1, typename T2>
-  llvm::Error addEdges(const T1 *LHS, const T2 *RHS) {
-    return addEdges(toEPL(LHS), RHS, false);
-  }
-
-  template <typename T>
-  llvm::Error addEdges(Expected<EntityPointerLevelSet> &&LHS, const T *RHS,
-                       bool IsRHSRet = false) {
-    auto Rs = toEPL(RHS, IsRHSRet);
-
-    if (!Rs)
-      return Rs.takeError();
-    if (!LHS)
-      return LHS.takeError();
-    for (auto L : *LHS)
-      Results[L].insert(Rs->begin(), Rs->end());
-    return llvm::Error::success();
-  }
-
-  template <typename ParmsProvider, typename ArgsProvider>
-  llvm::Error matchArgsWithParams(unsigned ArgIdxStart, ParmsProvider *PP,
-                                  ArgsProvider *AP) {
-    unsigned ArgIdx = ArgIdxStart;
-
-    for (unsigned ParmIdx = 0; ParmIdx < PP->getNumParams();
-         ++ArgIdx, ++ParmIdx) {
-      if (const ParmVarDecl *PD = PP->getParamDecl(ParmIdx);
-          PD && hasPtrOrArrType(PD)) {
-        if (auto Err = addEdges(PD, AP->getArg(ArgIdx)))
-          return Err;
-      }
-    }
-    return llvm::Error::success();
-  }
-
-  // Match initializer lists of the form 'Var = {a, b, c, ...}':
-  //
-  //   If 'Var' is a struct/union:
-  //     'Var = {a, b, c, ...}' => 'Var.field_1 = a'
-  //                               'Var.field_2 = b'
-  //                               ...
-  //   If 'Var' is an array:
-  //     'Var = {a, b, c, ...}' => '*Var = a'
-  //                               '*Var = b'
-  //                               ...
-  //
-  // The process is recursive: 'a', 'b', 'c', etc. may themselves be
-  // initializer lists.  We therefore use `ArrayIndirectLevel` to keep track.
+  /// Match initializer lists of the form 'Var = {a, b, c, ...}':
+  ///
+  ///   If 'Var' is a struct/union:
+  ///     XF(Var = {a, b, c, ...})  :=   XF(Var.field_1 = a)
+  ///                                    XF(Var.field_2 = b)
+  ///                                    ...
+  ///   If 'Var' is an array:
+  ///     XF(Var = {a, b, c, ...})  :=   XF(*Var = a)
+  ///                                    XF(*Var = b)
+  ///                                    ...
+  ///
+  /// The process is recursive: 'a', 'b', 'c', ...  may themselves be
+  /// initializer lists.  We therefore use \p ArrayElementIndirectLevel to keep
+  /// track of the pointer level the left-hand side.
   llvm::Error matchInitializerList(const ValueDecl *Base, const Expr *InitExpr,
                                    unsigned ArrayElementIndirectLevel = 0) {
     const InitListExpr *ILE = dyn_cast<InitListExpr>(InitExpr);
@@ -107,19 +70,21 @@ class PointerAssignmentMatcher {
       if (!hasPtrOrArrType(InitExpr))
         return llvm::Error::success();
 
-      auto Expected = toEPL(Base);
+      auto BaseEPL = toEPL(Base);
 
-      if (!Expected)
-        return Expected.takeError();
+      if (!BaseEPL)
+        return BaseEPL.takeError();
 
-      auto R = llvm::map_range(*Expected, [&ArrayElementIndirectLevel](
-                                              const EntityPointerLevel &EPL) {
+      // Apply ArrayElementIndirectLevel to BaseEPL
+      auto R = llvm::map_range(*BaseEPL, [&ArrayElementIndirectLevel](
+                                             const EntityPointerLevel &EPL) {
         EntityPointerLevel Result = EPL;
         for (unsigned I = 0; I < ArrayElementIndirectLevel; ++I)
           Result = incrementPointerLevel(Result);
         return Result;
       });
-      return addEdges(EntityPointerLevelSet{R.begin(), R.end()}, InitExpr);
+      return addEdges(EntityPointerLevelSet{R.begin(), R.end()},
+                      toEPL(InitExpr));
     }
     // Note that `Base`'s type is NOT the real LHS type when
     // ArrayElementIndirectLevel > 0:
@@ -154,7 +119,7 @@ class PointerAssignmentMatcher {
       return matchInitializerList(InitField, ILE->getInit(0));
     }
     // Handle struct/class:
-    ILE = ILE->getSemanticForm() ? ILE->getSemanticForm() : ILE;
+    ILE = ILE->isSemanticForm() ? ILE : ILE->getSemanticForm();
 
     auto FieldIter = RecordTy->field_begin();
 
@@ -182,25 +147,12 @@ public:
       ASTContext &Ctx, std::function<EntityId(const EntityName &)> AddEntity)
       : Ctx(Ctx), AddEntity(AddEntity) {}
 
-  // Match and extract assignments.
-  // The extraction function 'XF' can be described by the following rules:
-  //
-  // XF(l = r)               => '(toEPL(l), toEPL(r))'
-  // XF(foo(a, b, ...))      => XF(Param_1 = a), XF(Param_2 = b), ...
-  // XF(return e;)           => XF(Fun = e), where 'Fun' is the enclosing
-  //                                         function
-  // XF(ctor(a, ...) : x1(y1), ... {...})
-  //                         => XF(Param_1 = a), ...,
-  //                            XF(x1 = y1), ...,
-  //                            ctor's body will be visited later.
-  // XF(T var = e)           => XF(Var = e)
-  // XF(T var = init-list)   => see `matchInitializerList`
   llvm::Error matches(const DynTypedNode &DynNode, const NamedDecl *RootDecl) {
     if (const Stmt *S = DynNode.get<Stmt>()) {
       // Match 'p = q' whenever it has pointer or array type:
       if (const auto *BO = dyn_cast<BinaryOperator>(S);
           BO && BO->getOpcode() == BO_Assign && hasPtrOrArrType(BO)) {
-        return addEdges(BO->getLHS(), BO->getRHS());
+        return addEdges(toEPL(BO->getLHS()), toEPL(BO->getRHS()));
       }
 
       // Match arg-to-param passing (in CallExpr) for any pointer type argument:
@@ -228,7 +180,7 @@ public:
         const Expr *RetExpr = RS->getRetValue();
         if (!hasPtrOrArrType(RetExpr))
           return llvm::Error::success();
-        return addEdges(toEPL(RootDecl, true), RetExpr, false);
+        return addEdges(toEPL(RootDecl, true), toEPL(RetExpr));
       }
     }
 
@@ -247,7 +199,7 @@ public:
 
         // Match initializers to variables/fields of a pointer type:
         if (InitExpr && hasPtrOrArrType(VD))
-          return addEdges(VD, InitExpr);
+          return addEdges(toEPL(VD), toEPL(InitExpr));
       }
 
       // Match C++ constructor member-initializers:
@@ -256,11 +208,58 @@ public:
           if (E->isDelegatingInitializer())
             return matches(DynTypedNode::create(*E->getInit()), RootDecl);
           if (const FieldDecl *FD = E->getMember(); FD && hasPtrOrArrType(FD)) {
-            if (auto Err = addEdges(E->getMember(), E->getInit()))
+            if (auto Err = addEdges(toEPL(E->getMember()), toEPL(E->getInit())))
               return Err;
           }
         }
         return llvm::Error::success();
+      }
+    }
+    return llvm::Error::success();
+  }
+
+private:
+  ASTContext &Ctx;
+  std::function<EntityId(const EntityName &)> AddEntity;
+
+  Expected<EntityPointerLevelSet> toEPL(const NamedDecl *N,
+                                        bool IsRet = false) {
+    auto Ret = createEntityPointerLevel(N, AddEntity, IsRet);
+
+    if (Ret)
+      return EntityPointerLevelSet{*Ret};
+    return Ret.takeError();
+  }
+
+  Expected<EntityPointerLevelSet> toEPL(const Expr *N) {
+    return translateEntityPointerLevel(N, Ctx, AddEntity);
+  }
+
+  llvm::Error addEdges(Expected<EntityPointerLevelSet> &&LHS,
+                       Expected<EntityPointerLevelSet> &&RHS) {
+    if (!LHS && !RHS)
+      return llvm::joinErrors(LHS.takeError(), RHS.takeError());
+    if (!LHS)
+      return LHS.takeError();
+    if (!RHS)
+      return RHS.takeError();
+    for (auto L : *LHS)
+      Results[L].insert(RHS->begin(), RHS->end());
+    return llvm::Error::success();
+  }
+
+  template <typename ParmsProvider, typename ArgsProvider>
+  llvm::Error matchArgsWithParams(unsigned ArgIdxStart, ParmsProvider *PP,
+                                  ArgsProvider *AP) {
+    unsigned ArgIdx = ArgIdxStart;
+
+    for (unsigned ParmIdx = 0;
+         ParmIdx < PP->getNumParams() && ArgIdx < AP->getNumArgs();
+         ++ArgIdx, ++ParmIdx) {
+      if (const ParmVarDecl *PD = PP->getParamDecl(ParmIdx);
+          PD && hasPtrOrArrType(PD)) {
+        if (auto Err = addEdges(toEPL(PD), toEPL(AP->getArg(ArgIdx))))
+          return Err;
       }
     }
     return llvm::Error::success();

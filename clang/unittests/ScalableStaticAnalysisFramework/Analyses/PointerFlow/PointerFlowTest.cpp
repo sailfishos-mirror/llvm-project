@@ -549,6 +549,29 @@ TEST_F(PointerFlowTest, DefaultArg) {
                             {{{"a", 1U}, {"p", 1U}}, {{"b", 1U}, {"g", 1U}}}));
 }
 
+// Counter-example for the concern that matchArgsWithParams could go OOB
+// when fewer explicit args are provided than params (due to default args).
+// In Clang's AST, CallExpr::getNumArgs() always includes CXXDefaultArgExpr
+// nodes for defaulted parameters, so getNumArgs() >= getNumParams() holds.
+TEST_F(PointerFlowTest, AllArgsDefaulted) {
+  ASSERT_EQ(setUpTest(R"cpp(
+    int *g1, *g2;
+    void bar(int *a = g1, int *b = g2);
+    void foo() {
+      bar();
+    }
+  )cpp"),
+            true);
+
+  auto *Sum = getEntitySummary("foo");
+
+  ASSERT_NE(Sum, nullptr);
+  EXPECT_EQ(*Sum, makeEdges(__LINE__, {
+                                          {{"a", 1U}, {"g1", 1U}},
+                                          {{"b", 1U}, {"g2", 1U}},
+                                      }));
+}
+
 TEST_F(PointerFlowTest, DefaultArg2) {
   ASSERT_EQ(setUpTest(R"cpp(
     int *g;
