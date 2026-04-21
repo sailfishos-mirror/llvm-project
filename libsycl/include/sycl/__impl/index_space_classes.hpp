@@ -17,6 +17,9 @@
 
 #include <sycl/__impl/detail/config.hpp>
 
+#include <cstddef>
+#include <type_traits>
+
 _LIBSYCL_BEGIN_NAMESPACE_SYCL
 
 namespace detail {
@@ -95,12 +98,7 @@ public:
 
   friend bool operator!=(const RawArray<Dimensions> &lhs,
                          const RawArray<Dimensions> &rhs) {
-    for (int i = 0; i < Dimensions; ++i) {
-      if (lhs.MArray[i] != rhs.MArray[i]) {
-        return true;
-      }
-    }
-    return false;
+    return !(lhs == rhs);
   }
 
 protected:
@@ -370,13 +368,13 @@ public:
   std::size_t get_linear_id() const noexcept {
     if constexpr (WithOffset) {
       if constexpr (1 == Dimensions) {
-        return MId;
+        return MId[0] - MOffset[0];
       }
       if constexpr (2 == Dimensions) {
-        return (MId[0] - MOffset[0]) * MRange[1] + (MId[1] - MOffset[1]);
+        return (MId[0] - MOffset[0]) * MRange[1] + MId[1] - MOffset[1];
       }
-      return ((MId[0] - MOffset[0]) * MRange[1] * MRange[2]) +
-             ((MId[1] - MOffset[1]) * MRange[2]) + (MId[2] - MOffset[2]);
+      return (MId[0] - MOffset[0]) * MRange[1] * MRange[2] +
+             (MId[1] - MOffset[1]) * MRange[2] + MId[2] - MOffset[2];
     } else {
       if constexpr (1 == Dimensions) {
         return MId[0];
@@ -384,7 +382,7 @@ public:
       if constexpr (2 == Dimensions) {
         return MId[0] * MRange[1] + MId[1];
       }
-      return (MId[0] * MRange[1] * MRange[2]) + (MId[1] * MRange[2]) + MId[2];
+      return MId[0] * MRange[1] * MRange[2] + MId[1] * MRange[2] + MId[2];
     }
   }
 

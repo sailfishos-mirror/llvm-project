@@ -21,14 +21,10 @@
 #  include <cstdint>
 
 // SPIR-V built-in variables mapped to function call.
-#  define _LIBSYCL_SYCL_DEVICE_ATTR __attribute__((sycl_external))
 
-_LIBSYCL_SYCL_DEVICE_ATTR __attribute__((const)) size_t
-__spirv_BuiltInGlobalInvocationId(int);
-_LIBSYCL_SYCL_DEVICE_ATTR __attribute__((const)) size_t
-__spirv_BuiltInGlobalSize(int);
-_LIBSYCL_SYCL_DEVICE_ATTR __attribute__((const)) size_t
-__spirv_BuiltInGlobalOffset(int);
+__attribute__((const)) size_t __spirv_BuiltInGlobalInvocationId(int);
+__attribute__((const)) size_t __spirv_BuiltInGlobalSize(int);
+__attribute__((const)) size_t __spirv_BuiltInGlobalOffset(int);
 
 namespace __spirv {
 

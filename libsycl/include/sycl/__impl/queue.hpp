@@ -138,6 +138,11 @@ public:
   template <typename Param>
   typename Param::return_type get_backend_info() const;
 
+  /// Blocks the calling thread until all commands previously submitted to this
+  /// queue have completed. Synchronous errors are reported through SYCL
+  /// exceptions.
+  void wait();
+
   /// Defines and invokes a SYCL kernel function as a lambda expression or a
   /// named function object type.
   ///
@@ -172,8 +177,8 @@ public:
     static_assert(
         (detail::CheckFunctionSignature<std::remove_reference_t<KernelType>,
                                         void()>::value),
-        "sycl::queue::single_task() requires a kernel instead of command "
-        "group. ");
+        "sycl::queue::single_task() requires a kernel instead of a command "
+        "group");
 
     setKernelParameters(depEvents);
     using NameT =
@@ -305,18 +310,13 @@ public:
                                        std::forward<Rest>(rest)...);
   }
 
-  /// Blocks the calling thread until all commands previously submitted to this
-  /// queue have completed. Synchronous errors are reported through SYCL
-  /// exceptions.
-  void wait();
-
 private:
   template <typename KernelName, int Dims, typename... Rest>
   event parallelForImpl(range<Dims> numWorkItems,
                         const std::vector<event> &depEvents, Rest &&...rest) {
     if constexpr (sizeof...(Rest) != 1)
       throw sycl::exception(errc::feature_not_supported,
-                            "Reductions are not supported.");
+                            "Reductions are not supported");
     setKernelParameters(depEvents, numWorkItems);
 
     using KernelType =
@@ -366,7 +366,7 @@ private:
   /// sycl_kernel_launch instead of KernelFunc invocation.
   template <typename KernelName, typename KernelType>
   _LIBSYCL_ENTRY_POINT_ATTR__(KernelName)
-  void submitSingleTask(const KernelType KernelFunc) {
+  void submitSingleTask(const KernelType &KernelFunc) {
     KernelFunc();
   }
 
@@ -375,7 +375,7 @@ private:
   /// sycl_kernel_launch instead of KernelFunc invocation.
   template <typename KernelName, typename ElementType, typename KernelType>
   _LIBSYCL_ENTRY_POINT_ATTR__(KernelName)
-  void submitParallelFor(const KernelType KernelFunc) {
+  void submitParallelFor(const KernelType &KernelFunc) {
 #ifdef __SYCL_DEVICE_ONLY__
     KernelFunc(detail::Builder::getElement(detail::declptr<ElementType>()));
 #endif

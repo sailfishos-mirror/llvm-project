@@ -5,6 +5,11 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
+///
+/// \file
+/// This file contains helpers for kernel invocation.
+///
+//===----------------------------------------------------------------------===//
 
 #ifndef _LIBSYCL___IMPL_DETAIL_KERNEL_ARG_HELPERS
 #define _LIBSYCL___IMPL_DETAIL_KERNEL_ARG_HELPERS
@@ -17,11 +22,13 @@
 #  include <sycl/__spirv/spirv_vars.hpp>
 #endif
 
+#include <type_traits>
+
 _LIBSYCL_BEGIN_NAMESPACE_SYCL
 
 namespace detail {
 
-/// \name  Helpers for the unnamed lambda extension.
+/// \name  Helpers for the unnamed lambda.
 /// @{
 /// This class is the default kernel name template parameter type for kernel
 /// invocation APIs such as single_task.
@@ -35,7 +42,7 @@ template <typename Name, typename Type> struct get_kernel_name_t {
 };
 
 /// Specialization for the case when Name is undefined.
-/// This is only legal with our compiler with the unnamed lambda extension or if
+/// This is only legal with our compiler with the unnamed lambda support or if
 /// the kernel is a functor object.
 template <typename Type> struct get_kernel_name_t<detail::AutoName, Type> {
   using name = Type;

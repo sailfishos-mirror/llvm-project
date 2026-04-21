@@ -20,6 +20,7 @@ namespace detail {
 
 static void setKernelLaunchArgs(const detail::UnifiedRangeView &Range,
                                 ol_kernel_launch_size_args_t &ArgsToSet) {
+  assert(Range.MDims < 4 && "Invalid dimensions.");
   uint32_t GlobalSize[3] = {1, 1, 1};
   if (Range.MGlobalSize) {
     for (size_t I = 0; I < Range.MDims; ++I) {

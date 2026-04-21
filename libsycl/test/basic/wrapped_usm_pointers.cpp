@@ -90,13 +90,13 @@ int main() {
   };
 
   bool Fail = false;
-  Fail = Checker(SimpleObj);
-  Fail = Checker(NonTrivialObj);
-  Fail = Checker(NonTrivialDerivedObj);
-  Fail = Checker(WrapperOfSimpleObj.Obj);
+  Fail |= Checker(SimpleObj);
+  Fail |= Checker(NonTrivialObj);
+  Fail |= Checker(NonTrivialDerivedObj);
+  Fail |= Checker(WrapperOfSimpleObj.Obj);
 
   for (int i = 0; i < NumOfElements; ++i)
-    Fail = Checker(SimpleArr[i]);
+    Fail |= Checker(SimpleArr[i]);
 
   // Free allocated memory.
   sycl::free(NonTrivialObj.Data, Q);

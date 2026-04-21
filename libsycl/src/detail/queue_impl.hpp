@@ -21,7 +21,6 @@
 #include <OffloadAPI.h>
 
 #include <memory>
-#include <mutex>
 
 _LIBSYCL_BEGIN_NAMESPACE_SYCL
 namespace detail {
