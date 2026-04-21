@@ -54,64 +54,6 @@ void ConcatOutputSection::addInput(ConcatInputSection *input) {
 // The optimal approach is to mix islands for destinations within two hops,
 // and use thunks for destinations at greater distance. For now, we only
 // implement thunks. TODO: Adding support for branch islands!
-//
-// Internally -- as expressed in LLD's data structures -- a
-// branch-range-extension thunk consists of:
-//
-// (1) new Defined symbol for the thunk named
-//     <FUNCTION>.thunk.<SEQUENCE>, which references ...
-// (2) new InputSection, which contains ...
-// (3.1) new data for the instructions to load & branch to the far address +
-// (3.2) new Relocs on instructions to load the far address, which reference ...
-// (4.1) existing Defined symbol for the real function in __text, or
-// (4.2) existing DylibSymbol for the real function in a dylib
-//
-// Nearly-optimal thunk-placement algorithm features:
-//
-// * Single pass: O(n) on the number of call sites.
-//
-// * Accounts for the exact space overhead of thunks - no heuristics
-//
-// * Exploits the full range of call instructions - forward & backward
-//
-// Data:
-//
-// * DenseMap<ThunkKey, ThunkInfo> thunkMap: Maps each (referent, addend)
-//   pair seen on a branch relocation to its thunk bookkeeper.
-//
-// * struct ThunkInfo (bookkeeper): Call instructions have limited range, and
-//   distant call sites might be unable to reach the same thunk, so multiple
-//   thunks are necessary to serve all call sites in a very large program. A
-//   thunkInfo stores state for all thunks associated with a particular
-//   function:
-//     (a) thunk symbol
-//     (b) input section containing stub code, and
-//     (c) sequence number for the active thunk incarnation.
-//   When an old thunk goes out of range, we increment the sequence number and
-//   create a new thunk named <FUNCTION>.thunk.<SEQUENCE>.
-//
-// * A thunk consists of
-//     (a) a Defined symbol pointing to
-//     (b) an InputSection holding machine code (similar to a MachO stub), and
-//     (c) relocs referencing the real function for fixing up the stub code.
-//
-// * std::vector<InputSection *> MergedInputSection::thunks: A vector parallel
-//   to the inputs vector. We store new thunks via cheap vector append, rather
-//   than costly insertion into the inputs vector.
-//
-// Control Flow:
-//
-// * During address assignment, MergedInputSection::finalize() examines call
-//   sites by ascending address and creates thunks.  When a function is beyond
-//   the range of a call site, we need a thunk. Place it at the largest
-//   available forward address from the call site. Call sites increase
-//   monotonically and thunks are always placed as far forward as possible;
-//   thus, we place thunks at monotonically increasing addresses. Once a thunk
-//   is placed, it and all previous input-section addresses are final.
-//
-// * ConcatInputSection::finalize() and ConcatInputSection::writeTo() merge
-//   the inputs and thunks vectors (both ordered by ascending address), which
-//   is simple and cheap.
 
 DenseMap<ThunkKey, ThunkInfo, ThunkMapKeyInfo> lld::macho::thunkMap;
 
