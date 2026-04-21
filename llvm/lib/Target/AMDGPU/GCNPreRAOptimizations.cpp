@@ -256,110 +256,172 @@ bool GCNPreRAOptimizationsImpl::run(MachineFunction &MF) {
   SchedModel.init(&ST);
 
   bool Changed = false;
-  // Add RA anti-hints to reduce WMMA/MFMA hazard NOPs
+  // Add RA anti-hints to reduce WMMA/MFMA and TRANS hazard NOPs
   if (EnableAntiHintsForMFMARegs && ST.hasGFX1250Insts()) {
 
-    // Per-MFMA tracking to determine anti-hint eligibility for subsequent
+    // Per-MFMA/WMMA tracking to determine anti-hint eligibility for subsequent
     // instructions within the max lookback window.
-    struct MFMAInfo {
+    struct HazardInfo {
       SmallVector<Register, 4> Regs;
       unsigned HazardSlots;
       unsigned HazardConsumerSince = 0;
+      uint8_t HazardSlotMask;
+      uint8_t ConsumerMask;
     };
 
+    auto getCoexecMaskForMI = [](const MachineInstr &MI) {
+      if (SIInstrInfo::isWMMA(MI) || SIInstrInfo::isSWMMAC(MI))
+        return AMDGPU::CoExecMask::WMMA;
+      if (SIInstrInfo::isTRANS(MI))
+        return AMDGPU::CoExecMask::TRANS;
+      if (SIInstrInfo::isVALU(MI) && !SIInstrInfo::isLDSDMA(MI))
+        return AMDGPU::CoExecMask::VALU;
+      if (SIInstrInfo::isDS(MI) || SIInstrInfo::isLDSDMA(MI))
+        return AMDGPU::CoExecMask::DS;
+      if (SIInstrInfo::isVMEM(MI) || SIInstrInfo::isFLAT(MI))
+        return AMDGPU::CoExecMask::VMEM;
+      if (SIInstrInfo::isSMRD(MI))
+        return AMDGPU::CoExecMask::SMEM;
+      if (SIInstrInfo::isSALU(MI))
+        return AMDGPU::CoExecMask::SALU;
+
+      // Control instructions (s_delay_alu, s_waitcnt, etc.) - always allowed.
+      return AMDGPU::CoExecMask::CTRL;
+    };
+
+    auto collectNamedOperand = [&](AMDGPU::OpName OpName, const char *OpNameStr,
+                                   const MachineInstr &MI,
+                                   SmallVectorImpl<Register> &Regs) {
+      const MachineOperand *MO = TII->getNamedOperand(MI, OpName);
+      if (!MO) {
+        LLVM_DEBUG(dbgs() << "    Named operand " << OpNameStr
+                          << " not found\n");
+        return;
+      }
+      if (MO->isReg() && MO->getReg().isVirtual()) {
+        Register Reg = MO->getReg();
+        const TargetRegisterClass *RC = MRI->getRegClass(Reg);
+        // Only consider VGPRs
+        if (TRI->hasVGPRs(RC))
+          Regs.push_back(Reg);
+        LLVM_DEBUG(dbgs() << "    Collected " << OpNameStr << " : "
+                          << printReg(Reg, TRI) << "\n");
+      }
+    };
+
+    auto addAntiHints = [&](const MachineInstr &MI,
+                            std::optional<HazardInfo> &HintSource) {
+      const SlotIndex CurrentSlot = LIS->getInstructionIndex(MI).getRegSlot();
+
+      for (const MachineOperand &MO : MI.operands()) {
+        if (!MO.isReg() || !MO.getReg().isVirtual())
+          continue;
+
+        if (!MO.isDef())
+          continue;
+
+        const Register CandidateReg = MO.getReg();
+        const TargetRegisterClass *CandidateRC = MRI->getRegClass(CandidateReg);
+
+        // Only process VGPR registers
+        if (!TRI->isVGPRClass(CandidateRC))
+          continue;
+        LLVM_DEBUG(dbgs() << "\nAdding antihints for: "; MI.dump();
+                   dbgs() << "\n");
+
+        for (Register HazardReg : HintSource->Regs) {
+          // Check if TRANS register is dead at current instruction
+          const LiveInterval &HazardInterval = LIS->getInterval(HazardReg);
+          if (!HazardInterval.liveAt(CurrentSlot)) {
+            MRI->addRegAllocationAntiHints(CandidateReg, HazardReg);
+            LLVM_DEBUG(dbgs()
+                       << "  Anti-hint added: " << printReg(CandidateReg, TRI)
+                       << " <--> " << printReg(HazardReg, TRI) << "\n");
+
+            Changed = true;
+          }
+        }
+      }
+    };
+
+    auto updateHintSource =
+        [&addAntiHints](std::optional<HazardInfo> &HintSource, unsigned MIMask,
+                        const MachineInstr &MI) {
+          if (!HintSource)
+            return;
+
+          if (MIMask & HintSource->ConsumerMask) {
+            addAntiHints(MI, HintSource);
+          }
+
+          if (MIMask & HintSource->HazardSlotMask) {
+            ++HintSource->HazardConsumerSince;
+          }
+
+          if (HintSource->HazardConsumerSince >= HintSource->HazardSlots)
+            HintSource = std::nullopt;
+        };
+
     for (const MachineBasicBlock &MBB : MF) {
-      std::optional<MFMAInfo> LastMFMAOrWMMA = std::nullopt;
+      std::optional<HazardInfo> LastMFMAOrWMMA = std::nullopt;
+      std::optional<HazardInfo> LastTRANS = std::nullopt;
 
       for (const MachineInstr &MI : MBB) {
         if (MI.isDebugInstr())
           continue;
 
-        // Handle MFMA instructions
-        if (SIInstrInfo::isMFMAorWMMA(MI)) {
-          SmallVector<Register, 4> MFMARegisters;
-          // Helper to get named operand
-          auto collectNamedOperand = [&](AMDGPU::OpName OpName,
-                                         const char *OpNameStr) {
-            const MachineOperand *MO = TII->getNamedOperand(MI, OpName);
-            if (!MO) {
-              LLVM_DEBUG(dbgs() << "    Named operand " << OpNameStr
-                                << " not found\n");
-              return;
-            }
-            if (MO->isReg() && MO->getReg().isVirtual()) {
-              Register Reg = MO->getReg();
-              const TargetRegisterClass *RC = MRI->getRegClass(Reg);
-              // Only consider VGPRs
-              if (TRI->hasVGPRs(RC))
-                MFMARegisters.push_back(Reg);
-              LLVM_DEBUG(dbgs() << "    Collected " << OpNameStr << " : "
-                                << printReg(Reg, TRI) << "\n");
-            }
-          };
+        if (TII->getRepeatRate(MI) > 1 &&
+            !(SIInstrInfo::isMFMAorWMMA(MI) || SIInstrInfo::isTRANS(MI))) {
+          LastMFMAOrWMMA = std::nullopt;
+          LastTRANS = std::nullopt;
+          continue;
+        }
 
+        // Handle MFMA/WMMA instructions
+        if (SIInstrInfo::isMFMAorWMMA(MI)) {
+          // WMMA / MFMA kill active Trans + WMMA / MFMA windows
+          LastMFMAOrWMMA = std::nullopt;
+          LastTRANS = std::nullopt;
+
+          SmallVector<Register, 4> MFMARegisters;
           // Collect destination and source C (accumulator) registers
-          collectNamedOperand(AMDGPU::OpName::src0, "src0");
-          collectNamedOperand(AMDGPU::OpName::src1, "src1");
-          collectNamedOperand(AMDGPU::OpName::src2, "src2");
+          collectNamedOperand(AMDGPU::OpName::src0, "src0", MI, MFMARegisters);
+          collectNamedOperand(AMDGPU::OpName::src1, "src1", MI, MFMARegisters);
+          collectNamedOperand(AMDGPU::OpName::src2, "src2", MI, MFMARegisters);
           if (!MFMARegisters.empty()) {
             AMDGPU::CoExecInfo CEI = AMDGPU::getCoExecInfo(MI, *TII);
             unsigned VALUSlots =
                 CEI.getCoExecStageCount(AMDGPU::CoExecMask::VALU);
-            LastMFMAOrWMMA = {std::move(MFMARegisters), VALUSlots, 0u};
+            uint8_t SlotMask =
+                AMDGPU::CoExecMask::VALU | AMDGPU::CoExecMask::TRANS;
+            uint8_t ConsumerMask =
+                SlotMask | AMDGPU::CoExecMask::VMEM | AMDGPU::CoExecMask::DS;
+            LastMFMAOrWMMA = {std::move(MFMARegisters), VALUSlots, 0u, SlotMask,
+                              ConsumerMask};
           }
+          // MFMA / WMMA do no coexecute under other valu
           continue;
         }
 
-        if (!LastMFMAOrWMMA.has_value())
-          continue;
+        // Handle TRANS instructions
+        if (SIInstrInfo::isTRANS(MI)) {
+          SmallVector<Register, 4> TRANSRegisters;
+          collectNamedOperand(AMDGPU::OpName::src0, "src0", MI, TRANSRegisters);
 
-        if (LastMFMAOrWMMA->HazardConsumerSince >=
-            LastMFMAOrWMMA->HazardSlots) {
-          LastMFMAOrWMMA = std::nullopt;
-          continue;
-        }
-
-        if (!(MI.mayLoad() || MI.mayStore() || MI.isCopy() ||
-              SIInstrInfo::isVALU(MI)))
-          continue;
-
-        // Process operands that might reuse MFMA registers
-        const SlotIndex CurrentSlot = LIS->getInstructionIndex(MI).getRegSlot();
-
-        for (const MachineOperand &MO : MI.operands()) {
-
-          if (!MO.isReg() || !MO.getReg().isVirtual())
-            continue;
-
-          if (!MO.isDef())
-            continue;
-
-          const Register CandidateReg = MO.getReg();
-          const TargetRegisterClass *CandidateRC =
-              MRI->getRegClass(CandidateReg);
-
-          // Only process VGPR registers
-          if (!TRI->isVGPRClass(CandidateRC))
-            continue;
-          LLVM_DEBUG(dbgs() << "\nAdding antihints for instruction: ";
-                     MI.dump(); dbgs() << "\n");
-
-          for (Register HazardReg : LastMFMAOrWMMA->Regs) {
-            // Check if MFMA register is dead at current instruction
-            const LiveInterval &HazardInterval = LIS->getInterval(HazardReg);
-            if (!HazardInterval.liveAt(CurrentSlot)) {
-              MRI->addRegAllocationAntiHints(CandidateReg, HazardReg);
-              LLVM_DEBUG(dbgs()
-                         << "  Anti-hint added: " << printReg(CandidateReg, TRI)
-                         << " <--> " << printReg(HazardReg, TRI)
-                         << (SIInstrInfo::isVALU(MI) ? " (VALU)"
-                                                     : " (non-VALU)")
-                         << "\n");
-            }
+          if (!TRANSRegisters.empty()) {
+            unsigned RepeatRate = TII->getRepeatRate(MI);
+            uint8_t SlotMask = AMDGPU::CoExecMask::VALU;
+            uint8_t ConsumerMask =
+                SlotMask | AMDGPU::CoExecMask::VMEM | AMDGPU::CoExecMask::DS;
+            LastTRANS = {std::move(TRANSRegisters), RepeatRate - 1, 0u,
+                         SlotMask, ConsumerMask};
           }
         }
-        if (SIInstrInfo::isVALU(MI) && !SIInstrInfo::isLDSDMA(MI))
-          ++LastMFMAOrWMMA->HazardConsumerSince;
+
+        uint8_t MIMask = getCoexecMaskForMI(MI);
+
+        updateHintSource(LastMFMAOrWMMA, MIMask, MI);
+        updateHintSource(LastTRANS, MIMask, MI);
       }
     }
   }
