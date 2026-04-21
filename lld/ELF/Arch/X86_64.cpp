@@ -319,7 +319,7 @@ void X86_64::relaxCFIJumpTables() const {
   //   table if small enough.
   // - Move jump table before last called function and delete last branch
   //   instruction.
-  std::map<InputSection *, std::vector<InputSection *>> sectionReplacements;
+  DenseMap<InputSection *, std::vector<InputSection *>> sectionReplacements;
   SmallVector<InputSection *, 0> storage;
   for (OutputSection *osec : ctx.outputSections) {
     if (!(osec->flags & SHF_EXECINSTR))
