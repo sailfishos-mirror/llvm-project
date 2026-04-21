@@ -27,6 +27,7 @@
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Operator.h"
 #include "llvm/IR/TypedPointerType.h"
+#include "llvm/IR/ValueDeletionListener.h"
 #include "llvm/IR/ValueHandle.h"
 #include "llvm/IR/ValueSymbolTable.h"
 #include "llvm/Support/CommandLine.h"
@@ -77,6 +78,11 @@ Value::~Value() {
   // Notify all ValueHandles (if present) that this value is going away.
   if (HasValueHandle)
     ValueHandleBase::ValueIsDeleted(this);
+
+  // Notify context-level deletion listeners (e.g. analyses tracking Value*).
+  for (ValueDeletionListener *L : getContext().pImpl->ValueDeletionListeners)
+    L->valueDeleted(this);
+
   if (isUsedByMetadata())
     ValueAsMetadata::handleDeletion(this);
 

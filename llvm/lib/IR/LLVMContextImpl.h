@@ -73,6 +73,7 @@ class RemarkStreamer;
 template <typename T> class StringMapEntry;
 class StringRef;
 class TypedPointerType;
+class ValueDeletionListener;
 class ValueHandleBase;
 
 template <> struct DenseMapInfo<APFloat> {
@@ -1746,6 +1747,11 @@ public:
   /// whether or not a value has an entry in this map.
   using ValueHandlesTy = DenseMap<Value *, ValueHandleBase *>;
   ValueHandlesTy ValueHandles;
+
+  /// Context-level listeners notified when any Value in this context is
+  /// deleted. Used by analyses that track Value pointers (e.g. UniformValues)
+  /// to remove stale entries without per-value handle overhead.
+  SmallPtrSet<ValueDeletionListener *, 2> ValueDeletionListeners;
 
   /// CustomMDKindNames - Map to hold the metadata string to ID mapping.
   StringMap<unsigned> CustomMDKindNames;

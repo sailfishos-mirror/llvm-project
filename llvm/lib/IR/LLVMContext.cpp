@@ -20,6 +20,7 @@
 #include "llvm/IR/DiagnosticInfo.h"
 #include "llvm/IR/DiagnosticPrinter.h"
 #include "llvm/IR/LLVMRemarkStreamer.h"
+#include "llvm/IR/ValueDeletionListener.h"
 #include "llvm/Remarks/RemarkStreamer.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -205,6 +206,23 @@ void LLVMContext::setYieldCallback(YieldCallbackTy Callback, void *OpaqueHandle)
 void LLVMContext::yield() {
   if (pImpl->YieldCallback)
     pImpl->YieldCallback(this, pImpl->YieldOpaqueHandle);
+}
+
+ValueDeletionListener::ValueDeletionListener(LLVMContext &C, CallbackT CB)
+    : Ctx(C), Callback(CB) {
+  Ctx.addValueDeletionListener(this);
+}
+
+ValueDeletionListener::~ValueDeletionListener() {
+  Ctx.removeValueDeletionListener(this);
+}
+
+void LLVMContext::addValueDeletionListener(ValueDeletionListener *L) {
+  pImpl->ValueDeletionListeners.insert(L);
+}
+
+void LLVMContext::removeValueDeletionListener(ValueDeletionListener *L) {
+  pImpl->ValueDeletionListeners.erase(L);
 }
 
 void LLVMContext::emitError(const Twine &ErrorStr) {

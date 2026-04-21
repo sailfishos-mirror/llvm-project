@@ -32,6 +32,7 @@ class Instruction;
 class LLVMContextImpl;
 class Module;
 class OptPassGate;
+class ValueDeletionListener;
 template <typename T> class SmallVectorImpl;
 template <typename T> class StringMapEntry;
 class StringRef;
@@ -308,6 +309,15 @@ public:
   /// suspend the current thread. Only call this method when LLVM doesn't hold
   /// any global mutex or cannot block the execution in another LLVM context.
   LLVM_ABI void yield();
+
+  /// Register a listener that will be notified whenever a Value in this
+  /// context is deleted. This is typically called from the
+  /// ValueDeletionListener constructor.
+  LLVM_ABI void addValueDeletionListener(ValueDeletionListener *L);
+
+  /// Remove a previously registered listener. This is typically called from
+  /// the ValueDeletionListener destructor.
+  LLVM_ABI void removeValueDeletionListener(ValueDeletionListener *L);
 
   /// emitError - Emit an error message to the currently installed error handler
   /// with optional location information.  This function returns, so code should
