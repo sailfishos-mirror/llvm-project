@@ -1,9 +1,10 @@
-; RUN: opt < %s -passes=loop-interchange -cache-line-size=64 -pass-remarks-missed='loop-interchange' -pass-remarks-output=%t -S
+; RUN: opt < %s -passes=loop-interchange -loop-interchange-profitabilities=instorder -pass-remarks-missed='loop-interchange' -pass-remarks-output=%t -S
 ; RUN: FileCheck --input-file=%t %s
 
 @b = external dso_local global [5 x i32], align 16
 
-;; Not profitable to interchange, because the access is invariant to j loop.
+;; Not profitable to interchange in terms of locality of reference, because the
+;; access is invariant to j loop.
 ;;
 ;;  for(int i=0;i<4;i++) {
 ;;    for(int j=1;j<4;j++) {
@@ -13,10 +14,11 @@
 
 ; CHECK: --- !Missed
 ; CHECK-NEXT: Pass:            loop-interchange
-; CHECK-NEXT: Name:            Dependence
+; CHECK-NEXT: Name:            InterchangeNotProfitable
 ; CHECK-NEXT: Function:        test1
 ; CHECK-NEXT: Args:
-; CHECK-NEXT:  - String:       Cannot interchange loops due to dependences.
+; CHECK-NEXT:   - String:          Insufficient information to calculate the cost of loop for interchange.
+
 
 define void @test1() {
 entry:
@@ -54,10 +56,10 @@ exit:
 
 ; CHECK: --- !Missed
 ; CHECK-NEXT: Pass:            loop-interchange
-; CHECK-NEXT: Name:            Dependence
+; CHECK-NEXT: Name:            InterchangeNotProfitable
 ; CHECK-NEXT: Function:        test2
 ; CHECK-NEXT: Args:
-; CHECK-NEXT:  - String:       Cannot interchange loops due to dependences.
+; CHECK-NEXT:   - String:          Insufficient information to calculate the cost of loop for interchange.
 
 define void @test2() {
 entry:
