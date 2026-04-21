@@ -7,6 +7,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "SSAFAnalysesCommon.h"
+#include "clang/AST/ASTContext.h"
+#include "clang/AST/Decl.h"
 
 using namespace clang;
 
@@ -91,19 +93,22 @@ public:
 };
 } // namespace
 
-namespace clang::ssaf {
-
-void findContributors(ASTContext &Ctx,
-                      std::vector<const NamedDecl *> &Contributors) {
+void clang::ssaf::findContributors(
+    ASTContext &Ctx, std::vector<const NamedDecl *> &Contributors) {
   ContributorFinder Finder;
   Finder.TraverseAST(Ctx);
   Contributors.insert(Contributors.end(), Finder.Contributors.begin(),
                       Finder.Contributors.end());
 }
 
-void findMatchesIn(const NamedDecl *Contributor,
-                   llvm::function_ref<void(const DynTypedNode &)> MatchAction) {
+void clang::ssaf::findMatchesIn(
+    const NamedDecl *Contributor,
+    llvm::function_ref<void(const DynTypedNode &)> MatchAction) {
   ContributorFactFinder{MatchAction}.findMatches(Contributor);
 }
 
-} // namespace clang::ssaf
+llvm::Error clang::ssaf::makeEntityNameErr(clang::ASTContext &Ctx,
+                                           const clang::NamedDecl *D) {
+  return makeErrAtNode(Ctx, D, "failed to create entity name for %s",
+                       D->getNameAsString().data());
+}
