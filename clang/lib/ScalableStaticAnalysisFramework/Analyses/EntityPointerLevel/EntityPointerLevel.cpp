@@ -68,12 +68,12 @@ class EntityPointerLevelTranslator
     return EntityPointerLevelSet{Incremented.begin(), Incremented.end()};
   }
 
-  llvm::function_ref<EntityId(EntityName EN)> AddEntity;
+  std::function<EntityId(EntityName EN)> AddEntity;
   ASTContext &Ctx;
 
 public:
-  EntityPointerLevelTranslator(
-      llvm::function_ref<EntityId(EntityName EN)> AddEntity, ASTContext &Ctx)
+  EntityPointerLevelTranslator(std::function<EntityId(EntityName EN)> AddEntity,
+                               ASTContext &Ctx)
       : AddEntity(AddEntity), Ctx(Ctx) {}
 
   Expected<EntityPointerLevelSet> translate(const Expr *E) { return Visit(E); }
