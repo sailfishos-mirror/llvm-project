@@ -90,7 +90,7 @@ public:
 
   /// Sets kernel parameters to be used in the next submitKernelImpl call.
   /// Must be called prior to a submitKernelImpl call.
-  /// \param Events a collection of events that the kernal depends on.
+  /// \param Events a collection of events that the kernel depends on.
   /// \param Range a unified range view of the execution range.
   void setKernelParameters(std::vector<EventImplPtr> &&Events,
                            const detail::UnifiedRangeView &Range);

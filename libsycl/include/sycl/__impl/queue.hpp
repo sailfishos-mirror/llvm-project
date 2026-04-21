@@ -232,6 +232,7 @@ private:
   void submitSingleTask(const KernelType &KernelFunc) {
     KernelFunc();
   }
+#undef _LIBSYCL_ENTRY_POINT_ATTR__
 
   event getLastEvent();
   void submitKernelImpl(detail::DeviceKernelInfo &KernelInfo, void *ArgData,

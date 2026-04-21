@@ -23,14 +23,15 @@ static void setKernelLaunchArgs(const detail::UnifiedRangeView &Range,
   assert(Range.MDims < 4 && "Invalid dimensions.");
   uint32_t GlobalSize[3] = {1, 1, 1};
   if (Range.MGlobalSize) {
-    for (auto I = 0; I < Range.MDims; I++) {
+    for (size_t I = 0; I < Range.MDims; ++I) {
+      assert(Range.MGlobalSize[I] <= std::numeric_limits<uint32_t>::max());
       GlobalSize[I] = static_cast<uint32_t>(Range.MGlobalSize[I]);
     }
   }
 
   uint32_t GroupSize[3] = {1, 1, 1};
   if (Range.MLocalSize) {
-    for (auto I = 0; I < Range.MDims; I++) {
+    for (size_t I = 0; I < Range.MDims; ++I) {
       GroupSize[I] = static_cast<uint32_t>(Range.MLocalSize[I]);
     }
   }

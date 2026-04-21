@@ -12,8 +12,8 @@
 ///
 //===----------------------------------------------------------------------===//
 
-#ifndef _LIBSYCL_GET_DEV_INFO
-#define _LIBSYCL_GET_DEV_INFO
+#ifndef _LIBSYCL___IMPL_DETAIL_GET_DEVICE_KERNEL_INFO_HPP
+#define _LIBSYCL___IMPL_DETAIL_GET_DEVICE_KERNEL_INFO_HPP
 
 #include <sycl/__impl/detail/config.hpp>
 
@@ -40,4 +40,4 @@ DeviceKernelInfo &getDeviceKernelInfo(std::string_view KernelNameStr) {
 } // namespace detail
 _LIBSYCL_END_NAMESPACE_SYCL
 
-#endif // _LIBSYCL_GET_DEV_INFO
+#endif // _LIBSYCL___IMPL_DETAIL_GET_DEVICE_KERNEL_INFO_HPP
