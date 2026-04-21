@@ -686,6 +686,7 @@ static void InitializeCPlusPlusFeatureTestMacros(const LangOptions &LangOpts,
     Builder.defineMacro("__cpp_noexcept_function_type", "201510L");
     Builder.defineMacro("__cpp_capture_star_this", "201603L");
     Builder.defineMacro("__cpp_if_constexpr", "201606L");
+    Builder.defineMacro("__cpp_deduction_guides", "201703L");
     Builder.defineMacro("__cpp_template_auto", "201606L"); // (old name)
     Builder.defineMacro("__cpp_namespace_attributes", "201411L");
     Builder.defineMacro("__cpp_enumerator_attributes", "201411L");

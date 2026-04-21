@@ -94,7 +94,7 @@
 #error "wrong value for __cpp_aggregate_paren_init"
 #endif
 
-#if check(deduction_guides, 0, 0, 0, 0, 201907, 201907, 201907)
+#if check(deduction_guides, 0, 0, 0, 201703, 201907, 201907, 201907)
 #error "wrong value for __cpp_deduction_guides"
 #endif
 
