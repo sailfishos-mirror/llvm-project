@@ -12,23 +12,26 @@
 #include <detail/event_impl.hpp>
 #include <detail/program_manager.hpp>
 
+#include <algorithm>
+
 _LIBSYCL_BEGIN_NAMESPACE_SYCL
 
 namespace detail {
 
 static void setKernelLaunchArgs(const detail::UnifiedRangeView &Range,
                                 ol_kernel_launch_size_args_t &ArgsToSet) {
-  size_t GlobalSize[3] = {1, 1, 1};
+  uint32_t GlobalSize[3] = {1, 1, 1};
   if (Range.MGlobalSize) {
-    for (uint32_t I = 0; I < Range.MDims; I++) {
-      GlobalSize[I] = Range.MGlobalSize[I];
+    for (size_t I = 0; I < Range.MDims; ++I) {
+      assert(Range.MGlobalSize[I] <= std::numeric_limits<uint32_t>::max());
+      GlobalSize[I] = static_cast<uint32_t>(Range.MGlobalSize[I]);
     }
   }
 
-  size_t GroupSize[3] = {1, 1, 1};
+  uint32_t GroupSize[3] = {1, 1, 1};
   if (Range.MLocalSize) {
-    for (uint32_t I = 0; I < Range.MDims; I++) {
-      GroupSize[I] = Range.MLocalSize[I];
+    for (size_t I = 0; I < Range.MDims; ++I) {
+      GroupSize[I] = static_cast<uint32_t>(Range.MLocalSize[I]);
     }
   }
 
@@ -47,7 +50,7 @@ QueueImpl::QueueImpl(DeviceImpl &deviceImpl, const async_handler &asyncHandler,
     : MIsInorder(false), MAsyncHandler(asyncHandler), MPropList(propList),
       MDevice(deviceImpl),
       MContext(MDevice.getPlatformImpl().getDefaultContext()) {
-  callAndThrow(olCreateQueue, MDevice.getHandle(), &MOffloadQueue);
+  callAndThrow(olCreateQueue, MDevice.getOLHandle(), &MOffloadQueue);
 }
 
 QueueImpl::~QueueImpl() {
@@ -80,8 +83,8 @@ void QueueImpl::setKernelParameters(std::vector<EventImplPtr> &&Events,
         "libsycl doesn't support cross-context/platform event dependencies "
         "now.");
 
-  // TODO: this convertion and storing only offload events is possible only
-  // while we don't have host tasks (and features based on host tasks, like
+  // TODO: this conversion and storing of only offload events is possible only
+  // while we don't have host tasks (or features based on host tasks, like
   // streams). With them - it is very likely we should copy EventImplPtr
   // (shared_ptr) and keep it here. Although it may differ if host tasks will be
   // implemented on offload level (no data now).
@@ -95,51 +98,46 @@ void QueueImpl::setKernelParameters(std::vector<EventImplPtr> &&Events,
   setKernelLaunchArgs(Range, MCurrentSubmitInfo.Range);
 }
 
-void QueueImpl::submitKernelImpl(const char *KernelName,
-                                 detail::ArgCollection &TypelessArgs) {
+void QueueImpl::submitKernelImpl(DeviceKernelInfo &KernelInfo, void *ArgData,
+                                 size_t ArgSize) {
   ol_symbol_handle_t Kernel =
-      detail::ProgramManager::getInstance().getOrCreateKernel(KernelName,
-                                                              MDevice);
+      detail::ProgramAndKernelManager::getInstance().getOrCreateKernel(
+          KernelInfo, MDevice);
   assert(Kernel);
 
-  ol_event_handle_t NewEvent{};
+  // TODO: liboffload supports only in-order queues and no cross context waiting
+  // is available now that means that this code is excessive but correct. I
+  // don't want to skip it and rely on default liboffload behaviour that is
+  // applicable for in-order queue only. Once OOO queues are added this waiting
+  // must be disabled for in-order queues. Once host tasks are added - cross
+  // context dependencies should be enabled and checked as well.
   if (!MCurrentSubmitInfo.DepEvents.empty()) {
     callAndThrow(olWaitEvents, MOffloadQueue,
                  MCurrentSubmitInfo.DepEvents.data(),
                  MCurrentSubmitInfo.DepEvents.size());
   }
 
-  const void *Arguments = nullptr;
-  int64_t ArgumentsSize = 0;
-  if (TypelessArgs.getArgCount()) {
-    // without decomposition and free functions extension we always expect 1
-    // argument to the kernel - lambda capture.
-    assert(TypelessArgs.getArgCount() == 1 &&
-           "No arg decomposition or extensions are supported now.");
-    // TODO: liboffload doesn't support more than 1 argument without copy now.
-    // It doesn't expect array of arguments, it requires a contiguous memory
-    // with args. While we have only 1 argument we don't need extra handling
-    // here, we just pass the first argument directly.
-    Arguments = TypelessArgs.getArgPtrArray()[0];
-    ArgumentsSize = TypelessArgs.getSizesArray()[0];
-  }
+  assert(ArgData && "At least one argument must exist");
+  assert(ArgSize && "Arguments size must be greater than 0");
 
   // ol_kernel_launch_prop_t Props[2];
   // Props[0].type = OL_KERNEL_LAUNCH_PROP_TYPE_SIZE;
-  // Props[0].data = &ArgumentsSize;
+  // Props[0].data = &ArgSize;
   // Props[1] = OL_KERNEL_LAUNCH_PROP_END;
   auto Result =
-      olLaunchKernel(MOffloadQueue, MDevice.getHandle(), Kernel, Arguments,
-                     ArgumentsSize, &MCurrentSubmitInfo.Range /*, Props*/);
+      olLaunchKernel(MOffloadQueue, MDevice.getOLHandle(), Kernel, &ArgData,
+                     ArgSize, &MCurrentSubmitInfo.Range /*, Props*/);
   // Clean up current kernel submit data to prepare structures for next
   // submission.
   MCurrentSubmitInfo.DepEvents.clear();
   MCurrentSubmitInfo.Range = {};
   if (isFailed(Result))
     throw sycl::exception(sycl::make_error_code(sycl::errc::runtime),
-                          std::string("Kernel submission (") + KernelName +
-                              ") failed with " + formatCodeString(Result));
+                          std::string("Kernel submission (") +
+                              KernelInfo.getName().data() + ") failed with " +
+                              formatCodeString(Result));
 
+  ol_event_handle_t NewEvent{};
   callAndThrow(olCreateEvent, MOffloadQueue, &NewEvent);
 
   MCurrentSubmitInfo.LastEvent =

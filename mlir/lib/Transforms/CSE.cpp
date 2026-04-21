@@ -182,21 +182,21 @@ bool CSEDriver::hasOtherSideEffectingOpInBetween(Operation *fromOp,
   assert(hasEffect<MemoryEffects::Read>(toOp) &&
          "expected read effect on toOp");
 
-  // Collect the resources of fromOp's read effects. A write can only block
-  // CSE if its resource is not disjoint from one of these.
-  SmallPtrSet<SideEffects::Resource *, 1> readResources;
+  // Collect the read effects of fromOp. A write can only block CSE if it
+  // can conflict with one of these reads.
+  SmallVector<MemoryEffects::EffectInstance> readEffects;
   if (auto memOp = dyn_cast<MemoryEffectOpInterface>(fromOp)) {
     SmallVector<MemoryEffects::EffectInstance> fromEffects;
     memOp.getEffects(fromEffects);
-    for (const auto &e : fromEffects)
+    for (MemoryEffects::EffectInstance &e : fromEffects)
       if (isa<MemoryEffects::Read>(e.getEffect()))
-        readResources.insert(e.getResource());
+        readEffects.push_back(e);
   }
 
   Operation *nextOp = fromOp->getNextNode();
   auto result =
       memEffectsCache.try_emplace(fromOp, std::make_pair(fromOp, nullptr));
-  if (result.second) {
+  if (!result.second) {
     auto memEffectsCachePair = result.first->second;
     if (memEffectsCachePair.second == nullptr) {
       // No MemoryEffects::Write has been detected until the cached operation.
@@ -224,10 +224,20 @@ bool CSEDriver::hasOtherSideEffectingOpInBetween(Operation *fromOp,
       if (isa<MemoryEffects::Write>(effect.getEffect())) {
         // A write on a resource disjoint from all read resources cannot
         // conflict with the reads being CSE'd.
-        auto *writeResource = effect.getResource();
-        bool canConflict = llvm::any_of(readResources, [&](auto *readResource) {
-          return !writeResource->isDisjointFrom(readResource);
-        });
+        SideEffects::Resource *writeResource = effect.getResource();
+        bool canConflict =
+            llvm::any_of(readEffects, [&](const auto &readEffect) {
+              SideEffects::Resource *readResource = readEffect.getResource();
+              if (writeResource->isDisjointFrom(readResource))
+                return false;
+              // A pointer-based access to an addressable resource cannot
+              // conflict with a non-addressable resource.
+              if (readEffect.getValue() && !writeResource->isAddressable())
+                return false;
+              if (effect.getValue() && !readResource->isAddressable())
+                return false;
+              return true;
+            });
         if (canConflict) {
           result.first->second = {nextOp, MemoryEffects::Write::get()};
           return true;
@@ -247,13 +257,6 @@ LogicalResult CSEDriver::simplifyOperation(ScopedMapTy &knownValues,
   // Don't simplify terminator operations.
   if (op->hasTrait<OpTrait::IsTerminator>())
     return failure();
-
-  // If the operation is already trivially dead just add it to the erase list.
-  if (isOpTriviallyDead(op)) {
-    opsToErase.push_back(op);
-    ++numDCE;
-    return success();
-  }
 
   // Don't simplify operations with regions that have multiple blocks.
   // TODO: We need additional tests to verify that we handle such IR correctly.
@@ -288,7 +291,6 @@ LogicalResult CSEDriver::simplifyOperation(ScopedMapTy &knownValues,
   // Look for an existing definition for the operation.
   if (auto *existing = knownValues.lookup(op)) {
     replaceUsesAndDelete(knownValues, op, existing, hasSSADominance);
-    ++numCSE;
     return success();
   }
 
@@ -299,7 +301,16 @@ LogicalResult CSEDriver::simplifyOperation(ScopedMapTy &knownValues,
 
 void CSEDriver::simplifyBlock(ScopedMapTy &knownValues, Block *bb,
                               bool hasSSADominance) {
-  for (auto &op : *bb) {
+  for (auto &op : llvm::make_early_inc_range(*bb)) {
+    // If the operation is already trivially dead just add it to the erase list.
+    // This also avoids calling `simplifyRegion` on dead region ops
+    // unnecessarily.
+    if (isOpTriviallyDead(&op)) {
+      opsToErase.push_back(&op);
+      ++numDCE;
+      continue;
+    }
+
     // Most operations don't have regions, so fast path that case.
     if (op.getNumRegions() != 0) {
       // If this operation is isolated above, we can't process nested regions
@@ -385,9 +396,13 @@ void CSEDriver::simplify(Operation *op, bool *changed) {
   for (auto &region : op->getRegions())
     simplifyRegion(knownValues, region);
 
-  /// Erase any operations that were marked as dead during simplification.
-  for (auto *op : opsToErase)
+  /// Erase any operations that were marked as dead during simplification, and
+  /// remove their associated dominator trees.
+  for (auto *op : opsToErase) {
+    for (Region &region : op->getRegions())
+      domInfo->invalidate(&region);
     rewriter.eraseOp(op);
+  }
   if (changed)
     *changed = !opsToErase.empty();
 
@@ -424,7 +439,8 @@ void CSE::runOnOperation() {
   if (!changed)
     return markAllAnalysesPreserved();
 
-  // We currently don't remove region operations, so mark dominance as
-  // preserved.
+  // We only delete redundant operations without moving any operation to a
+  // different block, so the dominance tree structure remains unchanged and
+  // DominanceInfo/PostDominanceInfo can be safely preserved.
   markAnalysesPreserved<DominanceInfo, PostDominanceInfo>();
 }

@@ -5,6 +5,12 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
+///
+/// \file
+/// This file contains the declaration of the QueueImpl class, which implements
+/// sycl::queue functionality.
+///
+//===----------------------------------------------------------------------===//
 
 #ifndef _LIBSYCL_QUEUE_IMPL
 #define _LIBSYCL_QUEUE_IMPL
@@ -63,13 +69,17 @@ public:
   /// \return true if and only if the queue is in order.
   bool isInOrder() const { return MIsInorder; }
 
-  /// Enqueues kernel to liboffload.
+  /// Waits for completion of all commands submitted to this queue.
+  void wait();
+
+  /// Enqueues a kernel to liboffload.
   /// Kernel parameters like dependencies and range must be passed in advance by
   /// calling setKernelParameters.
-  /// \param KernelName a name of kernel to be enqueued.
+  /// \param KernelInfo a kernel info that is uniform between different
+  /// submissions of the same kernel.
   /// \param TypelessArgs data about kernel arguments to be used for enqueue.
-  void submitKernelImpl(const char *KernelName,
-                        detail::ArgCollection &TypelessArgs);
+  void submitKernelImpl(DeviceKernelInfo &KernelInfo, void *ArgData,
+                        size_t ArgSize);
 
   /// \return an event impl object that corresponds to the last kernel
   /// submission in the calling thread.
@@ -80,14 +90,11 @@ public:
   }
 
   /// Sets kernel parameters to be used in the next submitKernelImpl call.
-  /// Must be called prior to submitKernelImpl call.
-  /// \param Events a collection of events that kernal depends on.
-  /// \param Range a unified range view of execution range.
+  /// Must be called prior to a submitKernelImpl call.
+  /// \param Events a collection of events that the kernel depends on.
+  /// \param Range a unified range view of the execution range.
   void setKernelParameters(std::vector<EventImplPtr> &&Events,
                            const detail::UnifiedRangeView &Range);
-
-  /// Waits for completion of all kernels submitted to this queue.
-  void wait();
 
 private:
   // Queue features.

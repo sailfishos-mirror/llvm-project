@@ -23,6 +23,7 @@
 #include <sycl/__impl/detail/arg_wrapper.hpp>
 #include <sycl/__impl/detail/config.hpp>
 #include <sycl/__impl/detail/default_async_handler.hpp>
+#include <sycl/__impl/detail/get_device_kernel_info.hpp>
 #include <sycl/__impl/detail/kernel_arg_helpers.hpp>
 #include <sycl/__impl/detail/obj_utils.hpp>
 #include <sycl/__impl/detail/unified_range_view.hpp>
@@ -39,12 +40,10 @@ class QueueImpl;
 class _LIBSYCL_EXPORT queue {
 public:
   queue(const queue &rhs) = default;
-
   queue(queue &&rhs) = default;
-
   queue &operator=(const queue &rhs) = default;
-
   queue &operator=(queue &&rhs) = default;
+  ~queue() = default;
 
   friend bool operator==(const queue &lhs, const queue &rhs) {
     return lhs.impl == rhs.impl;
@@ -312,6 +311,48 @@ public:
   /// exceptions.
   void wait();
 
+  /// Defines and invokes a SYCL kernel function as a lambda expression or a
+  /// named function object type.
+  ///
+  /// \param kernelFunc is the kernel functor or lambda.
+  /// \return an event that represents the status of the submitted kernel.
+  template <typename KernelName, typename KernelType>
+  event single_task(const KernelType &kernelFunc) {
+    return single_task<KernelName, KernelType>({}, kernelFunc);
+  }
+
+  /// Defines and invokes a SYCL kernel function as a lambda expression or a
+  /// named function object type.
+  ///
+  /// \param depEvent is an event that specifies the kernel dependency.
+  /// \param kernelFunc is the kernel functor or lambda.
+  /// \return an event that represents the status of the submitted kernel.
+  template <typename KernelName, typename KernelType>
+  event single_task(event depEvent, const KernelType &kernelFunc) {
+    return single_task<KernelName, KernelType>({depEvent}, kernelFunc);
+  }
+
+  /// Defines and invokes a SYCL kernel function as a lambda expression or a
+  /// named function object type.
+  ///
+  /// \param depEvents is a collection of events that specify the kernel
+  /// dependencies.
+  /// \param kernelFunc is the kernel functor or lambda.
+  /// \return an event that represents the status of the submitted kernel.
+  template <typename KernelName, typename KernelType>
+  event single_task(const std::vector<event> &depEvents,
+                    const KernelType &kernelFunc) {
+    static_assert(
+        detail::CheckFunctionSignature<std::remove_reference_t<KernelType>,
+                                       void()>::value,
+        "sycl::queue::single_task() requires a kernel instead of a command "
+        "group");
+
+    setKernelParameters(depEvents);
+    submitSingleTask<KernelName, KernelType>(kernelFunc);
+    return getLastEvent();
+  }
+
 private:
   template <typename KernelName, int Dims, typename... Rest>
   event parallelForImpl(range<Dims> numWorkItems,
@@ -340,15 +381,16 @@ private:
   /// submitParallelFor.
   /// \param KernelName a name of the kernel being invoked.
   /// \param args kernel arguments for kernel invocation.
-  // TODO: now `args` always represents  single argument - lambda capture.
-  template <typename, typename... Args>
+  template <typename KN, typename... Args>
   void sycl_kernel_launch(const char *KernelName, Args &&...args) {
-    static_assert((sizeof...(args) == 1) &&
-                  "Only 2 arguments are expected in sycl_kernel_launch.");
-    detail::ArgCollection TypelessArgs;
-    (TypelessArgs.addArg(args), ...);
+    static_assert(
+        sizeof...(args) == 1,
+        "sycl_kernel_launch expects only 2 arguments now: name of kernel and "
+        "callable object passed to kernel invocation by the user.");
 
-    submitKernelImpl(KernelName, TypelessArgs);
+    auto FirstArg = std::get<0>(std::tie(args...));
+    submitKernelImpl(detail::getDeviceKernelInfo<KN>(KernelName), &FirstArg,
+                     sizeof(FirstArg));
   }
 
   /// The sycl_kernel_entry_point attribute facilitates the generation of an
@@ -382,6 +424,7 @@ private:
 #endif
     (void)KernelFunc;
   }
+#undef _LIBSYCL_ENTRY_POINT_ATTR__
 
   /// Passes kernel parameters to runtime.
   /// \param Events a collection of events representing dependencies of the
@@ -393,10 +436,11 @@ private:
   /// Passes kernel arguments to runtime.
   /// If all dependencies are met and kernel can be submitted to backend - it is
   /// done in this call.
-  /// \param KernelName a name of the kernel being invoked.
-  /// \param TypelessArgs a unified arguments collection.
-  void submitKernelImpl(const char *KernelName,
-                        detail::ArgCollection &TypelessArgs);
+  /// \param KernelInfo a name of the kernel being invoked.
+  /// \param ArgData a pointer to kernel argument.
+  /// \param ArgSize a size of kernel argument.
+  void submitKernelImpl(detail::DeviceKernelInfo &KernelInfo, void *ArgData,
+                        size_t ArgSize);
 
   /// \return an event representing last kernel invocation.
   event getLastEvent();

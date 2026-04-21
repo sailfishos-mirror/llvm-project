@@ -25,15 +25,14 @@ namespace detail {
 
 /// The structure to keep dimension and references to ranges unified for
 /// all dimensions.
-class UnifiedRangeView {
-
-public:
-  /// Default contructed view matches single task execution range.
+struct UnifiedRangeView {
+  /// Default contructed view matches the single task execution range.
   UnifiedRangeView() = default;
   UnifiedRangeView(const UnifiedRangeView &Desc) = default;
   UnifiedRangeView(UnifiedRangeView &&Desc) = default;
   UnifiedRangeView &operator=(const UnifiedRangeView &Desc) = default;
   UnifiedRangeView &operator=(UnifiedRangeView &&Desc) = default;
+  ~UnifiedRangeView() = default;
 
   template <int Dims>
   UnifiedRangeView(sycl::range<Dims> &N)
