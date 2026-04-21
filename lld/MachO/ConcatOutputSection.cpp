@@ -116,8 +116,8 @@ void TextOutputSection::finalize() {
   uint64_t forwardBranchRange = target->forwardBranchRange;
   uint64_t backwardBranchRange = target->backwardBranchRange;
   size_t thunkSize = target->thunkSize;
-  size_t thunkCount = 0;
   size_t thunkCallCount = 0;
+  size_t thunkCount = 0;
   DenseSet<uint64_t> residentThunkPages;
 
   auto isTargetInRange = [&](const ConcatInputSection &isec,
@@ -148,13 +148,12 @@ void TextOutputSection::finalize() {
     return nullptr;
   };
   auto createThunk = [&](const ConcatInputSection &isec, Relocation &r) {
-    assert(!isTargetInRange(isec, r));
     assert(getThunkInRange(isec, r) == nullptr);
     assert(isec.isFinal);
     uint64_t highVA = isec.getVA() + r.offset + forwardBranchRange;
     if (addr + size > highVA) {
       // There were too many consecutive branch instructions for `slop`
-      // above. If you hit this: For the current algorithm, just bumping up
+      // below. If you hit this: For the current algorithm, just bumping up
       // slop above and trying again is probably simplest. (See also PR51578
       // comment 5).
       fatal(Twine(__FUNCTION__) +
@@ -192,6 +191,7 @@ void TextOutputSection::finalize() {
     // The thunk itself bakes in the addend, so the call-site reloc must
     // branch to the thunk start with no extra offset.
     r.addend = 0;
+    ++thunkCallCount;
     finalizeOne(thunkInfo.isec);
     thunks.push_back(thunkInfo.isec);
     uint64_t thunkFirstByte = thunkInfo.isec->getVA();
@@ -199,7 +199,6 @@ void TextOutputSection::finalize() {
     residentThunkPages.insert(thunkFirstByte / target->getPageSize());
     residentThunkPages.insert(thunkLastByte / target->getPageSize());
     ++thunkCount;
-    ++thunkCallCount;
   };
 
   std::deque<std::tuple<ConcatInputSection *, Relocation *, ThunkKey>>
@@ -271,7 +270,7 @@ void TextOutputSection::finalize() {
     auto [callerIsec, r, thunkKey] = tuple;
     return isTargetInRange(*callerIsec, *r);
   });
-  // Count the number of new thunk we will need to create
+  // Count the number of new thunks we will need to create
   DenseSet<ThunkKey, ThunkMapKeyInfo> branchTargets;
   for (auto [callerIsec, r, thunkKey] : branchesToProcess)
     if (!getThunkInRange(*callerIsec, *r))
