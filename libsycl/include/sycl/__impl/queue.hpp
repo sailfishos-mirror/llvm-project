@@ -20,7 +20,6 @@
 #include <sycl/__impl/event.hpp>
 #include <sycl/__impl/property_list.hpp>
 
-#include <sycl/__impl/detail/arg_wrapper.hpp>
 #include <sycl/__impl/detail/config.hpp>
 #include <sycl/__impl/detail/default_async_handler.hpp>
 #include <sycl/__impl/detail/get_device_kernel_info.hpp>
@@ -310,48 +309,6 @@ public:
   /// queue have completed. Synchronous errors are reported through SYCL
   /// exceptions.
   void wait();
-
-  /// Defines and invokes a SYCL kernel function as a lambda expression or a
-  /// named function object type.
-  ///
-  /// \param kernelFunc is the kernel functor or lambda.
-  /// \return an event that represents the status of the submitted kernel.
-  template <typename KernelName, typename KernelType>
-  event single_task(const KernelType &kernelFunc) {
-    return single_task<KernelName, KernelType>({}, kernelFunc);
-  }
-
-  /// Defines and invokes a SYCL kernel function as a lambda expression or a
-  /// named function object type.
-  ///
-  /// \param depEvent is an event that specifies the kernel dependency.
-  /// \param kernelFunc is the kernel functor or lambda.
-  /// \return an event that represents the status of the submitted kernel.
-  template <typename KernelName, typename KernelType>
-  event single_task(event depEvent, const KernelType &kernelFunc) {
-    return single_task<KernelName, KernelType>({depEvent}, kernelFunc);
-  }
-
-  /// Defines and invokes a SYCL kernel function as a lambda expression or a
-  /// named function object type.
-  ///
-  /// \param depEvents is a collection of events that specify the kernel
-  /// dependencies.
-  /// \param kernelFunc is the kernel functor or lambda.
-  /// \return an event that represents the status of the submitted kernel.
-  template <typename KernelName, typename KernelType>
-  event single_task(const std::vector<event> &depEvents,
-                    const KernelType &kernelFunc) {
-    static_assert(
-        detail::CheckFunctionSignature<std::remove_reference_t<KernelType>,
-                                       void()>::value,
-        "sycl::queue::single_task() requires a kernel instead of a command "
-        "group");
-
-    setKernelParameters(depEvents);
-    submitSingleTask<KernelName, KernelType>(kernelFunc);
-    return getLastEvent();
-  }
 
 private:
   template <typename KernelName, int Dims, typename... Rest>
