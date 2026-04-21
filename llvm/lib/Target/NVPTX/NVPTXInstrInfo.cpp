@@ -194,10 +194,7 @@ unsigned NVPTXInstrInfo::insertBranch(MachineBasicBlock &MBB,
   }
 
   // Two-way Conditional Branch.
-  BuildMI(&MBB, DL, get(NVPTX::CBranch))
-      .add(Cond[0])
-      .addMBB(TBB)
-      .add(Cond[1]);
+  BuildMI(&MBB, DL, get(NVPTX::CBranch)).add(Cond[0]).addMBB(TBB).add(Cond[1]);
   BuildMI(&MBB, DL, get(NVPTX::GOTO)).addMBB(FBB);
   return 2;
 }
