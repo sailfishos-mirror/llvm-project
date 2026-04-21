@@ -1776,7 +1776,7 @@ The AMDGPU backend implements the following LLVM IR intrinsics.
                                                    * :ref:`Synchronization Scope<amdgpu-intrinsics-syncscope-metadata-operand>`.
                                                      Note that the scope used must ensure that the L2 cache will be hit.
 
-  llvm.amdgcn.av.global.load.b128                     This intrinsic is supported on gfx9, gfx10, gfx11, and gfx12 targets.
+  llvm.amdgcn.av.global.load.b128                  This intrinsic is supported on gfx9, gfx10, gfx11, and gfx12 targets.
 
                                                    Signature:
 
@@ -1828,7 +1828,7 @@ The AMDGPU backend implements the following LLVM IR intrinsics.
                                                    Instruction Set Architecture Reference Guide).
 
 
-  llvm.amdgcn.av.global.store.b128                    This intrinsic is supported on gfx9, gfx10, gfx11, and gfx12 targets.
+  llvm.amdgcn.av.global.store.b128                 This intrinsic is supported on gfx9, gfx10, gfx11, and gfx12 targets.
 
                                                    Signature:
 
