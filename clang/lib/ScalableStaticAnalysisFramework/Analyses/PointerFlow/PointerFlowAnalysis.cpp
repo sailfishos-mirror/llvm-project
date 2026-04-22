@@ -11,9 +11,9 @@
 // EdgeSets.
 //===----------------------------------------------------------------------===//
 
+#include "clang/ScalableStaticAnalysisFramework/Analyses/PointerFlow/PointerFlowAnalysis.h"
 #include "SSAFAnalysesCommon.h"
 #include "clang/ScalableStaticAnalysisFramework/Analyses/PointerFlow/PointerFlow.h"
-#include "clang/ScalableStaticAnalysisFramework/Analyses/PointerFlow/PointerFlowAnalysis.h"
 #include "clang/ScalableStaticAnalysisFramework/Analyses/PointerFlow/PointerFlowFormat.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/Serialization/JSONFormat.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/WholeProgramAnalysis/AnalysisRegistry.h"
@@ -53,9 +53,9 @@ Expected<std::unique_ptr<AnalysisResult>> deserializePointerFlowAnalysisResult(
                                    PointerFlowAnalysisResultName.data());
 
   if (Content->size() % 2 != 0)
-    return makeSawButExpectedError(
-        *Content, "an even number of elements, got %lu",
-        (unsigned long)Content->size());
+    return makeSawButExpectedError(*Content,
+                                   "an even number of elements, got %lu",
+                                   (unsigned long)Content->size());
 
   std::map<EntityId, EdgeSet> Edges;
 
