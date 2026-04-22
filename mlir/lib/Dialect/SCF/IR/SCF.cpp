@@ -3291,8 +3291,9 @@ void WhileOp::getSuccessorRegionsWithConstants(
   // Constant folding only applies when branching from the `scf.condition`
   // terminator of the "before" region. For all other branch points, fall back
   // to the unfiltered behavior.
-  auto conditionOp =
-      dyn_cast_or_null<ConditionOp>(point.getTerminatorPredecessorOrNull());
+  RegionBranchTerminatorOpInterface terminator =
+      point.getTerminatorPredecessorOrNull();
+  auto conditionOp = dyn_cast_or_null<ConditionOp>(terminator.getOperation());
   ArrayRef<Attribute> operands = operandConstants.getOperandConstants(point);
   if (!conditionOp || operands.empty()) {
     getSuccessorRegions(point, regions);
