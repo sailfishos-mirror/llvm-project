@@ -11,9 +11,9 @@
 // EdgeSets.
 //===----------------------------------------------------------------------===//
 
+#include "clang/ScalableStaticAnalysisFramework/Analyses/PointerFlow/PointerFlowAnalysis.h"
 #include "SSAFAnalysesCommon.h"
 #include "clang/ScalableStaticAnalysisFramework/Analyses/PointerFlow/PointerFlow.h"
-#include "clang/ScalableStaticAnalysisFramework/Analyses/PointerFlow/PointerFlowAnalysis.h"
 #include "clang/ScalableStaticAnalysisFramework/Analyses/PointerFlow/PointerFlowFormat.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/Serialization/JSONFormat.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/WholeProgramAnalysis/AnalysisRegistry.h"
@@ -55,7 +55,7 @@ Expected<std::unique_ptr<AnalysisResult>> deserializePointerFlowAnalysisResult(
   if (Content->size() % 2 != 0)
     return makeSawButExpectedError(*Content,
                                    "an even number of elements, got %lu",
-                                   static_cast<unsigned long>(Content->size()));
+                                   static_cast<size_t>(Content->size()));
 
   std::map<EntityId, EdgeSet> Edges;
 
@@ -102,7 +102,7 @@ public:
                   const PointerFlowEntitySummary &Summary) override {
     auto EdgesOfEntity = getEdges(Summary);
 
-    result().Edges[Id] = EdgeSet(EdgesOfEntity.begin(), EdgesOfEntity.end());
+    getResult().Edges[Id] = EdgeSet(EdgesOfEntity.begin(), EdgesOfEntity.end());
     return llvm::Error::success();
   }
 };

@@ -35,9 +35,8 @@ ssaf::getEdges(const PointerFlowEntitySummary &Sum) {
   return Sum.Edges;
 }
 
-Array ssaf::edgeSetToJSON(
-    llvm::iterator_range<EdgeSet::const_iterator> Edges,
-    JSONFormat::EntityIdToJSONFn EntityId2JSON) {
+Array ssaf::edgeSetToJSON(llvm::iterator_range<EdgeSet::const_iterator> Edges,
+                          JSONFormat::EntityIdToJSONFn EntityId2JSON) {
   Array EdgesData;
 
   for (const auto &[LHS, RHSSet] : Edges) {
