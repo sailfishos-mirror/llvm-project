@@ -7,19 +7,24 @@
 //===----------------------------------------------------------------------===//
 
 #include "SSAFAnalysesCommon.h"
+#include "clang/AST/ASTContext.h"
+#include "clang/AST/Decl.h"
+#include "clang/AST/DeclObjC.h"
 #include "clang/AST/DynamicRecursiveASTVisitor.h"
+#include "clang/AST/ExprCXX.h"
+#include <set>
 
 using namespace clang;
 
-std::string describeJSONValue(const llvm::json::Value &V) {
+std::string ssaf::describeJSONValue(const llvm::json::Value &V) {
   return llvm::formatv("{0:2}", V).str();
 }
 
-std::string describeJSONValue(const llvm::json::Array &A) {
+std::string ssaf::describeJSONValue(const llvm::json::Array &A) {
   return llvm::formatv("array of size {0}", A.size()).str();
 }
 
-std::string describeJSONValue(const llvm::json::Object &O) {
+std::string ssaf::describeJSONValue(const llvm::json::Object &O) {
   return llvm::formatv("an object of {0} key(s)", O.size()).str();
 }
 
@@ -27,15 +32,15 @@ namespace {
 // Traverses the AST and finds contributors.
 class ContributorFinder : public DynamicRecursiveASTVisitor {
 public:
-  std::vector<const NamedDecl *> Contributors;
+  std::set<const NamedDecl *> Contributors;
 
   bool VisitFunctionDecl(FunctionDecl *D) override {
-    Contributors.push_back(D);
+    Contributors.insert(D);
     return true;
   }
 
   bool VisitRecordDecl(RecordDecl *D) override {
-    Contributors.push_back(D);
+    Contributors.insert(D);
     return true;
   }
 
@@ -44,7 +49,7 @@ public:
 
     // Collects Decl for global variables or static data members:
     if (DC->isFileContext() || DC->isNamespace() || D->isStaticDataMember())
-      Contributors.push_back(D);
+      Contributors.insert(D);
     return true;
   }
 
@@ -56,24 +61,26 @@ public:
   }
 };
 
-// An AST visitor that skips the root node's strict-descendants that are
-// callable Decls and record Decls, because those are separate contributors.
-//
-// Clients need to implement their own `MatchAction`, which is a function that
-// takes a `DynTypedNode`, decides if it matches and performs any further
-// callback actions.
+/// An AST visitor that skips the root node's strict-descendants that are
+/// callable Decls and record Decls, because those are separate contributors.
+///
+/// Clients need to implement their own "MatchAction", which is a function that
+/// takes a `DynTypedNode`, decides if the node matches and performs any further
+/// callback actions.
+/// ContributorFactFinder takes a reference to a "MatchAction". It does not own
+/// the "MatchAction", which is usually stateful and may own containers.
 class ContributorFactFinder : public DynamicRecursiveASTVisitor {
-  llvm::function_ref<void(const DynTypedNode &)> MatchAction;
+  llvm::function_ref<void(const DynTypedNode &)> MatchActionRef;
   const NamedDecl *RootDecl = nullptr;
 
   template <typename NodeTy> void match(const NodeTy &Node) {
-    MatchAction(DynTypedNode::create(Node));
+    MatchActionRef(DynTypedNode::create(Node));
   }
 
 public:
   ContributorFactFinder(
-      llvm::function_ref<void(const DynTypedNode &)> MatchAction)
-      : MatchAction(MatchAction) {
+      llvm::function_ref<void(const DynTypedNode &)> MatchActionRef)
+      : MatchActionRef(MatchActionRef) {
     ShouldVisitTemplateInstantiations = true;
     ShouldVisitImplicitCode = false;
   }
@@ -112,19 +119,22 @@ public:
 };
 } // namespace
 
-namespace clang::ssaf {
-
-void findContributors(ASTContext &Ctx,
-                      std::vector<const NamedDecl *> &Contributors) {
+void ssaf::findContributors(ASTContext &Ctx,
+                            std::vector<const NamedDecl *> &Contributors) {
   ContributorFinder Finder;
   Finder.TraverseAST(Ctx);
   Contributors.insert(Contributors.end(), Finder.Contributors.begin(),
                       Finder.Contributors.end());
 }
 
-void findMatchesIn(const NamedDecl *Contributor,
-                   llvm::function_ref<void(const DynTypedNode &)> MatchAction) {
-  ContributorFactFinder{MatchAction}.findMatches(Contributor);
+void ssaf::findMatchesIn(
+    const NamedDecl *Contributor,
+    llvm::function_ref<void(const DynTypedNode &)> MatchActionRef) {
+  ContributorFactFinder{MatchActionRef}.findMatches(Contributor);
 }
 
-} // namespace clang::ssaf
+llvm::Error clang::ssaf::makeEntityNameErr(clang::ASTContext &Ctx,
+                                           const clang::NamedDecl *D) {
+  return makeErrAtNode(Ctx, D, "failed to create entity name for %s",
+                       D->getNameAsString().data());
+}

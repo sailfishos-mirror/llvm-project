@@ -19,7 +19,7 @@
 
 namespace clang::ssaf {
 
-/// Maps LHSs to their RHS sets:
+/// Maps each source node to its destination nodes:
 using EdgeSet = std::map<EntityPointerLevel, EntityPointerLevelSet>;
 
 class PointerFlowEntitySummary final : public EntitySummary {
@@ -36,7 +36,7 @@ class PointerFlowEntitySummary final : public EntitySummary {
 public:
   static constexpr llvm::StringLiteral Name = "PointerFlow";
 
-  SummaryName getSummaryName() const override { return summaryName(); };
+  SummaryName getSummaryName() const override { return summaryName(); }
 
   bool operator==(const EdgeSet &Other) const { return Edges == Other; }
 
