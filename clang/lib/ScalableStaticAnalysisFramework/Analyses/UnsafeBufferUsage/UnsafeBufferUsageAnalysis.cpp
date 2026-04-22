@@ -11,11 +11,11 @@
 // EntityPointerLevelSets
 //===----------------------------------------------------------------------===//
 
+#include "clang/ScalableStaticAnalysisFramework/Analyses/UnsafeBufferUsage/UnsafeBufferUsageAnalysis.h"
 #include "SSAFAnalysesCommon.h"
 #include "clang/ScalableStaticAnalysisFramework/Analyses/EntityPointerLevel/EntityPointerLevel.h"
 #include "clang/ScalableStaticAnalysisFramework/Analyses/EntityPointerLevel/EntityPointerLevelFormat.h"
 #include "clang/ScalableStaticAnalysisFramework/Analyses/UnsafeBufferUsage/UnsafeBufferUsage.h"
-#include "clang/ScalableStaticAnalysisFramework/Analyses/UnsafeBufferUsage/UnsafeBufferUsageAnalysis.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/Serialization/JSONFormat.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/WholeProgramAnalysis/AnalysisRegistry.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/WholeProgramAnalysis/SummaryAnalysis.h"
@@ -48,16 +48,17 @@ json::Object serializeUnsafeBufferUsageAnalysisResult(
 Expected<std::unique_ptr<AnalysisResult>>
 deserializeUnsafeBufferUsageAnalysisResult(
     const json::Object &Obj, JSONFormat::EntityIdFromJSONFn IdFromJSON) {
-  const json::Array *Content = Obj.getArray(UnsafeBufferUsageAnalysisResultName);
+  const json::Array *Content =
+      Obj.getArray(UnsafeBufferUsageAnalysisResultName);
 
   if (!Content)
     return makeSawButExpectedError(Obj, "an object with a key %s",
                                    UnsafeBufferUsageAnalysisResultName.data());
 
   if (Content->size() % 2 != 0)
-    return makeSawButExpectedError(
-        *Content, "an even number of elements, got %lu",
-        (unsigned long)Content->size());
+    return makeSawButExpectedError(*Content,
+                                   "an even number of elements, got %lu",
+                                   (unsigned long)Content->size());
 
   std::map<EntityId, EntityPointerLevelSet> UnsafeBuffers;
 
