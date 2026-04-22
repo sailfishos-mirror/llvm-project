@@ -311,19 +311,6 @@ public:
   /// any global mutex or cannot block the execution in another LLVM context.
   LLVM_ABI void yield();
 
-  /// Register a listener that will be notified whenever a Value in this
-  /// context is deleted. This is typically called from the
-  /// ValueDeletionListener constructor.
-  LLVM_ABI void addValueDeletionListener(ValueDeletionListener *L);
-
-  /// Remove a previously registered listener. This is typically called from
-  /// the ValueDeletionListener destructor.
-  LLVM_ABI void removeValueDeletionListener(ValueDeletionListener *L);
-
-  /// Notify all registered ValueDeletionListeners that \p V is being deleted.
-  /// Called from ~Value().
-  LLVM_ABI void notifyValueDeleted(Value *V);
-
   /// emitError - Emit an error message to the currently installed error handler
   /// with optional location information.  This function returns, so code should
   /// be prepared to drop the erroneous construct on the floor and "not crash".
@@ -377,6 +364,15 @@ private:
 
   /// removeModule - Unregister a module from this context.
   void removeModule(Module *);
+
+  // ValueDeletionListener registers/deregisters via its constructor/destructor.
+  friend class ValueDeletionListener;
+  // Value calls notifyValueDeleted from ~Value().
+  friend class Value;
+
+  LLVM_ABI void addValueDeletionListener(ValueDeletionListener *L);
+  LLVM_ABI void removeValueDeletionListener(ValueDeletionListener *L);
+  LLVM_ABI void notifyValueDeleted(Value *V);
 };
 
 // Create wrappers for C Binding types (see CBindingWrapping.h).

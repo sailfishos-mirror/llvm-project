@@ -11,8 +11,8 @@
 // an analysis that uses this as "a value handle to many values" — a single
 // registration replaces one handle per tracked value.
 //
-// Registration and unregistration happen automatically via RAII: the
-// constructor registers with an LLVMContext, and the destructor unregisters.
+// Registration and deregistration happen automatically via RAII: the
+// constructor registers with an LLVMContext, and the destructor deregisters.
 //
 //===----------------------------------------------------------------------===//
 
@@ -34,7 +34,7 @@ class Value;
 /// the point of registration.
 ///
 /// Lifetime is managed via RAII: the constructor registers with the
-/// LLVMContext, and the destructor unregisters.
+/// LLVMContext, and the destructor deregisters.
 class ValueDeletionListener {
 public:
   using CallbackT = void (*)(ValueDeletionListener *, const Value *);
