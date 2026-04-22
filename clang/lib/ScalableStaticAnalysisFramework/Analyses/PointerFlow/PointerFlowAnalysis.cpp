@@ -109,7 +109,7 @@ public:
                   const PointerFlowEntitySummary &Summary) override {
     auto EdgesOfEntity = getEdges(Summary);
 
-    getResult().Edges[Id] = EdgeSet(EdgesOfEntity.begin(), EdgesOfEntity.end());
+    this->getResult().Edges[Id] = EdgeSet(EdgesOfEntity.begin(), EdgesOfEntity.end());
     return llvm::Error::success();
   }
 };
@@ -185,7 +185,7 @@ class PointerFlowReachableAnalysis
 
       if (I != SubGraph.end()) {
         for (const auto &EPL : I->second) {
-          auto [Ignored, Inserted] = this->result().Reachables[Id].insert(EPL);
+          auto [Ignored, Inserted] = this->getResult().Reachables[Id].insert(EPL);
           if (Inserted)
             WorkList.push_back(&EPL);
         }
@@ -199,13 +199,13 @@ public:
   llvm::Error initialize(const PointerFlowAnalysisResult &Graph,
                          const AnalysisResultInPointerSet &Starter) override {
     this->Graph = &Graph.Edges;
-    assert(this->result().Reachables.empty());
-    this->result().Reachables.insert(Starter.begin(), Starter.end());
+    assert(this->getResult().Reachables.empty());
+    this->getResult().Reachables.insert(Starter.begin(), Starter.end());
     return llvm::Error::success();
   }
 
   llvm::Expected<bool> step() override {
-    auto &Reachables = this->result().Reachables;
+    auto &Reachables = this->getResult().Reachables;
     // Simple DFS:
     std::vector<EPLPtr> Worklist;
 
