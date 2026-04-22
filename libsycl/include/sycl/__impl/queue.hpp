@@ -323,13 +323,19 @@ private:
         std::decay_t<detail::nth_type_t<sizeof...(Rest) - 1, Rest...>>;
     using LambdaArgType = sycl::detail::lambda_arg_type<KernelType, item<Dims>>;
     static_assert(
-        std::is_convertible_v<sycl::item<Dims>, LambdaArgType>,
+        std::is_convertible_v<sycl::item<Dims>, LambdaArgType> ||
+            std::is_convertible_v<sycl::item<Dims, false>, LambdaArgType>,
         "Kernel argument of a sycl::parallel_for with sycl::range "
         "must be either sycl::item or be convertible from sycl::item");
+    using TranformedLambdaArgType = std::conditional_t<
+        std::is_convertible_v<item<Dims>, LambdaArgType>, item<Dims>,
+        std::conditional_t<
+            std::is_convertible_v<item<Dims, false>, LambdaArgType>,
+            item<Dims, false>, LambdaArgType>>;
 
     using NameT =
         typename detail::get_kernel_name_t<KernelName, KernelType>::name;
-    submitParallelFor<NameT, item<Dims>, KernelType>(rest...);
+    submitParallelFor<NameT, TranformedLambdaArgType, KernelType>(rest...);
     return getLastEvent();
   }
 
@@ -376,10 +382,7 @@ private:
   template <typename KernelName, typename ElementType, typename KernelType>
   _LIBSYCL_ENTRY_POINT_ATTR__(KernelName)
   void submitParallelFor(const KernelType &KernelFunc) {
-#ifdef __SYCL_DEVICE_ONLY__
     KernelFunc(detail::Builder::getElement(detail::declptr<ElementType>()));
-#endif
-    (void)KernelFunc;
   }
 #undef _LIBSYCL_ENTRY_POINT_ATTR__
 

@@ -18,9 +18,7 @@
 
 #include <sycl/__impl/detail/config.hpp>
 
-#ifdef __SYCL_DEVICE_ONLY__
-#  include <sycl/__spirv/spirv_vars.hpp>
-#endif
+#include <sycl/__spirv/spirv_vars.hpp>
 
 #include <type_traits>
 
@@ -121,7 +119,6 @@ class Builder {
 public:
   Builder() = delete;
 
-#ifdef __SYCL_DEVICE_ONLY__
   /// \return a global index of work item currently being operated on by device.
   template <int Dims> static const id<Dims> getElement(id<Dims> *) {
     static_assert(isValidDimensions<Dims>, "invalid dimensions");
@@ -181,8 +178,6 @@ public:
       -> decltype(getItem<Dims, WithOffset>()) {
     return getItem<Dims, WithOffset>();
   }
-
-#endif // __SYCL_DEVICE_ONLY__
 };
 
 } // namespace detail
