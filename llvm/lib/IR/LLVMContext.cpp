@@ -218,11 +218,14 @@ ValueDeletionListener::~ValueDeletionListener() {
 }
 
 void LLVMContext::addValueDeletionListener(ValueDeletionListener *L) {
-  pImpl->ValueDeletionListeners.insert(L);
+  assert(!llvm::is_contained(pImpl->ValueDeletionListeners, L) &&
+         "Listener already registered");
+  pImpl->ValueDeletionListeners.push_back(L);
 }
 
 void LLVMContext::removeValueDeletionListener(ValueDeletionListener *L) {
-  pImpl->ValueDeletionListeners.erase(L);
+  pImpl->ValueDeletionListeners.erase(
+      llvm::find(pImpl->ValueDeletionListeners, L));
 }
 
 void LLVMContext::notifyValueDeleted(Value *V) {

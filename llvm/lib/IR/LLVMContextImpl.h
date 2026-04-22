@@ -1751,7 +1751,7 @@ public:
   /// Context-level listeners notified when any Value in this context is
   /// deleted. Used by analyses that track Value pointers (e.g. UniformValues)
   /// to remove stale entries without per-value handle overhead.
-  SmallPtrSet<ValueDeletionListener *, 2> ValueDeletionListeners;
+  SmallVector<ValueDeletionListener *, 2> ValueDeletionListeners;
 
   /// CustomMDKindNames - Map to hold the metadata string to ID mapping.
   StringMap<unsigned> CustomMDKindNames;
