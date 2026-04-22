@@ -109,7 +109,8 @@ public:
                   const PointerFlowEntitySummary &Summary) override {
     auto EdgesOfEntity = getEdges(Summary);
 
-    this->getResult().Edges[Id] = EdgeSet(EdgesOfEntity.begin(), EdgesOfEntity.end());
+    this->getResult().Edges[Id] =
+        EdgeSet(EdgesOfEntity.begin(), EdgesOfEntity.end());
     return llvm::Error::success();
   }
 };
@@ -185,7 +186,8 @@ class PointerFlowReachableAnalysis
 
       if (I != SubGraph.end()) {
         for (const auto &EPL : I->second) {
-          auto [Ignored, Inserted] = this->getResult().Reachables[Id].insert(EPL);
+          auto [Ignored, Inserted] =
+              this->getResult().Reachables[Id].insert(EPL);
           if (Inserted)
             WorkList.push_back(&EPL);
         }
