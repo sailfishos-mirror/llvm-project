@@ -283,12 +283,6 @@ void TextOutputSection::finalize() {
     }
     return isTargetInRange(*callerIsec, *r);
   });
-  // Count the number of new thunks we will need to create
-  DenseSet<ThunkKey, ThunkMapKeyInfo> branchTargets;
-  for (auto [callerIsec, r, thunkKey] : branchesToProcess)
-    if (!getThunkInRange(*callerIsec, *r))
-      branchTargets.insert(thunkKey);
-  assert(numPendingThunkTargets == branchTargets.size());
 
   uint64_t estimatedTextEnd = addr + size + numPendingThunkTargets * thunkSize;
   uint64_t estimatedStubsEnd =
