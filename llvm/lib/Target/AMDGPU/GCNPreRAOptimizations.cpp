@@ -52,6 +52,16 @@ static cl::opt<bool>
                                         "MFMA in GCNPreRAOptimizations stage."),
                                cl::init(true));
 
+static cl::opt<bool>
+    EnableAntiHintsForVAVdst("amdgpu-anti-hints-for-va-vdst", cl::Hidden,
+                             cl::desc("Enable Anti-Hints for VA-VDST"),
+                             cl::init(false));
+
+static cl::opt<unsigned>
+    VAVDSTLookbackWindow("amdgpu-va-vdst-lookback-window", cl::Hidden,
+                         cl::desc("Lookback window for VA_VDST anti-hints"),
+                         cl::init(32));
+
 namespace {
 
 class GCNPreRAOptimizationsImpl {
@@ -422,6 +432,59 @@ bool GCNPreRAOptimizationsImpl::run(MachineFunction &MF) {
 
         updateHintSource(LastMFMAOrWMMA, MIMask, MI);
         updateHintSource(LastTRANS, MIMask, MI);
+      }
+    }
+  }
+
+  // On gfx1250 with sched.mode 2 enabled, the compiler must insert wait_alu
+  // va_vdst instructions between VALU and MEM instructions when there are WAR
+  // dependencies. Add anti-hints to try to avoid these WAR dependencies.
+  if (EnableAntiHintsForVAVdst && ST.hasGFX1250Insts()) {
+    const unsigned LookbackWindow = VAVDSTLookbackWindow;
+
+    for (const MachineBasicBlock &MBB : MF) {
+      SmallVector<Register, 64> RecentVALUSrcs;
+
+      for (const MachineInstr &MI : MBB) {
+        if (MI.isDebugInstr())
+          continue;
+
+        if (TII->isVALU(MI)) {
+          for (const MachineOperand &MO : MI.uses()) {
+            if (!MO.isReg() || !MO.getReg().isVirtual())
+              continue;
+            Register Reg = MO.getReg();
+            const TargetRegisterClass *RC = MRI->getRegClass(Reg);
+            if (TRI->hasVGPRs(RC)) {
+              if (!llvm::is_contained(RecentVALUSrcs, Reg)) {
+                RecentVALUSrcs.push_back(Reg);
+                if (RecentVALUSrcs.size() > LookbackWindow)
+                  RecentVALUSrcs.erase(RecentVALUSrcs.begin());
+              }
+            }
+          }
+        }
+
+        if ((TII->isDS(MI) || TII->isVMEM(MI)) && MI.mayLoad()) {
+          if (RecentVALUSrcs.empty())
+            continue;
+
+          for (const MachineOperand &MO : MI.defs()) {
+            if (!MO.isReg() || !MO.getReg().isVirtual())
+              continue;
+            Register DSDestReg = MO.getReg();
+            const TargetRegisterClass *RC = MRI->getRegClass(DSDestReg);
+            if (!TRI->hasVGPRs(RC))
+              continue;
+
+            for (Register VALUSrcReg : RecentVALUSrcs) {
+              if (VALUSrcReg == DSDestReg)
+                continue;
+              MRI->addRegAllocationAntiHints(DSDestReg, VALUSrcReg);
+              MRI->addRegAllocationAntiHints(VALUSrcReg, DSDestReg);
+            }
+          }
+        }
       }
     }
   }
