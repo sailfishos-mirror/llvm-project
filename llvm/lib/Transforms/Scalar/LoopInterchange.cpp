@@ -1589,17 +1589,19 @@ std::optional<const SCEV *> getAddRecCoefficient(ScalarEvolution &SE,
 }
 
 int LoopInterchangeProfitability::getInstrOrderCost() {
-  unsigned GoodOrder, BadOrder;
-  BadOrder = GoodOrder = 0;
+  // Map from the base pointer fo an acess to a pair of booleans indicating
+  // whether we find good or bad order.
+  DenseMap<const SCEV *, std::pair<bool, bool>> BasePtr2Score;
   for (BasicBlock *BB : InnerLoop->blocks()) {
     for (Instruction &Ins : *BB) {
       if (!isa<LoadInst, StoreInst>(&Ins))
         continue;
-      const SCEV *Ptr = SE->getSCEV(getLoadStorePointerOperand(&Ins));
+      const SCEV *Access = SE->getSCEV(getLoadStorePointerOperand(&Ins));
+      const SCEV *BasePtr = SE->getPointerBase(Access);
       std::optional<const SCEV *> OuterCoeff =
-          getAddRecCoefficient(*SE, Ptr, OuterLoop);
+          getAddRecCoefficient(*SE, Access, OuterLoop);
       std::optional<const SCEV *> InnerCoeff =
-          getAddRecCoefficient(*SE, Ptr, InnerLoop);
+          getAddRecCoefficient(*SE, Access, InnerLoop);
 
       if (!OuterCoeff.has_value() || !*OuterCoeff || !InnerCoeff.has_value() ||
           !*InnerCoeff)
@@ -1619,7 +1621,7 @@ int LoopInterchangeProfitability::getInstrOrderCost() {
         //   for(int j=0;j<N;j++)
         //     A[i][j] = A[i-1][j-1]+k;
         // then it is a good order.
-        GoodOrder++;
+        BasePtr2Score[BasePtr].first = true;
       } else if (SE->isKnownPredicate(ICmpInst::ICMP_SLT, OuterStep,
                                       InnerStep)) {
         // If we find the outer induction after an inner induction e.g.
@@ -1627,9 +1629,18 @@ int LoopInterchangeProfitability::getInstrOrderCost() {
         //   for(int j=0;j<N;j++)
         //     A[j][i] = A[j-1][i-1]+k;
         // then it is a bad order.
-        BadOrder++;
+        BasePtr2Score[BasePtr].second = true;
       }
     }
+  }
+
+  int GoodOrder = 0, BadOrder = 0;
+  for (const auto &[BasePtr, Score] : BasePtr2Score) {
+    auto [Good, Bad] = Score;
+    if (Good)
+      GoodOrder++;
+    if (Bad)
+      BadOrder++;
   }
   return GoodOrder - BadOrder;
 }
