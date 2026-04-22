@@ -32,6 +32,7 @@
 #include "clang/CIR/Dialect/IR/CIRTypes.h"
 #include "clang/CIR/Interfaces/CIROpInterfaces.h"
 #include "clang/CIR/MissingFeatures.h"
+#include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringRef.h"
 
 #include "CIRGenFunctionInfo.h"
@@ -698,6 +699,78 @@ void CIRGenModule::setCommonAttributes(GlobalDecl gd, mlir::Operation *gv) {
   }
 }
 
+/// Get the feature delta from the default feature map for the given target CPU.
+static std::vector<std::string>
+getFeatureDeltaFromDefault(const CIRGenModule &cgm, llvm::StringRef targetCPU,
+                           llvm::StringMap<bool> &featureMap) {
+  llvm::StringMap<bool> defaultFeatureMap;
+  cgm.getTarget().initFeatureMap(
+      defaultFeatureMap, cgm.getASTContext().getDiagnostics(), targetCPU, {});
+
+  std::vector<std::string> delta;
+  for (const auto &[k, v] : featureMap) {
+    auto defaultIt = defaultFeatureMap.find(k);
+    if (defaultIt == defaultFeatureMap.end() || defaultIt->getValue() != v)
+      delta.push_back((v ? "+" : "-") + k.str());
+  }
+
+  return delta;
+}
+
+bool CIRGenModule::getCPUAndFeaturesAttributes(
+    GlobalDecl gd, llvm::StringMap<std::string> &attrs,
+    bool setTargetFeatures) {
+  // Add target-cpu and target-features attributes to functions. If
+  // we have a decl for the function and it has a target attribute then
+  // parse that and add it to the feature set.
+  llvm::StringRef targetCPU = getTarget().getTargetOpts().CPU;
+  llvm::StringRef tuneCPU = getTarget().getTargetOpts().TuneCPU;
+  std::vector<std::string> features;
+  const auto *fd = dyn_cast_or_null<FunctionDecl>(gd.getDecl());
+  fd = fd ? fd->getMostRecentDecl() : fd;
+  const auto *td = fd ? fd->getAttr<TargetAttr>() : nullptr;
+  const auto *tv = fd ? fd->getAttr<TargetVersionAttr>() : nullptr;
+  assert((!td || !tv) && "both target_version and target specified");
+  const auto *sd = fd ? fd->getAttr<CPUSpecificAttr>() : nullptr;
+  const auto *tc = fd ? fd->getAttr<TargetClonesAttr>() : nullptr;
+  bool addedAttr = false;
+  if (td || tv || sd || tc) {
+    assert(!cir::MissingFeatures::opFuncMultiVersioning());
+  } else {
+    // Just add the existing target cpu and target features to the function.
+    if (setTargetFeatures && getTarget().getTriple().isAMDGPU()) {
+      llvm::StringMap<bool> featureMap;
+      if (fd)
+        astContext.getFunctionFeatureMap(featureMap, gd);
+      else
+        getTarget().initFeatureMap(featureMap, astContext.getDiagnostics(),
+                                   targetCPU,
+                                   getTarget().getTargetOpts().Features);
+      features = getFeatureDeltaFromDefault(*this, targetCPU, featureMap);
+    } else {
+      features = getTarget().getTargetOpts().Features;
+    }
+  }
+
+  if (!targetCPU.empty()) {
+    attrs["cir.target-cpu"] = targetCPU.str();
+    addedAttr = true;
+  }
+  if (!tuneCPU.empty()) {
+    attrs["cir.tune-cpu"] = tuneCPU.str();
+    addedAttr = true;
+  }
+  if (!features.empty() && setTargetFeatures) {
+    llvm::erase_if(features, [&](const std::string &f) {
+      return getTarget().isReadOnlyFeature(f.substr(1));
+    });
+    llvm::sort(features);
+    attrs["cir.target-features"] = llvm::join(features, ",");
+    addedAttr = true;
+  }
+  return addedAttr;
+}
+
 void CIRGenModule::setNonAliasAttributes(GlobalDecl gd, mlir::Operation *op) {
   setCommonAttributes(gd, op);
 
@@ -708,12 +781,18 @@ void CIRGenModule::setNonAliasAttributes(GlobalDecl gd, mlir::Operation *op) {
         gvi.setSection(builder.getStringAttr(sa->getName()));
       if (d->hasAttr<RetainAttr>())
         addUsedGlobal(gvi);
+
+      if (auto func = dyn_cast<cir::FuncOp>(op)) {
+        llvm::StringMap<std::string> attrs;
+        if (getCPUAndFeaturesAttributes(gd, attrs)) {
+          for (const auto &[key, val] : attrs)
+            func->setAttr(key, builder.getStringAttr(val));
+        }
+      }
     }
   }
 
   assert(!cir::MissingFeatures::opGlobalPragmaClangSection());
-  assert(!cir::MissingFeatures::opFuncCPUAndFeaturesAttributes());
-
   getTargetCIRGenInfo().setTargetAttributes(gd.getDecl(), op, *this);
 }
 
