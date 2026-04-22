@@ -106,7 +106,7 @@ public:
                   const UnsafeBufferUsageEntitySummary &Summary) override {
     auto UnsafeBuffersOfEntity = getUnsafeBuffers(Summary);
 
-    result().UnsafeBuffers[Id] = EntityPointerLevelSet(
+    getResult().UnsafeBuffers[Id] = EntityPointerLevelSet(
         UnsafeBuffersOfEntity.begin(), UnsafeBuffersOfEntity.end());
     return llvm::Error::success();
   }
