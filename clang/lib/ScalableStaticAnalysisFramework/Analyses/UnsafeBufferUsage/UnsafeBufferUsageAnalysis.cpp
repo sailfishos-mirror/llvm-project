@@ -11,11 +11,11 @@
 // EntityPointerLevelSets
 //===----------------------------------------------------------------------===//
 
+#include "clang/ScalableStaticAnalysisFramework/Analyses/UnsafeBufferUsage/UnsafeBufferUsageAnalysis.h"
 #include "SSAFAnalysesCommon.h"
 #include "clang/ScalableStaticAnalysisFramework/Analyses/EntityPointerLevel/EntityPointerLevel.h"
 #include "clang/ScalableStaticAnalysisFramework/Analyses/EntityPointerLevel/EntityPointerLevelFormat.h"
 #include "clang/ScalableStaticAnalysisFramework/Analyses/UnsafeBufferUsage/UnsafeBufferUsage.h"
-#include "clang/ScalableStaticAnalysisFramework/Analyses/UnsafeBufferUsage/UnsafeBufferUsageAnalysis.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/Serialization/JSONFormat.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/WholeProgramAnalysis/AnalysisRegistry.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/WholeProgramAnalysis/SummaryAnalysis.h"
@@ -72,7 +72,7 @@ public:
                   const UnsafeBufferUsageEntitySummary &Summary) override {
     auto UnsafeBuffersOfEntity = getUnsafeBuffers(Summary);
 
-    result().UnsafeBuffers[Id] = EntityPointerLevelSet(
+    getResult().UnsafeBuffers[Id] = EntityPointerLevelSet(
         UnsafeBuffersOfEntity.begin(), UnsafeBuffersOfEntity.end());
     return llvm::Error::success();
   }

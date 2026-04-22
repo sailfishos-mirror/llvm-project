@@ -18,7 +18,6 @@
 #include "clang/ScalableStaticAnalysisFramework/Core/WholeProgramAnalysis/AnalysisRegistry.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/WholeProgramAnalysis/DerivedAnalysis.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/WholeProgramAnalysis/SummaryAnalysis.h"
-#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/STLFunctionalExtras.h"
 #include "llvm/ADT/iterator_range.h"
 #include "llvm/Support/Error.h"
@@ -63,7 +62,7 @@ Expected<std::unique_ptr<AnalysisResult>> deserializePointerFlowAnalysisResult(
   if (Content->size() % 2 != 0)
     return makeSawButExpectedError(*Content,
                                    "an even number of elements, got %lu",
-                                   static_cast<unsigned long>(Content->size()));
+                                   static_cast<size_t>(Content->size()));
 
   std::map<EntityId, EdgeSet> Edges;
 
@@ -110,7 +109,7 @@ public:
                   const PointerFlowEntitySummary &Summary) override {
     auto EdgesOfEntity = getEdges(Summary);
 
-    result().Edges[Id] = EdgeSet(EdgesOfEntity.begin(), EdgesOfEntity.end());
+    getResult().Edges[Id] = EdgeSet(EdgesOfEntity.begin(), EdgesOfEntity.end());
     return llvm::Error::success();
   }
 };

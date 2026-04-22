@@ -17,8 +17,12 @@
 #include "clang/AST/Decl.h"
 #include "llvm/Support/JSON.h"
 
+namespace clang::ssaf {
+///\return a short descriptions of a json::Value
 std::string describeJSONValue(const llvm::json::Value &V);
+///\return a short descriptions of a json::Array
 std::string describeJSONValue(const llvm::json::Array &A);
+///\return a short descriptions of a json::Object
 std::string describeJSONValue(const llvm::json::Object &O);
 
 template <typename NodeTy, typename... Ts>
@@ -43,20 +47,19 @@ template <typename DeclOrExpr> bool hasPtrOrArrType(const DeclOrExpr *E) {
       E->getType().getCanonicalType());
 }
 
-inline llvm::Error makeEntityNameErr(clang::ASTContext &Ctx,
-                                     const clang::NamedDecl *D) {
-  return makeErrAtNode(Ctx, D, "failed to create entity name for %s",
-                       D->getNameAsString().c_str());
-}
-
-namespace clang::ssaf {
+llvm::Error makeEntityNameErr(clang::ASTContext &Ctx,
+                              const clang::NamedDecl *D);
 
 /// Find all contributors in an AST.
 void findContributors(ASTContext &Ctx,
                       std::vector<const NamedDecl *> &Contributors);
-/// Perform `MatchAction` on each Stmt and Decl belonging to the `Contributor`.
-void findMatchesIn(const NamedDecl *Contributor,
-                   llvm::function_ref<void(const DynTypedNode &)> MatchAction);
+
+/// Perform "MatchAction" on each Stmt and Decl belonging to the `Contributor`.
+/// \param Contributor
+/// \param MatchActionRef a reference (view) to a "MatchAction"
+void findMatchesIn(
+    const NamedDecl *Contributor,
+    llvm::function_ref<void(const DynTypedNode &)> MatchActionRef);
 
 } // namespace clang::ssaf
 
