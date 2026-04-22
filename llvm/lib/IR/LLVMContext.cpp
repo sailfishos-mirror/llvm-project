@@ -225,6 +225,11 @@ void LLVMContext::removeValueDeletionListener(ValueDeletionListener *L) {
   pImpl->ValueDeletionListeners.erase(L);
 }
 
+void LLVMContext::notifyValueDeleted(Value *V) {
+  for (ValueDeletionListener *L : pImpl->ValueDeletionListeners)
+    L->valueDeleted(V);
+}
+
 void LLVMContext::emitError(const Twine &ErrorStr) {
   diagnose(DiagnosticInfoGeneric(ErrorStr));
 }

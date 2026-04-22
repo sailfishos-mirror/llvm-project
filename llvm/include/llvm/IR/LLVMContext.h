@@ -37,6 +37,7 @@ template <typename T> class SmallVectorImpl;
 template <typename T> class StringMapEntry;
 class StringRef;
 class Twine;
+class Value;
 class LLVMRemarkStreamer;
 
 namespace remarks {
@@ -318,6 +319,10 @@ public:
   /// Remove a previously registered listener. This is typically called from
   /// the ValueDeletionListener destructor.
   LLVM_ABI void removeValueDeletionListener(ValueDeletionListener *L);
+
+  /// Notify all registered ValueDeletionListeners that \p V is being deleted.
+  /// Called from ~Value().
+  LLVM_ABI void notifyValueDeleted(Value *V);
 
   /// emitError - Emit an error message to the currently installed error handler
   /// with optional location information.  This function returns, so code should
