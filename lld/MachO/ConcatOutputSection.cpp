@@ -118,7 +118,6 @@ void TextOutputSection::finalize() {
   size_t thunkSize = target->thunkSize;
   size_t thunkCallCount = 0;
   size_t thunkCount = 0;
-  DenseSet<uint64_t> residentThunkPages;
 
   auto isTargetInRange = [&](const ConcatInputSection &isec,
                              const Relocation &r) -> bool {
@@ -194,10 +193,6 @@ void TextOutputSection::finalize() {
     ++thunkCallCount;
     finalizeOne(thunkInfo.isec);
     thunks.push_back(thunkInfo.isec);
-    uint64_t thunkFirstByte = thunkInfo.isec->getVA();
-    uint64_t thunkLastByte = thunkFirstByte + thunkInfo.isec->getSize() - 1;
-    residentThunkPages.insert(thunkFirstByte / target->getPageSize());
-    residentThunkPages.insert(thunkLastByte / target->getPageSize());
     ++thunkCount;
   };
 
@@ -308,8 +303,7 @@ void TextOutputSection::finalize() {
 
   if (thunkCount)
     log("Created " + Twine(thunkCount) + " (" +
-        Twine(thunkCount * thunkSize / 1024) + " KB) thunks residing in " +
-        Twine(residentThunkPages.size()) + " pages and updated " +
+        Twine(thunkCount * thunkSize / 1024) + " KB) thunks and updated " +
         Twine(thunkCallCount) + " branch targets");
 }
 
