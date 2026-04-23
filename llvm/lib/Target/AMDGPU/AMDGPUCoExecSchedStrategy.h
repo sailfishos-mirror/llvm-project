@@ -106,9 +106,9 @@ private:
 public:
   HardwareUnitInfo() {}
 
-  unsigned size() { return AllSUs.size(); }
+  unsigned size() const { return AllSUs.size(); }
 
-  unsigned getTotalCycles() { return TotalCycles; }
+  unsigned getTotalCycles() const { return TotalCycles; }
 
   void setType(unsigned TheType) {
     assert(TheType < (unsigned)AMDGPU::InstructionFlavor::NUM_FLAVORS);
@@ -229,6 +229,66 @@ struct WindowSlotDemand {
 };
 
 //===----------------------------------------------------------------------===//
+// Coexec Window
+//===----------------------------------------------------------------------===//
+
+/// Tracks the lifecycle of a co-execution window produced by a multi-cycle
+/// instruction (WMMA, TRANS, MultiCycleVALU).
+///
+/// Window lifecycle (top-down scheduling):
+///   Unpopulated → Populated (demand computed from template)
+///                → Active   (producer scheduled, StartCycle/EndCycle set)
+///                → Expired  (SU->TopReadyCycle >= EndCycle → rotate)
+///
+/// The scheduler maintains two windows: CurrentWindow and NextWindow.
+/// When CurrentWindow is active and its demand is satisfied, TargetWindow
+/// switches to NextWindow so the scheduler prepares fillers for the upcoming
+/// producer while the current one executes.
+struct CoexecWindow {
+  /// The flavor of the instruction that produces this window.
+  AMDGPU::InstructionFlavor ProducerFlavor = AMDGPU::InstructionFlavor::Other;
+  /// Template-derived slot demand for this window.
+  WindowSlotDemand Demand;
+  /// Cycle at which the producer was scheduled (top-down).
+  unsigned StartCycle = 0;
+  /// Cycle at which the window expires (StartCycle + latency - 1).
+  unsigned EndCycle = 0;
+  /// Whether this window has been populated with demand info.
+  bool IsPopulated = false;
+  /// Whether the producer has been scheduled (window is "open").
+  bool IsActive = false;
+
+  void clear() {
+    ProducerFlavor = AMDGPU::InstructionFlavor::Other;
+    Demand = WindowSlotDemand();
+    StartCycle = 0;
+    EndCycle = 0;
+    IsPopulated = false;
+    IsActive = false;
+  }
+
+  /// Populate this window from the best available producer in the region.
+  /// If \p PreferredFlavor is a window producer, use that flavor directly.
+  /// Otherwise, select the producer with the highest resource pressure.
+  void populate(AMDGPU::InstructionFlavor PreferredFlavor,
+                const SmallVectorImpl<HardwareUnitInfo> &HWUInfo,
+                const WindowSlotDemand &RegionDemand);
+
+  /// Check if the window has expired given the current \p Cycle.
+  bool isExpired(unsigned Cycle) const {
+    return IsActive && Cycle >= EndCycle;
+  }
+
+  /// Activate the window: the producer has been scheduled at \p Cycle with
+  /// the given \p Latency.
+  void activate(unsigned Cycle, unsigned Latency) {
+    IsActive = true;
+    StartCycle = Cycle;
+    EndCycle = Cycle + Latency - 1;
+  }
+};
+
+//===----------------------------------------------------------------------===//
 // Region Mix Info
 //===----------------------------------------------------------------------===//
 
@@ -277,6 +337,10 @@ protected:
   /// Region-aggregate slot demand averaged across all WMMAs. Used as fallback
   /// when no specific WMMA candidate is in the current comparison.
   WindowSlotDemand RegionSlotDemand;
+  /// Current co-execution window being filled/active.
+  CoexecWindow CurrentWindow;
+  /// Next window — populated for lookahead when CurrentWindow is satisfied.
+  CoexecWindow NextWindow;
 
   /// Walk over the region and collect characteristics for the various
   /// heuristics.
@@ -327,7 +391,8 @@ public:
   HardwareUnitInfo *getHWUIFromFlavor(AMDGPU::InstructionFlavor Flavor);
 
   /// Update the state to reflect that \p SU is going to be scheduled.
-  void updateForScheduling(SUnit *SU);
+  /// \p Zone provides cycle information for window lifecycle management.
+  void updateForScheduling(SUnit *SU, SchedBoundary *Zone);
 
   /// Sort the HWUInfo vector. After sorting, the HardwareUnits that are highest
   /// priority are first. Priority is determined by maximizing coexecution and

@@ -205,6 +205,45 @@ WindowSlotDemand::getMostDeficientFlavor(const RegionMixInfo &Mix) const {
   return InstructionFlavor::SingleCycleVALU;
 }
 
+//===----------------------------------------------------------------------===//
+// CoexecWindow
+//===----------------------------------------------------------------------===//
+
+void CoexecWindow::populate(InstructionFlavor PreferredFlavor,
+                            const SmallVectorImpl<HardwareUnitInfo> &HWUInfo,
+                            const WindowSlotDemand &RegionDemand) {
+  clear();
+
+  // If the preferred flavor is a window producer, use it directly.
+  for (const auto &HWUI : HWUInfo) {
+    if (HWUI.producesCoexecWindow() && HWUI.getType() == PreferredFlavor &&
+        HWUI.size() > 0) {
+      ProducerFlavor = PreferredFlavor;
+      // For WMMA, we could compute per-instruction demand, but at populate
+      // time we don't have a specific SUnit yet. Use region-aggregate demand.
+      Demand = RegionDemand;
+      IsPopulated = Demand.hasSlots();
+      return;
+    }
+  }
+
+  // Otherwise, select the producer with highest resource pressure.
+  unsigned BestCycles = 0;
+  for (const auto &HWUI : HWUInfo) {
+    if (!HWUI.producesCoexecWindow() || HWUI.size() == 0)
+      continue;
+    if (HWUI.getTotalCycles() > BestCycles) {
+      BestCycles = HWUI.getTotalCycles();
+      ProducerFlavor = HWUI.getType();
+    }
+  }
+
+  if (BestCycles > 0) {
+    Demand = RegionDemand;
+    IsPopulated = Demand.hasSlots();
+  }
+}
+
 SUnit *HardwareUnitInfo::getNextTargetSU(bool LookDeep) const {
   for (auto *PrioritySU : PrioritySUs) {
     if (!PrioritySU->isTopReady())
@@ -364,14 +403,40 @@ unsigned CandidateHeuristics::getHWUICyclesForMI(MachineInstr *MI) {
   return getMaxBlockingCycles(SchedModel->resolveSchedClass(MI), MI);
 }
 
-void CandidateHeuristics::updateForScheduling(SUnit *SU) {
+void CandidateHeuristics::updateForScheduling(SUnit *SU,
+                                              SchedBoundary *Zone) {
   auto Flavor = classifyFlavor(*SU->getInstr(), *SII);
+  unsigned Latency = getHWUICyclesForSU(SU);
   HardwareUnitInfo *HWUI = getHWUIFromFlavor(Flavor);
   assert(HWUI);
-  HWUI->markScheduled(SU, getHWUICyclesForSU(SU));
+  HWUI->markScheduled(SU, Latency);
   MixInfo.recordScheduled(Flavor);
   // Mix snapshot is now stale; tryShadowMix will refresh on its next call.
   MixInfo.invalidate();
+
+  // --- Window lifecycle management (bumpNode) ---
+
+  // Check if the current window has expired.
+  if (CurrentWindow.isExpired(SU->TopReadyCycle)) {
+    CurrentWindow.clear();
+    // Try to populate a new current window.
+    CoexecWindow Temp;
+    Temp.populate(InstructionFlavor::Other, HWUInfo, RegionSlotDemand);
+    if (Temp.IsPopulated) {
+      CurrentWindow = Temp;
+      NextWindow.clear();
+    }
+  }
+
+  // If the scheduled instruction matches the current window's producer,
+  // activate the window.
+  if (CurrentWindow.IsPopulated && !CurrentWindow.IsActive &&
+      HWUI->producesCoexecWindow() && Flavor == CurrentWindow.ProducerFlavor) {
+    CurrentWindow.activate(SU->TopReadyCycle, std::max(Latency, 1u));
+    LLVM_DEBUG(dbgs() << "CoexecWindow: activated " << getFlavorName(Flavor)
+                      << " window [" << CurrentWindow.StartCycle << ", "
+                      << CurrentWindow.EndCycle << "]\n");
+  }
 }
 
 void CandidateHeuristics::initialize(ScheduleDAGMI *SchedDAG,
@@ -398,6 +463,8 @@ void CandidateHeuristics::initialize(ScheduleDAGMI *SchedDAG,
 
   collectRegionSummary();
   MixInfo.reset();
+  CurrentWindow.clear();
+  NextWindow.clear();
 
   // Compute region-aggregate slot demand from WMMA templates.
   RegionSlotDemand = WindowSlotDemand();
@@ -426,6 +493,14 @@ void CandidateHeuristics::initialize(ScheduleDAGMI *SchedDAG,
              << RegionSlotDemand.ESlots << " E-slots, "
              << RegionSlotDemand.VSlots << " V-slots (avg over "
              << WMMACount << " WMMAs)\n";
+  });
+
+  // Populate the initial window for the first producer.
+  CurrentWindow.populate(InstructionFlavor::Other, HWUInfo, RegionSlotDemand);
+  LLVM_DEBUG({
+    if (CurrentWindow.IsPopulated)
+      dbgs() << "  Initial window: producer="
+             << getFlavorName(CurrentWindow.ProducerFlavor) << "\n";
   });
 }
 
@@ -977,8 +1052,8 @@ bool CandidateHeuristics::tryShadowMix(
   }
 
   // ---- Compute template-derived demand ----
-  // If a producer is being compared, use its specific CoExecInfo; otherwise
-  // fall back to the region-aggregate demand.
+  // Use the window's demand if populated; otherwise compute from the
+  // producer's CoExecInfo template or fall back to region-aggregate demand.
   WindowSlotDemand Demand = RegionSlotDemand;
   SUnit *ProducerSU = nullptr;
   if (CandIsProducer)
@@ -986,7 +1061,20 @@ bool CandidateHeuristics::tryShadowMix(
   else if (TryCandIsProducer)
     ProducerSU = TryCand.SU;
 
-  if (ProducerSU) {
+  // Select the TargetWindow for demand checking. When CurrentWindow is
+  // active and satisfied, switch to NextWindow for lookahead.
+  CoexecWindow *TargetWindow = &CurrentWindow;
+  if (CurrentWindow.IsActive && CurrentWindow.Demand.isSatisfied(MixInfo)) {
+    // Populate NextWindow if needed.
+    if (!NextWindow.IsPopulated)
+      NextWindow.populate(InstructionFlavor::Other, HWUInfo, RegionSlotDemand);
+    if (NextWindow.IsPopulated)
+      TargetWindow = &NextWindow;
+  }
+
+  if (TargetWindow->IsPopulated) {
+    Demand = TargetWindow->Demand;
+  } else if (ProducerSU) {
     auto ProducerFlavor = classifyFlavor(*ProducerSU->getInstr(), *SII);
     if (ProducerFlavor == InstructionFlavor::WMMA)
       Demand = WindowSlotDemand::fromCoExecInfo(
@@ -1143,7 +1231,7 @@ void AMDGPUCoExecSchedStrategy::initialize(ScheduleDAGMI *DAG) {
 }
 
 void AMDGPUCoExecSchedStrategy::schedNode(SUnit *SU, bool IsTopNode) {
-  Heurs.updateForScheduling(SU);
+  Heurs.updateForScheduling(SU, &Top);
   GCNSchedStrategy::schedNode(SU, IsTopNode);
 }
 
