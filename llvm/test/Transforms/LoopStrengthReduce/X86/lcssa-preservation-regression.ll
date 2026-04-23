@@ -70,14 +70,17 @@ define void @regression2() {
 ; CHECK-NEXT:    [[ADD4]] = add i32 [[PHI]], 1
 ; CHECK-NEXT:    br i1 false, label %[[LOOP1_LATCH1]], label %[[LOOP1_LATCH3SPLIT:.*]]
 ; CHECK:       [[LOOP1_LATCH3SPLIT]]:
-; CHECK-NEXT:    [[ADD_LCSSA:%.*]] = phi i32 [ [[ADD]], %[[LOOP1_LATCH2]] ]
+; CHECK-NEXT:    [[PHI6_PH:%.*]] = phi i32 [ [[ADD]], %[[LOOP1_LATCH2]] ]
+; CHECK-NEXT:    [[PHI7_PH:%.*]] = phi i32 [ 0, %[[LOOP1_LATCH2]] ]
 ; CHECK-NEXT:    br label %[[LOOP1_LATCH3:.*]]
 ; CHECK:       [[LOOP1_LATCH1_LOOP1_LATCH3_CRIT_EDGE]]:
 ; CHECK-NEXT:    [[PHI_LCSSA:%.*]] = phi i32 [ [[PHI]], %[[LOOP1_LATCH1]] ]
+; CHECK-NEXT:    [[SPLIT:%.*]] = phi i32 [ 0, %[[LOOP1_LATCH1]] ]
+; CHECK-NEXT:    [[SPLIT1:%.*]] = phi i32 [ [[PHI]], %[[LOOP1_LATCH1]] ]
 ; CHECK-NEXT:    br label %[[LOOP1_LATCH3]]
 ; CHECK:       [[LOOP1_LATCH3]]:
-; CHECK-NEXT:    [[PHI6:%.*]] = phi i32 [ 0, %[[LOOP1_LATCH1_LOOP1_LATCH3_CRIT_EDGE]] ], [ [[ADD_LCSSA]], %[[LOOP1_LATCH3SPLIT]] ]
-; CHECK-NEXT:    [[PHI7:%.*]] = phi i32 [ [[PHI_LCSSA]], %[[LOOP1_LATCH1_LOOP1_LATCH3_CRIT_EDGE]] ], [ 0, %[[LOOP1_LATCH3SPLIT]] ]
+; CHECK-NEXT:    [[PHI6:%.*]] = phi i32 [ [[SPLIT]], %[[LOOP1_LATCH1_LOOP1_LATCH3_CRIT_EDGE]] ], [ [[PHI6_PH]], %[[LOOP1_LATCH3SPLIT]] ]
+; CHECK-NEXT:    [[PHI7:%.*]] = phi i32 [ [[PHI_LCSSA]], %[[LOOP1_LATCH1_LOOP1_LATCH3_CRIT_EDGE]] ], [ [[PHI7_PH]], %[[LOOP1_LATCH3SPLIT]] ]
 ; CHECK-NEXT:    br label %[[LOOP1_HEADER_BACKEDGE]]
 ;
 entry:
@@ -111,10 +114,10 @@ define i64 @regression3() {
 ; CHECK-NEXT:    [[ASHR:%.*]] = ashr i64 0, 1
 ; CHECK-NEXT:    br label %[[LOOP2_HEADER:.*]]
 ; CHECK:       [[FUNCEXITSPLIT:.*]]:
-; CHECK-NEXT:    [[PHI6_LCSSA:%.*]] = phi i64 [ [[PHI6:%.*]], %[[LOOP1_HEADER:.*]] ]
+; CHECK-NEXT:    [[PHI_PH:%.*]] = phi i64 [ [[PHI6:%.*]], %[[LOOP1_HEADER:.*]] ]
 ; CHECK-NEXT:    br label %[[FUNCEXIT:.*]]
 ; CHECK:       [[FUNCEXIT]]:
-; CHECK-NEXT:    [[PHI:%.*]] = phi i64 [ [[ASHR]], %[[LOOP1_LATCH_FUNCEXIT_CRIT_EDGE:.*]] ], [ [[PHI6_LCSSA]], %[[FUNCEXITSPLIT]] ]
+; CHECK-NEXT:    [[PHI:%.*]] = phi i64 [ [[ASHR]], %[[LOOP1_LATCH_FUNCEXIT_CRIT_EDGE:.*]] ], [ [[PHI_PH]], %[[FUNCEXITSPLIT]] ]
 ; CHECK-NEXT:    ret i64 [[PHI]]
 ; CHECK:       [[LOOP2_HEADER]]:
 ; CHECK-NEXT:    [[LSR_IV:%.*]] = phi i64 [ [[LSR_IV_NEXT:%.*]], %[[LOOP2_LATCH:.*]] ], [ [[ASHR]], %[[ENTRY]] ]
@@ -131,6 +134,7 @@ define i64 @regression3() {
 ; CHECK:       [[LOOP1_LATCH]]:
 ; CHECK-NEXT:    br i1 false, label %[[LOOP1_LATCH_FUNCEXIT_CRIT_EDGE]], label %[[LOOP1_HEADER]]
 ; CHECK:       [[LOOP1_LATCH_FUNCEXIT_CRIT_EDGE]]:
+; CHECK-NEXT:    [[SPLIT:%.*]] = phi i64 [ [[ASHR]], %[[LOOP1_LATCH]] ]
 ; CHECK-NEXT:    br label %[[FUNCEXIT]]
 ;
 entry:
