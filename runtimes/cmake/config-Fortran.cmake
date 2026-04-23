@@ -261,7 +261,15 @@ function (flang_module_target tgtname)
         Fortran_MODULE_DIRECTORY "${RUNTIMES_OUTPUT_RESOURCE_MOD_DIR}"
     )
   else ()
-    # Keep non-public modules where CMake would put them normally;
-    # Modules of different target must not overwrite each other.
+    # Modules of different targets must not overwrite each other.
+    # Ideally, we would use $<TARGET_PROPERTY:${tgtname},BINARY_DIR> but
+    # Fortran_MODULE_DIRECTORY does not support generator expressions.
+    # Not defining Fortran_MODULE_DIRECTORY at all would but it into
+    # ${CMAKE_CURRENT_BINARY_DIR} where modules with the same name but compiled
+    # by different targets would clash.
+    set_target_properties(${tgtname}
+      PROPERTIES
+        Fortran_MODULE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/${tgtname}.dir/${CMAKE_CFG_INTDIR}"
+    )
   endif ()
 endfunction ()
