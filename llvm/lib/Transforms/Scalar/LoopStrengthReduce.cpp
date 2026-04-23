@@ -5908,7 +5908,8 @@ void LSRInstance::RewriteForPHI(PHINode *PN, const LSRUse &LU,
                 SplitCriticalEdge(BB, Parent,
                                   CriticalEdgeSplittingOptions(&DT, &LI, MSSAU)
                                       .setMergeIdenticalEdges()
-                                      .setKeepOneInputPHIs());
+                                      .setKeepOneInputPHIs()
+                                      .setPreserveLCSSA());
           } else {
             SmallVector<BasicBlock*, 2> NewBBs;
             DomTreeUpdater DTU(DT, DomTreeUpdater::UpdateStrategy::Eager);
@@ -5929,20 +5930,6 @@ void LSRInstance::RewriteForPHI(PHINode *PN, const LSRUse &LU,
             e = PN->getNumIncomingValues();
             BB = NewBB;
             i = PN->getBasicBlockIndex(BB);
-
-            for (Instruction &I : *Parent) {
-              if (!isa<PHINode>(I))
-                continue;
-              for (const Use &U : cast<PHINode>(I).incoming_values()) {
-                if (!isa<Instruction>(U.get()))
-                  continue;
-                if (LI.getLoopFor(cast<Instruction>(U.get())->getParent())) {
-                  // This phi node references a value inside the loop. We will need
-                  // to update LCSSA maybe.
-                  InsertedNonLCSSAInsts.insert(cast<Instruction>(U.get()));
-                }
-              }
-            }
 
             needUpdateFixups = true;
           }
