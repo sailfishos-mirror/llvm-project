@@ -90,7 +90,9 @@ GCNHazardRecognizer::GCNHazardRecognizer(
       TII(*ST.getInstrInfo()), TRI(TII.getRegisterInfo()),
       TSchedModel(TII.getSchedModel()), MLI(MLI),
       ClauseUses(TRI.getNumRegUnits()), ClauseDefs(TRI.getNumRegUnits()) {
-  MaxLookAhead = MF.getRegInfo().isPhysRegUsed(AMDGPU::AGPR0) ? 19 : 5;
+  MaxLookAhead = MF.getRegInfo().isPhysRegUsed(AMDGPU::AGPR0) ? 19
+                 : ST.hasGFX1250Insts()                       ? 16
+                                                              : 5;
   RunLdsBranchVmemWARHazardFixup = shouldRunLdsBranchVmemWARHazardFixup(MF, ST);
   LLVM_DEBUG_HR({
     if (isPreRA())
@@ -520,6 +522,103 @@ static unsigned getHWReg(const SIInstrInfo *TII, const MachineInstr &RegInstr) {
   return std::get<0>(AMDGPU::Hwreg::HwregEncoding::decode(RegOp->getImm()));
 }
 
+/// Check if \p MI is a VALU instruction that uses an SGPR operand.
+static bool isVALUWithSGPR(const MachineInstr &MI,
+                           const MachineRegisterInfo &MRI,
+                           const SIRegisterInfo &TRI) {
+  if (!SIInstrInfo::isVALU(MI))
+    return false;
+
+  for (const MachineOperand &Op : MI.operands()) {
+    if (!Op.isReg() || !Op.isUse())
+      continue;
+
+    Register Reg = Op.getReg();
+    if (Reg.isPhysical())
+      continue;
+
+    auto RC = MRI.getRegClass(Reg);
+    if (TRI.isSGPRClass(RC))
+      return true;
+  }
+  return false;
+}
+
+/// Check if \p MI is a VALU instruction that defines an SGPR operand.
+static bool isVALUDefsSGPR(const MachineInstr &MI,
+                           const MachineRegisterInfo &MRI,
+                           const SIRegisterInfo &TRI) {
+  if (!SIInstrInfo::isVALU(MI))
+    return false;
+
+  for (const MachineOperand &Op : MI.operands()) {
+    if (!Op.isReg() || !Op.isDef())
+      continue;
+
+    Register Reg = Op.getReg();
+    if (Reg == AMDGPU::EXEC || Reg == AMDGPU::MODE)
+      continue;
+
+    if (Reg.isPhysical())
+      continue;
+
+    auto RC = MRI.getRegClass(Reg);
+    if (TRI.isSGPRClass(RC))
+      return true;
+  }
+  return false;
+}
+
+unsigned
+GCNHazardRecognizer::checkVALUSGPRHazard(const MachineInstr &MI) const {
+  const MachineRegisterInfo &MRI = MF.getRegInfo();
+
+  // Only SALU instructions (or COPY to SGPR) are affected by this hazard
+  bool IsSALU = SIInstrInfo::isSALU(MI);
+  bool IsSALUCopy = false;
+  if (!IsSALU && MI.isCopy()) {
+    Register Dest = MI.getOperand(0).getReg();
+    if (Dest.isVirtual()) {
+      auto RC = MRI.getRegClass(Dest);
+      if (TRI.isSGPRClass(RC))
+        IsSALUCopy = true;
+    }
+  }
+
+  if (!IsSALU && !IsSALUCopy)
+    return 0;
+
+  // Check for V_READFIRSTLANE (VALU defines SGPR) - 16 cycle hazard
+  constexpr int VALUDefsSGPRHazardCycles = 16;
+  auto IsVALUDefsSGPRHazardFn = [&MRI, this](const MachineInstr &I) {
+    return isVALUDefsSGPR(I, MRI, TRI);
+  };
+  int WaitStatesSinceDefsSGPR =
+      getWaitStatesSince(IsVALUDefsSGPRHazardFn, VALUDefsSGPRHazardCycles);
+  if (WaitStatesSinceDefsSGPR < VALUDefsSGPRHazardCycles) {
+    int Stall = VALUDefsSGPRHazardCycles - WaitStatesSinceDefsSGPR;
+    LLVM_DEBUG(dbgs() << "checkVALUSGPRHazard: VALU defs SGPR, stall " << Stall
+                      << " cycles for: " << MI);
+    return Stall;
+  }
+
+  // Check for VALU uses SGPR - 8 cycle hazard
+  constexpr int VALUUsesSGPRHazardCycles = 8;
+  auto IsVALUUsesSGPRHazardFn = [&MRI, this](const MachineInstr &I) {
+    return isVALUWithSGPR(I, MRI, TRI);
+  };
+  int WaitStatesSinceUsesSGPR =
+      getWaitStatesSince(IsVALUUsesSGPRHazardFn, VALUUsesSGPRHazardCycles);
+  if (WaitStatesSinceUsesSGPR < VALUUsesSGPRHazardCycles) {
+    int Stall = VALUUsesSGPRHazardCycles - WaitStatesSinceUsesSGPR;
+    LLVM_DEBUG(dbgs() << "checkVALUSGPRHazard: VALU uses SGPR, stall " << Stall
+                      << " cycles for: " << MI);
+    return Stall;
+  }
+
+  return 0;
+}
+
 ScheduleHazardRecognizer::HazardType
 GCNHazardRecognizer::getHazardType(SUnit *SU, int Stalls) {
   MachineInstr *MI = SU->getInstr();
@@ -537,6 +636,8 @@ GCNHazardRecognizer::getHazardType(SUnit *SU, int Stalls) {
     if (checkTRANSHazard(*MI) > 0)
       return Hazard;
     if (checkMultiCycleVALUHazard(*MI) > 0)
+      return Hazard;
+    if (checkVALUSGPRHazard(*MI) > 0)
       return Hazard;
     // Pre-RA has no physical registers, so skip the remaining checks.
     if (isPreRA())
@@ -691,6 +792,7 @@ unsigned GCNHazardRecognizer::getHazardWaitStates(MachineInstr *MI) const {
     W = checkWMMACoexecSlot(*MI);
     W = std::max(W, checkTRANSHazard(*MI));
     W = std::max(W, checkMultiCycleVALUHazard(*MI));
+    W = std::max(W, checkVALUSGPRHazard(*MI));
     if (isPreRA())
       return W;
   }
@@ -788,6 +890,7 @@ void GCNHazardRecognizer::AdvanceCycle() {
 
     if (HasPendingWMMACoexecHazard)
       EmittedVALUInstrs.push_front(nullptr);
+
     return;
   }
 
@@ -1025,7 +1128,6 @@ int GCNHazardRecognizer::getWaitStatesSince(
         continue;
     }
     WaitStates += MI ? GetNumWaitStates(*MI) : 1;
-
     if (WaitStates >= Limit)
       break;
   }

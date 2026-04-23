@@ -219,6 +219,11 @@ private:
   int checkMAIHazards(MachineInstr *MI) const;
   int checkMAIHazards908(MachineInstr *MI) const;
   int checkMAIHazards90A(MachineInstr *MI) const;
+
+  /// Check for VALU-SGPR to SALU hazard.
+  /// Returns cycles until SALU can be scheduled without hazard.
+  unsigned checkVALUSGPRHazard(const MachineInstr &MI) const;
+
   /// Pad the latency between neighboring MFMA instructions with s_nops. The
   /// percentage of wait states to fill with s_nops is specified by the command
   /// line option '-amdgpu-mfma-padding-ratio'.
