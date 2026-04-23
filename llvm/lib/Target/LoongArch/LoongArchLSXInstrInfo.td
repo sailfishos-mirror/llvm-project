@@ -1794,6 +1794,17 @@ def : Pat<(xor (v4i32 LSX128:$vj), (v4i32 (vsplat_uimm_pow2 uimm5:$imm))),
 def : Pat<(xor (v2i64 LSX128:$vj), (v2i64 (vsplat_uimm_pow2 uimm6:$imm))),
           (VBITREVI_D LSX128:$vj, uimm6:$imm)>;
 
+// VBITSEL_V
+foreach vt = [v16i8, v8i16, v4i32, v2i64] in
+  def : Pat<(vt (or (and LSX128:$va, LSX128:$vk),
+                    (loongarch_vandn LSX128:$va, LSX128:$vj))),
+            (vt (VBITSEL_V LSX128:$vj, LSX128:$vk, LSX128:$va))>;
+
+// VBITSELI_B
+def : Pat<(v16i8 (or (and LSX128:$vd, (v16i8 (SplatPat_uimm8 uimm8:$imm))),
+                     (loongarch_vandn LSX128:$vd, LSX128:$vj))),
+          (VBITSELI_B LSX128:$vd, LSX128:$vj, uimm8:$imm)>;
+
 // Vector bswaps
 def : Pat<(bswap (v8i16 LSX128:$vj)), (VSHUF4I_B LSX128:$vj, 0b10110001)>;
 def : Pat<(bswap (v4i32 LSX128:$vj)), (VSHUF4I_B LSX128:$vj, 0b00011011)>;
