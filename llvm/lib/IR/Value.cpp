@@ -77,10 +77,6 @@ Value::~Value() {
   // Notify all ValueHandles (if present) that this value is going away.
   if (HasValueHandle)
     ValueHandleBase::ValueIsDeleted(this);
-
-  // Notify context-level deletion listeners (e.g. analyses tracking Value*).
-  getContext().notifyValueDeleted(this);
-
   if (isUsedByMetadata())
     ValueAsMetadata::handleDeletion(this);
 

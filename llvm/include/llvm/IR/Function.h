@@ -18,6 +18,7 @@
 #define LLVM_IR_FUNCTION_H
 
 #include "llvm/ADT/DenseSet.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/ADT/ilist_node.h"
@@ -61,6 +62,7 @@ class Type;
 class User;
 class BranchProbabilityInfo;
 class BlockFrequencyInfo;
+class InstructionDeletionListener;
 
 class LLVM_ABI Function : public GlobalObject, public ilist_node<Function> {
 public:
@@ -112,7 +114,22 @@ private:
 
   friend class SymbolTableListTraits<Function>;
 
+  friend class InstructionDeletionListener;
+  SmallVector<InstructionDeletionListener *, 0> InstructionDeletionListeners;
+
+  void addInstructionDeletionListener(InstructionDeletionListener *L);
+  void removeInstructionDeletionListener(InstructionDeletionListener *L);
+
 public:
+  /// Notify all registered listeners that an instruction is being removed
+  /// from this function. Called from Instruction::setParent and
+  /// BasicBlock::setParent when the parent is being set to null.
+  LLVM_ABI void notifyInstructionRemoved(Instruction *I);
+
+  bool hasInstructionDeletionListeners() const {
+    return !InstructionDeletionListeners.empty();
+  }
+
   /// hasLazyArguments/CheckLazyArguments - The argument list of a function is
   /// built on demand, so that the list isn't allocated until the first client
   /// needs it.  The hasLazyArguments predicate returns true if the arg list

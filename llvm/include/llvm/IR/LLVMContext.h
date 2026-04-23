@@ -32,12 +32,10 @@ class Instruction;
 class LLVMContextImpl;
 class Module;
 class OptPassGate;
-class ValueDeletionListener;
 template <typename T> class SmallVectorImpl;
 template <typename T> class StringMapEntry;
 class StringRef;
 class Twine;
-class Value;
 class LLVMRemarkStreamer;
 
 namespace remarks {
@@ -364,15 +362,6 @@ private:
 
   /// removeModule - Unregister a module from this context.
   void removeModule(Module *);
-
-  // ValueDeletionListener registers/deregisters via its constructor/destructor.
-  friend class ValueDeletionListener;
-  // Value calls notifyValueDeleted from ~Value().
-  friend class Value;
-
-  LLVM_ABI void addValueDeletionListener(ValueDeletionListener *L);
-  LLVM_ABI void removeValueDeletionListener(ValueDeletionListener *L);
-  LLVM_ABI void notifyValueDeleted(Value *V);
 };
 
 // Create wrappers for C Binding types (see CBindingWrapping.h).

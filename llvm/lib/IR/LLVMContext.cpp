@@ -20,7 +20,6 @@
 #include "llvm/IR/DiagnosticInfo.h"
 #include "llvm/IR/DiagnosticPrinter.h"
 #include "llvm/IR/LLVMRemarkStreamer.h"
-#include "llvm/IR/ValueDeletionListener.h"
 #include "llvm/Remarks/RemarkStreamer.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -206,31 +205,6 @@ void LLVMContext::setYieldCallback(YieldCallbackTy Callback, void *OpaqueHandle)
 void LLVMContext::yield() {
   if (pImpl->YieldCallback)
     pImpl->YieldCallback(this, pImpl->YieldOpaqueHandle);
-}
-
-ValueDeletionListener::ValueDeletionListener(LLVMContext &C, CallbackT CB)
-    : Ctx(C), Callback(CB) {
-  Ctx.addValueDeletionListener(this);
-}
-
-ValueDeletionListener::~ValueDeletionListener() {
-  Ctx.removeValueDeletionListener(this);
-}
-
-void LLVMContext::addValueDeletionListener(ValueDeletionListener *L) {
-  assert(!llvm::is_contained(pImpl->ValueDeletionListeners, L) &&
-         "Listener already registered");
-  pImpl->ValueDeletionListeners.push_back(L);
-}
-
-void LLVMContext::removeValueDeletionListener(ValueDeletionListener *L) {
-  pImpl->ValueDeletionListeners.erase(
-      llvm::find(pImpl->ValueDeletionListeners, L));
-}
-
-void LLVMContext::notifyValueDeleted(Value *V) {
-  for (ValueDeletionListener *L : pImpl->ValueDeletionListeners)
-    L->valueDeleted(V);
 }
 
 void LLVMContext::emitError(const Twine &ErrorStr) {

@@ -30,6 +30,7 @@
 #include "llvm/IR/GlobalValue.h"
 #include "llvm/IR/InstIterator.h"
 #include "llvm/IR/Instruction.h"
+#include "llvm/IR/InstructionDeletionListener.h"
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/IR/LLVMContext.h"
@@ -61,6 +62,33 @@ using ProfileCount = Function::ProfileCount;
 // Explicit instantiations of SymbolTableListTraits since some of the methods
 // are not in the public header file...
 template class LLVM_EXPORT_TEMPLATE llvm::SymbolTableListTraits<BasicBlock>;
+
+InstructionDeletionListener::InstructionDeletionListener(Function &F,
+                                                         CallbackT CB)
+    : F(F), Callback(CB) {
+  F.addInstructionDeletionListener(this);
+}
+
+InstructionDeletionListener::~InstructionDeletionListener() {
+  F.removeInstructionDeletionListener(this);
+}
+
+void Function::addInstructionDeletionListener(InstructionDeletionListener *L) {
+  assert(!llvm::is_contained(InstructionDeletionListeners, L) &&
+         "Listener already registered");
+  InstructionDeletionListeners.push_back(L);
+}
+
+void Function::removeInstructionDeletionListener(
+    InstructionDeletionListener *L) {
+  InstructionDeletionListeners.erase(
+      llvm::find(InstructionDeletionListeners, L));
+}
+
+void Function::notifyInstructionRemoved(Instruction *I) {
+  for (InstructionDeletionListener *L : InstructionDeletionListeners)
+    L->instructionRemoved(I);
+}
 
 static cl::opt<int> NonGlobalValueMaxNameSize(
     "non-global-value-max-name-size", cl::Hidden, cl::init(1024),

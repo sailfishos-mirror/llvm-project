@@ -31,6 +31,7 @@ add_llvm_unittest(IRTests
   GlobalObjectTest.cpp
   PassBuilderCallbacksTest.cpp
   IRBuilderTest.cpp
+  InstructionDeletionListenerTest.cpp
   InstructionsTest.cpp
   IntrinsicsTest.cpp
   LegacyPassManagerTest.cpp
@@ -49,7 +50,6 @@ add_llvm_unittest(IRTests
   TypesTest.cpp
   UseTest.cpp
   UserTest.cpp
-  ValueDeletionListenerTest.cpp
   ValueHandleTest.cpp
   ValueMapTest.cpp
   ValueTest.cpp
