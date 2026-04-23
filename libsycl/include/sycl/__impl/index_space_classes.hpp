@@ -19,6 +19,7 @@
 
 #include <cstddef>
 #include <type_traits>
+#include <variant>
 
 _LIBSYCL_BEGIN_NAMESPACE_SYCL
 
@@ -401,7 +402,7 @@ protected:
 private:
   range<Dimensions> MRange;
   id<Dimensions> MId;
-  id<Dimensions> MOffset;
+  std::conditional_t<WithOffset, id<Dimensions>, std::monostate> MOffset;
 
   friend class detail::Builder;
 };

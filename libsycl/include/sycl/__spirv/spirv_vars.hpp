@@ -15,8 +15,8 @@
 #ifndef _LIBSYCL___SPIRV_SPIRV_VARS
 #define _LIBSYCL___SPIRV_SPIRV_VARS
 
-#  include <cstddef>
-#  include <cstdint>
+#include <cstddef>
+#include <cstdint>
 
 // SPIR-V built-in variables mapped to function call.
 
@@ -58,7 +58,7 @@ __SPIRV_DEFINE_INIT_AND_GET_HELPERS(BuiltInGlobalSize);
 __SPIRV_DEFINE_INIT_AND_GET_HELPERS(BuiltInGlobalInvocationId)
 __SPIRV_DEFINE_INIT_AND_GET_HELPERS(BuiltInGlobalOffset)
 
-#  undef __SPIRV_DEFINE_INIT_AND_GET_HELPERS
+#undef __SPIRV_DEFINE_INIT_AND_GET_HELPERS
 
 } // namespace __spirv
 
