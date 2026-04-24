@@ -965,6 +965,8 @@ static uint64_t getAttrKindEncoding(Attribute::AttrKind Kind) {
     return bitc::ATTR_KIND_DENORMAL_FPENV;
   case Attribute::NoOutline:
     return bitc::ATTR_KIND_NOOUTLINE;
+  case Attribute::SignalingNans:
+    return bitc::ATTR_KIND_SIGNALING_NANS;
   case Attribute::EndAttrKinds:
     llvm_unreachable("Can not encode end-attribute kinds marker.");
   case Attribute::None:
