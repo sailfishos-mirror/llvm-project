@@ -117,7 +117,6 @@ void TextOutputSection::finalize() {
   uint64_t backwardBranchRange = target->backwardBranchRange;
   size_t thunkSize = target->thunkSize;
   size_t thunkCallCount = 0;
-  size_t thunkCount = 0;
 
   auto isTargetKnownInRange = [&](const ConcatInputSection &isec,
                                   const Relocation &r) -> bool {
@@ -146,6 +145,13 @@ void TextOutputSection::finalize() {
     }
     return nullptr;
   };
+  auto updateBranchTargetToThunk = [&](Relocation &r, Defined *thunk) {
+    r.referent = thunk;
+    // The thunk itself bakes in the addend, so the call-site reloc must
+    // branch to the thunk start with no extra offset.
+    r.addend = 0;
+    ++thunkCallCount;
+  };
   auto createThunk = [&](const ConcatInputSection &isec, Relocation &r) {
     assert(getThunkInRange(isec, r) == nullptr);
     assert(isec.isFinal);
@@ -173,13 +179,13 @@ void TextOutputSection::finalize() {
         saver().save(funcSym->getName() + addendSuffix + ".thunk." +
                      std::to_string(thunkInfo.sequence++));
     if (!isa<Defined>(funcSym) || cast<Defined>(funcSym)->isExternal()) {
-      r.referent = thunkInfo.sym = symtab->addDefined(
+      thunkInfo.sym = symtab->addDefined(
           thunkName, /*file=*/nullptr, thunkInfo.isec, /*value=*/0, thunkSize,
           /*isWeakDef=*/false, /*isPrivateExtern=*/true,
           /*isReferencedDynamically=*/false, /*noDeadStrip=*/false,
           /*isWeakDefCanBeHidden=*/false);
     } else {
-      r.referent = thunkInfo.sym = make<Defined>(
+      thunkInfo.sym = make<Defined>(
           thunkName, /*file=*/nullptr, thunkInfo.isec, /*value=*/0, thunkSize,
           /*isWeakDef=*/false, /*isExternal=*/false, /*isPrivateExtern=*/true,
           /*includeInSymtab=*/true, /*isReferencedDynamically=*/false,
@@ -187,13 +193,9 @@ void TextOutputSection::finalize() {
     }
     thunkInfo.sym->used = true;
     target->populateThunk(thunkInfo.isec, funcSym, r.addend);
-    // The thunk itself bakes in the addend, so the call-site reloc must
-    // branch to the thunk start with no extra offset.
-    r.addend = 0;
-    ++thunkCallCount;
+    updateBranchTargetToThunk(r, thunkInfo.sym);
     finalizeOne(thunkInfo.isec);
     thunks.push_back(thunkInfo.isec);
-    ++thunkCount;
   };
 
   // Branches whose target sections are out of range or have not yet been
@@ -215,8 +217,8 @@ void TextOutputSection::finalize() {
         branchesToProcess.pop_front();
         continue;
       }
-      if (auto *sym = getThunkInRange(*callerIsec, *r)) {
-        deferredBranchRedirects.emplace_back(callerIsec, r, sym);
+      if (auto *thunk = getThunkInRange(*callerIsec, *r)) {
+        deferredBranchRedirects.emplace_back(callerIsec, r, thunk);
         branchesToProcess.pop_front();
         continue;
       }
@@ -235,6 +237,8 @@ void TextOutputSection::finalize() {
     }
     finalizeOne(isec);
 
+    // TODO: Remove this check and the assert below. In fact, I don't believe
+    // the relocation iteration order matters for correctness.
     bool hasCallsite = llvm::any_of(isec->relocs, [](Relocation &r) {
       return target->hasAttr(r.type, RelocAttrBits::BRANCH);
     });
@@ -252,8 +256,8 @@ void TextOutputSection::finalize() {
         continue;
       if (isTargetKnownInRange(*isec, r))
         continue;
-      if (auto *sym = getThunkInRange(*isec, r)) {
-        deferredBranchRedirects.emplace_back(isec, &r, sym);
+      if (auto *thunk = getThunkInRange(*isec, r)) {
+        deferredBranchRedirects.emplace_back(isec, &r, thunk);
         continue;
       }
       auto *funcSym = cast<Symbol *>(r.referent);
@@ -299,28 +303,22 @@ void TextOutputSection::finalize() {
       continue;
     if (isTargetStubsAndInRange(*callerIsec, *r))
       continue;
-    r->referent = thunk;
-    r->addend = 0;
-    ++thunkCallCount;
+    updateBranchTargetToThunk(*r, thunk);
   }
 
   for (auto [isec, r, thunkKey] : branchesToProcess) {
     if (isTargetStubsAndInRange(*isec, *r))
       continue;
-    if (auto *sym = getThunkInRange(*isec, *r)) {
-      r->referent = sym;
-      // The thunk itself bakes in the addend, so the call-site reloc must
-      // branch to the thunk start with no extra offset.
-      r->addend = 0;
-      ++thunkCallCount;
+    if (auto *thunk = getThunkInRange(*isec, *r)) {
+      updateBranchTargetToThunk(*r, thunk);
       continue;
     }
     createThunk(*isec, *r);
   }
 
-  if (thunkCount)
-    log("Created " + Twine(thunkCount) + " (" +
-        Twine(thunkCount * thunkSize / 1024) + " KB) thunks and updated " +
+  if (thunks.size())
+    log("Created " + Twine(thunks.size()) + " (" +
+        Twine(thunks.size() * thunkSize / 1024) + " KB) thunks and updated " +
         Twine(thunkCallCount) + " branch targets");
 }
 
