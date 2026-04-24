@@ -294,10 +294,10 @@ def UsmmlaOp : ArmSVE_Op<"usmmla", [Pure,
     "$acc `,` $src1 `,` $src2 attr-dict `:` type($src1) `to` type($dst)";
 }
 
-def BfmmlaOp : ArmSVE_IntrOp<"bfmmla", [Pure,
-                                        AllTypesMatch<["src1", "src2"]>,
-                                        AllTypesMatch<["acc", "res"]>,
-                                        ]> {
+def BfmmlaOp : LLVM_IntrOpBase<ArmSVE_Dialect, "intr.bfmmla", "aarch64_sve_fmmla", [0], [1],
+                               [Pure,
+                                AllTypesMatch<["src1", "src2"]>,
+                                AllTypesMatch<["acc", "res"]>], 1> {
   let summary = "BFloat16 matrix multiply-accumulate";
   let description = [{
     BFMMLA: BFloat16 matrix multiply-accumulate into 2×2 matrices";
