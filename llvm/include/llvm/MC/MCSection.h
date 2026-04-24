@@ -230,7 +230,10 @@ public:
   // FixupSize.
   void clearFixups() { FixupEnd = FixupStart; }
   LLVM_ABI void addFixup(MCFixup Fixup);
+  // Insert Fixup while keeping fixups sorted by offset.
+  LLVM_ABI void insertFixup(MCFixup Fixup);
   LLVM_ABI void appendFixups(ArrayRef<MCFixup> Fixups);
+  LLVM_ABI void moveFixupsToEnd();
   MutableArrayRef<MCFixup> getFixups();
   ArrayRef<MCFixup> getFixups() const;
 

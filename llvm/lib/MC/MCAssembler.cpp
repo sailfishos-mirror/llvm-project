@@ -732,7 +732,7 @@ void MCAssembler::layout() {
     }
 
     uint64_t Offset = Sym ? Sym->getOffset() + Res.getConstant() : 0;
-    F->addFixup(MCFixup::create(Offset, PF.Expr, PF.Kind));
+    F->insertFixup(MCFixup::create(Offset, PF.Expr, PF.Kind));
   }
 
   // Evaluate and apply the fixups, generating relocation entries as necessary.
