@@ -1676,6 +1676,7 @@ void CodeGenFunction::EmitOMPReductionClauseInit(
     case OMPD_error:
     case OMPD_barrier:
     case OMPD_taskwait:
+    case OMPD_taskgraph:
     case OMPD_taskgroup:
     case OMPD_flush:
     case OMPD_depobj:
@@ -5872,6 +5873,20 @@ void CodeGenFunction::EmitOMPTaskwaitDirective(const OMPTaskwaitDirective &S) {
   CGM.getOpenMPRuntime().emitTaskwaitCall(*this, S.getBeginLoc(), Data);
 }
 
+void CodeGenFunction::EmitOMPTaskgraphDirective(
+    const OMPTaskgraphDirective &S) {
+  const Expr *IfCond = nullptr;
+  for (const auto *C : S.getClausesOfKind<OMPIfClause>()) {
+    if (C->getNameModifier() == OMPD_unknown ||
+        C->getNameModifier() == OMPD_cancel) {
+      IfCond = C->getCondition();
+      break;
+    }
+  }
+
+  CGM.getOpenMPRuntime().emitTaskgraphCall(*this, S.getBeginLoc(), S, IfCond);
+}
+
 static bool isSupportedByOpenMPIRBuilder(const OMPTaskgroupDirective &T) {
   return T.clauses().empty();
 }
@@ -8329,11 +8344,13 @@ void CodeGenFunction::EmitOMPTaskLoopBasedDirective(const OMPLoopDirective &S) {
                                (*LIP)->getType(), S.getBeginLoc()));
     });
   };
-  auto &&TaskGen = [&S, SharedsTy, CapturedStruct,
-                    IfCond](CodeGenFunction &CGF, llvm::Function *OutlinedFn,
-                            const OMPTaskDataTy &Data) {
-    auto &&CodeGen = [&S, OutlinedFn, SharedsTy, CapturedStruct, IfCond,
-                      &Data](CodeGenFunction &CGF, PrePostActionTy &) {
+  auto &&TaskGen =
+      [&S, SharedsTy, CapturedStruct, IfCond]
+        (CodeGenFunction &CGF, llvm::Function *OutlinedFn,
+         const OMPTaskDataTy &Data) {
+    auto &&CodeGen =
+        [&S, OutlinedFn, SharedsTy, CapturedStruct, IfCond, &Data]
+          (CodeGenFunction &CGF, PrePostActionTy &) {
       OMPLoopScope PreInitScope(CGF, S);
       CGF.CGM.getOpenMPRuntime().emitTaskLoopCall(CGF, S.getBeginLoc(), S,
                                                   OutlinedFn, SharedsTy,
