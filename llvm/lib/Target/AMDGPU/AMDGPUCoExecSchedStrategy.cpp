@@ -427,7 +427,8 @@ bool CandidateHeuristics::tryEffectiveStall(
         *SU->getInstr(), *static_cast<const SIInstrInfo *>(DAG->TII));
     HardwareUnitInfo *HWUI = getHWUIFromFlavor(Flavor);
 
-    if (HWUI->getBufferSize() <= 1)
+    // A BufferSize of 0 means "unlimited" buffer, thus we will never fill it.
+    if (HWUI->getBufferSize() == 0)
       return 0;
 
     // getBufferAvailableCycle assumes top-down scheduling.
@@ -866,67 +867,6 @@ bool AMDGPUCoExecSchedStrategy::tryCandidateCoexec(SchedCandidate &Cand,
   }
 
   return false;
-}
-
-bool AMDGPUCoExecSchedStrategy::tryEffectiveStall(SchedCandidate &Cand,
-                                                  SchedCandidate &TryCand,
-                                                  SchedBoundary &Zone) {
-  auto getBufferFullStalls = [this, &Zone](SUnit *SU) -> unsigned {
-    InstructionFlavor Flavor = classifyFlavor(
-        *SU->getInstr(), *static_cast<const SIInstrInfo *>(DAG->TII));
-    HardwareUnitInfo *HWUI = Heurs.getHWUIFromFlavor(Flavor);
-
-    // A BufferSize of 0 means "unlimited" buffer, thus we will never fill it.
-    if (HWUI->getBufferSize() == 0)
-      return 0;
-
-    // getBufferAvailableCycle assumes top-down scheduling.
-    assert(Zone.isTop());
-    unsigned CurrCycle = Zone.getCurrCycle();
-    unsigned BufferReadyCycle = HWUI->getBufferAvailableCycle(CurrCycle);
-    if (BufferReadyCycle <= CurrCycle)
-      return 0;
-
-    return BufferReadyCycle - CurrCycle;
-  };
-
-  // Treat structural and latency stalls as a single scheduling cost for the
-  // current cycle.
-  struct StallCosts {
-    unsigned Ready = 0;
-    unsigned Structural = 0;
-    unsigned Latency = 0;
-    unsigned Effective = 0;
-    unsigned Buffer = 0;
-  };
-
-  unsigned CurrCycle = Zone.getCurrCycle();
-  auto GetStallCosts = [&](SUnit *SU) {
-    unsigned ReadyCycle = Zone.isTop() ? SU->TopReadyCycle : SU->BotReadyCycle;
-    StallCosts Costs;
-    Costs.Ready = ReadyCycle > CurrCycle ? ReadyCycle - CurrCycle : 0;
-    Costs.Structural = getStructuralStallCycles(Zone, SU);
-    Costs.Latency = Zone.getLatencyStallCycles(SU);
-    Costs.Buffer = getBufferFullStalls(SU);
-    Costs.Effective =
-        std::max({Costs.Ready, Costs.Structural, Costs.Latency, Costs.Buffer});
-    return Costs;
-  };
-
-  StallCosts TryCosts = GetStallCosts(TryCand.SU);
-  StallCosts CandCosts = GetStallCosts(Cand.SU);
-
-  LLVM_DEBUG(if (TryCosts.Effective || CandCosts.Effective) {
-    dbgs() << "Effective stalls: try=" << TryCosts.Effective
-           << " (ready=" << TryCosts.Ready << ", struct=" << TryCosts.Structural
-           << ", lat=" << TryCosts.Latency << ", buffer=" << TryCosts.Buffer
-           << ") cand=" << CandCosts.Effective << " (ready=" << CandCosts.Ready
-           << ", struct=" << CandCosts.Structural
-           << ", lat=" << CandCosts.Latency << ", buffer=" << CandCosts.Buffer
-           << ")\n";
-  });
-
-  return tryLess(TryCosts.Effective, CandCosts.Effective, TryCand, Cand, Stall);
 }
 
 ScheduleDAGInstrs *
