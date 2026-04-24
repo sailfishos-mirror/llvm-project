@@ -10,6 +10,7 @@
 #include "clang/ScalableStaticAnalysisFramework/Analyses/EntityPointerLevel/EntityPointerLevelFormat.h"
 #include "clang/ScalableStaticAnalysisFramework/Analyses/PointerFlow/PointerFlow.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/Serialization/JSONFormat.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/iterator_range.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/JSON.h"
@@ -52,11 +53,7 @@ summaryToJSON(const EntitySummary &ES,
       EdgesEntryData.push_back(entityPointerLevelToJSON(RHS, EntityId2JSON));
     EdgesData.push_back(Value(std::move(EdgesEntryData)));
   }
-
-  Object Data;
-
-  Data[PointerFlowKey] = Value(std::move(EdgesData));
-  return Data;
+  return Object{{PointerFlowKey, Value(std::move(EdgesData))}};
 }
 
 static llvm::Expected<std::unique_ptr<EntitySummary>>
@@ -82,13 +79,11 @@ summaryFromJSON(const Object &Data, EntityIdTable &,
           EdgesEntryData, "a JSON array of EntityPointerLevels with a size "
                           "greater than 1: [lhs, rhs, rhs, ...]");
 
-    auto SrcEPL =
-        entityPointerLevelFromJSON(*EPLArray->begin(), EntityIdFromJSON);
+    auto SrcEPL = entityPointerLevelFromJSON((*EPLArray)[0], EntityIdFromJSON);
 
     if (!SrcEPL)
       return SrcEPL.takeError();
-    for (const auto &EPLData :
-         llvm::make_range(EPLArray->begin() + 1, EPLArray->end())) {
+    for (const auto &EPLData : llvm::drop_begin(*EPLArray)) {
       auto EPL = entityPointerLevelFromJSON(EPLData, EntityIdFromJSON);
       if (!EPL)
         return EPL.takeError();
@@ -99,11 +94,13 @@ summaryFromJSON(const Object &Data, EntityIdTable &,
       buildPointerFlowEntitySummary(std::move(Edges)));
 }
 
-struct PointerFlowJSONFormatInfo : JSONFormat::FormatInfo {
+namespace {
+struct PointerFlowJSONFormatInfo final : JSONFormat::FormatInfo {
   PointerFlowJSONFormatInfo()
       : JSONFormat::FormatInfo(PointerFlowEntitySummary::summaryName(),
                                summaryToJSON, summaryFromJSON) {}
 };
+} // namespace
 
 static llvm::Registry<JSONFormat::FormatInfo>::Add<PointerFlowJSONFormatInfo>
     RegisterPointerFlowJSONFormatInfo(

@@ -68,11 +68,13 @@ deserialize(const Object &Data, EntityIdTable &,
   return deserializeImpl(Data, Fn);
 }
 
-struct UnsafeBufferUsageJSONFormatInfo : JSONFormat::FormatInfo {
+namespace {
+struct UnsafeBufferUsageJSONFormatInfo final : JSONFormat::FormatInfo {
   UnsafeBufferUsageJSONFormatInfo()
       : JSONFormat::FormatInfo(UnsafeBufferUsageEntitySummary::summaryName(),
                                serialize, deserialize) {}
 };
+} // namespace
 
 static llvm::Registry<JSONFormat::FormatInfo>::Add<
     UnsafeBufferUsageJSONFormatInfo>
