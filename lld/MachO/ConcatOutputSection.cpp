@@ -119,8 +119,8 @@ void TextOutputSection::finalize() {
   size_t thunkCallCount = 0;
   size_t thunkCount = 0;
 
-  auto isTargetInRange = [&](const ConcatInputSection &isec,
-                             const Relocation &r) -> bool {
+  auto isTargetKnownInRange = [&](const ConcatInputSection &isec,
+                                  const Relocation &r) -> bool {
     uint64_t callVA = isec.getVA() + r.offset;
     uint64_t lowVA =
         backwardBranchRange < callVA ? callVA - backwardBranchRange : 0;
@@ -132,7 +132,7 @@ void TextOutputSection::finalize() {
   };
   auto getThunkInRange = [&](const ConcatInputSection &isec,
                              const Relocation &r) -> Defined * {
-    assert(!isTargetInRange(isec, r));
+    assert(!isTargetKnownInRange(isec, r));
     uint64_t callVA = isec.getVA() + r.offset;
     uint64_t lowVA =
         backwardBranchRange < callVA ? callVA - backwardBranchRange : 0;
@@ -153,7 +153,7 @@ void TextOutputSection::finalize() {
     if (addr + size > highVA) {
       // There were too many consecutive branch instructions for `slop`
       // below. If you hit this: For the current algorithm, just bumping up
-      // slop above and trying again is probably simplest. (See also PR51578
+      // slop below and trying again is probably simplest. (See also PR51578
       // comment 5).
       fatal(Twine(__FUNCTION__) +
             ": FIXME: thunk range overrun. Consider increasing the "
@@ -196,8 +196,13 @@ void TextOutputSection::finalize() {
     ++thunkCount;
   };
 
+  // Branches whose target sections are out of range or have not yet been
+  // finalized. We may need to emit thunks for them.
   std::deque<std::tuple<ConcatInputSection *, Relocation *, ThunkKey>>
       branchesToProcess;
+  // Branches whose targets have not yet be finalized, but a thunk for that
+  // target exists. We defer processing these branches because it's possible we
+  // can still direct call to their targets after they have all been finalized.
   SmallVector<std::tuple<ConcatInputSection *, Relocation *, Defined *>>
       deferredBranchRedirects;
 
@@ -206,7 +211,7 @@ void TextOutputSection::finalize() {
     while (!branchesToProcess.empty()) {
       auto &[callerIsec, r, thunkKey] = branchesToProcess.front();
       assert(callerIsec->isFinal);
-      if (isTargetInRange(*callerIsec, *r)) {
+      if (isTargetKnownInRange(*callerIsec, *r)) {
         branchesToProcess.pop_front();
         continue;
       }
@@ -218,6 +223,10 @@ void TextOutputSection::finalize() {
       uint64_t highVA = callerIsec->getVA() + r->offset + forwardBranchRange;
       uint64_t nextEnd =
           alignToPowerOf2(addr + size, isec->align) + isec->getSize();
+      // If we were to emit this section, would we have enough space for more
+      // thunks? If we do, then we can delay processing this thunk so we may
+      // finalize more potencial target sections. Otherwise we must emit thunks
+      // until we have enough space.
       if (nextEnd + slop <= highVA)
         break;
 
@@ -241,7 +250,7 @@ void TextOutputSection::finalize() {
     for (Relocation &r : reverse(isec->relocs)) {
       if (!target->hasAttr(r.type, RelocAttrBits::BRANCH))
         continue;
-      if (isTargetInRange(*isec, r))
+      if (isTargetKnownInRange(*isec, r))
         continue;
       if (auto *sym = getThunkInRange(*isec, r)) {
         deferredBranchRedirects.emplace_back(isec, &r, sym);
@@ -252,20 +261,14 @@ void TextOutputSection::finalize() {
       branchesToProcess.emplace_back(isec, &r, key);
     }
   }
-  for (auto [callerIsec, r, thunk] : deferredBranchRedirects) {
-    if (isTargetInRange(*callerIsec, *r))
-      continue;
-    r->referent = thunk;
-    r->addend = 0;
-    ++thunkCallCount;
-  }
-  deferredBranchRedirects.clear();
 
   llvm::erase_if(branchesToProcess, [&](auto &tuple) {
     auto [callerIsec, r, thunkKey] = tuple;
-    return isTargetInRange(*callerIsec, *r);
+    return isTargetKnownInRange(*callerIsec, *r);
   });
-  // Count the number of new thunks we will need to create
+  // Count distinct unresolved branch targets that still lack an in-range thunk.
+  // We use this as an upper bound on the number of thunks we may still create
+  // when estimating where __stubs / __objc_stubs could end up.
   DenseSet<ThunkKey, ThunkMapKeyInfo> branchTargets;
   for (auto [callerIsec, r, thunkKey] : branchesToProcess)
     if (!getThunkInRange(*callerIsec, *r))
@@ -279,17 +282,31 @@ void TextOutputSection::finalize() {
         alignToPowerOf2(estimatedStubsEnd, in.objcStubs->align) +
         in.objcStubs->getSize();
 
-  for (auto [isec, r, thunkKey] : branchesToProcess) {
-    uint64_t highVA = isec->getVA() + r->offset + forwardBranchRange;
-    auto *funcSym = cast<Symbol *>(r->referent);
-    if ((funcSym->isInStubs() ||
-         (in.objcStubs && in.objcStubs->isNeeded() &&
-          ObjCStubsSection::isObjCStubSymbol(funcSym))) &&
-        r->addend == 0 && estimatedStubsEnd <= highVA) {
-      // The branch target can reach any section in __stubs or __objc_stubs
-      assert(isec->getVA() != TargetInfo::outOfRangeVA);
+  auto isTargetStubsAndInRange = [&](const ConcatInputSection &isec,
+                                     const Relocation &r) -> bool {
+    auto *funcSym = cast<Symbol *>(r.referent);
+    if (!funcSym->isInStubs() && !(in.objcStubs && in.objcStubs->isNeeded() &&
+                                   ObjCStubsSection::isObjCStubSymbol(funcSym)))
+      return false;
+    if (r.addend)
+      return false;
+    uint64_t highVA = isec.getVA() + r.offset + forwardBranchRange;
+    return estimatedStubsEnd <= highVA;
+  };
+
+  for (auto [callerIsec, r, thunk] : deferredBranchRedirects) {
+    if (isTargetKnownInRange(*callerIsec, *r))
       continue;
-    }
+    if (isTargetStubsAndInRange(*callerIsec, *r))
+      continue;
+    r->referent = thunk;
+    r->addend = 0;
+    ++thunkCallCount;
+  }
+
+  for (auto [isec, r, thunkKey] : branchesToProcess) {
+    if (isTargetStubsAndInRange(*isec, *r))
+      continue;
     if (auto *sym = getThunkInRange(*isec, *r)) {
       r->referent = sym;
       // The thunk itself bakes in the addend, so the call-site reloc must
