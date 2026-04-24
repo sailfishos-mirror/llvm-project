@@ -672,22 +672,37 @@ bool AMDGPUCoExecSchedStrategy::tryEffectiveStall(SchedCandidate &Cand,
                                                   SchedBoundary &Zone) const {
   // Treat structural and latency stalls as a single scheduling cost for the
   // current cycle.
-  unsigned TryStructStall = getStructuralStallCycles(Zone, TryCand.SU);
-  unsigned TryLatencyStall = Zone.getLatencyStallCycles(TryCand.SU);
-  unsigned TryEffectiveStall = std::max(TryStructStall, TryLatencyStall);
+  struct StallCosts {
+    unsigned Ready = 0;
+    unsigned Structural = 0;
+    unsigned Latency = 0;
+    unsigned Effective = 0;
+  };
 
-  unsigned CandStructStall = getStructuralStallCycles(Zone, Cand.SU);
-  unsigned CandLatencyStall = Zone.getLatencyStallCycles(Cand.SU);
-  unsigned CandEffectiveStall = std::max(CandStructStall, CandLatencyStall);
+  unsigned CurrCycle = Zone.getCurrCycle();
+  auto GetStallCosts = [&](SUnit *SU) {
+    unsigned ReadyCycle = Zone.isTop() ? SU->TopReadyCycle : SU->BotReadyCycle;
+    StallCosts Costs;
+    Costs.Ready = ReadyCycle > CurrCycle ? ReadyCycle - CurrCycle : 0;
+    Costs.Structural = getStructuralStallCycles(Zone, SU);
+    Costs.Latency = Zone.getLatencyStallCycles(SU);
+    Costs.Effective = std::max({Costs.Ready, Costs.Structural, Costs.Latency});
+    return Costs;
+  };
 
-  LLVM_DEBUG(if (TryEffectiveStall || CandEffectiveStall) {
-    dbgs() << "Effective stalls: try=" << TryEffectiveStall
-           << " (struct=" << TryStructStall << ", lat=" << TryLatencyStall
-           << ") cand=" << CandEffectiveStall << " (struct=" << CandStructStall
-           << ", lat=" << CandLatencyStall << ")\n";
+  StallCosts TryCosts = GetStallCosts(TryCand.SU);
+  StallCosts CandCosts = GetStallCosts(Cand.SU);
+
+  LLVM_DEBUG(if (TryCosts.Effective || CandCosts.Effective) {
+    dbgs() << "Effective stalls: try=" << TryCosts.Effective
+           << " (ready=" << TryCosts.Ready << ", struct=" << TryCosts.Structural
+           << ", lat=" << TryCosts.Latency << ") cand=" << CandCosts.Effective
+           << " (ready=" << CandCosts.Ready
+           << ", struct=" << CandCosts.Structural
+           << ", lat=" << CandCosts.Latency << ")\n";
   });
 
-  return tryLess(TryEffectiveStall, CandEffectiveStall, TryCand, Cand, Stall);
+  return tryLess(TryCosts.Effective, CandCosts.Effective, TryCand, Cand, Stall);
 }
 
 ScheduleDAGInstrs *

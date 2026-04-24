@@ -9,6 +9,7 @@
   attributes #0 = { "amdgpu-waves-per-eu"="1,1" }
 ...
 
+---
 name: test-sched-effective-stall
 tracksRegLiveness: true
 body: |
