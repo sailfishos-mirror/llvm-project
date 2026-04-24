@@ -2953,6 +2953,7 @@ static void RenderFloatingPointOptions(const ToolChain &TC, const Driver &D,
         break;
       }
       StrictFPModel = false;
+      SignalingNaNs = false;
       if (!FPModel.empty() && FPModel != Val)
         D.Diag(clang::diag::warn_drv_overriding_option)
             << Args.MakeArgString("-ffp-model=" + FPModel)
@@ -2982,6 +2983,7 @@ static void RenderFloatingPointOptions(const ToolChain &TC, const Driver &D,
         LastFpContractOverrideOption = "-ffp-model=strict";
         TrappingMath = true;
         RoundingFPMath = true;
+        SignalingNaNs = true;
         setComplexRange(D, Args.MakeArgString(A->getSpelling() + Val),
                         LangOptions::ComplexRangeKind::CX_Full,
                         LastComplexRangeOption, Range);

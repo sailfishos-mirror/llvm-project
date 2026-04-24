@@ -557,6 +557,12 @@ define void @f94() nodivergencesource {
   ret void;
 }
 
+; CHECK: define float @f95(float %x) [[SIGNALING_NANS:#[0-9]+]]
+define float @f95(float %x) signaling_nans {
+  %r = fadd float %x, 2.0
+  ret float %r
+}
+
 ; CHECK: define range(i32 -1, 42) i32 @range_attribute(<4 x i32> range(i32 -1, 42) %a)
 define range(i32 -1, 42) i32 @range_attribute(<4 x i32> range(i32 -1, 42) %a) {
   ret i32 0
@@ -654,4 +660,5 @@ define void @dead_on_return_sized(ptr dead_on_return(4) %p) {
 ; CHECK: attributes [[SKIPPROFILE]] = { skipprofile }
 ; CHECK: attributes [[OPTDEBUG]] = { optdebug }
 ; CHECK: attributes [[NODIVERGENCESOURCE]] = { nodivergencesource }
+; CHECK: attributes [[SIGNALING_NANS]] = { signaling_nans }
 ; CHECK: attributes #[[NOBUILTIN]] = { nobuiltin }
