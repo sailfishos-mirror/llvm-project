@@ -356,11 +356,8 @@ RISCVTTIImpl::getMaxScalableVF(unsigned MaxWidthInBits) const {
 
   MaxWidthInBits = std::max(8U, MaxWidthInBits);
   unsigned LMULMax = 1 << std::min<unsigned>(VectorPrimaryLMULMaxExp, 3);
-  if (!VectorPrimaryLMULMaxExp.getNumOccurrences()) {
-    LMULMax = 4;
-    if (ST->getProcFamily() == RISCVSubtarget::SiFive7)
-      LMULMax = 8;
-  }
+  if (!VectorPrimaryLMULMaxExp.getNumOccurrences())
+    return std::nullopt;
 
   return ElementCount::getScalable(LMULMax * RISCV::RVVBitsPerBlock /
                                    MaxWidthInBits);
