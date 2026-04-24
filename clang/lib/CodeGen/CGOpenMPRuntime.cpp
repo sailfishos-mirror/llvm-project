@@ -60,6 +60,8 @@ public:
     ParallelOutlinedRegion,
     /// Region with outlined function for standalone 'task' directive.
     TaskOutlinedRegion,
+    /// Region with outlined function for standalone 'taskgraph' directive.
+    TaskgraphOutlinedRegion,
     /// Region for constructs that do not require function outlining,
     /// like 'for', 'sections', 'atomic' etc. directives.
     InlinedRegion,
@@ -344,6 +346,26 @@ public:
 
 private:
   StringRef HelperName;
+};
+
+/// API for captured statement code generation in OpenMP taskgraphs.
+class CGOpenMPTaskgraphRegionInfo final : public CGOpenMPRegionInfo {
+public:
+  CGOpenMPTaskgraphRegionInfo(const CapturedStmt &CS,
+                              const RegionCodeGenTy &CodeGen)
+      : CGOpenMPRegionInfo(CS, TaskgraphOutlinedRegion, CodeGen,
+                           llvm::omp::OMPD_taskgraph, false) {}
+
+  const VarDecl *getThreadIDVariable() const override { return 0; }
+
+  /// Get the name of the capture helper.
+  StringRef getHelperName() const override { return "taskgraph.omp_outlined."; }
+
+  static bool classof(const CGCapturedStmtInfo *Info) {
+    return CGOpenMPRegionInfo::classof(Info) &&
+           cast<CGOpenMPRegionInfo>(Info)->getRegionKind() ==
+               TaskgraphOutlinedRegion;
+  }
 };
 
 static void EmptyCodeGen(CodeGenFunction &, PrePostActionTy &) {
@@ -2218,6 +2240,33 @@ void CGOpenMPRuntime::emitTaskyieldCall(CodeGenFunction &CGF,
 
   if (auto *Region = dyn_cast_or_null<CGOpenMPRegionInfo>(CGF.CapturedStmtInfo))
     Region->emitUntiedSwitch(CGF);
+}
+
+void CGOpenMPRuntime::emitTaskgraphCall(CodeGenFunction &CGF,
+                                        SourceLocation Loc,
+                                        const OMPExecutableDirective &D,
+                                        const Expr *IfCond) {
+  if (!CGF.HaveInsertPoint())
+    return;
+
+  CodeGenFunction OutlinedCGF(CGM, /*suppressNewContext=*/true);
+
+  const auto *CS = cast<CapturedStmt>(D.getAssociatedStmt());
+  LValue CapStruct = CGF.InitCapturedStruct(*CS);
+
+  llvm::Function *FnT = OutlinedCGF.GenerateCapturedStmtFunction(*CS);
+
+  llvm::Value *CapturedArgsPtr = CGF.Builder.CreatePointerBitCastOrAddrSpaceCast(
+      CapStruct.getPointer(OutlinedCGF), CGM.VoidPtrTy);
+
+  auto &&CodeGen = [&](CodeGenFunction &CGF, PrePostActionTy &Action) {
+    Action.Enter(CGF);
+      CGF.CGM.getOpenMPRuntime().emitOutlinedFunctionCall(CGF, Loc,
+        FnT,
+        CapturedArgsPtr);
+  };
+  RegionCodeGenTy RCG(CodeGen);
+  RCG(CGF);
 }
 
 void CGOpenMPRuntime::emitTaskgroupRegion(CodeGenFunction &CGF,
@@ -6538,6 +6587,7 @@ const Expr *CGOpenMPRuntime::getNumTeamsExprForTargetDirective(
   case OMPD_taskyield:
   case OMPD_barrier:
   case OMPD_taskwait:
+  case OMPD_taskgraph:
   case OMPD_taskgroup:
   case OMPD_atomic:
   case OMPD_flush:
@@ -10462,6 +10512,7 @@ getNestedDistributeDirective(ASTContext &Ctx, const OMPExecutableDirective &D) {
     case OMPD_taskyield:
     case OMPD_barrier:
     case OMPD_taskwait:
+    case OMPD_taskgraph:
     case OMPD_taskgroup:
     case OMPD_atomic:
     case OMPD_flush:
@@ -11197,6 +11248,7 @@ void CGOpenMPRuntime::scanForTargetRegionsFunctions(const Stmt *S,
     case OMPD_taskyield:
     case OMPD_barrier:
     case OMPD_taskwait:
+    case OMPD_taskgraph:
     case OMPD_taskgroup:
     case OMPD_atomic:
     case OMPD_flush:
@@ -11767,6 +11819,7 @@ void CGOpenMPRuntime::emitTargetDataStandAloneCall(
     case OMPD_taskyield:
     case OMPD_barrier:
     case OMPD_taskwait:
+    case OMPD_taskgraph:
     case OMPD_taskgroup:
     case OMPD_atomic:
     case OMPD_flush:
@@ -13118,6 +13171,13 @@ void CGOpenMPSIMDRuntime::emitMaskedRegion(CodeGenFunction &CGF,
 
 void CGOpenMPSIMDRuntime::emitTaskyieldCall(CodeGenFunction &CGF,
                                             SourceLocation Loc) {
+  llvm_unreachable("Not supported in SIMD-only mode");
+}
+
+void CGOpenMPSIMDRuntime::emitTaskgraphCall(CodeGenFunction &CGF,
+                                            SourceLocation Loc,
+                                            const OMPExecutableDirective &D,
+                                            const Expr *IfCond) {
   llvm_unreachable("Not supported in SIMD-only mode");
 }
 
