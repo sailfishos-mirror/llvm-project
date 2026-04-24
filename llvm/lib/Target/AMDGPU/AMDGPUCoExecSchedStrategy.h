@@ -68,6 +68,34 @@ inline StringRef getReasonName(AMDGPUSchedReason R) {
 } // End namespace AMDGPU
 
 //===----------------------------------------------------------------------===//
+// Roofline Co-Execution Analysis Result
+//===----------------------------------------------------------------------===//
+
+/// Results of the roofline co-execution analysis for a scheduling region.
+/// Computes the maximum number of WMMA co-exec slots that can be filled
+/// by available consumer instructions (via max-flow), yielding an exact
+/// lower bound on unavoidable stall cycles under the "arbitrary reorder,
+/// coexec-only" abstraction.
+struct RooflineResult {
+  unsigned TotalSlots = 0;       // Total co-exec slots from all WMMAs (excl. E0)
+  unsigned MaxFilledSlots = 0;   // Max-flow: best possible slot filling
+  unsigned LowerBoundStalls = 0; // TotalSlots - MaxFilledSlots
+  unsigned TotalConsumers = 0;   // Total consumer instructions in region
+
+  // Per-consumer-class counts indexed by CoExecMask bit position (0-7):
+  // 0=CTRL, 1=VALU, 2=TRANS, 3=SALU, 4=DS, 5=VMEM, 6=SMEM, 7=WMMA
+  unsigned ConsumerCount[8] = {};
+
+  bool isValid() const { return TotalSlots > 0; }
+
+  float getSlotUtilization() const {
+    if (TotalSlots == 0)
+      return 0.0f;
+    return static_cast<float>(MaxFilledSlots) / TotalSlots;
+  }
+};
+
+//===----------------------------------------------------------------------===//
 // Hardware Unit Information
 //===----------------------------------------------------------------------===//
 
@@ -351,6 +379,14 @@ protected:
   unsigned getMaxBlockingCycles(const MCSchedClassDesc *SC,
                                 const MachineInstr *MI);
 
+  /// Compute the roofline co-execution analysis for the current region.
+  /// Aggregates WMMA co-exec slots by compatibility set and consumer
+  /// instructions by class, then solves a bipartite max-flow to find
+  /// the maximum number of fillable slots.
+  void computeRooflineCoExec();
+
+  RooflineResult Roofline;
+
   /// Compute the blocking cycles for the appropriate HardwareUnit given an \p
   /// SU
   unsigned getHWUICyclesForSU(SUnit *SU);
@@ -414,6 +450,9 @@ public:
   /// TODO -- add better modelling and heuristics for pipelining based scheduling.
   bool tryMemoryPipeline(GenericSchedulerBase::SchedCandidate &TryCand,
                          GenericSchedulerBase::SchedCandidate &Cand);
+
+  /// Get the roofline co-execution analysis result for the current region.
+  const RooflineResult &getRooflineResult() const { return Roofline; }
 
   /// Check for critical resource consumption. Prefer the candidate that uses
   /// the most prioritized HardwareUnit. If both candidates use the same

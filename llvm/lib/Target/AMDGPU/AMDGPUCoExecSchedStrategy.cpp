@@ -14,7 +14,11 @@
 #include "AMDGPUCoExecSchedStrategy.h"
 #include "GCNHazardRecognizer.h"
 #include "GCNSubtarget.h"
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/Format.h"
+#include "llvm/Support/MathExtras.h"
+#include <queue>
 
 using namespace llvm;
 using namespace llvm::AMDGPU;
@@ -34,6 +38,94 @@ public:
 
   // Do nothing.
   void schedule() override {}
+};
+
+/// Map an InstructionFlavor to its CoExecMask bit for the roofline analysis.
+/// Returns 0 for flavors that cannot fill co-exec slots.
+uint8_t flavorToCoExecMask(InstructionFlavor F) {
+  switch (F) {
+  case InstructionFlavor::SingleCycleVALU:
+  case InstructionFlavor::MultiCycleVALU:
+    return CoExecMask::VALU;
+  case InstructionFlavor::TRANS:
+    return CoExecMask::TRANS;
+  case InstructionFlavor::SALU:
+    return CoExecMask::SALU;
+  case InstructionFlavor::DS:
+  case InstructionFlavor::DMA:
+    return CoExecMask::DS;
+  case InstructionFlavor::VMEM:
+    return CoExecMask::VMEM;
+  case InstructionFlavor::WMMA:
+    return CoExecMask::WMMA;
+  default:
+    return 0;
+  }
+}
+
+/// Get the bit index (0-7) for a single CoExecMask bit.
+unsigned coexecBitIndex(uint8_t Bit) {
+  assert(Bit && (Bit & (Bit - 1)) == 0 && "Must be a single bit");
+  return llvm::countr_zero(Bit);
+}
+
+/// Tiny max-flow solver (Edmonds-Karp) for the roofline bipartite matching.
+/// The graph has at most ~14 nodes so fixed-size arrays suffice.
+struct TinyMaxFlow {
+  static constexpr unsigned MaxNodes = 20;
+  int Capacity[MaxNodes][MaxNodes];
+  unsigned NumNodes = 0;
+
+  void init(unsigned N) {
+    assert(N <= MaxNodes);
+    NumNodes = N;
+    memset(Capacity, 0, sizeof(Capacity));
+  }
+
+  void addEdge(unsigned From, unsigned To, int Cap) {
+    Capacity[From][To] += Cap;
+  }
+
+  int solve() {
+    unsigned Source = 0;
+    unsigned Sink = NumNodes - 1;
+    int TotalFlow = 0;
+    int Parent[MaxNodes];
+
+    while (true) {
+      // BFS to find augmenting path.
+      memset(Parent, -1, sizeof(Parent));
+      Parent[Source] = static_cast<int>(Source);
+      std::queue<unsigned> Q;
+      Q.push(Source);
+      while (!Q.empty() && Parent[Sink] == -1) {
+        unsigned U = Q.front();
+        Q.pop();
+        for (unsigned V = 0; V < NumNodes; ++V) {
+          if (Parent[V] == -1 && Capacity[U][V] > 0) {
+            Parent[V] = static_cast<int>(U);
+            Q.push(V);
+          }
+        }
+      }
+      if (Parent[Sink] == -1)
+        break;
+
+      // Find bottleneck.
+      int PathFlow = std::numeric_limits<int>::max();
+      for (unsigned V = Sink; V != Source; V = Parent[V])
+        PathFlow = std::min(PathFlow, Capacity[Parent[V]][V]);
+
+      // Update residual.
+      for (unsigned V = Sink; V != Source; V = Parent[V]) {
+        unsigned U = Parent[V];
+        Capacity[U][V] -= PathFlow;
+        Capacity[V][U] += PathFlow;
+      }
+      TotalFlow += PathFlow;
+    }
+    return TotalFlow;
+  }
 };
 
 } // namespace
@@ -463,6 +555,8 @@ void CandidateHeuristics::initialize(ScheduleDAGMI *SchedDAG,
 
   collectRegionSummary();
   MixInfo.reset();
+  computeRooflineCoExec();
+  LLVM_DEBUG(dumpRegionSummary());
   CurrentWindow.clear();
   NextWindow.clear();
 
@@ -577,8 +671,6 @@ void CandidateHeuristics::collectRegionSummary() {
   for (auto &HWUI : HWUInfo) {
     HWUI.finalizeCycles();
   }
-
-  LLVM_DEBUG(dumpRegionSummary());
 }
 
 void CandidateHeuristics::dumpRegionSummary() {
@@ -596,6 +688,121 @@ void CandidateHeuristics::dumpRegionSummary() {
            << HWUI.size() << " instrs\n";
   }
   dbgs() << "\n";
+
+  if (Roofline.isValid()) {
+    dbgs() << "Roofline Co-Exec Analysis:\n";
+    dbgs() << "  Total coexec slots: " << Roofline.TotalSlots << "\n";
+    dbgs() << "  Max fillable slots: " << Roofline.MaxFilledSlots << "\n";
+    dbgs() << "  Lower bound stalls: " << Roofline.LowerBoundStalls << "\n";
+    dbgs() << "  Slot utilization:   "
+           << format("%.1f%%", Roofline.getSlotUtilization() * 100) << "\n";
+    static const char *Names[] = {"CTRL", "VALU", "TRANS", "SALU",
+                                  "DS",   "VMEM", "SMEM",  "WMMA"};
+    for (unsigned I = 0; I < 8; ++I) {
+      if (Roofline.ConsumerCount[I])
+        dbgs() << "  " << Names[I]
+               << " consumers: " << Roofline.ConsumerCount[I] << "\n";
+    }
+    dbgs() << "\n";
+  }
+}
+
+void CandidateHeuristics::computeRooflineCoExec() {
+  Roofline = RooflineResult();
+
+  // Slot types: map from stage bitmask to count of slots with that mask.
+  DenseMap<uint8_t, unsigned> SlotTypes;
+  unsigned NumWMMAs = 0;
+
+  for (auto &SU : DAG->SUnits) {
+    const MachineInstr &MI = *SU.getInstr();
+    InstructionFlavor Flavor = classifyFlavor(MI, *SII);
+
+    if (Flavor == InstructionFlavor::WMMA) {
+      // Producer: enumerate coexec slots from this WMMA's stage pattern.
+      CoExecInfo Info = getCoExecInfo(MI, *SII);
+      for (unsigned S = 0; S < Info.TotalWindow; ++S) {
+        uint8_t Mask = Info.getMask(S);
+        // Skip E0 stages (CTRL-only, filled by hazard recognizer).
+        if (Mask == CoExecMask::StageE0)
+          continue;
+        SlotTypes[Mask]++;
+      }
+      NumWMMAs++;
+      continue;
+    }
+
+    // Consumer: map to CoExecMask bit.
+    uint8_t Bit = flavorToCoExecMask(Flavor);
+    // Catch SMEM instructions that classifyFlavor maps to Other.
+    if (!Bit && SII->isSMRD(MI))
+      Bit = CoExecMask::SMEM;
+    if (!Bit)
+      continue;
+    Roofline.ConsumerCount[coexecBitIndex(Bit)]++;
+    Roofline.TotalConsumers++;
+  }
+
+  // WMMAs can also consume V-stage slots of preceding WMMAs.
+  if (NumWMMAs > 1)
+    Roofline.ConsumerCount[coexecBitIndex(CoExecMask::WMMA)] += NumWMMAs - 1;
+
+  // Compute total slots.
+  for (auto &[Mask, Count] : SlotTypes)
+    Roofline.TotalSlots += Count;
+
+  if (Roofline.TotalSlots == 0)
+    return;
+
+  // Identify active consumer classes (those with count > 0).
+  SmallVector<unsigned, 8> ActiveClasses;
+  for (unsigned I = 0; I < 8; ++I) {
+    if (Roofline.ConsumerCount[I] > 0)
+      ActiveClasses.push_back(I);
+  }
+
+  // Collect slot types into a vector for indexing.
+  SmallVector<std::pair<uint8_t, unsigned>, 8> SlotTypeVec(SlotTypes.begin(),
+                                                           SlotTypes.end());
+
+  // Build flow network.
+  // Nodes: 0=source, 1..C=consumer classes, C+1..C+T=slot types, C+T+1=sink.
+  unsigned C = ActiveClasses.size();
+  unsigned T = SlotTypeVec.size();
+  unsigned NumNodes = 1 + C + T + 1;
+
+  TinyMaxFlow MF;
+  MF.init(NumNodes);
+
+  unsigned Source = 0;
+  unsigned Sink = NumNodes - 1;
+
+  // Source -> consumer class edges.
+  for (unsigned I = 0; I < C; ++I) {
+    unsigned ClassNode = 1 + I;
+    unsigned Nk = Roofline.ConsumerCount[ActiveClasses[I]];
+    MF.addEdge(Source, ClassNode, Nk);
+  }
+
+  // Slot type -> sink edges, and consumer class -> slot type edges.
+  for (unsigned J = 0; J < T; ++J) {
+    unsigned SlotNode = 1 + C + J;
+    unsigned Mt = SlotTypeVec[J].second;
+    uint8_t Mask = SlotTypeVec[J].first;
+    MF.addEdge(SlotNode, Sink, Mt);
+
+    for (unsigned I = 0; I < C; ++I) {
+      unsigned BitIdx = ActiveClasses[I];
+      uint8_t ClassBit = 1u << BitIdx;
+      if (Mask & ClassBit) {
+        unsigned Nk = Roofline.ConsumerCount[BitIdx];
+        MF.addEdge(1 + I, SlotNode, std::min(Nk, Mt));
+      }
+    }
+  }
+
+  Roofline.MaxFilledSlots = MF.solve();
+  Roofline.LowerBoundStalls = Roofline.TotalSlots - Roofline.MaxFilledSlots;
 }
 
 void CandidateHeuristics::sortHWUIResources() {
