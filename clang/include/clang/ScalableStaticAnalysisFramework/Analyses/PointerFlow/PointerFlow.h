@@ -31,7 +31,7 @@ class PointerFlowEntitySummary final : public EntitySummary {
   getEdges(const PointerFlowEntitySummary &);
 
   explicit PointerFlowEntitySummary(EdgeSet Edges)
-      : EntitySummary(), Edges(std::move(Edges)) {}
+      : Edges(std::move(Edges)) {}
 
 public:
   static constexpr llvm::StringLiteral Name = "PointerFlow";
