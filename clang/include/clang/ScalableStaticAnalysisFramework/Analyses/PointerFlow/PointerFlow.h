@@ -25,7 +25,6 @@ using EdgeSet = std::map<EntityPointerLevel, EntityPointerLevelSet>;
 class PointerFlowEntitySummary final : public EntitySummary {
   EdgeSet Edges;
 
-  friend class PointerFlowTUSummaryExtractor;
   friend PointerFlowEntitySummary buildPointerFlowEntitySummary(EdgeSet Edges);
   friend llvm::iterator_range<EdgeSet::const_iterator>
   getEdges(const PointerFlowEntitySummary &);

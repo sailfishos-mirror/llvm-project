@@ -29,6 +29,10 @@
 #include <memory>
 #include <optional>
 
+namespace clang::ssaf {
+extern PointerFlowEntitySummary buildPointerFlowEntitySummary(EdgeSet Edges);
+} // namespace  clang::ssaf
+
 namespace {
 using namespace clang;
 using namespace ssaf;
@@ -43,18 +47,22 @@ public:
       : Ctx(Ctx), AddEntity(std::move(AddEntity)) {}
 
   llvm::Error matches(const DynTypedNode &DynNode, const NamedDecl *RootDecl);
+
   llvm::Error matchesInitializerList(const ValueDecl *Base,
                                      const Expr *InitExpr,
                                      unsigned ArrayElementIndirectLevel = 0);
+
   llvm::Error matchesStmt(const Stmt *S, const NamedDecl *RootDecl);
+
   llvm::Error matchesDecl(const Decl *D, const NamedDecl *RootDecl);
 
 private:
   std::function<EntityId(const EntityName &)> AddEntity;
 
-  Expected<EntityPointerLevelSet> toEPL(const NamedDecl *N, bool IsRet = false);
+  Expected<EntityPointerLevelSet> toEPL(const NamedDecl *N,
+                                        bool IsRet = false) const;
 
-  Expected<EntityPointerLevelSet> toEPL(const Expr *N);
+  Expected<EntityPointerLevelSet> toEPL(const Expr *N) const;
 
   llvm::Error addEdges(Expected<EntityPointerLevelSet> &&LHS,
                        Expected<EntityPointerLevelSet> &&RHS);
@@ -78,7 +86,7 @@ private:
 };
 
 Expected<EntityPointerLevelSet> PointerFlowMatcher::toEPL(const NamedDecl *N,
-                                                          bool IsRet) {
+                                                          bool IsRet) const {
   auto Ret = createEntityPointerLevel(N, AddEntity, IsRet);
 
   if (Ret)
@@ -86,7 +94,7 @@ Expected<EntityPointerLevelSet> PointerFlowMatcher::toEPL(const NamedDecl *N,
   return Ret.takeError();
 }
 
-Expected<EntityPointerLevelSet> PointerFlowMatcher::toEPL(const Expr *N) {
+Expected<EntityPointerLevelSet> PointerFlowMatcher::toEPL(const Expr *N) const {
   return translateEntityPointerLevel(N, Ctx, AddEntity);
 }
 
@@ -293,9 +301,7 @@ PointerFlowMatcher::matchesInitializerList(const ValueDecl *Base,
   // Must be the case of using a initializer-list for a scalar:
   return matchesInitializerList(Base, ILE->getInit(0));
 }
-} // namespace
 
-namespace clang::ssaf {
 class PointerFlowTUSummaryExtractor : public TUSummaryExtractor {
 public:
   PointerFlowTUSummaryExtractor(TUSummaryBuilder &Builder)
@@ -318,7 +324,7 @@ public:
 
     findMatchesIn(Contributor, MatchAction);
     return std::make_unique<PointerFlowEntitySummary>(
-        PointerFlowEntitySummary(std::move(Matcher.Results)));
+        buildPointerFlowEntitySummary(std::move(Matcher.Results)));
   }
 
   void HandleTranslationUnit(ASTContext &Ctx) override {
@@ -346,7 +352,7 @@ public:
     }
   }
 };
-} // namespace clang::ssaf
+} // namespace
 
 // NOLINTNEXTLINE(misc-use-internal-linkage)
 volatile int PointerFlowTUSummaryExtractorAnchorSource = 0;
