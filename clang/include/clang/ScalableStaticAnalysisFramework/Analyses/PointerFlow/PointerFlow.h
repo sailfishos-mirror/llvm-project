@@ -30,7 +30,7 @@ class PointerFlowEntitySummary final : public EntitySummary {
   friend llvm::iterator_range<EdgeSet::const_iterator>
   getEdges(const PointerFlowEntitySummary &);
 
-  PointerFlowEntitySummary(EdgeSet Edges)
+  explicit PointerFlowEntitySummary(EdgeSet Edges)
       : EntitySummary(), Edges(std::move(Edges)) {}
 
 public:
