@@ -220,14 +220,9 @@ struct __fold_right {
     _Iter __tail = ranges::next(__first, __last);
     --__tail;
     _Up __result = std::invoke(__func, *__tail, std::move(__init));
-    __identity __proj;
-    std::__for_each(
-        std::make_reverse_iterator(__tail),
-        std::make_reverse_iterator(__first),
-        [&](auto&& __element) {
-          __result = std::invoke(__func, std::forward<decltype(__element)>(__element), std::move(__result));
-        },
-        __proj);
+    std::for_each(std::make_reverse_iterator(__tail), std::make_reverse_iterator(__first), [&](auto&& __element) {
+      __result = std::invoke(__func, std::forward<decltype(__element)>(__element), std::move(__result));
+    });
 
     return __result;
   }
