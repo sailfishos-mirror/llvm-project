@@ -24,8 +24,8 @@
 #include "clang/ScalableStaticAnalysisFramework/Core/TUSummary/TUSummaryBuilder.h"
 #include "clang/ScalableStaticAnalysisFramework/Core/TUSummary/TUSummaryExtractor.h"
 #include "llvm/ADT/STLExtras.h"
-#include "llvm/ADT/Sequence.h"
 #include "llvm/ADT/STLFunctionalExtras.h"
+#include "llvm/ADT/Sequence.h"
 #include "llvm/Support/Error.h"
 #include <memory>
 #include <optional>
