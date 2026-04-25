@@ -168,13 +168,7 @@ define float @foo3(ptr nocapture readonly %A) #0 {
 ; CHECK-NEXT:    [[CMP:%.*]] = icmp slt i32 [[TMP16]], 121
 ; CHECK-NEXT:    br i1 [[CMP]], label [[FOR_BODY]], label [[FOR_END:%.*]]
 ; CHECK:       for.end:
-; CHECK-NEXT:    [[TMP28:%.*]] = extractelement <4 x float> [[TMP17]], i32 0
-; CHECK-NEXT:    [[TMP32:%.*]] = extractelement <4 x float> [[TMP17]], i32 1
-; CHECK-NEXT:    [[ADD30:%.*]] = fadd float [[TMP28]], [[TMP32]]
-; CHECK-NEXT:    [[TMP20:%.*]] = extractelement <4 x float> [[TMP17]], i32 2
-; CHECK-NEXT:    [[ADD31:%.*]] = fadd float [[ADD30]], [[TMP20]]
-; CHECK-NEXT:    [[TMP30:%.*]] = extractelement <4 x float> [[TMP17]], i32 3
-; CHECK-NEXT:    [[ADD33:%.*]] = fadd float [[ADD31]], [[TMP30]]
+; CHECK-NEXT:    [[ADD33:%.*]] = call float @llvm.vector.reduce.fadd.v4f32(float -0.000000e+00, <4 x float> [[TMP17]])
 ; CHECK-NEXT:    [[ADD32:%.*]] = fadd float [[ADD33]], [[ADD6]]
 ; CHECK-NEXT:    ret float [[ADD32]]
 ;
