@@ -29,8 +29,8 @@ namespace clang::ssaf {
 
 constexpr llvm::StringLiteral PointerFlowAnalysisResultName =
     "PointerFlowAnalysisResult";
-constexpr llvm::StringLiteral PointerFlowReachableAnalysisResultName =
-    "PointerFlowReachableAnalysisResult";
+constexpr llvm::StringLiteral UnsafeBufferReachableAnalysisResultName =
+    "UnsafeBufferReachableAnalysisResult";
 
 struct PointerFlowAnalysisResult final : AnalysisResult {
   static AnalysisName analysisName() {
@@ -40,9 +40,9 @@ struct PointerFlowAnalysisResult final : AnalysisResult {
   std::map<EntityId, EdgeSet> Edges;
 };
 
-struct PointerFlowReachableAnalysisResult final : AnalysisResult {
+struct UnsafeBufferReachableAnalysisResult final : AnalysisResult {
   static AnalysisName analysisName() {
-    return AnalysisName(PointerFlowReachableAnalysisResultName.str());
+    return AnalysisName(UnsafeBufferReachableAnalysisResultName.str());
   }
 
   std::map<EntityId, EntityPointerLevelSet> Reachables;

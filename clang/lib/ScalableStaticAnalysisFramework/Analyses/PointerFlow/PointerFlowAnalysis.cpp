@@ -123,11 +123,11 @@ AnalysisRegistry::Add<PointerFlowAnalysis>
 //===----------------------------------------------------------------------===//
 
 json::Object serializePointerFlowReachableAnalysisResult(
-    const PointerFlowReachableAnalysisResult &R,
+    const UnsafeBufferReachableAnalysisResult &R,
     JSONFormat::EntityIdToJSONFn IdToJSON) {
   json::Object Result;
 
-  Result[PointerFlowReachableAnalysisResultName] =
+  Result[UnsafeBufferReachableAnalysisResultName] =
       entityPointerLevelMapToJSON(R.Reachables, IdToJSON);
   return Result;
 }
@@ -136,36 +136,36 @@ Expected<std::unique_ptr<AnalysisResult>>
 deserializePointerFlowReachableAnalysisResult(
     const json::Object &Obj, JSONFormat::EntityIdFromJSONFn IdFromJSON) {
   const json::Array *Content =
-      Obj.getArray(PointerFlowReachableAnalysisResultName);
+      Obj.getArray(UnsafeBufferReachableAnalysisResultName);
 
   if (!Content)
     return makeSawButExpectedError(
         Obj, "an object with a key %s",
-        PointerFlowReachableAnalysisResultName.data());
+        UnsafeBufferReachableAnalysisResultName.data());
 
   auto Reachables = entityPointerLevelMapFromJSON(*Content, IdFromJSON);
 
   if (!Reachables)
     return Reachables.takeError();
 
-  auto Ret = std::make_unique<PointerFlowReachableAnalysisResult>();
+  auto Ret = std::make_unique<UnsafeBufferReachableAnalysisResult>();
 
   Ret->Reachables = std::move(*Reachables);
   return Ret;
 }
 
-JSONFormat::AnalysisResultRegistry::Add<PointerFlowReachableAnalysisResult>
+JSONFormat::AnalysisResultRegistry::Add<UnsafeBufferReachableAnalysisResult>
     RegisterPointerFlowReachableResultForJSON(
         serializePointerFlowReachableAnalysisResult,
         deserializePointerFlowReachableAnalysisResult);
 
-// For any AnalysisResult that is a set of pointers, it can be the starting set
-// for reachable analysis.
-template <typename AnalysisResultInPointerSet>
-class PointerFlowReachableAnalysis
-    : public DerivedAnalysis<PointerFlowReachableAnalysisResult,
+/// Computes all the reachable "nodes" (pointers) in a pointer flow graph from a
+/// provided starter node set.  Specifically, the starter set is the unsafe
+/// pointers found by `UnsafeBufferUsageAnalysis`.
+class UnsafeBufferReachableAnalysis
+    : public DerivedAnalysis<UnsafeBufferReachableAnalysisResult,
                              PointerFlowAnalysisResult,
-                             AnalysisResultInPointerSet> {
+                             UnsafeBufferUsageAnalysisResult> {
   using GraphT = std::map<EntityId, EdgeSet>;
   const GraphT *Graph = nullptr;
 
@@ -196,10 +196,9 @@ class PointerFlowReachableAnalysis
   }
 
 public:
-  // FIXME: we need a unique analysis name for each instantiation
-
-  llvm::Error initialize(const PointerFlowAnalysisResult &Graph,
-                         const AnalysisResultInPointerSet &Starter) override {
+  llvm::Error
+  initialize(const PointerFlowAnalysisResult &Graph,
+             const UnsafeBufferUsageAnalysisResult &Starter) override {
     this->Graph = &Graph.Edges;
     assert(this->getResult().Reachables.empty());
     this->getResult().Reachables.insert(Starter.begin(), Starter.end());
@@ -225,8 +224,7 @@ public:
   }
 };
 
-AnalysisRegistry::Add<
-    PointerFlowReachableAnalysis<UnsafeBufferUsageAnalysisResult>>
+AnalysisRegistry::Add<UnsafeBufferReachableAnalysis>
     RegisterPointerFlowReachableAnalysis(
         "Reachable pointers from unsafe buffer usage in pointer flow graph");
 
