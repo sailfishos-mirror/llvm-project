@@ -1040,8 +1040,7 @@ void UnsymbolizedProfileReader::readUnsymbolizedProfile(StringRef FileName) {
       TraceIt.advance();
       if (!LeafIsInternal) {
         // Skip ranges and branches for non-matching leaf buildid.
-        while (!TraceIt.isAtEoF() &&
-               !TraceIt.getCurrentLine().starts_with("["))
+        while (!TraceIt.isAtEoF() && !TraceIt.getCurrentLine().starts_with("["))
           TraceIt.advance();
         continue;
       }

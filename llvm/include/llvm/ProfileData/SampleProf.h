@@ -603,10 +603,9 @@ public:
   /// `buildid:` prefixes; non-matching frames become 0x0.
   /// Returns true if the leaf (first) frame's buildid matches or no
   /// filter is set, false if the leaf is external (non-matching buildid).
-  static bool
-  createCtxVectorFromStr(StringRef ContextStr,
-                         SampleContextFrameVector &Context,
-                         StringRef FilterBuildID = StringRef()) {
+  static bool createCtxVectorFromStr(StringRef ContextStr,
+                                     SampleContextFrameVector &Context,
+                                     StringRef FilterBuildID = StringRef()) {
     // Remove encapsulating '[' and ']' if any
     ContextStr = ContextStr.substr(1, ContextStr.size() - 2);
     StringRef ContextRemain = ContextStr;

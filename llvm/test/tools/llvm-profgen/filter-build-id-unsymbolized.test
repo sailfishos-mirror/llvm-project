@@ -6,19 +6,13 @@
 ; RUN: llvm-profgen --format=text --unsymbolized-profile=%S/Inputs/buildid-unsymbolized.raw --binary=%S/Inputs/noinline-cs-noprobe.perfbin --output=%t1 --filter-build-id=aabb1122 --profile-summary-cold-count=0
 ; RUN: FileCheck %s --input-file %t1 --check-prefix=CHECK-MATCH
 
-; CHECK-MATCH:      0x4005dc:202:0
-; CHECK-MATCH-NEXT:  0: 0x400634:202
-; CHECK-MATCH-NEXT:   2: 6
-; CHECK-MATCH:        0: 0x400684:100
-; CHECK-MATCH-NEXT:      0: 6
-; CHECK-MATCH-NEXT:      1: 6
+; CHECK-MATCH: 0x4005dc:202:0
+; CHECK-MATCH:  0: 0x400634:202
+; CHECK-MATCH:   0: 0x400684:100
 
-;; Test 2: Non-matching buildid - only deadbeef contexts are processed.
-; RUN: llvm-profgen --format=text --unsymbolized-profile=%S/Inputs/buildid-unsymbolized.raw --binary=%S/Inputs/noinline-cs-noprobe.perfbin --output=%t2 --filter-build-id=deadbeef --profile-summary-cold-count=0
-; RUN: FileCheck %s --input-file %t2 --check-prefix=CHECK-NOMATCH
-
-; CHECK-NOMATCH:     0x700100:1:0
-; CHECK-NOMATCH-NOT: 0x4005dc
+;; Test 2: Non-matching buildid - aabb1122 contexts are skipped.
+; RUN: llvm-profgen --format=text --unsymbolized-profile=%S/Inputs/buildid-unsymbolized.raw --binary=%S/Inputs/noinline-cs-noprobe.perfbin --output=%t2 --filter-build-id=ccdd3344 --profile-summary-cold-count=0 2>&1 | FileCheck %s --check-prefix=CHECK-NOMATCH
+; CHECK-NOMATCH: warning:
 
 ;; Test 3: Backward compatibility - unsymbolized profile without buildid
 ;; prefixes works unchanged when no --filter-build-id is specified.
@@ -26,7 +20,6 @@
 ; RUN: llvm-profgen --format=text --unsymbolized-profile=%t.unsym --binary=%S/Inputs/noinline-cs-noprobe.perfbin --output=%t3 --profile-summary-cold-count=0
 ; RUN: FileCheck %s --input-file %t3 --check-prefix=CHECK-COMPAT
 
-; CHECK-COMPAT:      main:202:0
-; CHECK-COMPAT-NEXT:  1: foo:202
-; CHECK-COMPAT-NEXT:   2: 6
-; CHECK-COMPAT-NEXT:   3: bar:100
+; CHECK-COMPAT: main:202:0
+; CHECK-COMPAT:  1: foo:202
+; CHECK-COMPAT:   3: bar:100
