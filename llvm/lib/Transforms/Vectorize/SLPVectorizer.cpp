@@ -30141,8 +30141,7 @@ static void forEachOperandChainCandidate(Instruction *I, Func F) {
       F(RI->getReturnValue(), 0);
     return;
   }
-  for (auto [Idx, U] : enumerate(I->operands()))
-    F(U.get(), Idx);
+  llvm_unreachable("Unexpected instruction kind for operand-chain seeding");
 }
 
 template <typename ItT>
@@ -30189,12 +30188,15 @@ bool SLPVectorizerPass::vectorizeNonVectorizableInsts(
       IndirectCall,
     };
     Kind RootKind;
-    unsigned KindID;    // Intrinsic ID, opcode (+ atomicrmw op) or value ID.
+    unsigned KindID;    // Intrinsic ID for Intrinsic, opcode for NonCall,
+                        // callee value-kind for IndirectCall, 0 for
+                        // NamedFunction.
+    unsigned SubOp;     // AtomicRMW operation; 0 otherwise.
     StringRef FuncName; // Non-empty only for NamedFunction.
     unsigned Position;  // Operand slot within the root.
 
     bool operator==(const OperandGroupKey &O) const {
-      return RootKind == O.RootKind && KindID == O.KindID &&
+      return RootKind == O.RootKind && KindID == O.KindID && SubOp == O.SubOp &&
              FuncName == O.FuncName && Position == O.Position;
     }
     bool operator!=(const OperandGroupKey &O) const { return !(*this == O); }
@@ -30204,6 +30206,8 @@ bool SLPVectorizerPass::vectorizeNonVectorizableInsts(
                static_cast<unsigned>(O.RootKind);
       if (KindID != O.KindID)
         return KindID < O.KindID;
+      if (SubOp != O.SubOp)
+        return SubOp < O.SubOp;
       if (int C = FuncName.compare(O.FuncName))
         return C < 0;
       return Position < O.Position;
@@ -30216,20 +30220,23 @@ bool SLPVectorizerPass::vectorizeNonVectorizableInsts(
       if (auto *II = dyn_cast<IntrinsicInst>(CB))
         return {OperandGroupKey::Kind::Intrinsic,
                 II->getIntrinsicID(),
+                0,
                 {},
                 Position};
       if (Function *F = CB->getCalledFunction())
-        return {OperandGroupKey::Kind::NamedFunction, 0, F->getName(),
+        return {OperandGroupKey::Kind::NamedFunction, 0, 0, F->getName(),
                 Position};
       return {OperandGroupKey::Kind::IndirectCall,
               CB->getCalledOperand()->getValueID(),
+              0,
               {},
               Position};
     }
-    unsigned Discriminator = I->getOpcode();
+    unsigned SubOp = 0;
     if (auto *AI = dyn_cast<AtomicRMWInst>(I))
-      Discriminator |= static_cast<unsigned>(AI->getOperation()) << 16;
-    return {OperandGroupKey::Kind::NonCall, Discriminator, {}, Position};
+      SubOp = static_cast<unsigned>(AI->getOperation());
+    return {
+        OperandGroupKey::Kind::NonCall, I->getOpcode(), SubOp, {}, Position};
   };
 
   auto OperandSorter = [&OpKeys](Value *V1, Value *V2) -> bool {
