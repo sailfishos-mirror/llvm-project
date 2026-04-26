@@ -41,6 +41,7 @@ enum class AMDGPUSchedReason : uint8_t {
   MemoryPipeline,
   CritResourceBalance, // tryCriticalResource chose based on resource pressure
   CritResourceDep,     // tryCriticalResourceDependency chose based on enabling
+  ShadowMix,           // tryShadowMix deferred/prioritized for co-exec filling
   NUM_REASONS
 };
 
@@ -56,6 +57,8 @@ inline StringRef getReasonName(AMDGPUSchedReason R) {
     return "CritResource";
   case AMDGPUSchedReason::CritResourceDep:
     return "CritResourceDep";
+  case AMDGPUSchedReason::ShadowMix:
+    return "ShadowMix";
   case AMDGPUSchedReason::NUM_REASONS:
     return "???";
   }
@@ -199,6 +202,63 @@ public:
 };
 
 //===----------------------------------------------------------------------===//
+// Window Slot Demand
+//===----------------------------------------------------------------------===//
+
+struct RegionMixInfo; // Forward declaration
+
+/// Slot demand derived from a WMMA CoExecInfo template.
+/// Instead of hardcoded filler thresholds, this counts actual I-slots and
+/// E-slots from the WMMA's window pattern, telling the scheduler exactly
+/// how many compatible fillers are needed.
+struct WindowSlotDemand {
+  unsigned ISlots = 0; // Stages accepting VALU/TRANS (CoExecMask::StageI)
+  unsigned ESlots = 0; // Stages accepting SALU/DS only (CoExecMask::StageE)
+  unsigned VSlots = 0; // Vacant stages (next WMMA only, CoExecMask::StageV)
+
+  /// Compute demand from a CoExecInfo template.
+  static WindowSlotDemand fromCoExecInfo(const AMDGPU::CoExecInfo &Info);
+
+  /// Check if ready fillers in \p Mix meet the slot demand.
+  bool isSatisfied(const RegionMixInfo &Mix) const;
+
+  /// Return the flavor with the largest gap between demand and ready count.
+  AMDGPU::InstructionFlavor getMostDeficientFlavor(const RegionMixInfo &Mix) const;
+
+  bool hasSlots() const { return ISlots > 0 || ESlots > 0; }
+};
+
+//===----------------------------------------------------------------------===//
+// Region Mix Info
+//===----------------------------------------------------------------------===//
+
+/// Tracks per-flavor instruction counts across a scheduling region.
+/// Used by ShadowMix heuristics to determine when enough co-execution
+/// fillers are ready to justify scheduling a window-producing instruction.
+///
+/// `ReadyCount[]` is a snapshot of the boundary's Available + Pending queues
+/// (both DAG-ready, the latter would just stall this cycle). The snapshot is
+/// lazy: invalidated whenever a node is scheduled, refreshed on first read.
+/// Callers that consume `ReadyCount` MUST call `refreshFromBoundary(Zone)`
+/// first, or the value is stale.
+struct RegionMixInfo {
+  unsigned ReadyCount[static_cast<unsigned>(AMDGPU::InstructionFlavor::NUM_FLAVORS)] = {};
+  unsigned ScheduledCount[static_cast<unsigned>(AMDGPU::InstructionFlavor::NUM_FLAVORS)] = {};
+
+  void reset();
+  void recordScheduled(AMDGPU::InstructionFlavor Flavor);
+  void invalidate() { SnapshotDirty = true; }
+  void refreshFromBoundary(SchedBoundary &Zone, const SIInstrInfo &SII);
+
+  unsigned getReadyCount(AMDGPU::InstructionFlavor F) const {
+    return ReadyCount[static_cast<unsigned>(F)];
+  }
+
+private:
+  bool SnapshotDirty = true;
+};
+
+//===----------------------------------------------------------------------===//
 // Candidate Heuristics
 //===----------------------------------------------------------------------===//
 
@@ -213,6 +273,10 @@ protected:
   const TargetSchedModel *SchedModel;
   SmallVector<HardwareUnitInfo, 8> HWUInfo;
   DenseMap<MachineInstr *, unsigned> CarriedLatencies;
+  RegionMixInfo MixInfo;
+  /// Region-aggregate slot demand averaged across all WMMAs. Used as fallback
+  /// when no specific WMMA candidate is in the current comparison.
+  WindowSlotDemand RegionSlotDemand;
 
   /// Walk over the region and collect characteristics for the various
   /// heuristics.
@@ -236,6 +300,21 @@ protected:
   /// Thus, this method just attempts to find a reasonable upper bound for
   /// carried load latency to avoid long stalls.
   unsigned getCarriedLatency(SUnit *SU);
+
+  /// Count how many successors of \p SU match \p TargetFlavor and would become
+  /// ready (NumPredsLeft == 1) if \p SU were scheduled.
+  unsigned countDirectlyEnabledByFlavor(SUnit *SU,
+                                        AMDGPU::InstructionFlavor TargetFlavor);
+
+  /// BFS to find the nearest pending SU matching \p TargetFlavor reachable from
+  /// successors of instructions in the DAG. Returns the distance or nullopt.
+  std::optional<unsigned>
+  findNearestPendingByFlavor(AMDGPU::InstructionFlavor TargetFlavor,
+                             unsigned MaxDepth);
+
+  /// Returns true if scheduling \p SU would directly or transitively help
+  /// enable \p TargetSU.
+  bool wouldHelpEnable(SUnit *SU, SUnit *TargetSU);
 
 public:
   CandidateHeuristics() = default;
@@ -288,6 +367,15 @@ public:
   tryCriticalResourceDependency(GenericSchedulerBase::SchedCandidate &TryCand,
                                 GenericSchedulerBase::SchedCandidate &Cand,
                                 SchedBoundary *Zone) const;
+
+  /// ShadowMix heuristic: prefer window-producing instructions (WMMA, TRANS,
+  /// MultiCycleVALU) over compatible fillers so fillers execute in the
+  /// producer's shadow. When fillers are insufficient, steer enablement
+  /// toward the most deficient filler flavor. When fillers are sufficient,
+  /// promote the producer.
+  bool tryShadowMix(GenericSchedulerBase::SchedCandidate &TryCand,
+                    GenericSchedulerBase::SchedCandidate &Cand,
+                    SchedBoundary *Zone);
 
   void dumpRegionSummary();
 };

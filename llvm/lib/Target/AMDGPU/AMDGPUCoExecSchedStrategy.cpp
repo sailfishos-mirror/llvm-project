@@ -21,6 +21,9 @@ using namespace llvm::AMDGPU;
 
 #define DEBUG_TYPE "machine-scheduler"
 
+// BFS depth limit for lookahead search (search-budget, not hardware-derived).
+static constexpr unsigned ShadowMixLookaheadDepth = 8;
+
 namespace {
 
 // Used to disable post-RA scheduling with function level granularity.
@@ -83,6 +86,123 @@ InstructionFlavor llvm::AMDGPU::classifyFlavor(const MachineInstr &MI,
     return InstructionFlavor::SALU;
 
   return InstructionFlavor::Other;
+}
+
+//===----------------------------------------------------------------------===//
+// RegionMixInfo
+//===----------------------------------------------------------------------===//
+
+void RegionMixInfo::reset() {
+  constexpr unsigned N =
+      static_cast<unsigned>(InstructionFlavor::NUM_FLAVORS);
+  for (unsigned I = 0; I < N; ++I) {
+    ReadyCount[I] = 0;
+    ScheduledCount[I] = 0;
+  }
+  SnapshotDirty = true;
+}
+
+void RegionMixInfo::recordScheduled(InstructionFlavor Flavor) {
+  ScheduledCount[static_cast<unsigned>(Flavor)]++;
+}
+
+void RegionMixInfo::refreshFromBoundary(SchedBoundary &Zone,
+                                        const SIInstrInfo &SII) {
+  if (!SnapshotDirty)
+    return;
+  constexpr unsigned N =
+      static_cast<unsigned>(InstructionFlavor::NUM_FLAVORS);
+  for (unsigned I = 0; I < N; ++I)
+    ReadyCount[I] = 0;
+
+  // Snapshot Available + Pending: both have NumPredsLeft == 0 (DAG-ready).
+  // Pending entries would cause a structural stall this cycle but are still
+  // candidates the picker may select, so ShadowMix counts them as "ready".
+  auto Bump = [&](SUnit *SU) {
+    unsigned Idx =
+        static_cast<unsigned>(classifyFlavor(*SU->getInstr(), SII));
+    ReadyCount[Idx]++;
+  };
+  for (SUnit *SU : Zone.Available.elements())
+    Bump(SU);
+  for (SUnit *SU : Zone.Pending.elements())
+    Bump(SU);
+  SnapshotDirty = false;
+}
+
+//===----------------------------------------------------------------------===//
+// WindowSlotDemand
+//===----------------------------------------------------------------------===//
+
+WindowSlotDemand
+WindowSlotDemand::fromCoExecInfo(const CoExecInfo &Info) {
+  WindowSlotDemand Demand;
+  for (unsigned S = 0; S < Info.TotalWindow; ++S) {
+    uint8_t Mask = Info.getMask(S);
+    switch (Mask) {
+    case CoExecMask::StageE0:
+      // Control-only stage, no filler needed.
+      break;
+    case CoExecMask::StageE:
+      Demand.ESlots++;
+      break;
+    case CoExecMask::StageI:
+      Demand.ISlots++;
+      break;
+    case CoExecMask::StageV:
+      Demand.VSlots++;
+      break;
+    default:
+      // Permissive or unknown stage — count as I-slot (most permissive
+      // non-trivial type).
+      if (Mask & CoExecMask::VALU)
+        Demand.ISlots++;
+      else if (Mask != CoExecMask::None)
+        Demand.ESlots++;
+      break;
+    }
+  }
+  return Demand;
+}
+
+bool WindowSlotDemand::isSatisfied(const RegionMixInfo &Mix) const {
+  // I-slots accept VALU/TRANS/VMEM (all take 1 issue cycle).
+  unsigned ReadyICompat =
+      Mix.getReadyCount(InstructionFlavor::SingleCycleVALU) +
+      Mix.getReadyCount(InstructionFlavor::TRANS) +
+      Mix.getReadyCount(InstructionFlavor::VMEM);
+  // E-slots accept SALU/DS.
+  unsigned ReadyECompat =
+      Mix.getReadyCount(InstructionFlavor::DS) +
+      Mix.getReadyCount(InstructionFlavor::SALU);
+
+  if (ReadyICompat < ISlots)
+    return false;
+  if (ReadyECompat < ESlots)
+    return false;
+  return true;
+}
+
+InstructionFlavor
+WindowSlotDemand::getMostDeficientFlavor(const RegionMixInfo &Mix) const {
+  // Compute deficit for each filler class relative to slot demand.
+  // I-slots need VALU/TRANS/VMEM.
+  int IDeficit = static_cast<int>(ISlots) -
+                 static_cast<int>(
+                     Mix.getReadyCount(InstructionFlavor::SingleCycleVALU) +
+                     Mix.getReadyCount(InstructionFlavor::TRANS) +
+                     Mix.getReadyCount(InstructionFlavor::VMEM));
+  // E-slots need DS or SALU.
+  int EDeficit = static_cast<int>(ESlots) -
+                 static_cast<int>(
+                     Mix.getReadyCount(InstructionFlavor::DS) +
+                     Mix.getReadyCount(InstructionFlavor::SALU));
+
+  // Break ties: if both have equal deficit, prefer enabling VALU (typically
+  // scarcer and higher-value for I-slots).
+  if (EDeficit > IDeficit)
+    return InstructionFlavor::DS;
+  return InstructionFlavor::SingleCycleVALU;
 }
 
 SUnit *HardwareUnitInfo::getNextTargetSU(bool LookDeep) const {
@@ -245,10 +365,13 @@ unsigned CandidateHeuristics::getHWUICyclesForMI(MachineInstr *MI) {
 }
 
 void CandidateHeuristics::updateForScheduling(SUnit *SU) {
-  HardwareUnitInfo *HWUI =
-      getHWUIFromFlavor(classifyFlavor(*SU->getInstr(), *SII));
+  auto Flavor = classifyFlavor(*SU->getInstr(), *SII);
+  HardwareUnitInfo *HWUI = getHWUIFromFlavor(Flavor);
   assert(HWUI);
   HWUI->markScheduled(SU, getHWUICyclesForSU(SU));
+  MixInfo.recordScheduled(Flavor);
+  // Mix snapshot is now stale; tryShadowMix will refresh on its next call.
+  MixInfo.invalidate();
 }
 
 void CandidateHeuristics::initialize(ScheduleDAGMI *SchedDAG,
@@ -274,6 +397,36 @@ void CandidateHeuristics::initialize(ScheduleDAGMI *SchedDAG,
   HWUInfo[(int)InstructionFlavor::DS].setBufferSize(DefaultBufferSizes::DS);
 
   collectRegionSummary();
+  MixInfo.reset();
+
+  // Compute region-aggregate slot demand from WMMA templates.
+  RegionSlotDemand = WindowSlotDemand();
+  unsigned WMMACount = 0;
+  for (auto &SU : DAG->SUnits) {
+    if (classifyFlavor(*SU.getInstr(), *SII) != InstructionFlavor::WMMA)
+      continue;
+    WindowSlotDemand D =
+        WindowSlotDemand::fromCoExecInfo(getCoExecInfo(*SU.getInstr(), *SII));
+    RegionSlotDemand.ISlots += D.ISlots;
+    RegionSlotDemand.ESlots += D.ESlots;
+    RegionSlotDemand.VSlots += D.VSlots;
+    WMMACount++;
+  }
+  if (WMMACount > 0) {
+    RegionSlotDemand.ISlots =
+        (RegionSlotDemand.ISlots + WMMACount - 1) / WMMACount;
+    RegionSlotDemand.ESlots =
+        (RegionSlotDemand.ESlots + WMMACount - 1) / WMMACount;
+    RegionSlotDemand.VSlots =
+        (RegionSlotDemand.VSlots + WMMACount - 1) / WMMACount;
+  }
+  LLVM_DEBUG({
+    if (RegionSlotDemand.hasSlots())
+      dbgs() << "  RegionSlotDemand: " << RegionSlotDemand.ISlots << " I-slots, "
+             << RegionSlotDemand.ESlots << " E-slots, "
+             << RegionSlotDemand.VSlots << " V-slots (avg over "
+             << WMMACount << " WMMAs)\n";
+  });
 }
 
 unsigned CandidateHeuristics::getCarriedLatency(SUnit *SU) {
@@ -684,6 +837,273 @@ bool CandidateHeuristics::tryCriticalResource(
   return false;
 }
 
+//===----------------------------------------------------------------------===//
+// ShadowMix Helpers
+//===----------------------------------------------------------------------===//
+
+unsigned CandidateHeuristics::countDirectlyEnabledByFlavor(
+    SUnit *SU, InstructionFlavor TargetFlavor) {
+  unsigned Count = 0;
+  for (const SDep &Succ : SU->Succs) {
+    if (Succ.isWeak())
+      continue;
+    SUnit *SuccSU = Succ.getSUnit();
+    if (SuccSU->isScheduled || SuccSU->NumPredsLeft != 1)
+      continue;
+    if (classifyFlavor(*SuccSU->getInstr(), *SII) == TargetFlavor)
+      ++Count;
+  }
+  return Count;
+}
+
+std::optional<unsigned> CandidateHeuristics::findNearestPendingByFlavor(
+    InstructionFlavor TargetFlavor, unsigned MaxDepth) {
+  // BFS from all currently ready SUs to find nearest pending SU of
+  // TargetFlavor.
+  SmallVector<std::pair<SUnit *, unsigned>, 32> Worklist;
+  SmallPtrSet<SUnit *, 32> Visited;
+
+  for (auto &SU : DAG->SUnits) {
+    if (!SU.isScheduled && SU.isTopReady()) {
+      Worklist.push_back({&SU, 0});
+      Visited.insert(&SU);
+    }
+  }
+
+  std::optional<unsigned> BestDist;
+  for (unsigned I = 0; I < Worklist.size(); ++I) {
+    auto [SU, Depth] = Worklist[I];
+    if (Depth > MaxDepth)
+      continue;
+
+    if (!SU->isTopReady() && !SU->isScheduled) {
+      if (classifyFlavor(*SU->getInstr(), *SII) == TargetFlavor) {
+        if (!BestDist || Depth < *BestDist)
+          BestDist = Depth;
+        continue; // Don't expand past target
+      }
+    }
+
+    for (const SDep &Succ : SU->Succs) {
+      if (Succ.isWeak())
+        continue;
+      SUnit *SuccSU = Succ.getSUnit();
+      if (SuccSU->isScheduled || Visited.count(SuccSU))
+        continue;
+      Visited.insert(SuccSU);
+      Worklist.push_back({SuccSU, Depth + 1});
+    }
+  }
+  return BestDist;
+}
+
+bool CandidateHeuristics::wouldHelpEnable(SUnit *SU, SUnit *TargetSU) {
+  return DAG->IsReachable(TargetSU, SU);
+}
+
+//===----------------------------------------------------------------------===//
+// ShadowMix Heuristic
+//===----------------------------------------------------------------------===//
+
+/// Helper: return true if \p F is a compatible filler for a co-execution
+/// window (single issue-cycle instruction that fills shadow slots).
+static bool isShadowFiller(InstructionFlavor F) {
+  switch (F) {
+  case InstructionFlavor::SingleCycleVALU:
+  case InstructionFlavor::TRANS:
+  case InstructionFlavor::DS:
+  case InstructionFlavor::SALU:
+  case InstructionFlavor::VMEM:
+    return true;
+  default:
+    return false;
+  }
+}
+
+bool CandidateHeuristics::tryShadowMix(
+    GenericSchedulerBase::SchedCandidate &TryCand,
+    GenericSchedulerBase::SchedCandidate &Cand, SchedBoundary *Zone) {
+
+  auto CandFlavor = classifyFlavor(*Cand.SU->getInstr(), *SII);
+  auto TryCandFlavor = classifyFlavor(*TryCand.SU->getInstr(), *SII);
+
+  // If both candidates are the same flavor, ShadowMix has no opinion.
+  if (CandFlavor == TryCandFlavor)
+    return false;
+
+  // Refresh ready-mix snapshot from the boundary's queues. No-op if the
+  // snapshot is still valid (cleared on schedNode).
+  MixInfo.refreshFromBoundary(*Zone, *SII);
+
+  // Determine if either candidate is a window producer.
+  HardwareUnitInfo *CandHWUI = getHWUIFromFlavor(CandFlavor);
+  HardwareUnitInfo *TryCandHWUI = getHWUIFromFlavor(TryCandFlavor);
+  bool CandIsProducer = CandHWUI && CandHWUI->producesCoexecWindow();
+  bool TryCandIsProducer = TryCandHWUI && TryCandHWUI->producesCoexecWindow();
+
+  // If neither is a producer, ShadowMix has no opinion.
+  if (!CandIsProducer && !TryCandIsProducer)
+    return false;
+
+  // ---- Layer 1: Producer over compatible filler ----
+  // A filler scheduled before a producer executes outside any shadow window,
+  // wasting its coexecution potential. Always prefer the producer so fillers
+  // scheduled after it land inside the shadow.
+  if (CandIsProducer != TryCandIsProducer) {
+    bool CandIsFiller = isShadowFiller(CandFlavor);
+    bool TryCandIsFiller = isShadowFiller(TryCandFlavor);
+
+    if (CandIsProducer && TryCandIsFiller) {
+      // Cand is producer, TryCand is filler — prefer producer (Cand).
+      LLVM_DEBUG(dbgs() << "ShadowMix: prefer producer SU("
+                        << Cand.SU->NodeNum << ") "
+                        << getFlavorName(CandFlavor) << " over filler SU("
+                        << TryCand.SU->NodeNum << ") "
+                        << getFlavorName(TryCandFlavor) << "\n");
+      if (Cand.Reason > GenericSchedulerBase::RegCritical)
+        Cand.Reason = GenericSchedulerBase::RegCritical;
+      return true;
+    }
+    if (TryCandIsProducer && CandIsFiller) {
+      // TryCand is producer, Cand is filler — prefer producer (TryCand).
+      LLVM_DEBUG(dbgs() << "ShadowMix: prefer producer SU("
+                        << TryCand.SU->NodeNum << ") "
+                        << getFlavorName(TryCandFlavor) << " over filler SU("
+                        << Cand.SU->NodeNum << ") "
+                        << getFlavorName(CandFlavor) << "\n");
+      TryCand.Reason = GenericSchedulerBase::RegCritical;
+      return true;
+    }
+  }
+
+  // ---- Compute template-derived demand ----
+  // If a producer is being compared, use its specific CoExecInfo; otherwise
+  // fall back to the region-aggregate demand.
+  WindowSlotDemand Demand = RegionSlotDemand;
+  SUnit *ProducerSU = nullptr;
+  if (CandIsProducer)
+    ProducerSU = Cand.SU;
+  else if (TryCandIsProducer)
+    ProducerSU = TryCand.SU;
+
+  if (ProducerSU) {
+    auto ProducerFlavor = classifyFlavor(*ProducerSU->getInstr(), *SII);
+    if (ProducerFlavor == InstructionFlavor::WMMA)
+      Demand = WindowSlotDemand::fromCoExecInfo(
+          getCoExecInfo(*ProducerSU->getInstr(), *SII));
+  }
+
+  if (!Demand.hasSlots())
+    return false;
+
+  // ---- Layer 3: Producer promotion when demand satisfied ----
+  // Enough fillers are ready — prefer the producer so the window opens and
+  // fillers fill its shadow.
+  if (Demand.isSatisfied(MixInfo) && CandIsProducer != TryCandIsProducer) {
+    if (CandIsProducer) {
+      LLVM_DEBUG(dbgs() << "ShadowMix: promote producer SU("
+                        << Cand.SU->NodeNum << ") — fillers ready\n");
+      if (Cand.Reason > GenericSchedulerBase::RegCritical)
+        Cand.Reason = GenericSchedulerBase::RegCritical;
+      return true;
+    }
+    LLVM_DEBUG(dbgs() << "ShadowMix: promote producer SU("
+                      << TryCand.SU->NodeNum << ") — fillers ready\n");
+    TryCand.Reason = GenericSchedulerBase::RegCritical;
+    return true;
+  }
+
+  // ---- Layer 2: Enablement when demand not satisfied ----
+  // Fillers are insufficient. Try to find non-producer instructions that
+  // enable the most deficient filler flavor.
+  if (!Demand.isSatisfied(MixInfo)) {
+    InstructionFlavor NeededFlavor = Demand.getMostDeficientFlavor(MixInfo);
+
+    // Direct enablement — exclude producers from scoring (scheduling a
+    // producer doesn't help make fillers ready).
+    unsigned CandEnables =
+        CandIsProducer ? 0
+                       : countDirectlyEnabledByFlavor(Cand.SU, NeededFlavor);
+    unsigned TryCandEnables =
+        TryCandIsProducer
+            ? 0
+            : countDirectlyEnabledByFlavor(TryCand.SU, NeededFlavor);
+
+    if (CandEnables != TryCandEnables) {
+      if (TryCandEnables > CandEnables) {
+        LLVM_DEBUG(dbgs() << "ShadowMix: SU(" << TryCand.SU->NodeNum
+                          << ") enables " << TryCandEnables << " "
+                          << getFlavorName(NeededFlavor) << " (vs "
+                          << CandEnables << ")\n");
+        TryCand.Reason = GenericSchedulerBase::RegCritical;
+        return true;
+      }
+      LLVM_DEBUG(dbgs() << "ShadowMix: SU(" << Cand.SU->NodeNum
+                        << ") enables " << CandEnables << " "
+                        << getFlavorName(NeededFlavor) << " (vs "
+                        << TryCandEnables << ")\n");
+      if (Cand.Reason > GenericSchedulerBase::RegCritical)
+        Cand.Reason = GenericSchedulerBase::RegCritical;
+      return true;
+    }
+
+    // BFS lookahead — check if one candidate is on the path to a pending
+    // filler of the needed flavor. Exclude producers from scoring.
+    auto NearestDist =
+        findNearestPendingByFlavor(NeededFlavor, ShadowMixLookaheadDepth);
+    if (NearestDist) {
+      for (auto &SU : DAG->SUnits) {
+        if (SU.isScheduled || SU.isTopReady())
+          continue;
+        if (classifyFlavor(*SU.getInstr(), *SII) != NeededFlavor)
+          continue;
+
+        bool CandHelps =
+            !CandIsProducer && wouldHelpEnable(Cand.SU, &SU);
+        bool TryCandHelps =
+            !TryCandIsProducer && wouldHelpEnable(TryCand.SU, &SU);
+
+        if (CandHelps == TryCandHelps)
+          continue;
+
+        if (TryCandHelps) {
+          LLVM_DEBUG(dbgs() << "ShadowMix lookahead: SU("
+                            << TryCand.SU->NodeNum << ") helps enable "
+                            << getFlavorName(NeededFlavor) << " SU("
+                            << SU.NodeNum << ")\n");
+          TryCand.Reason = GenericSchedulerBase::RegCritical;
+          return true;
+        }
+        LLVM_DEBUG(dbgs() << "ShadowMix lookahead: SU(" << Cand.SU->NodeNum
+                          << ") helps enable " << getFlavorName(NeededFlavor)
+                          << " SU(" << SU.NodeNum << ")\n");
+        if (Cand.Reason > GenericSchedulerBase::RegCritical)
+          Cand.Reason = GenericSchedulerBase::RegCritical;
+        return true;
+      }
+    }
+
+    // Greedy fallback: enablement/lookahead found no path to fillers.
+    // Prefer the producer rather than stalling indefinitely.
+    if (CandIsProducer != TryCandIsProducer) {
+      if (CandIsProducer) {
+        LLVM_DEBUG(dbgs() << "ShadowMix: greedy take producer SU("
+                          << Cand.SU->NodeNum << ") — no enablement path\n");
+        if (Cand.Reason > GenericSchedulerBase::RegCritical)
+          Cand.Reason = GenericSchedulerBase::RegCritical;
+        return true;
+      }
+      LLVM_DEBUG(dbgs() << "ShadowMix: greedy take producer SU("
+                        << TryCand.SU->NodeNum
+                        << ") — no enablement path\n");
+      TryCand.Reason = GenericSchedulerBase::RegCritical;
+      return true;
+    }
+  }
+
+  return false;
+}
+
 AMDGPUCoExecSchedStrategy::AMDGPUCoExecSchedStrategy(
     const MachineSchedContext *C)
     : GCNSchedStrategy(C) {
@@ -908,6 +1328,12 @@ bool AMDGPUCoExecSchedStrategy::tryCandidateCoexec(SchedCandidate &Cand,
 
     if (Heurs.tryCriticalResourceDependency(TryCand, Cand, Zone)) {
       LastAMDGPUReason = AMDGPUSchedReason::CritResourceDep;
+      return TryCand.Reason != NoCand;
+    }
+
+    // ShadowMix: defer window producers until co-exec fillers are ready.
+    if (Heurs.tryShadowMix(TryCand, Cand, Zone)) {
+      LastAMDGPUReason = AMDGPUSchedReason::ShadowMix;
       return TryCand.Reason != NoCand;
     }
   }
