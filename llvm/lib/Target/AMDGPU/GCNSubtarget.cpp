@@ -342,6 +342,7 @@ void GCNSubtarget::overrideSchedPolicy(MachineSchedPolicy &Policy,
   if (AMDGPU::getSchedStrategy(F) == "coexec") {
     Policy.OnlyTopDown = true;
     Policy.OnlyBottomUp = false;
+    Policy.ShouldTrackLaneMasks = true;
     return;
   }
 
