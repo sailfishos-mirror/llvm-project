@@ -1,0 +1,33 @@
+; REQUIRES: x86_64-linux
+; Test that [buildid:]0xaddr format is correctly parsed in hybrid perfscript
+; input. Both callstack frames and LBR entries may carry buildid prefixes.
+
+;; Test 1: Hybrid perfscript with buildid prefix on callstack frames and
+;; LBR entries, using --filter-build-id to match "aabb1122".
+; RUN: llvm-profgen --format=text --perfscript=%S/Inputs/buildid-cs-noprobe.aggperfscript --binary=%S/Inputs/noinline-cs-noprobe.perfbin --output=%t --skip-symbolization --profile-summary-cold-count=0 --filter-build-id=aabb1122
+; RUN: FileCheck %s --input-file %t --check-prefix=CHECK-HYBRID
+
+; CHECK-HYBRID:      [foo]
+; CHECK-HYBRID-NEXT:   3
+; CHECK-HYBRID-NEXT:   5ff-62f:6
+; CHECK-HYBRID-NEXT:   634-637:6
+; CHECK-HYBRID-NEXT:   645-645:6
+; CHECK-HYBRID-NEXT:   3
+; CHECK-HYBRID-NEXT:   62f->5b0:6
+; CHECK-HYBRID-NEXT:   637->645:6
+; CHECK-HYBRID-NEXT:   645->5ff:6
+; CHECK-HYBRID-NEXT: [foo:3 @ bar]
+; CHECK-HYBRID-NEXT:   4
+; CHECK-HYBRID-NEXT:   5b0-5c8:2
+; CHECK-HYBRID-NEXT:   5b0-5d7:4
+; CHECK-HYBRID-NEXT:   5dc-5e9:2
+; CHECK-HYBRID-NEXT:   5e5-5e9:4
+; CHECK-HYBRID-NEXT:   3
+; CHECK-HYBRID-NEXT:   5c8->5dc:4
+; CHECK-HYBRID-NEXT:   5d7->5e5:4
+; CHECK-HYBRID-NEXT:   5e9->634:6
+
+;; Test 2: With non-matching filter, callstack frames are filtered out,
+;; resulting in no samples.
+; RUN: llvm-profgen --format=text --perfscript=%S/Inputs/buildid-cs-noprobe.aggperfscript --binary=%S/Inputs/noinline-cs-noprobe.perfbin --output=%t2 --skip-symbolization --filter-build-id=ccdd3344 2>&1 | FileCheck %s --check-prefix=CHECK-NOMATCH
+; CHECK-NOMATCH: warning: No samples in perf script!
