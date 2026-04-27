@@ -756,9 +756,9 @@ static bool __kmp_track_children_task(kmp_taskdata_t *taskdata) {
 }
 
 #if OMP_TASKGRAPH_EXPERIMENTAL
-static bool __kmp_taskgraph_exec_descr_finish(kmp_int32 gtid,
-                                              kmp_info_t *thread,
-                                              kmp_taskgraph_exec_descr_t *descr);
+static bool
+__kmp_taskgraph_exec_descr_finish(kmp_int32 gtid, kmp_info_t *thread,
+                                  kmp_taskgraph_exec_descr_t *descr);
 #endif
 
 // __kmp_task_finish: bookkeeping to do when a task finishes execution
@@ -2118,43 +2118,35 @@ __kmp_fill_exec_descr(kmp_int32, kmp_info_t *, kmp_taskgraph_record_t *,
                       kmp_taskgraph_exec_descr_t *, kmp_size_t &,
                       kmp_taskgraph_exec_descr_t **);
 
-static kmp_int32
-__kmp_pred_list_length(kmp_taskgraph_exec_descr_t *desc) {
+static kmp_int32 __kmp_pred_list_length(kmp_taskgraph_exec_descr_t *desc) {
   kmp_int32 res = 0;
   for (; desc; desc = desc->predecessor_chain)
     ++res;
   return res;
 }
 
-static kmp_taskgraph_exec_descr_t *
-__kmp_fill_sequential_descr(kmp_int32 gtid, kmp_info_t *thread,
-                               kmp_taskgraph_record_t *taskgraph,
-                               kmp_taskgraph_region_t *region,
-                               kmp_taskdata_t *parent_taskdata,
-                               kmp_taskgraph_exec_descr_t *exec_descrs,
-                               kmp_size_t &next_idx,
-                               kmp_taskgraph_exec_descr_t **succs_to_fill_p) {
+static kmp_taskgraph_exec_descr_t *__kmp_fill_sequential_descr(
+    kmp_int32 gtid, kmp_info_t *thread, kmp_taskgraph_record_t *taskgraph,
+    kmp_taskgraph_region_t *region, kmp_taskdata_t *parent_taskdata,
+    kmp_taskgraph_exec_descr_t *exec_descrs, kmp_size_t &next_idx,
+    kmp_taskgraph_exec_descr_t **succs_to_fill_p) {
   assert(region->type == TASKGRAPH_REGION_SEQUENTIAL);
   kmp_taskgraph_exec_descr_t *first_node = nullptr;
   for (kmp_int32 c = 0; c < region->inner.num_children; c++) {
-    kmp_taskgraph_exec_descr *descr =
-      __kmp_fill_exec_descr(gtid, thread, taskgraph, region->inner.children[c],
-                            parent_taskdata, exec_descrs, next_idx,
-                            succs_to_fill_p);
+    kmp_taskgraph_exec_descr *descr = __kmp_fill_exec_descr(
+        gtid, thread, taskgraph, region->inner.children[c], parent_taskdata,
+        exec_descrs, next_idx, succs_to_fill_p);
     if (!first_node)
       first_node = descr;
   }
   return first_node;
 }
 
-static kmp_taskgraph_exec_descr_t *
-__kmp_fill_par_or_excl_descr(kmp_int32 gtid, kmp_info_t *thread,
-                              kmp_taskgraph_record_t *taskgraph,
-                              kmp_taskgraph_region_t *region,
-                              kmp_taskdata_t *parent_taskdata,
-                              kmp_taskgraph_exec_descr_t *exec_descrs,
-                              kmp_size_t &next_idx,
-                              kmp_taskgraph_exec_descr_t **succs_to_fill_p) {
+static kmp_taskgraph_exec_descr_t *__kmp_fill_par_or_excl_descr(
+    kmp_int32 gtid, kmp_info_t *thread, kmp_taskgraph_record_t *taskgraph,
+    kmp_taskgraph_region_t *region, kmp_taskdata_t *parent_taskdata,
+    kmp_taskgraph_exec_descr_t *exec_descrs, kmp_size_t &next_idx,
+    kmp_taskgraph_exec_descr_t **succs_to_fill_p) {
   assert(region->type == TASKGRAPH_REGION_PARALLEL ||
          region->type == TASKGRAPH_REGION_EXCLUSIVE);
 
@@ -2177,10 +2169,9 @@ __kmp_fill_par_or_excl_descr(kmp_int32 gtid, kmp_info_t *thread,
 
   for (kmp_int32 c = 0; c < region->inner.num_children; c++) {
     kmp_taskgraph_exec_descr_t *succs_to_fill = nullptr;
-    kmp_taskgraph_exec_descr_t *head =
-      __kmp_fill_exec_descr(gtid, thread, taskgraph, region->inner.children[c],
-                            parent_taskdata, exec_descrs, next_idx,
-                            &succs_to_fill);
+    kmp_taskgraph_exec_descr_t *head = __kmp_fill_exec_descr(
+        gtid, thread, taskgraph, region->inner.children[c], parent_taskdata,
+        exec_descrs, next_idx, &succs_to_fill);
     if (!sibling_list) {
       sibling_list = head;
       sibling_list->sibling = head;
@@ -2214,106 +2205,101 @@ __kmp_fill_par_or_excl_descr(kmp_int32 gtid, kmp_info_t *thread,
   return exec_descr;
 }
 
-static kmp_taskgraph_exec_descr_t *
-__kmp_fill_exec_descr(kmp_int32 gtid, kmp_info_t *thread,
-                              kmp_taskgraph_record_t *taskgraph,
-                              kmp_taskgraph_region_t *region,
-                              kmp_taskdata_t *parent_taskdata,
-                              kmp_taskgraph_exec_descr_t *exec_descrs,
-                              kmp_size_t &next_idx,
-                              kmp_taskgraph_exec_descr_t **succs_to_fill_p) {
+static kmp_taskgraph_exec_descr_t *__kmp_fill_exec_descr(
+    kmp_int32 gtid, kmp_info_t *thread, kmp_taskgraph_record_t *taskgraph,
+    kmp_taskgraph_region_t *region, kmp_taskdata_t *parent_taskdata,
+    kmp_taskgraph_exec_descr_t *exec_descrs, kmp_size_t &next_idx,
+    kmp_taskgraph_exec_descr_t **succs_to_fill_p) {
   switch (region->type) {
-    case TASKGRAPH_REGION_ENTRY:
-    case TASKGRAPH_REGION_EXIT:
-      break;
-    case TASKGRAPH_REGION_NODE:
-    case TASKGRAPH_REGION_WAIT: {
-      kmp_taskgraph_exec_descr_t *incoming_succs_to_fill = *succs_to_fill_p;
-      kmp_taskgraph_exec_descr_t *exec_descr = &exec_descrs[next_idx++];
-      exec_descr->region = region;
-      exec_descr->region->exec_descr = exec_descr;
-      exec_descr->nblocks = region->task.node->u.resolved.count - 1;
-      exec_descr->npredecessors = __kmp_pred_list_length(incoming_succs_to_fill);
-      exec_descr->sibling = exec_descr;
-      exec_descr->predecessor_chain = nullptr;
-      exec_descr->successor = nullptr;
-      exec_descr->next_instance = nullptr;
+  case TASKGRAPH_REGION_ENTRY:
+  case TASKGRAPH_REGION_EXIT:
+    break;
+  case TASKGRAPH_REGION_NODE:
+  case TASKGRAPH_REGION_WAIT: {
+    kmp_taskgraph_exec_descr_t *incoming_succs_to_fill = *succs_to_fill_p;
+    kmp_taskgraph_exec_descr_t *exec_descr = &exec_descrs[next_idx++];
+    exec_descr->region = region;
+    exec_descr->region->exec_descr = exec_descr;
+    exec_descr->nblocks = region->task.node->u.resolved.count - 1;
+    exec_descr->npredecessors = __kmp_pred_list_length(incoming_succs_to_fill);
+    exec_descr->sibling = exec_descr;
+    exec_descr->predecessor_chain = nullptr;
+    exec_descr->successor = nullptr;
+    exec_descr->next_instance = nullptr;
 
-      // Edit the taskdata for this specific instantiation.  At present the
-      // task/taskdata structures cannot be used simultaneously by different
-      // threads. We could duplicate the structures to allow simultaneous issue,
-      // but that's not done yet.  The exec_descr can already by thread-local,
-      // in principle, but for now it points to the taskgraph's single copy
-      // of each task/taskdata structure.
-      if (region->type == TASKGRAPH_REGION_NODE) {
-        kmp_task_t *task = exec_descr->region->task.node->task;
-        kmp_taskdata_t *taskdata = KMP_TASK_TO_TASKDATA(task);
-        taskdata->exec_descr = exec_descr;
-      }
-
-      for (kmp_taskgraph_exec_descr_t *pred = incoming_succs_to_fill; pred;
-           pred = pred->predecessor_chain) {
-        pred->successor = exec_descr;
-      }
-
-      *succs_to_fill_p = exec_descr;
-
-      return exec_descr;
+    // Edit the taskdata for this specific instantiation.  At present the
+    // task/taskdata structures cannot be used simultaneously by different
+    // threads. We could duplicate the structures to allow simultaneous issue,
+    // but that's not done yet.  The exec_descr can already by thread-local,
+    // in principle, but for now it points to the taskgraph's single copy
+    // of each task/taskdata structure.
+    if (region->type == TASKGRAPH_REGION_NODE) {
+      kmp_task_t *task = exec_descr->region->task.node->task;
+      kmp_taskdata_t *taskdata = KMP_TASK_TO_TASKDATA(task);
+      taskdata->exec_descr = exec_descr;
     }
-    case TASKGRAPH_REGION_SEQUENTIAL:
-      return __kmp_fill_sequential_descr(gtid, thread, taskgraph, region,
-                                         parent_taskdata, exec_descrs,
-                                         next_idx, succs_to_fill_p);
-    case TASKGRAPH_REGION_PARALLEL:
-    case TASKGRAPH_REGION_EXCLUSIVE:
-      return __kmp_fill_par_or_excl_descr(gtid, thread, taskgraph, region,
-                                          parent_taskdata, exec_descrs,
-                                          next_idx, succs_to_fill_p);
+
+    for (kmp_taskgraph_exec_descr_t *pred = incoming_succs_to_fill; pred;
+         pred = pred->predecessor_chain) {
+      pred->successor = exec_descr;
+    }
+
+    *succs_to_fill_p = exec_descr;
+
+    return exec_descr;
+  }
+  case TASKGRAPH_REGION_SEQUENTIAL:
+    return __kmp_fill_sequential_descr(gtid, thread, taskgraph, region,
+                                       parent_taskdata, exec_descrs, next_idx,
+                                       succs_to_fill_p);
+  case TASKGRAPH_REGION_PARALLEL:
+  case TASKGRAPH_REGION_EXCLUSIVE:
+    return __kmp_fill_par_or_excl_descr(gtid, thread, taskgraph, region,
+                                        parent_taskdata, exec_descrs, next_idx,
+                                        succs_to_fill_p);
   }
   return nullptr;
 }
 
 #ifdef DEBUG_TASKGRAPH
-static void
-__kmp_debug_taskgraph_exec_descr(kmp_taskgraph_exec_descr_t *descrs,
-                                 kmp_size_t count) {
+static void __kmp_debug_taskgraph_exec_descr(kmp_taskgraph_exec_descr_t *descrs,
+                                             kmp_size_t count) {
   fprintf(stderr, "digraph ExecDescr {\n");
   fprintf(stderr, "  end [shape=diamond]\n");
   for (kmp_size_t i = 0; i < count; i++) {
     kmp_taskgraph_exec_descr_t *descr = &descrs[i];
     fprintf(stderr, "  \"%p\" [label=< <B>", descr->region);
     switch (descr->region->type) {
-      case TASKGRAPH_REGION_PARALLEL:
-        fprintf(stderr, "par</B> %p<BR/>preds=%d", descr->region,
+    case TASKGRAPH_REGION_PARALLEL:
+      fprintf(stderr, "par</B> %p<BR/>preds=%d", descr->region,
+              descr->npredecessors.load());
+      break;
+    case TASKGRAPH_REGION_EXCLUSIVE:
+      fprintf(stderr, "excl</B> %p<BR/>preds=%d", descr->region,
+              descr->npredecessors.load());
+      break;
+    case TASKGRAPH_REGION_NODE:
+      if (descr->region->task.node->u.resolved.count > 1) {
+        fprintf(stderr, "task</B> %p<BR/>preds=%d instances=%d",
+                descr->region->task.node, descr->npredecessors.load(),
+                descr->region->task.node->u.resolved.count);
+      } else {
+        fprintf(stderr, "task</B> %p<BR/>preds=%d", descr->region->task.node,
                 descr->npredecessors.load());
-        break;
-      case TASKGRAPH_REGION_EXCLUSIVE:
-        fprintf(stderr, "excl</B> %p<BR/>preds=%d", descr->region,
+      }
+      break;
+    case TASKGRAPH_REGION_WAIT:
+      if (descr->region->task.node->u.resolved.count > 1) {
+        fprintf(stderr, "wait</B> %p<BR/>preds=%d instances=%d", descr->region,
+                descr->npredecessors.load(),
+                descr->region->task.node->u.resolved.count);
+      } else {
+        fprintf(stderr, "wait</B> %p<BR/>preds=%d", descr->region,
                 descr->npredecessors.load());
-        break;
-      case TASKGRAPH_REGION_NODE:
-        if (descr->region->task.node->u.resolved.count > 1) {
-          fprintf(stderr, "task</B> %p<BR/>preds=%d instances=%d",
-                  descr->region->task.node,
-                  descr->npredecessors.load(),
-                  descr->region->task.node->u.resolved.count);
-        } else {
-          fprintf(stderr, "task</B> %p<BR/>preds=%d", descr->region->task.node,
-                  descr->npredecessors.load());
-        }
-        break;
-      case TASKGRAPH_REGION_WAIT:
-        if (descr->region->task.node->u.resolved.count > 1) {
-          fprintf(stderr, "wait</B> %p<BR/>preds=%d instances=%d",
-                  descr->region, descr->npredecessors.load(),
-                  descr->region->task.node->u.resolved.count);
-        } else {
-          fprintf(stderr, "wait</B> %p<BR/>preds=%d", descr->region,
-                  descr->npredecessors.load());
-        }
-        break;
-      default:
-        fprintf(stderr, "???</B>");
+      }
+      break;
+    default:
+      fprintf(stderr, "???</B>");
     }
     fprintf(stderr, " >, shape=box]\n");
 
@@ -2321,9 +2307,10 @@ __kmp_debug_taskgraph_exec_descr(kmp_taskgraph_exec_descr_t *descrs,
          descr->region->type == TASKGRAPH_REGION_WAIT) &&
         descr->region->task.node->u.resolved.count > 1) {
       kmp_taskgraph_region_t *region = descr->region;
-      fprintf(stderr,
-              "  \"%p\" -> \"%p\" [style=dotted, color=blue, constraint=false]\n",
-              region, region->task.next_instance);
+      fprintf(
+          stderr,
+          "  \"%p\" -> \"%p\" [style=dotted, color=blue, constraint=false]\n",
+          region, region->task.next_instance);
     }
 
     if (descr->successor) {
@@ -2353,9 +2340,8 @@ __kmp_debug_taskgraph_exec_descr(kmp_taskgraph_exec_descr_t *descrs,
 }
 #endif
 
-static void
-__kmp_exec_descr_link_instances(kmp_taskgraph_exec_descr_t *descrs,
-                                kmp_size_t count) {
+static void __kmp_exec_descr_link_instances(kmp_taskgraph_exec_descr_t *descrs,
+                                            kmp_size_t count) {
   for (kmp_size_t i = 0; i < count; i++) {
     kmp_taskgraph_exec_descr_t *descr = &descrs[i];
     if (descr->region->type == TASKGRAPH_REGION_NODE ||
@@ -2366,9 +2352,10 @@ __kmp_exec_descr_link_instances(kmp_taskgraph_exec_descr_t *descrs,
 
 /// Reset, reparent and regroup the recorded task TASK and re-invoke it.
 
-static void
-__kmp_omp_tg_task(kmp_int32 gtid, kmp_task_t *task, kmp_taskgroup_t *taskgroup,
-                  kmp_taskdata_t *parent_taskdata, bool serialize_immediate) {
+static void __kmp_omp_tg_task(kmp_int32 gtid, kmp_task_t *task,
+                              kmp_taskgroup_t *taskgroup,
+                              kmp_taskdata_t *parent_taskdata,
+                              bool serialize_immediate) {
   kmp_taskdata_t *taskdata = KMP_TASK_TO_TASKDATA(task);
   taskdata->td_parent = parent_taskdata;
 
@@ -2377,8 +2364,8 @@ __kmp_omp_tg_task(kmp_int32 gtid, kmp_task_t *task, kmp_taskgroup_t *taskgroup,
   taskdata->td_flags.freed = 0;
   taskdata->td_flags.executing = 0;
   taskdata->td_flags.task_serial =
-      (parent_taskdata->td_flags.final ||
-        taskdata->td_flags.team_serial || taskdata->td_flags.tasking_ser);
+      (parent_taskdata->td_flags.final || taskdata->td_flags.team_serial ||
+       taskdata->td_flags.tasking_ser);
 
   KMP_ATOMIC_ST_RLX(&taskdata->td_untied_count, 0);
   KMP_ATOMIC_ST_RLX(&taskdata->td_incomplete_child_tasks, 0);
@@ -2398,79 +2385,76 @@ struct kmp_taskred_input;
 template <typename T>
 void *__kmp_task_reduction_init(int gtid, int num, T *data);
 
-static void
-__kmp_taskgraph_exec_descr_start(kmp_int32 gtid, kmp_info_t *thread,
-                                 kmp_taskgraph_exec_descr_t *descr,
-                                 kmp_taskgroup_t *taskgroup) {
+static void __kmp_taskgraph_exec_descr_start(kmp_int32 gtid, kmp_info_t *thread,
+                                             kmp_taskgraph_exec_descr_t *descr,
+                                             kmp_taskgroup_t *taskgroup) {
   kmp_int32 npredecessors = KMP_ATOMIC_DEC(&descr->npredecessors) - 1;
   if (npredecessors > 0)
     return;
 
   switch (descr->region->type) {
-    case TASKGRAPH_REGION_NODE:
-    case TASKGRAPH_REGION_WAIT: {
-      kmp_taskgraph_exec_descr_t *lowest_descr = nullptr, *iter = descr;
-      do {
-        if (!lowest_descr || lowest_descr > iter)
-          lowest_descr = iter;
-        iter = iter->next_instance;
-      } while (iter != descr);
-      kmp_int32 nblocks = KMP_ATOMIC_DEC(&lowest_descr->nblocks);
-      if (nblocks <= 0) {
-        if (descr->region->type == TASKGRAPH_REGION_NODE) {
-          kmp_task_t *task = descr->region->task.node->task;
-          kmp_taskdata_t *current_taskdata = thread->th.th_current_task;
-          __kmp_omp_tg_task(gtid, task, taskgroup, current_taskdata, false);
-        } else {
-          // There's no task for a 'taskwait', so start successors immediately.
-          kmp_taskgraph_exec_descr_t *walk = descr;
-          do {
-            if (walk->successor) {
-              __kmp_taskgraph_exec_descr_start(gtid, thread, walk->successor,
-                                               taskgroup);
-            }
-            walk = walk->next_instance;
-          } while (walk != descr);
-
-        }
-      }
-      break;
-    }
-    case TASKGRAPH_REGION_PARALLEL: {
-      if (descr->region->reduce_input) {
-        // If there are reductions associated with this parallel region, we
-        // start a new taskgroup here.
-        __kmpc_taskgroup(/*loc=*/nullptr, gtid);
-        // Update variable to the newly-created taskgroup.
-        taskgroup = thread->th.th_current_task->td_taskgroup;
-        __kmp_task_reduction_init(gtid,
-                                  descr->region->reduce_input->reduce_num_data,
-                                  (struct kmp_taskred_input *)
-                                    descr->region->reduce_input->reduce_data);
-      }
-      kmp_taskgraph_exec_descr_t *head = descr->successor;
-      kmp_taskgraph_exec_descr_t *item = head;
-      do {
-        __kmp_taskgraph_exec_descr_start(gtid, thread, item, taskgroup);
-        item = item->sibling;
-      } while (item != head);
-      if (descr->region->reduce_input)
-        __kmpc_end_taskgroup(/*loc=*/nullptr, gtid);
-      break;
-    }
-    case TASKGRAPH_REGION_EXCLUSIVE: {
-      kmp_taskgraph_exec_descr_t *head = descr->successor;
-      kmp_taskgraph_exec_descr_t *item = head;
-      do {
-        assert(item->region->type == TASKGRAPH_REGION_NODE);
-        kmp_task_t *task = item->region->task.node->task;
+  case TASKGRAPH_REGION_NODE:
+  case TASKGRAPH_REGION_WAIT: {
+    kmp_taskgraph_exec_descr_t *lowest_descr = nullptr, *iter = descr;
+    do {
+      if (!lowest_descr || lowest_descr > iter)
+        lowest_descr = iter;
+      iter = iter->next_instance;
+    } while (iter != descr);
+    kmp_int32 nblocks = KMP_ATOMIC_DEC(&lowest_descr->nblocks);
+    if (nblocks <= 0) {
+      if (descr->region->type == TASKGRAPH_REGION_NODE) {
+        kmp_task_t *task = descr->region->task.node->task;
         kmp_taskdata_t *current_taskdata = thread->th.th_current_task;
-        __kmp_omp_tg_task(gtid, task, taskgroup, current_taskdata, true);
-        item = item->sibling;
-      } while (item != head);
-      break;
+        __kmp_omp_tg_task(gtid, task, taskgroup, current_taskdata, false);
+      } else {
+        // There's no task for a 'taskwait', so start successors immediately.
+        kmp_taskgraph_exec_descr_t *walk = descr;
+        do {
+          if (walk->successor) {
+            __kmp_taskgraph_exec_descr_start(gtid, thread, walk->successor,
+                                             taskgroup);
+          }
+          walk = walk->next_instance;
+        } while (walk != descr);
+      }
     }
-    default: ;
+    break;
+  }
+  case TASKGRAPH_REGION_PARALLEL: {
+    if (descr->region->reduce_input) {
+      // If there are reductions associated with this parallel region, we
+      // start a new taskgroup here.
+      __kmpc_taskgroup(/*loc=*/nullptr, gtid);
+      // Update variable to the newly-created taskgroup.
+      taskgroup = thread->th.th_current_task->td_taskgroup;
+      __kmp_task_reduction_init(
+          gtid, descr->region->reduce_input->reduce_num_data,
+          (struct kmp_taskred_input *)descr->region->reduce_input->reduce_data);
+    }
+    kmp_taskgraph_exec_descr_t *head = descr->successor;
+    kmp_taskgraph_exec_descr_t *item = head;
+    do {
+      __kmp_taskgraph_exec_descr_start(gtid, thread, item, taskgroup);
+      item = item->sibling;
+    } while (item != head);
+    if (descr->region->reduce_input)
+      __kmpc_end_taskgroup(/*loc=*/nullptr, gtid);
+    break;
+  }
+  case TASKGRAPH_REGION_EXCLUSIVE: {
+    kmp_taskgraph_exec_descr_t *head = descr->successor;
+    kmp_taskgraph_exec_descr_t *item = head;
+    do {
+      assert(item->region->type == TASKGRAPH_REGION_NODE);
+      kmp_task_t *task = item->region->task.node->task;
+      kmp_taskdata_t *current_taskdata = thread->th.th_current_task;
+      __kmp_omp_tg_task(gtid, task, taskgroup, current_taskdata, true);
+      item = item->sibling;
+    } while (item != head);
+    break;
+  }
+  default:;
   }
 }
 
@@ -2478,55 +2462,54 @@ static bool
 __kmp_taskgraph_exec_descr_finish(kmp_int32 gtid, kmp_info_t *thread,
                                   kmp_taskgraph_exec_descr_t *descr) {
   switch (descr->region->type) {
-    case TASKGRAPH_REGION_NODE: {
-      kmp_task_t *task = descr->region->task.node->task;
-      kmp_taskdata_t *taskdata = KMP_TASK_TO_TASKDATA(task);
-      taskdata->td_flags.started = 0;
-      taskdata->td_flags.executing = 0;
-      taskdata->td_flags.complete = 0;
-      taskdata->td_flags.freed = 0;
-      bool any_successors = false;
-      kmp_taskgraph_exec_descr_t *walk = descr;
-      do {
-        if (walk->successor) {
-          any_successors = true;
-          __kmp_taskgraph_exec_descr_start(gtid, thread, walk->successor,
-                                          taskdata->td_taskgroup);
-        }
-        walk = walk->next_instance;
-      } while (walk != descr);
-      return any_successors;
-    }
-    default:
-      fprintf(stderr, "unexpected exec descr type for finish? (%p)\n", descr);
-      exit(1);
+  case TASKGRAPH_REGION_NODE: {
+    kmp_task_t *task = descr->region->task.node->task;
+    kmp_taskdata_t *taskdata = KMP_TASK_TO_TASKDATA(task);
+    taskdata->td_flags.started = 0;
+    taskdata->td_flags.executing = 0;
+    taskdata->td_flags.complete = 0;
+    taskdata->td_flags.freed = 0;
+    bool any_successors = false;
+    kmp_taskgraph_exec_descr_t *walk = descr;
+    do {
+      if (walk->successor) {
+        any_successors = true;
+        __kmp_taskgraph_exec_descr_start(gtid, thread, walk->successor,
+                                         taskdata->td_taskgroup);
+      }
+      walk = walk->next_instance;
+    } while (walk != descr);
+    return any_successors;
+  }
+  default:
+    fprintf(stderr, "unexpected exec descr type for finish? (%p)\n", descr);
+    exit(1);
   }
 
   return false;
 }
 
-static kmp_size_t
-__kmp_exec_descr_count(kmp_taskgraph_region_t *region) {
+static kmp_size_t __kmp_exec_descr_count(kmp_taskgraph_region_t *region) {
   kmp_size_t sum = 0;
 
   switch (region->type) {
-    case TASKGRAPH_REGION_ENTRY:
-    case TASKGRAPH_REGION_EXIT:
-      return 0;
-    case TASKGRAPH_REGION_NODE:
-    case TASKGRAPH_REGION_WAIT:
-      return 1;
-    case TASKGRAPH_REGION_PARALLEL:
-    case TASKGRAPH_REGION_EXCLUSIVE:
-      sum++;
-      KMP_FALLTHROUGH();
-    case TASKGRAPH_REGION_SEQUENTIAL:
-      for (kmp_int32 i = 0; i < region->inner.num_children; i++)
-        sum += __kmp_exec_descr_count(region->inner.children[i]);
-      break;
-    default:
-      fprintf(stderr, "unexpected region type\n");
-      exit(1);
+  case TASKGRAPH_REGION_ENTRY:
+  case TASKGRAPH_REGION_EXIT:
+    return 0;
+  case TASKGRAPH_REGION_NODE:
+  case TASKGRAPH_REGION_WAIT:
+    return 1;
+  case TASKGRAPH_REGION_PARALLEL:
+  case TASKGRAPH_REGION_EXCLUSIVE:
+    sum++;
+    KMP_FALLTHROUGH();
+  case TASKGRAPH_REGION_SEQUENTIAL:
+    for (kmp_int32 i = 0; i < region->inner.num_children; i++)
+      sum += __kmp_exec_descr_count(region->inner.children[i]);
+    break;
+  default:
+    fprintf(stderr, "unexpected region type\n");
+    exit(1);
   }
   return sum;
 }
@@ -2720,8 +2703,8 @@ void *__kmpc_taskred_init(int gtid, int num, void *data) {
 }
 
 #if OMP_TASKGRAPH_EXPERIMENTAL
-static kmp_taskgraph_record_t *__kmp_taskgraph_or_parent_recording(
-    kmp_taskgroup_t *taskgroup) {
+static kmp_taskgraph_record_t *
+__kmp_taskgraph_or_parent_recording(kmp_taskgroup_t *taskgroup) {
   kmp_taskgraph_record_t *rec = nullptr;
 
   for (; taskgroup; taskgroup = taskgroup->parent) {
@@ -2742,13 +2725,15 @@ void *__kmpc_taskgraph_taskred_init(kmp_int32 gtid, kmp_int32 num, void *data) {
     kmp_taskgraph_status_t status = KMP_ATOMIC_LD_ACQ(&rec->status);
     if (status == KMP_TDG_RECORDING) {
       kmp_taskgraph_reduce_input_data_t *input_data =
-        (kmp_taskgraph_reduce_input_data_t *)
-          __kmp_fast_allocate(thread,
-                              sizeof(kmp_taskgraph_reduce_input_data_t));
+          (kmp_taskgraph_reduce_input_data_t *)__kmp_fast_allocate(
+              thread, sizeof(kmp_taskgraph_reduce_input_data_t));
       // The compiler might build the reduction input data on the stack, so
       // we must make a copy.
-      input_data->reduce_data = __kmp_fast_allocate(thread, sizeof(kmp_taskred_input_t) * num);
-      KMP_MEMCPY(input_data->reduce_data, data, sizeof(kmp_taskred_input_t) * num);;
+      input_data->reduce_data =
+          __kmp_fast_allocate(thread, sizeof(kmp_taskred_input_t) * num);
+      KMP_MEMCPY(input_data->reduce_data, data,
+                 sizeof(kmp_taskred_input_t) * num);
+      ;
       input_data->reduce_num_data = num;
       taskgroup->taskgraph.reduce_input = input_data;
     } else if (status == KMP_TDG_READY)
@@ -3193,29 +3178,26 @@ void __kmpc_end_taskgroup(ident_t *loc, int gtid) {
 }
 
 #if OMP_TASKGRAPH_EXPERIMENTAL
-void
-__kmp_replay_taskgraph(kmp_int32 gtid, kmp_taskdata_t *current_taskdata,
-                       kmp_taskgraph_record_t *taskgraph, kmp_uint32 graph_id,
-                       kmp_taskgroup_t *taskgroup) {
+void __kmp_replay_taskgraph(kmp_int32 gtid, kmp_taskdata_t *current_taskdata,
+                            kmp_taskgraph_record_t *taskgraph,
+                            kmp_uint32 graph_id, kmp_taskgroup_t *taskgroup) {
   kmp_info_t *thread = __kmp_threads[gtid];
 
   kmp_taskgraph_exec_descr_t *exec_descrs = taskgraph->exec_descrs;
 
   if (!exec_descrs) {
     kmp_int32 exec_descr_count = __kmp_exec_descr_count(taskgraph->root);
-    exec_descrs =
-      (kmp_taskgraph_exec_descr_t*)__kmp_thread_malloc(thread,
-          exec_descr_count * sizeof(kmp_taskgraph_exec_descr_t));
+    exec_descrs = (kmp_taskgraph_exec_descr_t *)__kmp_thread_malloc(
+        thread, exec_descr_count * sizeof(kmp_taskgraph_exec_descr_t));
     taskgraph->exec_descrs = exec_descrs;
     taskgraph->exec_descr_size = exec_descr_count;
   }
 
   kmp_taskgraph_exec_descr_t *succs_to_fill = nullptr;
   kmp_size_t next_idx = 0;
-  kmp_taskgraph_exec_descr_t *head =
-    __kmp_fill_exec_descr(gtid, thread, taskgraph, taskgraph->root,
-                          current_taskdata, exec_descrs, next_idx,
-                          &succs_to_fill);
+  kmp_taskgraph_exec_descr_t *head = __kmp_fill_exec_descr(
+      gtid, thread, taskgraph, taskgraph->root, current_taskdata, exec_descrs,
+      next_idx, &succs_to_fill);
   assert(next_idx == taskgraph->exec_descr_size);
 
   __kmp_exec_descr_link_instances(exec_descrs, taskgraph->exec_descr_size);
@@ -5008,9 +4990,9 @@ public:
 };
 
 #if OMP_TASKGRAPH_EXPERIMENTAL
-kmp_taskgraph_node_t* __kmp_taskgraph_node_alloc(kmp_taskgraph_record_t *rec,
-                                                 kmp_task_t *task,
-                                                 kmp_size_t *index_p = nullptr) {
+kmp_taskgraph_node_t *
+__kmp_taskgraph_node_alloc(kmp_taskgraph_record_t *rec, kmp_task_t *task,
+                           kmp_size_t *index_p = nullptr) {
   kmp_int32 gtid = rec->gtid;
   kmp_info_t *thread = __kmp_threads[gtid];
   kmp_taskgraph_node_t *new_task = nullptr;
@@ -5019,14 +5001,14 @@ kmp_taskgraph_node_t* __kmp_taskgraph_node_alloc(kmp_taskgraph_record_t *rec,
 
   if (!rec->record_map) {
     rec->nodes_allocated = 4;
-    rec->record_map = (kmp_taskgraph_node_t *)__kmp_thread_malloc(thread,
-                        rec->nodes_allocated * sizeof(kmp_taskgraph_node_t));
+    rec->record_map = (kmp_taskgraph_node_t *)__kmp_thread_malloc(
+        thread, rec->nodes_allocated * sizeof(kmp_taskgraph_node_t));
   }
 
   if (rec->num_tasks >= rec->nodes_allocated) {
-    rec->record_map =
-      (kmp_taskgraph_node_t *)__kmp_thread_realloc(thread, rec->record_map,
-                      2 * rec->nodes_allocated * sizeof(kmp_taskgraph_node_t));
+    rec->record_map = (kmp_taskgraph_node_t *)__kmp_thread_realloc(
+        thread, rec->record_map,
+        2 * rec->nodes_allocated * sizeof(kmp_taskgraph_node_t));
     rec->nodes_allocated *= 2;
   }
 
@@ -5064,22 +5046,21 @@ kmp_taskgraph_node_t* __kmp_taskgraph_node_alloc(kmp_taskgraph_record_t *rec,
 // tc         Iterations count
 // task_dup   Tasks duplication routine
 // codeptr_ra Return address for OMPT events
-static void __kmp_taskloop_linear(ident_t *loc, int gtid, kmp_task_t *task,
-                                  kmp_uint64 *lb, kmp_uint64 *ub, kmp_int64 st,
-                                  kmp_int32 nogroup, kmp_uint64 ub_glob,
-                                  kmp_uint64 num_tasks, kmp_uint64 grainsize,
-                                  kmp_uint64 extras, kmp_int64 last_chunk,
-                                  kmp_uint64 tc,
+static void
+__kmp_taskloop_linear(ident_t *loc, int gtid, kmp_task_t *task, kmp_uint64 *lb,
+                      kmp_uint64 *ub, kmp_int64 st, kmp_int32 nogroup,
+                      kmp_uint64 ub_glob, kmp_uint64 num_tasks,
+                      kmp_uint64 grainsize, kmp_uint64 extras,
+                      kmp_int64 last_chunk, kmp_uint64 tc,
 #if OMPT_SUPPORT
-                                  void *codeptr_ra,
+                      void *codeptr_ra,
 #endif
-                                  void *task_dup
+                      void *task_dup
 #if OMP_TASKGRAPH_EXPERIMENTAL
-                                  ,
-                                  kmp_taskgraph_record_t *taskgraph_rec =
-                                    nullptr
+                      ,
+                      kmp_taskgraph_record_t *taskgraph_rec = nullptr
 #endif
-                                 ) {
+) {
   KMP_COUNT_BLOCK(OMP_TASKLOOP);
   KMP_TIME_PARTITIONED_BLOCK(OMP_taskloop_scheduling);
   p_task_dup_t ptask_dup = (p_task_dup_t)task_dup;
@@ -5166,7 +5147,7 @@ static void __kmp_taskloop_linear(ident_t *loc, int gtid, kmp_task_t *task,
       kmp_size_t rec_index = -1;
       // Record the task in the taskgraph.
       kmp_taskgraph_node_t *node =
-        __kmp_taskgraph_node_alloc(taskgraph_rec, next_task, &rec_index);
+          __kmp_taskgraph_node_alloc(taskgraph_rec, next_task, &rec_index);
       kmp_taskgroup_t *taskgroup = current_task->td_taskgroup;
       if (taskgroup->taskgraph.reduce_input) {
         node->reduce_input = taskgroup->taskgraph.reduce_input;
@@ -5183,8 +5164,8 @@ static void __kmp_taskloop_linear(ident_t *loc, int gtid, kmp_task_t *task,
       if (nogroup)
         taskgraph_rec->record_map[rec_index].u.unresolved.cfg_successor = -1;
       else if (taskloop_prev_idx != -1)
-        taskgraph_rec->record_map[taskloop_prev_idx].u.unresolved.cfg_successor =
-          rec_index;
+        taskgraph_rec->record_map[taskloop_prev_idx]
+            .u.unresolved.cfg_successor = rec_index;
       if (taskloop_first_idx == -1)
         taskloop_first_idx = rec_index;
       taskloop_prev_idx = rec_index;
@@ -5200,7 +5181,7 @@ static void __kmp_taskloop_linear(ident_t *loc, int gtid, kmp_task_t *task,
       }
 #endif // OMPT_OPTIONAL
 #else
-      __kmp_omp_task(gtid, next_task, true); // schedule new task
+    __kmp_omp_task(gtid, next_task, true); // schedule new task
 #endif
 #if OMP_TASKGRAPH_EXPERIMENTAL
     }
@@ -5213,14 +5194,14 @@ static void __kmp_taskloop_linear(ident_t *loc, int gtid, kmp_task_t *task,
       // Create a node to act as an "end group" marker.
       kmp_size_t endgroup_idx = -1;
       kmp_taskgraph_node_t *endgrpnode =
-        __kmp_taskgraph_node_alloc(taskgraph_rec, nullptr, &endgroup_idx);
+          __kmp_taskgraph_node_alloc(taskgraph_rec, nullptr, &endgroup_idx);
       endgrpnode->taskloop_task = true;
       // Point all the cfg_successor indices to this node now.
       for (kmp_int32 looptask = taskloop_first_idx; looptask != -1;) {
         kmp_int32 next_task =
-          taskgraph_rec->record_map[looptask].u.unresolved.cfg_successor;
+            taskgraph_rec->record_map[looptask].u.unresolved.cfg_successor;
         taskgraph_rec->record_map[looptask].u.unresolved.cfg_successor =
-          endgroup_idx;
+            endgroup_idx;
         looptask = next_task;
       }
     }
@@ -5467,7 +5448,7 @@ static void __kmp_taskloop(ident_t *loc, int gtid, kmp_task_t *task, int if_val,
                            ,
                            kmp_taskgraph_record_t *taskgraph_rec = nullptr
 #endif
-                          ) {
+) {
   kmp_taskdata_t *taskdata = KMP_TASK_TO_TASKDATA(task);
   KMP_DEBUG_ASSERT(task != NULL);
   if (nogroup == 0) {
@@ -5600,11 +5581,12 @@ static void __kmp_taskloop(ident_t *loc, int gtid, kmp_task_t *task, int if_val,
                           OMPT_GET_RETURN_ADDRESS(0),
 #endif
                           task_dup, taskgraph_rec);
-  // check if clause value next
-  // Also require GOMP_taskloop to reduce to linear (taskdata->td_flags.native)
+    // check if clause value next
+    // Also require GOMP_taskloop to reduce to linear
+    // (taskdata->td_flags.native)
   } else
 #endif
-  if (if_val == 0) { // if(0) specified, mark task as serial
+      if (if_val == 0) { // if(0) specified, mark task as serial
     taskdata->td_flags.task_serial = 1;
     taskdata->td_flags.tiedness = TASK_TIED; // AC: serial task cannot be untied
     // always start serial tasks linearly
@@ -5758,11 +5740,12 @@ bool __kmpc_omp_has_task_team(kmp_int32 gtid) {
 
 #if OMP_TASKGRAPH_EXPERIMENTAL
 
-static kmp_taskgraph_record_t*
-__kmp_taskgraph_alloc(kmp_int32 gtid, kmp_int32 graph_id) {
+static kmp_taskgraph_record_t *__kmp_taskgraph_alloc(kmp_int32 gtid,
+                                                     kmp_int32 graph_id) {
   kmp_info_t *thread = __kmp_threads[gtid];
   kmp_taskgraph_record_t *new_rec =
-    (kmp_taskgraph_record_t *)__kmp_fast_allocate(thread, sizeof(kmp_taskgraph_record_t));
+      (kmp_taskgraph_record_t *)__kmp_fast_allocate(
+          thread, sizeof(kmp_taskgraph_record_t));
   new_rec->status = KMP_TDG_RECORDING;
   new_rec->gtid = gtid;
   new_rec->graph_id = graph_id;
@@ -5782,8 +5765,10 @@ __kmp_taskgraph_alloc(kmp_int32 gtid, kmp_int32 graph_id) {
 // Clone a (new) task that has had its private variables and shared variables
 // initialised already.
 static kmp_task_t *__kmp_taskgraph_clone_task(kmp_info_t *thread,
-    kmp_taskgraph_record_t *taskgraph, kmp_task_t *orig,
-    size_t sizeof_kmp_task_t, size_t sizeof_shareds) {
+                                              kmp_taskgraph_record_t *taskgraph,
+                                              kmp_task_t *orig,
+                                              size_t sizeof_kmp_task_t,
+                                              size_t sizeof_shareds) {
   // FIXME: This should use a "taskdup" function like taskloops in cases where
   // private variables are not trivially copyable.  For now, do it by plain
   // bitwise copy.
@@ -5794,7 +5779,8 @@ static kmp_task_t *__kmp_taskgraph_clone_task(kmp_info_t *thread,
   kmp_taskdata_t *taskdata = KMP_TASK_TO_TASKDATA(orig);
   size_t shareds_offset = sizeof(kmp_taskdata_t) + sizeof_kmp_task_t;
   shareds_offset = __kmp_round_up_to_val(shareds_offset, sizeof(kmp_uint64));
-  kmp_taskdata_t *copy_td = (kmp_taskdata_t *)__kmp_fast_allocate(thread, shareds_offset + sizeof_shareds);
+  kmp_taskdata_t *copy_td = (kmp_taskdata_t *)__kmp_fast_allocate(
+      thread, shareds_offset + sizeof_shareds);
   KMP_MEMCPY(copy_td, taskdata, shareds_offset + sizeof_shareds);
   // Tasks cloned for a taskgraph always have this field set.
   copy_td->owning_taskgraph = taskgraph;
@@ -5813,10 +5799,11 @@ static kmp_task_t *__kmp_taskgraph_clone_task(kmp_info_t *thread,
 // entry:       Pointer to the entry function
 // args:        Pointer to the function arguments
 void __kmpc_taskgraph(ident_t *loc_ref, kmp_int32 gtid,
-                      std::atomic<void*> *tdg_handle, kmp_uint32 graph_id,
+                      std::atomic<void *> *tdg_handle, kmp_uint32 graph_id,
                       kmp_int32 graph_reset, kmp_int32 nogroup,
                       void (*entry)(void *), void *args) {
-  kmp_taskgraph_record_t *record = (kmp_taskgraph_record_t*)KMP_ATOMIC_LD_ACQ(tdg_handle);
+  kmp_taskgraph_record_t *record =
+      (kmp_taskgraph_record_t *)KMP_ATOMIC_LD_ACQ(tdg_handle);
   kmp_info_t *thread = __kmp_threads[gtid];
   kmp_taskgroup_t *taskgroup;
 
@@ -5834,11 +5821,11 @@ void __kmpc_taskgraph(ident_t *loc_ref, kmp_int32 gtid,
 
   if (!record) {
     record = __kmp_taskgraph_alloc(gtid, graph_id);
-    // Another thread may have allocated the taskgraph already.  Check that here.
+    // Another thread may have allocated the taskgraph already.  Check that
+    // here.
     kmp_taskgraph_record_t *other =
-      (kmp_taskgraph_record_t *)KMP_COMPARE_AND_STORE_RET64(tdg_handle,
-                                                            nullptr,
-                                                            record);
+        (kmp_taskgraph_record_t *)KMP_COMPARE_AND_STORE_RET64(tdg_handle,
+                                                              nullptr, record);
     if (other != nullptr) {
       __kmp_fast_free(thread, record);
       record = other;
@@ -5863,7 +5850,7 @@ void __kmpc_taskgraph(ident_t *loc_ref, kmp_int32 gtid,
   else if (status == KMP_TDG_READY) {
     kmp_taskdata *current_taskdata = thread->th.th_current_task;
     KG_TRACE(10, ("Replay taskgraph %p from task %p\n", record,
-             KMP_TASKDATA_TO_TASK(current_taskdata)));
+                  KMP_TASKDATA_TO_TASK(current_taskdata)));
     __kmp_acquire_lock(&record->map_lock, gtid);
     __kmp_replay_taskgraph(gtid, current_taskdata, record, graph_id, taskgroup);
     __kmpc_end_taskgroup(loc_ref, gtid);
@@ -5893,9 +5880,8 @@ kmp_uint32 __kmpc_taskgraph_task(ident_t *loc_ref, kmp_int32 gtid,
   if (rec) {
     kmp_taskgraph_status_t status = KMP_ATOMIC_LD_ACQ(&rec->status);
     if (status == KMP_TDG_RECORDING) {
-      kmp_task_t *cloned_task =
-        __kmp_taskgraph_clone_task(thread, rec, new_task, sizeof_kmp_task_t,
-                                   sizeof_shareds);
+      kmp_task_t *cloned_task = __kmp_taskgraph_clone_task(
+          thread, rec, new_task, sizeof_kmp_task_t, sizeof_shareds);
       kmp_taskgraph_node_t *node = __kmp_taskgraph_node_alloc(rec, cloned_task);
       if (taskgroup->taskgraph.reduce_input) {
         node->reduce_input = taskgroup->taskgraph.reduce_input;
@@ -5904,25 +5890,28 @@ kmp_uint32 __kmpc_taskgraph_task(ident_t *loc_ref, kmp_int32 gtid,
 #if defined(DEBUG_TASKGRAPH)
       fprintf(stderr, "__kmpc_taskgraph_task: record task here!\n");
       fprintf(stderr, "private size: %d, shared size: %d\n",
-              (int)(sizeof_kmp_task_t - sizeof(kmp_task_t)), (int)sizeof_shareds);
-      fprintf(stderr, "ndeps: %d\n", (int) ndeps);
+              (int)(sizeof_kmp_task_t - sizeof(kmp_task_t)),
+              (int)sizeof_shareds);
+      fprintf(stderr, "ndeps: %d\n", (int)ndeps);
       fprintf(stderr, "gtid: %d rec->gtid: %d\n", gtid, rec->gtid);
-      fprintf(stderr, "taskgroup: %p\n", thread->th.th_current_task->td_taskgroup);
+      fprintf(stderr, "taskgroup: %p\n",
+              thread->th.th_current_task->td_taskgroup);
       kmp_taskdata_t *parent = thread->th.th_current_task->td_parent;
       while (parent) {
-        fprintf(stderr, "  parent: %p (taskgroup %p)\n", parent, parent->td_taskgroup);
+        fprintf(stderr, "  parent: %p (taskgroup %p)\n", parent,
+                parent->td_taskgroup);
         parent = parent->td_parent;
       }
 #endif
       node->u.unresolved.ndeps = ndeps;
-      node->u.unresolved.dep_list =
-        (kmp_depend_info_t *)__kmp_thread_malloc(thread,
-                                                 ndeps * sizeof(kmp_depend_info_t));
+      node->u.unresolved.dep_list = (kmp_depend_info_t *)__kmp_thread_malloc(
+          thread, ndeps * sizeof(kmp_depend_info_t));
       KMP_MEMCPY(node->u.unresolved.dep_list, dep_list,
                  ndeps * sizeof(kmp_depend_info_t));
     } else if (status == KMP_TDG_READY) {
 #ifdef DEBUG_TASKGRAPH
-      fprintf(stderr, "non-taskgraph task entry point for task in finalized taskgraph");
+      fprintf(stderr,
+              "non-taskgraph task entry point for task in finalized taskgraph");
 #endif
       return 0;
     }
@@ -5937,15 +5926,15 @@ kmp_uint32 __kmpc_taskgraph_task(ident_t *loc_ref, kmp_int32 gtid,
   if (ndeps == 0)
     res = __kmpc_omp_task(loc_ref, gtid, new_task);
   else
-    res = __kmpc_omp_task_with_deps(loc_ref, gtid, new_task, ndeps, dep_list,
-                                    0, nullptr);
+    res = __kmpc_omp_task_with_deps(loc_ref, gtid, new_task, ndeps, dep_list, 0,
+                                    nullptr);
 
   return res;
 }
 
-void
-__kmpc_taskgraph_taskwait(ident_t *loc_ref, kmp_int32 gtid, kmp_int32 ndeps,
-                          kmp_depend_info_t *dep_list, kmp_int32 has_no_wait) {
+void __kmpc_taskgraph_taskwait(ident_t *loc_ref, kmp_int32 gtid,
+                               kmp_int32 ndeps, kmp_depend_info_t *dep_list,
+                               kmp_int32 has_no_wait) {
   kmp_info_t *thread = __kmp_threads[gtid];
   kmp_taskgroup_t *taskgroup = thread->th.th_current_task->td_taskgroup;
   kmp_taskgraph_record_t *rec = __kmp_taskgraph_or_parent_recording(taskgroup);
@@ -5956,17 +5945,20 @@ __kmpc_taskgraph_taskwait(ident_t *loc_ref, kmp_int32 gtid, kmp_int32 ndeps,
       kmp_taskgraph_node_t *node = __kmp_taskgraph_node_alloc(rec, nullptr);
 #ifdef DEBUG_TASKGRAPH
       fprintf(stderr, "__kmpc_taskgraph_taskwait: record taskwait here!\n");
-      fprintf(stderr, "ndeps: %d\n", (int) ndeps);
+      fprintf(stderr, "ndeps: %d\n", (int)ndeps);
 #endif
       node->u.unresolved.ndeps = ndeps;
-      node->u.unresolved.dep_list = (kmp_depend_info_t *)__kmp_thread_malloc(thread, ndeps * sizeof(kmp_depend_info_t));
-      KMP_MEMCPY(node->u.unresolved.dep_list, dep_list, ndeps * sizeof(kmp_depend_info_t));
+      node->u.unresolved.dep_list = (kmp_depend_info_t *)__kmp_thread_malloc(
+          thread, ndeps * sizeof(kmp_depend_info_t));
+      KMP_MEMCPY(node->u.unresolved.dep_list, dep_list,
+                 ndeps * sizeof(kmp_depend_info_t));
       // TODO: Record has_no_wait somewhere?
-      //if (has_no_wait)
+      // if (has_no_wait)
       //  return;
     } else if (status == KMP_TDG_READY) {
 #ifdef DEBUG_TASKGRAPH
-      fprintf(stderr, "non-taskgraph taskwait entry point for taskwait in finalized taskgraph\n");
+      fprintf(stderr, "non-taskgraph taskwait entry point for taskwait in "
+                      "finalized taskgraph\n");
 #endif
       return;
     }
@@ -5976,14 +5968,14 @@ __kmpc_taskgraph_taskwait(ident_t *loc_ref, kmp_int32 gtid, kmp_int32 ndeps,
                               has_no_wait);
 }
 
-kmp_uint32
-__kmpc_taskgraph_taskloop(ident_t *loc_ref, kmp_int32 gtid, kmp_task_t *new_task,
-                          kmp_int32 flags, size_t sizeof_kmp_task_t,
-                          void *shareds, size_t sizeof_shareds,
-                          kmp_int32 if_val, kmp_uint64 *lb, kmp_uint64 *ub,
-                          kmp_int64 st, kmp_int32 nogroup, kmp_int32 sched,
-                          kmp_uint64 grainsize, kmp_int32 modifier,
-                          void *task_dup) {
+kmp_uint32 __kmpc_taskgraph_taskloop(ident_t *loc_ref, kmp_int32 gtid,
+                                     kmp_task_t *new_task, kmp_int32 flags,
+                                     size_t sizeof_kmp_task_t, void *shareds,
+                                     size_t sizeof_shareds, kmp_int32 if_val,
+                                     kmp_uint64 *lb, kmp_uint64 *ub,
+                                     kmp_int64 st, kmp_int32 nogroup,
+                                     kmp_int32 sched, kmp_uint64 grainsize,
+                                     kmp_int32 modifier, void *task_dup) {
   kmp_info_t *thread = __kmp_threads[gtid];
   kmp_taskgroup_t *taskgroup = thread->th.th_current_task->td_taskgroup;
   kmp_taskgraph_record_t *rec = __kmp_taskgraph_or_parent_recording(taskgroup);
@@ -5995,7 +5987,8 @@ __kmpc_taskgraph_taskloop(ident_t *loc_ref, kmp_int32 gtid, kmp_task_t *new_task
                      sched, grainsize, modifier, task_dup, rec);
     else if (status == KMP_TDG_READY) {
 #ifdef DEBUG_TASKGRAPH
-      fprintf(stderr, "non-taskgraph taskloop entry point for taskloop in finalized taskgraph\n");
+      fprintf(stderr, "non-taskgraph taskloop entry point for taskloop in "
+                      "finalized taskgraph\n");
 #endif
       return 0;
     }
