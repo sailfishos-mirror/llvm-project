@@ -8598,8 +8598,9 @@ public:
         LParenLoc(LParenLoc), Condition(Cond) {}
 
   /// Build an empty clause.
-  OMPGraphResetClause() : OMPClause(llvm::omp::OMPC_graph_reset,
-                                    SourceLocation(), SourceLocation()) {}
+  OMPGraphResetClause()
+      : OMPClause(llvm::omp::OMPC_graph_reset, SourceLocation(),
+                  SourceLocation()) {}
 
   /// Sets the location of '('.
   void setLParenLoc(SourceLocation Loc) { LParenLoc = Loc; }
