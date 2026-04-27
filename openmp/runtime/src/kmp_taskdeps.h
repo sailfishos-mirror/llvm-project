@@ -123,8 +123,8 @@ static inline void __kmp_release_deps(kmp_int32 gtid, kmp_taskdata_t *task) {
                 gtid, task));
 
   KMP_ACQUIRE_DEPNODE(gtid, node);
-    node->dn.task =
-        NULL; // mark this task as finished, so no new dependencies are generated
+  node->dn.task =
+      NULL; // mark this task as finished, so no new dependencies are generated
   KMP_RELEASE_DEPNODE(gtid, node);
 
   kmp_depnode_list_t *next;
