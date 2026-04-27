@@ -585,7 +585,7 @@ protected:
                             llvm::Function *TaskFunction, QualType SharedsTy,
                             Address Shareds, const OMPTaskDataTy &Data,
                             bool ForTaskgraph,
-                            std::array<llvm::Value*, 3> &TaskAllocArgs);
+                            std::array<llvm::Value *, 3> &TaskAllocArgs);
 
   /// Emit update for lastprivate conditional data.
   void emitLastprivateConditionalUpdate(CodeGenFunction &CGF, LValue IVLVal,
@@ -1388,7 +1388,8 @@ public:
 
   /// Emit code for 'taskgraph' directive.
   virtual void emitTaskgraphCall(CodeGenFunction &CGF, SourceLocation Loc,
-                                 const OMPExecutableDirective &D, const Expr *IfCond);
+                                 const OMPExecutableDirective &D,
+                                 const Expr *IfCond);
 
   /// Emit code for 'cancellation point' construct.
   /// \param CancelRegion Region kind for which the cancellation point must be
@@ -2097,8 +2098,8 @@ public:
   void emitTaskLoopCall(CodeGenFunction &CGF, SourceLocation Loc,
                         const OMPLoopDirective &D, llvm::Function *TaskFunction,
                         QualType SharedsTy, Address Shareds, const Expr *IfCond,
-                        const Expr *ReplayableCond, const OMPTaskDataTy &Data)
-                        override;
+                        const Expr *ReplayableCond,
+                        const OMPTaskDataTy &Data) override;
 
   /// Emit a code for reduction clause. Next code should be emitted for
   /// reduction:
@@ -2218,16 +2219,15 @@ public:
 
   /// Emit code for 'taskwait' directive.
   void emitTaskwaitCall(CodeGenFunction &CGF, SourceLocation Loc,
-                        const Expr *ReplayableCond, const OMPTaskDataTy &Data)
-                        override;
+                        const Expr *ReplayableCond,
+                        const OMPTaskDataTy &Data) override;
 
   /// Emit code for 'taskgraph' directive.
   /// \param IfCond Expression evaluated in if clause associated with the target
   /// \param D Directive to emit.
   void emitTaskgraphCall(CodeGenFunction &CGF, SourceLocation Loc,
                          const OMPExecutableDirective &D,
-                         const Expr *IfCond
-                        ) override;
+                         const Expr *IfCond) override;
 
   /// Emit code for 'cancellation point' construct.
   /// \param CancelRegion Region kind for which the cancellation point must be
