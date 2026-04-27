@@ -1776,116 +1776,76 @@ The AMDGPU backend implements the following LLVM IR intrinsics.
                                                    * :ref:`Synchronization Scope<amdgpu-intrinsics-syncscope-metadata-operand>`.
                                                      Note that the scope used must ensure that the L2 cache will be hit.
 
-  llvm.amdgcn.av.global.load.b128                  This intrinsic is supported on gfx9, gfx10, gfx11, and gfx12 targets.
-
-                                                   Signature:
-
-                                                   .. code-block:: llvm
-
-                                                      <4 x i32> @llvm.amdgcn.av.global.load.b128(
-                                                          ptr addrspace(1), ; source
-                                                          metadata)         ; scope    - e.g. '!0' where '!0 = !{!"wavegroup"}'
-
-                                                   Reads the value from the source address with cache behavior specified by the scope.
-
-                                                   The following table shows the mapping between valid scope values and target
-                                                   instruction flags or field values.
-
-                                                   ============== ========================== ========================== ========================== ========================== ==========================
-                                                   targets        instruction                           ``"wavefront"``            ``"workgroup"``                ``"agent"``      ``""`` (empty string)
-                                                   ============== ========================== ========================== ========================== ========================== ==========================
-                                                   gfx90*         ``global_load_dwordx4``                                                                             ``glc``                    ``glc``
-
-                                                   gfx942, gfx950 ``global_load_dwordx4``                        (wave)            ``sc0`` (group)           ``sc1`` (device)       ``sc0 sc1`` (system)
-
-                                                   gfx10*         ``global_load_dwordx4``                                                  ``glc``                ``glc dlc``                ``glc dlc``
-
-                                                   gfx11*         ``global_load_dwordx4``                                                  ``glc``                    ``glc``                    ``glc``
-
-                                                   gfx120*        ``global_load_b128``                             (CU)    ``scope:SCOPE_SE`` (SE)  ``scope:SCOPE_DEV`` (DEV)  ``scope:SCOPE_SYS`` (SYS)
-
-                                                   gfx125*        ``global_load_b128``                             (CU)                             ``scope:SCOPE_DEV`` (DEV)  ``scope:SCOPE_SYS`` (SYS)
-                                                   ============== ========================== ========================== ========================== ========================== ==========================
-
-                                                   For gfx90*, see "GLC Bit Explained" in the appropriate instruction set reference
-                                                   (e.g. Chapter 9.1.10 in "AMD Instinct MI100" Instruction Set Architecture Reference
-                                                   Guide).
-
-                                                   For gfx942 and gfx950 targets, see "Memory Scope and Temporal Controls" in the
-                                                   appropriate instruction set reference (e.g. Chapter 9.1.10.2 in the "AMD Instinct
-                                                   MI300" Instruction Set Architecture Reference Guide).
-
-                                                   For gfx10* targets, see "GLC, DLC and SLC Bit Explained" in the appropriate
-                                                   instruction set reference (e.g. Chapter 8.1.10 in "RDNA 2" Instruction Set Architecture
-                                                   Reference Guide)
-
-                                                   For gfx11* targets, see "Cache Controls: SLC, GLC and DLC" in the appropriate
-                                                   instruction set reference (e.g. Chapter 4.1.1 in "RDNA3" Instruction Set Architecture
-                                                   Reference Guide).
-
-                                                   For gfx12* targets, see "Cache Controls: SCOPE and Temporal-Hint" in the
-                                                   appropriate instruction set reference (e.g. Chapter 4.1.1 in the "RDNA4"
-                                                   Instruction Set Architecture Reference Guide).
-
-
-  llvm.amdgcn.av.global.store.b128                 This intrinsic is supported on gfx9, gfx10, gfx11, and gfx12 targets.
-
-                                                   Signature:
-
-                                                   .. code-block:: llvm
-
-                                                      void @llvm.amdgcn.av.global.store.b128(
-                                                          ptr addrspace(1), ; destination
-                                                          <4 x i32>,        ; value
-                                                          metadata)         ; scope    - e.g. '!0' where '!0 = !{!"wavegroup"}'
-
-                                                   Writes the value to the destination address with cache
-                                                   behavior specified by the scope.
-
-                                                   The following table shows the mapping between valid scope values and target
-                                                   instruction flags or field values.
-
-                                                   ============== ========================== ========================== ========================== ========================== ==========================
-                                                   targets        instruction                           ``"wavefront"``            ``"workgroup"``                ``"agent"``      ``""`` (empty string)
-                                                   ============== ========================== ========================== ========================== ========================== ==========================
-                                                   gfx90*         ``global_store_dwordx4``
-
-                                                   gfx942, gfx950 ``global_store_dwordx4``                       (wave)            ``sc0`` (group)           ``sc1`` (device)       ``sc0 sc1`` (system)
-
-                                                   gfx10*         ``global_store_dwordx4``
-
-                                                   gfx11*         ``global_store_dwordx4``
-
-                                                   gfx120*        ``global_store_b128``                            (CU)    ``scope:SCOPE_SE`` (SE)  ``scope:SCOPE_DEV`` (DEV)  ``scope:SCOPE_SYS`` (SYS)
-
-                                                   gfx125*        ``global_store_b128``                            (CU)                             ``scope:SCOPE_DEV`` (DEV)  ``scope:SCOPE_SYS`` (SYS)
-                                                   ============== ========================== ========================== ========================== ========================== ==========================
-
-                                                   For gfx90*, see "GLC Bit Explained" in the appropriate instruction set reference
-                                                   (e.g. Chapter 9.1.10 in "AMD Instinct MI100" Instruction Set Architecture Reference
-                                                   Guide).
-
-                                                   For gfx942 and gfx950 targets, see "Memory Scope and Temporal Controls" in the
-                                                   appropriate instruction set reference (e.g. Chapter 9.1.10.2 in the "AMD Instinct
-                                                   MI300" Instruction Set Architecture Reference Guide).
-
-                                                   For gfx10* targets, see "GLC, DLC and SLC Bit Explained" in the appropriate
-                                                   instruction set reference (e.g. Chapter 8.1.10 in "RDNA 2" Instruction Set
-                                                   Architecture Reference Guide)
-
-                                                   For gfx11* targets, see "Cache Controls: SLC, GLC and DLC" in the appropriate
-                                                   instruction set reference (e.g. Chapter 4.1.1 in "RDNA3" Instruction Set
-                                                   Architecture Reference Guide).
-
-                                                   For gfx12* targets, see "Cache Controls: SCOPE and Temporal-Hint" in the
-                                                   appropriate instruction set reference (e.g. Chapter 4.1.1 in the "RDNA4"
-                                                   Instruction Set Architecture Reference Guide).
-
   ==============================================   ==========================================================
 
 .. TODO::
 
    List AMDGPU intrinsics.
+
+'``llvm.amdgcn.av.global``' Intrinsics
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The '``llvm.amdgcn.av.global``' intrinsics are used to perform load and store
+operations on global memory, with explicit control on how their side-effects
+propagate through the system. They take a *scope* argument as a string metadata,
+which indicates the scope within which these side-effects are guaranteed to be
+observable. [TODO: The exact semantics as a memory consistency model is a work
+in progress.]
+
+.. code-block:: llvm
+
+   <4 x i32> @llvm.amdgcn.av.global.load.b128(
+       ptr addrspace(1), ; source
+       metadata)         ; scope    - e.g. '!0' where '!0 = !{!"wavegroup"}'
+
+   void @llvm.amdgcn.av.global.store.b128(
+       ptr addrspace(1), ; destination
+       <4 x i32>,        ; value
+       metadata)         ; scope    - e.g. '!0' where '!0 = !{!"wavegroup"}'
+
+Implementation Details
+++++++++++++++++++++++
+
+This section is informational and for **internal reference only**. Users should
+not rely on the expansions described below. The only reliable user-level
+guarantees are those provided by the memory consistency model, which is
+currently a work in progress.
+
+.. table:: AMDGPU Load-Visible Impelementation
+
+   ============== ========================== ========================== ========================== ========================== ==========================
+   targets        instruction                           ``"wavefront"``            ``"workgroup"``                ``"agent"``      ``""`` (empty string)
+   ============== ========================== ========================== ========================== ========================== ==========================
+   gfx90*         ``global_load_dwordx4``                                                                             ``glc``                    ``glc``
+
+   gfx942, gfx950 ``global_load_dwordx4``                        (wave)            ``sc0`` (group)           ``sc1`` (device)       ``sc0 sc1`` (system)
+
+   gfx10*         ``global_load_dwordx4``                                                  ``glc``                ``glc dlc``                ``glc dlc``
+
+   gfx11*         ``global_load_dwordx4``                                                  ``glc``                    ``glc``                    ``glc``
+
+   gfx120*        ``global_load_b128``                             (CU)    ``scope:SCOPE_SE`` (SE)  ``scope:SCOPE_DEV`` (DEV)  ``scope:SCOPE_SYS`` (SYS)
+
+   gfx125*        ``global_load_b128``                             (CU)    ``scope:SCOPE_SE`` (SE)  ``scope:SCOPE_DEV`` (DEV)  ``scope:SCOPE_SYS`` (SYS)
+   ============== ========================== ========================== ========================== ========================== ==========================
+
+.. table:: AMDGPU Store-Available Impelementation
+
+   ============== ========================== ========================== ========================== ========================== ==========================
+   targets        instruction                           ``"wavefront"``            ``"workgroup"``                ``"agent"``      ``""`` (empty string)
+   ============== ========================== ========================== ========================== ========================== ==========================
+   gfx90*         ``global_store_dwordx4``
+
+   gfx942, gfx950 ``global_store_dwordx4``                       (wave)            ``sc0`` (group)           ``sc1`` (device)       ``sc0 sc1`` (system)
+
+   gfx10*         ``global_store_dwordx4``
+
+   gfx11*         ``global_store_dwordx4``
+
+   gfx120*        ``global_store_b128``                            (CU)    ``scope:SCOPE_SE`` (SE)  ``scope:SCOPE_DEV`` (DEV)  ``scope:SCOPE_SYS`` (SYS)
+
+   gfx125*        ``global_store_b128``                            (CU)    ``scope:SCOPE_SE`` (SE)  ``scope:SCOPE_DEV`` (DEV)  ``scope:SCOPE_SYS`` (SYS)
+   ============== ========================== ========================== ========================== ========================== ==========================
 
 '``llvm.amdgcn.cooperative.atomic``' Intrinsics
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
