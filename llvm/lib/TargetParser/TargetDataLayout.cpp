@@ -298,7 +298,8 @@ static std::string computeRISCVDataLayout(const Triple &TT, StringRef ABIName) {
 
   // TODO: Maybe we should move RISCVABI to TargetParser, so we can reuse that
   // logic here instead of duplicating the string handling?
-  bool IsRVYPurecapABI = ABIName.starts_with("il32pc64") || ABIName.starts_with("l64pc128");
+  bool IsRVYPurecapABI =
+      ABIName.starts_with("il32pc64") || ABIName.starts_with("l64pc128");
 
   // Pointer and integer sizes.
   if (TT.isRISCV64()) {
