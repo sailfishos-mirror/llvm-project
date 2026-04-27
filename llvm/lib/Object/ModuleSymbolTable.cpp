@@ -114,7 +114,7 @@ initializeRecordStreamer(const Module &M,
       createMCAsmParser(SrcMgr, MCCtx, Streamer, *MAI));
 
   std::unique_ptr<MCTargetAsmParser> TAP(
-      T->createMCAsmParser(*STI, *Parser, *MCII, MCOptions));
+      T->createMCAsmParser(*STI, *Parser, *MCII));
   if (!TAP)
     return;
 
@@ -128,6 +128,8 @@ initializeRecordStreamer(const Module &M,
   // Module-level inline asm is assumed to use At&t syntax (see
   // AsmPrinter::doInitialization()).
   Parser->setAssemblerDialect(InlineAsm::AD_ATT);
+
+  Parser->setSymbolScanningMode(true);
 
   Parser->setTargetParser(*TAP);
   if (Parser->Run(false))

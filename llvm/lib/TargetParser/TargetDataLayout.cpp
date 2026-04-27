@@ -6,11 +6,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/TargetParser/ARMTargetParser.h"
-#include "llvm/TargetParser/RISCVISAInfo.h"
 #include "llvm/TargetParser/Triple.h"
 #include <cstring>
 using namespace llvm;
@@ -281,14 +279,14 @@ static std::string computeAMDDataLayout(const Triple &TT) {
          "v1024:1024-v2048:2048-n32:64-S32-A5-G1-ni:7:8:9";
 }
 
-static std::string computeRISCVDataLayout(const Triple &TT, StringRef ABIName,
-                                          StringRef FS) {
+static std::string computeRISCVDataLayout(const Triple &TT, StringRef ABIName) {
   if (TT.isOSBinFormatMachO()) {
     assert(TT.isLittleEndian() && "Invalid endianness");
     assert(TT.isArch32Bit() && "Invalid triple");
     assert((ABIName != "ilp32e") && "Invalid ABI.");
     return "e-m:o-p:32:32-i64:64-n32-S128";
   }
+
   std::string Ret;
 
   if (TT.isLittleEndian())
@@ -298,35 +296,34 @@ static std::string computeRISCVDataLayout(const Triple &TT, StringRef ABIName,
 
   Ret += "-m:e";
 
-  std::vector<std::string> Features;
-  if (!FS.empty())
-    llvm::append_range(Features, llvm::split(FS, ','));
-  auto ISAInfo = cantFail(
-      llvm::RISCVISAInfo::parseFeatures(TT.isArch64Bit() ? 64 : 32, Features));
-  bool HasRVY = ISAInfo->hasExtension("experimental-y");
+  // TODO: Maybe we should move RISCVABI to TargetParser, so we can reuse that
+  // logic here instead of duplicating the string handling?
+  bool IsRVYPurecapABI = ABIName.starts_with("il32pc64") || ABIName.starts_with("l64pc128");
 
   // Pointer and integer sizes.
   if (TT.isRISCV64()) {
     Ret += "-p:64:64";
-    if (HasRVY)
+    if (IsRVYPurecapABI)
       Ret += "-pe200:128:128:128:64";
     Ret += "-i64:64-i128:128-n32:64";
   } else {
     assert(TT.isRISCV32() && "only RV32 and RV64 are currently supported");
     Ret += "-p:32:32";
-    if (HasRVY)
+    if (IsRVYPurecapABI)
       Ret += "-pe200:64:64:64:32";
     Ret += "-i64:64-n32";
   }
 
   // Stack alignment based on ABI.
-  StringRef ABI = ABIName;
-  if (ABI == "ilp32e")
+  if (ABIName == "ilp32e")
     Ret += "-S32";
-  else if (ABI == "lp64e")
+  else if (ABIName == "lp64e")
     Ret += "-S64";
   else
     Ret += "-S128";
+
+  if (IsRVYPurecapABI)
+    Ret += "-A200-P200-G200";
 
   return Ret;
 }
@@ -486,8 +483,7 @@ static std::string computeSPIRVDataLayout(const Triple &TT) {
     return "e-p:32:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-"
            "v256:256-v512:512-v1024:1024-n8:16:32:64-G1";
   if (Arch == Triple::spirv)
-    return "e-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-"
-           "v512:512-v1024:1024-n8:16:32:64-G10";
+    return "e-ve-i64:64-n8:16:32:64-G10";
   if (TT.getVendor() == Triple::VendorType::AMD &&
       TT.getOS() == Triple::OSType::AMDHSA)
     return "e-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-"
@@ -554,7 +550,7 @@ static std::string computeVEDataLayout(const Triple &T) {
   return Ret;
 }
 
-std::string Triple::computeDataLayout(StringRef ABIName, StringRef FS) const {
+std::string Triple::computeDataLayout(StringRef ABIName) const {
   switch (getArch()) {
   case Triple::arm:
   case Triple::armeb:
@@ -576,11 +572,8 @@ std::string Triple::computeDataLayout(StringRef ABIName, StringRef FS) const {
   case Triple::csky:
     return computeCSKYDataLayout(*this);
   case Triple::dxil:
-    // TODO: We need to align vectors on the element size generally, but for now
-    // we hard code this for 3-element 32- and 64-bit vectors as a workaround.
-    // See https://github.com/llvm/llvm-project/issues/123968
-    return "e-m:e-p:32:32-i1:32-i8:8-i16:16-i32:32-i64:64-f16:16-"
-           "f32:32-f64:64-n8:16:32:64-v48:16:16-v96:32:32-v192:64:64";
+    return "e-m:e-ve-p:32:32-i1:32-i8:8-i16:16-i32:32-i64:64-f16:16-"
+           "f32:32-f64:64-n8:16:32:64";
   case Triple::hexagon:
     return "e-m:e-p:32:32:32-a:0-n16:32-"
            "i64:64:64-i32:32:32-i16:16:16-i1:8:8-f32:32:32-f64:64:64-"
@@ -609,7 +602,7 @@ std::string Triple::computeDataLayout(StringRef ABIName, StringRef FS) const {
   case Triple::riscv64:
   case Triple::riscv32be:
   case Triple::riscv64be:
-    return computeRISCVDataLayout(*this, ABIName, FS);
+    return computeRISCVDataLayout(*this, ABIName);
   case Triple::sparc:
   case Triple::sparcv9:
   case Triple::sparcel:
@@ -617,7 +610,20 @@ std::string Triple::computeDataLayout(StringRef ABIName, StringRef FS) const {
   case Triple::systemz:
     return computeSystemZDataLayout(*this);
   case Triple::tce:
+    return "E-p:32:32:32-i1:8:8-i8:8:32-i16:16:32-i32:32:32-i64:32:32-"
+           "f16:16:16-f32:32:32-f64:32:32-v64:64:64-i128:128-v128:128:128-"
+           "v256:256:256-v512:512:512-v1024:1024:1024-v2048:2048:2048-"
+           "v4096:4096:4096-a0:0:32-n32";
   case Triple::tcele:
+    return "e-p:32:32:32-i1:8:8-i8:8:32-i16:16:32-i32:32:32-i64:32:32-"
+           "f16:16:16-f32:32:32-f64:32:32-v64:64:64-i128:128-v128:128:128-"
+           "v256:256:256-v512:512:512-v1024:1024:1024-v2048:2048:2048-"
+           "v4096:4096:4096-a0:0:32-n32";
+  case Triple::tcele64:
+    return "e-p:64:64:64-i1:8:64-i8:8:64-i16:16:64-i32:32:64-i64:64:64-"
+           "f16:16:64-f32:32:64-f64:64:64-v64:64:64-i128:128-v128:128:128-"
+           "v256:256:256-v512:512:512-v1024:1024:1024-v2048:2048:2048-"
+           "v4096:4096:4096-a0:0:64-n64";
   case Triple::x86:
   case Triple::x86_64:
     return computeX86DataLayout(*this);
