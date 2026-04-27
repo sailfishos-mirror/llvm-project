@@ -778,7 +778,6 @@ static void __kmp_task_finish(kmp_int32 gtid, kmp_task_t *task,
 
   KMP_DEBUG_ASSERT(taskdata->td_flags.tasktype == TASK_EXPLICIT);
 
-
   if (UNLIKELY(taskdata->td_flags.tiedness == TASK_UNTIED)) {
     // untied task needs to check the counter so that the task structure is not
     // freed prematurely
@@ -2264,7 +2263,6 @@ Note: this entry supposes the optional compiler-generated initializer routine
 has two parameters, pointer to object to be initialized and pointer to omp_orig
 */
 void *__kmpc_taskred_init(int gtid, int num, void *data) {
-  }
   return __kmp_task_reduction_init(gtid, num, (kmp_taskred_input_t *)data);
 }
 
