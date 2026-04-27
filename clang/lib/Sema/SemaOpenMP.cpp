@@ -11455,6 +11455,10 @@ StmtResult SemaOpenMP::ActOnOpenMPErrorDirective(ArrayRef<OMPClause *> Clauses,
   return OMPErrorDirective::Create(getASTContext(), StartLoc, EndLoc, Clauses);
 }
 
+static OpenMPDirectiveKind getOpenMPCaptureRegionForClause(
+    OpenMPDirectiveKind DKind, OpenMPClauseKind CKind, unsigned OpenMPVersion,
+    OpenMPDirectiveKind NameModifier = OMPD_unknown);
+
 StmtResult
 SemaOpenMP::ActOnOpenMPTaskwaitDirective(ArrayRef<OMPClause *> Clauses,
                                          SourceLocation StartLoc,
@@ -11466,6 +11470,10 @@ SemaOpenMP::ActOnOpenMPTaskwaitDirective(ArrayRef<OMPClause *> Clauses,
            .empty();
   if (NowaitC && !HasDependC) {
     Diag(StartLoc, diag::err_omp_nowait_clause_without_depend);
+    return StmtError();
+  }
+  if (DSAStack->getParentDirective() == OMPD_taskgraph && !HasDependC) {
+    Diag(StartLoc, diag::err_omp_taskgraph_taskwait_without_depend);
     return StmtError();
   }
 
@@ -17015,9 +17023,10 @@ OMPClause *SemaOpenMP::ActOnOpenMPSingleExprClause(OpenMPClauseKind Kind,
 // the region in which to capture expressions associated with a clause.
 // A return value of OMPD_unknown signifies that the expression should not
 // be captured.
-static OpenMPDirectiveKind getOpenMPCaptureRegionForClause(
-    OpenMPDirectiveKind DKind, OpenMPClauseKind CKind, unsigned OpenMPVersion,
-    OpenMPDirectiveKind NameModifier = OMPD_unknown) {
+static OpenMPDirectiveKind
+getOpenMPCaptureRegionForClause(OpenMPDirectiveKind DKind,
+                                OpenMPClauseKind CKind, unsigned OpenMPVersion,
+                                OpenMPDirectiveKind NameModifier) {
   assert(isAllowedClauseForDirective(DKind, CKind, OpenMPVersion) &&
          "Invalid directive with CKind-clause");
 
@@ -19105,8 +19114,6 @@ OMPClause *SemaOpenMP::ActOnOpenMPGraphIdClause(Expr *Id,
                                                 SourceLocation LParenLoc,
                                                 SourceLocation EndLoc) {
   Expr *ValExpr = Id;
-  //Stmt *HelperValStmt = nullptr;
-  OpenMPDirectiveKind CaptureRegion = OMPD_unknown;
 
   if (!Id->isValueDependent() && !Id->isTypeDependent() &&
       !Id->isInstantiationDependent() &&
@@ -19116,21 +19123,10 @@ OMPClause *SemaOpenMP::ActOnOpenMPGraphIdClause(Expr *Id,
       return nullptr;
 
     ValExpr = Val.get();
-
-    /*OpenMPDirectiveKind DKind = DSAStack->getCurrentDirective();
-    CaptureRegion = getOpenMPCaptureRegionForClause(DKind, OMPC_graph_id,
-                                                    getLangOpts().OpenMP);
-    if (CaptureRegion != OMPD_unknown &&
-        !SemaRef.CurContext->isDependentContext()) {
-      ValExpr = SemaRef.MakeFullExpr(ValExpr).get();
-      llvm::MapVector<const Expr *, DeclRefExpr *> Captures;
-      ValExpr = tryBuildCapture(SemaRef, ValExpr, Captures).get();
-      HelperValStmt = buildPreInits(getASTContext(), Captures);
-    }*/
   }
 
-  return new (getASTContext()) OMPGraphIdClause(ValExpr, StartLoc, LParenLoc,
-                                                EndLoc);
+  return new (getASTContext())
+      OMPGraphIdClause(ValExpr, StartLoc, LParenLoc, EndLoc);
 }
 
 OMPClause *SemaOpenMP::ActOnOpenMPGraphResetClause(Expr *Condition,
@@ -19138,8 +19134,6 @@ OMPClause *SemaOpenMP::ActOnOpenMPGraphResetClause(Expr *Condition,
                                                    SourceLocation LParenLoc,
                                                    SourceLocation EndLoc) {
   Expr *ValExpr = Condition;
-  //Stmt *HelperValStmt = nullptr;
-  OpenMPDirectiveKind CaptureRegion = OMPD_unknown;
   if (Condition && LParenLoc.isValid()) {
     if (!Condition->isValueDependent() && !Condition->isTypeDependent() &&
         !Condition->isInstantiationDependent() &&
@@ -19149,22 +19143,11 @@ OMPClause *SemaOpenMP::ActOnOpenMPGraphResetClause(Expr *Condition,
         return nullptr;
 
       ValExpr = Val.get();
-
-      /*OpenMPDirectiveKind DKind = DSAStack->getCurrentDirective();
-      CaptureRegion = getOpenMPCaptureRegionForClause(DKind, OMPC_graph_reset,
-                                                      getLangOpts().OpenMP);
-      if (CaptureRegion != OMPD_unknown &&
-          !SemaRef.CurContext->isDependentContext()) {
-        ValExpr = SemaRef.MakeFullExpr(ValExpr).get();
-        llvm::MapVector<const Expr *, DeclRefExpr *> Captures;
-        ValExpr = tryBuildCapture(SemaRef, ValExpr, Captures).get();
-        HelperValStmt = buildPreInits(getASTContext(), Captures);
-      }*/
     }
   }
 
-  return new (getASTContext()) OMPGraphResetClause(
-      ValExpr, StartLoc, LParenLoc, EndLoc);
+  return new (getASTContext())
+      OMPGraphResetClause(ValExpr, StartLoc, LParenLoc, EndLoc);
 }
 
 OMPClause *SemaOpenMP::ActOnOpenMPNovariantsClause(Expr *Condition,
