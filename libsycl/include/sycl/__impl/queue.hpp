@@ -167,7 +167,7 @@ public:
   /// Defines and invokes a SYCL kernel function as a lambda expression or a
   /// named function object type.
   ///
-  /// \param depEvents is a collection of events which specify the kernel
+  /// \param depEvents is a collection of events that specify the kernel
   /// dependencies.
   /// \param kernelFunc is the kernel functor or lambda.
   /// \return an event that represents the status of the submitted kernel.
@@ -191,7 +191,7 @@ public:
   /// named function object type, for the specified range.
   ///
   /// \param numWorkItems specifies the global work space of the kernel.
-  /// \param rest acts as-if: const KernelType &KernelFunc".
+  /// \param rest acts as if it was "const KernelType &KernelFunc".
   // TODO: Rest will represent reduction types once it is supported.
   template <typename KernelName = detail::AutoName, typename... Rest>
   event parallel_for(range<1> numWorkItems, Rest &&...rest) {
@@ -203,7 +203,7 @@ public:
   /// named function object type, for the specified range.
   ///
   /// \param numWorkItems specifies the global work space of the kernel.
-  /// \param rest acts as-if: const KernelType &KernelFunc".
+  /// \param rest acts as if it was "const KernelType &KernelFunc".
   // TODO: Rest will represent reduction types once it is supported.
   template <typename KernelName = detail::AutoName, typename... Rest>
   event parallel_for(range<2> numWorkItems, Rest &&...rest) {
@@ -215,7 +215,7 @@ public:
   /// named function object type, for the specified range.
   ///
   /// \param numWorkItems specifies the global work space of the kernel.
-  /// \param rest acts as-if: const KernelType &KernelFunc".
+  /// \param rest acts as if it was "const KernelType &KernelFunc".
   // TODO: Rest will represent reduction types once it is supported.
   template <typename KernelName = detail::AutoName, typename... Rest>
   event parallel_for(range<3> numWorkItems, Rest &&...rest) {
@@ -229,7 +229,7 @@ public:
   /// \param numWorkItems specifies the global work space of the kernel.
   /// \param depEvent adds a requirement that the action represented by depEvent
   /// must complete before executing this kernel.
-  /// \param rest acts as-if: const KernelType &KernelFunc".
+  /// \param rest acts as if it was "const KernelType &KernelFunc".
   // TODO: Rest will represent reduction types once it is supported.
   template <typename KernelName = detail::AutoName, typename... Rest>
   event parallel_for(range<1> numWorkItems, event depEvent, Rest &&...rest) {
@@ -243,7 +243,7 @@ public:
   /// \param numWorkItems specifies the global work space of the kernel.
   /// \param depEvent adds a requirement that the action represented by depEvent
   /// must complete before executing this kernel.
-  /// \param rest acts as-if: const KernelType &KernelFunc".
+  /// \param rest acts as if it was "const KernelType &KernelFunc".
   // TODO: Rest will represent reduction types once it is supported.
   template <typename KernelName = detail::AutoName, typename... Rest>
   event parallel_for(range<2> numWorkItems, event depEvent, Rest &&...rest) {
@@ -257,7 +257,7 @@ public:
   /// \param numWorkItems specifies the global work space of the kernel.
   /// \param depEvent adds a requirement that the action represented by depEvent
   /// must complete before executing this kernel.
-  /// \param rest acts as-if: const KernelType &KernelFunc".
+  /// \param rest acts as if it was "const KernelType &KernelFunc".
   // TODO: Rest will represent reduction types once it is supported.
   template <typename KernelName = detail::AutoName, typename... Rest>
   event parallel_for(range<3> numWorkItems, event depEvent, Rest &&...rest) {
@@ -271,7 +271,7 @@ public:
   /// \param numWorkItems specifies the global work space of the kernel
   /// \param depEvents is a vector of events that specifies the kernel
   /// dependencies.
-  /// \param rest acts as-if: const KernelType &KernelFunc".
+  /// \param rest acts as if it was "const KernelType &KernelFunc".
   // TODO: Rest will represent reduction types once it is supported.
   template <typename KernelName = detail::AutoName, typename... Rest>
   event parallel_for(range<1> numWorkItems, const std::vector<event> &depEvents,
@@ -286,7 +286,7 @@ public:
   /// \param numWorkItems specifies the global work space of the kernel
   /// \param depEvents is a vector of events that specifies the kernel
   /// dependencies.
-  /// \param rest acts as-if: const KernelType &KernelFunc".
+  /// \param rest acts as if it was "const KernelType &KernelFunc".
   // TODO: Rest will represent reduction types once it is supported.
   template <typename KernelName = detail::AutoName, typename... Rest>
   event parallel_for(range<2> numWorkItems, const std::vector<event> &depEvents,
@@ -301,7 +301,7 @@ public:
   /// \param numWorkItems specifies the global work space of the kernel
   /// \param depEvents is a vector of events that specifies the kernel
   /// dependencies.
-  /// \param rest acts as-if: const KernelType &KernelFunc".
+  /// \param rest acts as if it was "const KernelType &KernelFunc".
   // TODO: Rest will represent reduction types once it is supported.
   template <typename KernelName = detail::AutoName, typename... Rest>
   event parallel_for(range<3> numWorkItems, const std::vector<event> &depEvents,
@@ -339,11 +339,11 @@ private:
     return getLastEvent();
   }
 
-  /// Name of this function is defined by compiler. It generates call to this
+  /// Name of this function is defined by compiler. It generates a call to this
   /// function in the host implementation of KernelFunc in submitSingleTask or
   /// submitParallelFor.
-  /// \param KernelName a name of the kernel being invoked.
-  /// \param args kernel arguments for kernel invocation.
+  /// \param KernelName the name of the kernel being invoked.
+  /// \param args the kernel arguments for the kernel invocation.
   template <typename KN, typename... Args>
   void sycl_kernel_launch(const char *KernelName, Args &&...args) {
     static_assert(
@@ -358,8 +358,8 @@ private:
 
   /// The sycl_kernel_entry_point attribute facilitates the generation of an
   /// offload kernel entry point function with parameters corresponding to the
-  /// (potentially decomposed) kernel arguments and a body that (potentially
-  /// reconstructs the arguments and) executes the kernel.
+  /// (potentially decomposed) kernel arguments and a body that executes the
+  /// kernel (after reconstructing the arguments if required).
 #ifdef SYCL_LANGUAGE_VERSION
 #  define _LIBSYCL_ENTRY_POINT_ATTR__(KernelName)                              \
     [[clang::sycl_kernel_entry_point(KernelName)]]
@@ -368,8 +368,8 @@ private:
 #endif // SYCL_LANGUAGE_VERSION
 
   /// Specifies the parameters and body of the generated offload kernel entry
-  /// point for single_task invocations. On host compiler generates call to
-  /// sycl_kernel_launch instead of KernelFunc invocation.
+  /// point for single_task invocations. On host, the compiler generates a call
+  /// to sycl_kernel_launch instead of the KernelFunc invocation.
   template <typename KernelName, typename KernelType>
   _LIBSYCL_ENTRY_POINT_ATTR__(KernelName)
   void submitSingleTask(const KernelType &KernelFunc) {
@@ -377,8 +377,8 @@ private:
   }
 
   /// Specifies the parameters and body of the generated offload kernel entry
-  /// point for parallel_for invocations. On host compiler generates call to
-  /// sycl_kernel_launch instead of KernelFunc invocation.
+  /// point for parallel_for invocations. On host, the compiler generates a call
+  /// to sycl_kernel_launch instead of the KernelFunc invocation.
   template <typename KernelName, typename ElementType, typename KernelType>
   _LIBSYCL_ENTRY_POINT_ATTR__(KernelName)
   void submitParallelFor(const KernelType &KernelFunc) {
@@ -386,19 +386,19 @@ private:
   }
 #undef _LIBSYCL_ENTRY_POINT_ATTR__
 
-  /// Passes kernel parameters to runtime.
+  /// Passes kernel parameters to the runtime.
   /// \param Events a collection of events representing dependencies of the
   /// kernel to submit.
-  /// \param Range a unified view of range for kernel execution.
+  /// \param Range a unified view of the kernel execution range.
   void setKernelParameters(const std::vector<event> &Events,
                            const detail::UnifiedRangeView &Range = {});
 
   /// Passes kernel arguments to runtime.
   /// If all dependencies are met and kernel can be submitted to backend - it is
   /// done in this call.
-  /// \param KernelInfo a name of the kernel being invoked.
-  /// \param ArgData a pointer to kernel argument.
-  /// \param ArgSize a size of kernel argument.
+  /// \param KernelInfo the information for the kernel being invoked.
+  /// \param ArgData a pointer to the kernel argument.
+  /// \param ArgSize the size of the kernel argument.
   void submitKernelImpl(detail::DeviceKernelInfo &KernelInfo, void *ArgData,
                         size_t ArgSize);
 

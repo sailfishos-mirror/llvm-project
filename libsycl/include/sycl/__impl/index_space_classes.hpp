@@ -33,50 +33,50 @@ template <int Dimensions = 1> class RawArray {
                 "RawArray can only be 1, 2, or 3 Dimensional.");
 
 public:
-  /// Constructs one-dimensional instance and assign corresponding data to Dim0
-  /// value. Available only if Dimensions = 1.
+  /// Constructs a one-dimensional instance and assigns the corresponding data
+  /// to Dim0 value. Available only if Dimensions = 1.
   template <int N = Dimensions, std::enable_if_t<N == 1, bool> = true>
   RawArray(size_t Dim0 = 0) : MArray{Dim0} {}
 
-  /// Constructs two-dimensional instance and assign corresponding data.
+  /// Constructs a two-dimensional instance and assigns the corresponding data.
   /// Available only if Dimensions = 2.
   template <int N = Dimensions, std::enable_if_t<N == 2, bool> = true>
   RawArray(size_t Dim0, size_t Dim1) : MArray{Dim0, Dim1} {}
 
-  /// Constructs two-dimensional instance with zero-initialized corresponding
-  /// data. Available only if Dimensions = 2.
+  /// Constructs a two-dimensional instance with the zero-initialized
+  /// corresponding data. Available only if Dimensions = 2.
   template <int N = Dimensions, std::enable_if_t<N == 2, bool> = true>
   RawArray() : RawArray(0, 0) {}
 
-  /// Constructs three-dimensional instance and assign corresponding data.
-  /// Available only if Dimensions = 3.
+  /// Constructs a three-dimensional instance and assigns the corresponding
+  /// data. Available only if Dimensions = 3.
   template <int N = Dimensions, std::enable_if_t<N == 3, bool> = true>
   RawArray(size_t Dim0, size_t Dim1, size_t Dim2) : MArray{Dim0, Dim1, Dim2} {}
 
-  /// Constructs three-dimensional instance with zero-initialized corresponding
-  /// data. Available only if Dimensions = 3.
+  /// Constructs a three-dimensional instance with the zero-initialized
+  /// corresponding data. Available only if Dimensions = 3.
   template <int N = Dimensions, std::enable_if_t<N == 3, bool> = true>
   RawArray() : RawArray(0, 0, 0) {}
 
-  /// Returns value for the specified dimension.
+  /// Returns the value for the specified dimension.
   /// Results in undefined behavior if dimension is not in the range [0,
   /// Dimensions).
-  /// \param Dimension a dimension to query data for.
-  /// \return value in array matching requested dimension.
+  /// \param Dimension the dimension to return the value for.
+  /// \return the value matching the requested dimension.
   std::size_t get(int Dimension) const noexcept { return MArray[Dimension]; }
 
-  /// Returns value for the specified dimension.
+  /// Returns the value for the specified dimension.
   /// Results in undefined behavior if dimension is not in the range [0,
   /// Dimensions).
-  /// \param Dimension a dimension to query data for.
-  /// \return value in array matching requested dimension.
+  /// \param Dimension the dimension to return the value for.
+  /// \return the value matching the requested dimension.
   std::size_t &operator[](int Dimension) noexcept { return MArray[Dimension]; }
 
-  /// Returns value for the specified dimension.
+  /// Returns the value for the specified dimension.
   /// Results in undefined behavior if dimension is not in the range [0,
   /// Dimensions).
-  /// \param Dimension a dimension to query data for.
-  /// \return value in array matching requested dimension.
+  /// \param Dimension the dimension to return the value for.
+  /// \return the value matching the requested dimension.
   std::size_t operator[](int Dimension) const noexcept {
     return MArray[Dimension];
   }
@@ -114,7 +114,7 @@ protected:
 template <int Dimensions = 1>
 class range : public detail::RawArray<Dimensions> {
   static_assert(Dimensions >= 1 && Dimensions <= 3,
-                "range can only be 1, 2, or 3 Dimensional.");
+                "range can only be 1-, 2-, or 3-dimensional.");
   using Base = detail::RawArray<Dimensions>;
 
 public:
@@ -125,17 +125,17 @@ public:
   range<Dimensions> &operator=(const range<Dimensions> &rhs) = default;
   range<Dimensions> &operator=(range<Dimensions> &&rhs) = default;
 
-  /// Construct a 1D range with value dim0.
+  /// Constructs a 1D range with value dim0.
   ///  Only valid when the template parameter Dimensions is equal to 1.
   template <int N = Dimensions, std::enable_if_t<N == 1, bool> = true>
   range(std::size_t dim0) noexcept : Base(dim0) {}
 
-  /// Construct a 2D range with values dim0 and dim1.
+  /// Constructs a 2D range with values dim0 and dim1.
   /// Only valid when the template parameter Dimensions is equal to 2.
   template <int N = Dimensions, std::enable_if_t<N == 2, bool> = true>
   range(std::size_t dim0, std::size_t dim1) noexcept : Base(dim0, dim1) {}
 
-  /// Construct a 3D range with values dim0, dim1 and dim2.
+  /// Constructs a 3D range with values dim0, dim1 and dim2.
   /// Only valid when the template parameter Dimensions is equal to 3.
   template <int N = Dimensions, std::enable_if_t<N == 3, bool> = true>
   range(std::size_t dim0, std::size_t dim1, std::size_t dim2) noexcept
@@ -175,7 +175,7 @@ template <int Dimensions = 1, bool WithOffset = true> class item;
 /// the same rank.
 template <int Dimensions = 1> class id : public detail::RawArray<Dimensions> {
   static_assert(Dimensions >= 1 && Dimensions <= 3,
-                "id can only be 1, 2, or 3 Dimensional.");
+                "id can only be 1-, 2-, or 3-dimensional.");
   using Base = detail::RawArray<Dimensions>;
 
   // Helper class for conversion operator. Void type is not suitable. User
@@ -195,51 +195,51 @@ public:
   id<Dimensions> &operator=(const id<Dimensions> &rhs) = default;
   id<Dimensions> &operator=(id<Dimensions> &&rhs) = default;
 
-  /// Construct a 1D id with value dim0.
+  /// Constructs a 1D id with value dim0.
   /// Only valid when the template parameter Dimensions is equal to 1.
   template <int N = Dimensions, std::enable_if_t<N == 1, bool> = true>
   id(std::size_t dim0) noexcept : Base(dim0) {}
 
-  /// Construct a 2D id with values dim0, dim1.
+  /// Constructs a 2D id with values dim0, dim1.
   /// Only valid when the template parameter Dimensions is equal to 2.
   template <int N = Dimensions, std::enable_if_t<N == 2, bool> = true>
   id(std::size_t dim0, std::size_t dim1) noexcept : Base(dim0, dim1) {}
 
-  /// Construct a 3D id with values dim0, dim1, dim2.
+  /// Constructs a 3D id with values dim0, dim1, dim2.
   /// Only valid when the template parameter Dimensions is equal to 3.
   template <int N = Dimensions, std::enable_if_t<N == 3, bool> = true>
   id(std::size_t dim0, std::size_t dim1, std::size_t dim2) noexcept
       : Base(dim0, dim1, dim2) {}
 
-  /// Construct an id from the dimensions of range.
+  /// Constructs an id from the dimensions of range.
   /// Only valid when the template parameter Dimensions is equal to 1.
   template <int N = Dimensions, std::enable_if_t<N == 1, bool> = true>
   id(const range<Dimensions> &range) noexcept : Base(range.get(0)) {}
 
-  /// Construct an id from the dimensions of range.
+  /// Constructs an id from the dimensions of range.
   /// Only valid when the template parameter Dimensions is equal to 2.
   template <int N = Dimensions, std::enable_if_t<N == 2, bool> = true>
   id(const range<Dimensions> &range) noexcept
       : Base(range.get(0), range.get(1)) {}
 
-  /// Construct an id from the dimensions of range.
+  /// Constructs an id from the dimensions of range.
   /// Only valid when the template parameter Dimensions is equal to 3.
   template <int N = Dimensions, std::enable_if_t<N == 3, bool> = true>
   id(const range<Dimensions> &range) noexcept
       : Base(range.get(0), range.get(1), range.get(2)) {}
 
-  /// Construct an id from item.get_id().
+  /// Constructs an id from item.get_id().
   /// Only valid when the template parameter Dimensions is equal to 1.
   template <int N = Dimensions, std::enable_if_t<N == 1, bool> = true>
   id(const item<Dimensions> &item) noexcept : Base(item.get_id(0)) {}
 
-  /// Construct an id from item.get_id().
+  /// Constructs an id from item.get_id().
   /// Only valid when the template parameter Dimensions is equal to 2.
   template <int N = Dimensions, std::enable_if_t<N == 2, bool> = true>
   id(const item<Dimensions> &item) noexcept
       : Base(item.get_id(0), item.get_id(1)) {}
 
-  /// Construct an id from item.get_id().
+  /// Constructs an id from item.get_id().
   /// Only valid when the template parameter Dimensions is equal to 3.
   template <int N = Dimensions, std::enable_if_t<N == 3, bool> = true>
   id(const item<Dimensions> &item) noexcept
@@ -335,11 +335,11 @@ public:
   }
 
   /// Deprecated in SYCL 2020.
-  /// For an item converted from an item with no offset this will always return
+  /// For an item converted from an item with no offset, this will always return
   /// an id of all 0 values. This member function is only available if
   /// WithOffset is true.
   /// \return an id representing the n-dimensional offset provided to the
-  /// parallel_for and that is added by the runtime to the global-ID of each
+  /// parallel_for and added by the runtime to the global-ID of each
   /// work-item, if this item represents a global range.
   template <bool HasOffset = WithOffset,
             std::enable_if_t<HasOffset == true, bool> = true>
@@ -348,7 +348,7 @@ public:
   }
 
   /// Deprecated in SYCL 2020.
-  /// This conversion allow users to seamlessly write code that assumes an
+  /// This conversion allows users to seamlessly write code that assumes an
   /// offset and still provides an offset-less item. Available only when:
   /// WithOffset == false.
   /// \return an item representing the same information as the object holds but

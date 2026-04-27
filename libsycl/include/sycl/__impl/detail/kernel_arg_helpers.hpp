@@ -26,14 +26,14 @@ _LIBSYCL_BEGIN_NAMESPACE_SYCL
 
 namespace detail {
 
-/// \name  Helpers for the unnamed lambda.
+/// \name  Helpers for unnamed lambdas.
 /// @{
 /// This class is the default kernel name template parameter type for kernel
 /// invocation APIs such as single_task.
 class AutoName {};
 
 /// Helper struct to get a kernel name type based on given Name and Type
-/// types: if Name is undefined (is a AutoName) then Type becomes
+/// types: if Name is undefined (is AutoName) then Type becomes
 /// the Name.
 template <typename Name, typename Type> struct get_kernel_name_t {
   using name = Name;
@@ -41,13 +41,13 @@ template <typename Name, typename Type> struct get_kernel_name_t {
 
 /// Specialization for the case when Name is undefined.
 /// This is only legal with our compiler with the unnamed lambda support or if
-/// the kernel is a functor object.
+/// the kernel is a functor.
 template <typename Type> struct get_kernel_name_t<detail::AutoName, Type> {
   using name = Type;
 };
 /// @}
 
-/// \name  Helpers to verify kernel lambda type.
+/// \name  Helpers to verify kernel lambda types.
 /// \brief Checks that the function is callable with operator().
 /// @{
 template <typename, typename T> struct CheckFunctionSignature {
@@ -119,7 +119,8 @@ class Builder {
 public:
   Builder() = delete;
 
-  /// \return a global index of work item currently being operated on by device.
+  /// \return the global index of the work item currently being operated on by
+  /// the device.
   template <int Dims> static const id<Dims> getElement(id<Dims> *) {
     static_assert(isValidDimensions<Dims>, "invalid dimensions");
     return __spirv::initBuiltInGlobalInvocationId<Dims, id<Dims>>();
@@ -151,8 +152,8 @@ public:
     return item<Dims, WithOffset>(Extent, Index);
   }
 
-  /// Creates sycl::item instance for work item that is currently being operated
-  /// on.
+  /// Creates a sycl::item instance for the work item that is currently being
+  /// operated on.
   template <int Dims, bool WithOffset>
   static std::enable_if_t<WithOffset, const item<Dims, WithOffset>> getItem() {
     static_assert(isValidDimensions<Dims>, "invalid dimensions");
@@ -162,8 +163,8 @@ public:
     return createItem<Dims, true>(GlobalSize, GlobalId, GlobalOffset);
   }
 
-  /// Creates sycl::item instance for work item that is currently being operated
-  /// on.
+  /// Creates a sycl::item instance for the work item that is currently being
+  /// operated on.
   template <int Dims, bool WithOffset>
   static std::enable_if_t<!WithOffset, const item<Dims, WithOffset>> getItem() {
     static_assert(isValidDimensions<Dims>, "invalid dimensions");
@@ -172,7 +173,7 @@ public:
     return createItem<Dims, false>(GlobalSize, GlobalId);
   }
 
-  /// \return a work item currently being operated on by device.
+  /// \return the work item currently being operated on by the device.
   template <int Dims, bool WithOffset>
   static auto getElement(item<Dims, WithOffset> *)
       -> decltype(getItem<Dims, WithOffset>()) {
