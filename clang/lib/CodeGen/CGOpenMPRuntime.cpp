@@ -2256,14 +2256,14 @@ void CGOpenMPRuntime::emitTaskgraphCall(CodeGenFunction &CGF,
 
   llvm::Function *FnT = OutlinedCGF.GenerateCapturedStmtFunction(*CS);
 
-  llvm::Value *CapturedArgsPtr = CGF.Builder.CreatePointerBitCastOrAddrSpaceCast(
-      CapStruct.getPointer(OutlinedCGF), CGM.VoidPtrTy);
+  llvm::Value *CapturedArgsPtr =
+      CGF.Builder.CreatePointerBitCastOrAddrSpaceCast(
+          CapStruct.getPointer(OutlinedCGF), CGM.VoidPtrTy);
 
   auto &&CodeGen = [&](CodeGenFunction &CGF, PrePostActionTy &Action) {
     Action.Enter(CGF);
-      CGF.CGM.getOpenMPRuntime().emitOutlinedFunctionCall(CGF, Loc,
-        FnT,
-        CapturedArgsPtr);
+    CGF.CGM.getOpenMPRuntime().emitOutlinedFunctionCall(CGF, Loc, FnT,
+                                                        CapturedArgsPtr);
   };
   RegionCodeGenTy RCG(CodeGen);
   RCG(CGF);
