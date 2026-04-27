@@ -394,8 +394,8 @@ private:
                            const detail::UnifiedRangeView &Range = {});
 
   /// Passes kernel arguments to runtime.
-  /// If all dependencies are met and kernel can be submitted to backend - it is
-  /// done in this call.
+  /// If all the dependencies can be handled by the backend, the kernel is
+  /// submitted to it directly in this call.
   /// \param KernelInfo the information for the kernel being invoked.
   /// \param ArgData a pointer to the kernel argument.
   /// \param ArgSize the size of the kernel argument.
