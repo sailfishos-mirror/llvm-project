@@ -32,6 +32,7 @@
 ;;==============================================================================
 ;; A few basic test cases
 ;;==============================================================================
+;; vgpr pointer, wavefront scope
 define <4 x i32> @av_global_load_b128_0_00(ptr addrspace(1) %addr) {
 ; GFX9-GENERIC-SDAG-LABEL: av_global_load_b128_0_00:
 ; GFX9-GENERIC-SDAG:       ; %bb.0: ; %entry
@@ -229,6 +230,7 @@ entry:
   ret <4 x i32> %data
 }
 
+;; vgpr pointer, workgroup scope
 define <4 x i32> @av_global_load_b128_0_01(ptr addrspace(1) %addr) {
 ; GFX9-GENERIC-SDAG-LABEL: av_global_load_b128_0_01:
 ; GFX9-GENERIC-SDAG:       ; %bb.0: ; %entry
@@ -426,6 +428,7 @@ entry:
   ret <4 x i32> %data
 }
 
+;; vgpr pointer, agent scope
 define <4 x i32> @av_global_load_b128_0_10(ptr addrspace(1) %addr) {
 ; GFX9-GENERIC-SDAG-LABEL: av_global_load_b128_0_10:
 ; GFX9-GENERIC-SDAG:       ; %bb.0: ; %entry
@@ -623,6 +626,7 @@ entry:
   ret <4 x i32> %data
 }
 
+;; vgpr pointer, system scope
 define <4 x i32> @av_global_load_b128_0_11(ptr addrspace(1) %addr) {
 ; GFX9-GENERIC-SDAG-LABEL: av_global_load_b128_0_11:
 ; GFX9-GENERIC-SDAG:       ; %bb.0: ; %entry
@@ -820,6 +824,7 @@ entry:
   ret <4 x i32> %data
 }
 
+;; sgpr pointer, wavefront scope
 define <4 x i32> @av_global_load_b128_saddr_0_00(ptr addrspace(1) inreg %addr) {
 ; GFX9-GENERIC-SDAG-LABEL: av_global_load_b128_saddr_0_00:
 ; GFX9-GENERIC-SDAG:       ; %bb.0: ; %entry
@@ -1043,6 +1048,7 @@ entry:
   ret <4 x i32> %data
 }
 
+;; sgpr pointer, workgroup scope
 define <4 x i32> @av_global_load_b128_saddr_0_01(ptr addrspace(1) inreg %addr) {
 ; GFX9-GENERIC-SDAG-LABEL: av_global_load_b128_saddr_0_01:
 ; GFX9-GENERIC-SDAG:       ; %bb.0: ; %entry
@@ -1266,6 +1272,7 @@ entry:
   ret <4 x i32> %data
 }
 
+;; sgpr pointer, agent scope
 define <4 x i32> @av_global_load_b128_saddr_0_02(ptr addrspace(1) inreg %addr) {
 ; GFX9-GENERIC-SDAG-LABEL: av_global_load_b128_saddr_0_02:
 ; GFX9-GENERIC-SDAG:       ; %bb.0: ; %entry
@@ -1489,6 +1496,7 @@ entry:
   ret <4 x i32> %data
 }
 
+;; sgpr pointer, system scope
 define <4 x i32> @av_global_load_b128_saddr_0_03(ptr addrspace(1) inreg %addr) {
 ; GFX9-GENERIC-SDAG-LABEL: av_global_load_b128_saddr_0_03:
 ; GFX9-GENERIC-SDAG:       ; %bb.0: ; %entry
@@ -4597,6 +4605,7 @@ define <4 x float> @global_load_i8_offset_neg2050(ptr addrspace(1) %sbase) {
   ret <4 x float> %cast.load
 }
 
+;; maximum gfx12 saddr positive offset
 define <4 x float> @global_load_i8_offset_0x7FFFFF(ptr addrspace(1) %sbase) {
 ; GFX9-GENERIC-SDAG-LABEL: global_load_i8_offset_0x7FFFFF:
 ; GFX9-GENERIC-SDAG:       ; %bb.0:
@@ -4847,6 +4856,7 @@ define <4 x float> @global_load_i8_offset_0x7FFFFF(ptr addrspace(1) %sbase) {
   ret <4 x float> %cast.load
 }
 
+;; maximum gfx12 saddr negative offset
 define <4 x float> @global_load_i8_offset_0xFFFFFF(ptr addrspace(1) %sbase) {
 ; GFX9-GENERIC-SDAG-LABEL: global_load_i8_offset_0xFFFFFF:
 ; GFX9-GENERIC-SDAG:       ; %bb.0:
@@ -5097,6 +5107,7 @@ define <4 x float> @global_load_i8_offset_0xFFFFFF(ptr addrspace(1) %sbase) {
   ret <4 x float> %cast.load
 }
 
+;; 32-bit unsigned max offset
 define <4 x float> @global_load_i8_offset_0xFFFFFFFF(ptr addrspace(1) %sbase) {
 ; GFX9-GENERIC-SDAG-LABEL: global_load_i8_offset_0xFFFFFFFF:
 ; GFX9-GENERIC-SDAG:       ; %bb.0:
@@ -5359,6 +5370,7 @@ define <4 x float> @global_load_i8_offset_0xFFFFFFFF(ptr addrspace(1) %sbase) {
   ret <4 x float> %cast.load
 }
 
+;; exceeds 32-bit offset
 define <4 x float> @global_load_i8_offset_0x100000000(ptr addrspace(1) %sbase) {
 ; GFX9-GENERIC-SDAG-LABEL: global_load_i8_offset_0x100000000:
 ; GFX9-GENERIC-SDAG:       ; %bb.0:
@@ -5602,6 +5614,7 @@ define <4 x float> @global_load_i8_offset_0x100000000(ptr addrspace(1) %sbase) {
   ret <4 x float> %cast.load
 }
 
+;; exceeds 32-bit offset + 1
 define <4 x float> @global_load_i8_offset_0x100000001(ptr addrspace(1) %sbase) {
 ; GFX9-GENERIC-SDAG-LABEL: global_load_i8_offset_0x100000001:
 ; GFX9-GENERIC-SDAG:       ; %bb.0:
@@ -5864,6 +5877,7 @@ define <4 x float> @global_load_i8_offset_0x100000001(ptr addrspace(1) %sbase) {
   ret <4 x float> %cast.load
 }
 
+;; exceeds 32-bit offset + max gfx9 imm
 define <4 x float> @global_load_i8_offset_0x100000FFF(ptr addrspace(1) %sbase) {
 ; GFX9-GENERIC-SDAG-LABEL: global_load_i8_offset_0x100000FFF:
 ; GFX9-GENERIC-SDAG:       ; %bb.0:
@@ -6126,6 +6140,7 @@ define <4 x float> @global_load_i8_offset_0x100000FFF(ptr addrspace(1) %sbase) {
   ret <4 x float> %cast.load
 }
 
+;; exceeds 32-bit offset + max gfx9 imm + 1
 define <4 x float> @global_load_i8_offset_0x100001000(ptr addrspace(1) %sbase) {
 ; GFX9-GENERIC-SDAG-LABEL: global_load_i8_offset_0x100001000:
 ; GFX9-GENERIC-SDAG:       ; %bb.0:
@@ -6388,6 +6403,7 @@ define <4 x float> @global_load_i8_offset_0x100001000(ptr addrspace(1) %sbase) {
   ret <4 x float> %cast.load
 }
 
+;; negative 32-bit unsigned max offset
 define <4 x float> @global_load_i8_offset_neg0xFFFFFFFF(ptr addrspace(1) %sbase) {
 ; GFX9-GENERIC-SDAG-LABEL: global_load_i8_offset_neg0xFFFFFFFF:
 ; GFX9-GENERIC-SDAG:       ; %bb.0:
@@ -6650,6 +6666,7 @@ define <4 x float> @global_load_i8_offset_neg0xFFFFFFFF(ptr addrspace(1) %sbase)
   ret <4 x float> %cast.load
 }
 
+;; negative exceeds 32-bit offset
 define <4 x float> @global_load_i8_offset_neg0x100000000(ptr addrspace(1) %sbase) {
 ; GFX9-GENERIC-SDAG-LABEL: global_load_i8_offset_neg0x100000000:
 ; GFX9-GENERIC-SDAG:       ; %bb.0:
@@ -6893,6 +6910,7 @@ define <4 x float> @global_load_i8_offset_neg0x100000000(ptr addrspace(1) %sbase
   ret <4 x float> %cast.load
 }
 
+;; negative exceeds 32-bit offset + 1
 define <4 x float> @global_load_i8_offset_neg0x100000001(ptr addrspace(1) %sbase) {
 ; GFX9-GENERIC-SDAG-LABEL: global_load_i8_offset_neg0x100000001:
 ; GFX9-GENERIC-SDAG:       ; %bb.0:
@@ -15184,6 +15202,7 @@ define <4 x float> @global_load_i8_offset_or_i64_imm_offset_16(ptr addrspace(6) 
   ret <4 x float> %cast.load
 }
 
+;; or-as-add with offset exceeding gfx9 imm range
 define <4 x float> @global_load_i8_offset_or_i64_imm_offset_4160(ptr addrspace(6) %sbase, i32 %idx) {
 ; GFX9-GENERIC-SDAG-LABEL: global_load_i8_offset_or_i64_imm_offset_4160:
 ; GFX9-GENERIC-SDAG:       ; %bb.0:
@@ -15966,6 +15985,7 @@ bb3:                                              ; preds = %bb3, %bb
 
 ;; Make sure we only have a single zero vaddr initialization.
 
+;; 64-bit LSR induction variable with multiple loads
 define <4 x float> @global_addr_64bit_lsr_iv_multiload(ptr addrspace(1) %arg, ptr addrspace(1) %arg.1, i32 %x) {
 ; GFX9-GENERIC-SDAG-LABEL: global_addr_64bit_lsr_iv_multiload:
 ; GFX9-GENERIC-SDAG:       ; %bb.0: ; %bb
@@ -19562,6 +19582,7 @@ define <4 x float> @global_load_saddr_i8_offset_neg2050(ptr addrspace(1) inreg %
   ret <4 x float> %cast.load
 }
 
+;; maximum gfx12 saddr positive offset
 define <4 x float> @global_load_saddr_i8_offset_0x7FFFFF(ptr addrspace(1) inreg %sbase) {
 ; GFX9-GENERIC-SDAG-LABEL: global_load_saddr_i8_offset_0x7FFFFF:
 ; GFX9-GENERIC-SDAG:       ; %bb.0:
@@ -19786,6 +19807,7 @@ define <4 x float> @global_load_saddr_i8_offset_0x7FFFFF(ptr addrspace(1) inreg 
   ret <4 x float> %cast.load
 }
 
+;; maximum gfx12 saddr negative offset
 define <4 x float> @global_load_saddr_i8_offset_0xFFFFFF(ptr addrspace(1) inreg %sbase) {
 ; GFX9-GENERIC-SDAG-LABEL: global_load_saddr_i8_offset_0xFFFFFF:
 ; GFX9-GENERIC-SDAG:       ; %bb.0:
@@ -20055,6 +20077,7 @@ define <4 x float> @global_load_saddr_i8_offset_0xFFFFFF(ptr addrspace(1) inreg 
   ret <4 x float> %cast.load
 }
 
+;; 32-bit unsigned max offset
 define <4 x float> @global_load_saddr_i8_offset_0xFFFFFFFF(ptr addrspace(1) inreg %sbase) {
 ; GFX9-GENERIC-SDAG-LABEL: global_load_saddr_i8_offset_0xFFFFFFFF:
 ; GFX9-GENERIC-SDAG:       ; %bb.0:
@@ -20284,6 +20307,7 @@ define <4 x float> @global_load_saddr_i8_offset_0xFFFFFFFF(ptr addrspace(1) inre
   ret <4 x float> %cast.load
 }
 
+;; exceeds 32-bit offset
 define <4 x float> @global_load_saddr_i8_offset_0x100000000(ptr addrspace(1) inreg %sbase) {
 ; GFX9-GENERIC-SDAG-LABEL: global_load_saddr_i8_offset_0x100000000:
 ; GFX9-GENERIC-SDAG:       ; %bb.0:
@@ -20557,6 +20581,7 @@ define <4 x float> @global_load_saddr_i8_offset_0x100000000(ptr addrspace(1) inr
   ret <4 x float> %cast.load
 }
 
+;; exceeds 32-bit offset + 1
 define <4 x float> @global_load_saddr_i8_offset_0x100000001(ptr addrspace(1) inreg %sbase) {
 ; GFX9-GENERIC-SDAG-LABEL: global_load_saddr_i8_offset_0x100000001:
 ; GFX9-GENERIC-SDAG:       ; %bb.0:
@@ -20842,6 +20867,7 @@ define <4 x float> @global_load_saddr_i8_offset_0x100000001(ptr addrspace(1) inr
   ret <4 x float> %cast.load
 }
 
+;; exceeds 32-bit offset + max gfx9 imm
 define <4 x float> @global_load_saddr_i8_offset_0x100000FFF(ptr addrspace(1) inreg %sbase) {
 ; GFX9-GENERIC-SDAG-LABEL: global_load_saddr_i8_offset_0x100000FFF:
 ; GFX9-GENERIC-SDAG:       ; %bb.0:
@@ -21121,6 +21147,7 @@ define <4 x float> @global_load_saddr_i8_offset_0x100000FFF(ptr addrspace(1) inr
   ret <4 x float> %cast.load
 }
 
+;; exceeds 32-bit offset + max gfx9 imm + 1
 define <4 x float> @global_load_saddr_i8_offset_0x100001000(ptr addrspace(1) inreg %sbase) {
 ; GFX9-GENERIC-SDAG-LABEL: global_load_saddr_i8_offset_0x100001000:
 ; GFX9-GENERIC-SDAG:       ; %bb.0:
@@ -21400,6 +21427,7 @@ define <4 x float> @global_load_saddr_i8_offset_0x100001000(ptr addrspace(1) inr
   ret <4 x float> %cast.load
 }
 
+;; negative 32-bit unsigned max offset
 define <4 x float> @global_load_saddr_i8_offset_neg0xFFFFFFFF(ptr addrspace(1) inreg %sbase) {
 ; GFX9-GENERIC-SDAG-LABEL: global_load_saddr_i8_offset_neg0xFFFFFFFF:
 ; GFX9-GENERIC-SDAG:       ; %bb.0:
@@ -21692,6 +21720,7 @@ define <4 x float> @global_load_saddr_i8_offset_neg0xFFFFFFFF(ptr addrspace(1) i
   ret <4 x float> %cast.load
 }
 
+;; negative exceeds 32-bit offset
 define <4 x float> @global_load_saddr_i8_offset_neg0x100000000(ptr addrspace(1) inreg %sbase) {
 ; GFX9-GENERIC-SDAG-LABEL: global_load_saddr_i8_offset_neg0x100000000:
 ; GFX9-GENERIC-SDAG:       ; %bb.0:
@@ -21965,6 +21994,7 @@ define <4 x float> @global_load_saddr_i8_offset_neg0x100000000(ptr addrspace(1) 
   ret <4 x float> %cast.load
 }
 
+;; negative exceeds 32-bit offset + 1
 define <4 x float> @global_load_saddr_i8_offset_neg0x100000001(ptr addrspace(1) inreg %sbase) {
 ; GFX9-GENERIC-SDAG-LABEL: global_load_saddr_i8_offset_neg0x100000001:
 ; GFX9-GENERIC-SDAG:       ; %bb.0:
@@ -29477,6 +29507,7 @@ define <4 x float> @global_load_saddr_i8_offset_or_i64_imm_offset_16(ptr addrspa
   ret <4 x float> %cast.load
 }
 
+;; or-as-add with offset exceeding gfx9 imm range
 define <4 x float> @global_load_saddr_i8_offset_or_i64_imm_offset_4160(ptr addrspace(6) inreg %sbase, i32 %idx) {
 ; GFX9-GENERIC-SDAG-LABEL: global_load_saddr_i8_offset_or_i64_imm_offset_4160:
 ; GFX9-GENERIC-SDAG:       ; %bb.0:
@@ -30288,6 +30319,7 @@ bb3:                                              ; preds = %bb3, %bb
 
 ;; Make sure we only have a single zero vaddr initialization.
 
+;; 64-bit LSR induction variable with multiple loads
 define <4 x float> @global_saddr_64bit_lsr_iv_multiload(ptr addrspace(1) inreg %arg, ptr addrspace(1) inreg %arg.1, i32 %x) {
 ; GFX9-GENERIC-SDAG-LABEL: global_saddr_64bit_lsr_iv_multiload:
 ; GFX9-GENERIC-SDAG:       ; %bb.0: ; %bb

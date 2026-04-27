@@ -31,6 +31,7 @@
 ;;==============================================================================
 ;; A few basic test cases
 ;;==============================================================================
+;; vgpr pointer, wavefront scope
 define void @av_global_store_b128_0_00(ptr addrspace(1) %addr, <4 x i32> %data) {
 ; GFX9-GENERIC-SDAG-LABEL: av_global_store_b128_0_00:
 ; GFX9-GENERIC-SDAG:       ; %bb.0: ; %entry
@@ -216,6 +217,7 @@ entry:
   ret void
 }
 
+;; vgpr pointer, workgroup scope
 define void @av_global_store_b128_0_01(ptr addrspace(1) %addr, <4 x i32> %data) {
 ; GFX9-GENERIC-SDAG-LABEL: av_global_store_b128_0_01:
 ; GFX9-GENERIC-SDAG:       ; %bb.0: ; %entry
@@ -401,6 +403,7 @@ entry:
   ret void
 }
 
+;; vgpr pointer, agent scope
 define void @av_global_store_b128_0_10(ptr addrspace(1) %addr, <4 x i32> %data) {
 ; GFX9-GENERIC-SDAG-LABEL: av_global_store_b128_0_10:
 ; GFX9-GENERIC-SDAG:       ; %bb.0: ; %entry
@@ -586,6 +589,7 @@ entry:
   ret void
 }
 
+;; vgpr pointer, system scope
 define void @av_global_store_b128_0_11(ptr addrspace(1) %addr, <4 x i32> %data) {
 ; GFX9-GENERIC-SDAG-LABEL: av_global_store_b128_0_11:
 ; GFX9-GENERIC-SDAG:       ; %bb.0: ; %entry
@@ -775,6 +779,7 @@ entry:
 ;; Signed offset addressing modes (derived from global-saddr-store.ll) {
 ;;==============================================================================
 
+;; basic pattern, no immediate offset
 define void @global_store_i8_zext_vgpr(ptr addrspace(1) %sbase, ptr addrspace(1) %voffset.ptr, <4 x i32> %data) {
 ; GFX9-GENERIC-SDAG-LABEL: global_store_i8_zext_vgpr:
 ; GFX9-GENERIC-SDAG:       ; %bb.0:
@@ -1077,6 +1082,7 @@ define void @global_store_i8_zext_vgpr(ptr addrspace(1) %sbase, ptr addrspace(1)
   ret void
 }
 
+;; negative immediate offset
 define void @global_store_v4i32_zext_vgpr_offset_neg128(ptr addrspace(1) %sbase, i32 %voffset, <4 x i32> %data) {
 ; GFX9-GENERIC-SDAG-LABEL: global_store_v4i32_zext_vgpr_offset_neg128:
 ; GFX9-GENERIC-SDAG:       ; %bb.0:
@@ -1972,6 +1978,7 @@ define void @global_store_i8_zext_vgpr_offset_neg2048(ptr addrspace(1) %sbase, p
 ;; Various saddr addressing modes (derived from global-saddr-load.ll) {
 ;;==============================================================================
 
+;; basic saddr pattern, no immediate offset
 define void @global_store_saddr_i8_zext_vgpr(ptr addrspace(1) inreg %sbase, ptr addrspace(1) %voffset.ptr, <4 x i32> %data) {
 ; GFX9-GENERIC-SDAG-LABEL: global_store_saddr_i8_zext_vgpr:
 ; GFX9-GENERIC-SDAG:       ; %bb.0:
@@ -2213,6 +2220,7 @@ define void @global_store_saddr_i8_zext_vgpr(ptr addrspace(1) inreg %sbase, ptr 
   ret void
 }
 
+;; saddr with negative immediate offset
 define void @global_store_saddr_v4i32_zext_vgpr_offset_neg128(ptr addrspace(1) inreg %sbase, i32 %voffset, <4 x i32> %data) {
 ; GFX9-GENERIC-SDAG-LABEL: global_store_saddr_v4i32_zext_vgpr_offset_neg128:
 ; GFX9-GENERIC-SDAG:       ; %bb.0:
