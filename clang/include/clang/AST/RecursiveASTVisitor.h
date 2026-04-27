@@ -3658,7 +3658,8 @@ bool RecursiveASTVisitor<Derived>::VisitOMPNowaitClause(OMPNowaitClause *C) {
 }
 
 template <typename Derived>
-bool RecursiveASTVisitor<Derived>::VisitOMPReplayableClause(OMPReplayableClause *C) {
+bool RecursiveASTVisitor<Derived>::VisitOMPReplayableClause(
+    OMPReplayableClause *C) {
   TRY_TO(TraverseStmt(C->getCondition()));
   return true;
 }
