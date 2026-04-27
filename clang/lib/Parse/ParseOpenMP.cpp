@@ -3386,8 +3386,7 @@ OMPClause *Parser::ParseOpenMPClause(OpenMPDirectiveKind DKind,
       ErrorFound = true;
     }
 
-    if (CKind == OMPC_nowait &&
-        PP.LookAhead(/*N=*/0).is(tok::l_paren) &&
+    if (CKind == OMPC_nowait && PP.LookAhead(/*N=*/0).is(tok::l_paren) &&
         getLangOpts().OpenMP >= 60)
       Clause = ParseOpenMPSingleExprClause(CKind, WrongDirective);
     else

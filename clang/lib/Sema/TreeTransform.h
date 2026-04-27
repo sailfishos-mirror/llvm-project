@@ -10887,9 +10887,8 @@ TreeTransform<Derived>::TransformOMPReplayableClause(OMPReplayableClause *C) {
     if (Cond.isInvalid())
       return nullptr;
   }
-  return getDerived().RebuildOMPReplayableClause(Cond.get(), C->getBeginLoc(),
-                                                 C->getLParenLoc(),
-                                                 C->getEndLoc());
+  return getDerived().RebuildOMPReplayableClause(
+      Cond.get(), C->getBeginLoc(), C->getLParenLoc(), C->getEndLoc());
 }
 
 template <typename Derived>

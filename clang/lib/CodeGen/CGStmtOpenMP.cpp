@@ -5725,11 +5725,10 @@ void CodeGenFunction::EmitOMPTargetTaskBasedDirective(
   if (auto *RC = S.getSingleClause<OMPReplayableClause>()) {
     ReplayableCond = RC->getCondition();
     if (!ReplayableCond) {
-      ReplayableCond =
-        IntegerLiteral::Create(
-            getContext(), llvm::APInt(32, 1),
-            getContext().getIntTypeForBitwidth(32, /*Signed=*/0),
-            SourceLocation());
+      ReplayableCond = IntegerLiteral::Create(
+          getContext(), llvm::APInt(32, 1),
+          getContext().getIntTypeForBitwidth(32, /*Signed=*/0),
+          SourceLocation());
     }
   }
   CGM.getOpenMPRuntime().emitTaskCall(*this, S.getBeginLoc(), S, OutlinedFn,
@@ -5847,20 +5846,18 @@ void CodeGenFunction::EmitOMPTaskDirective(const OMPTaskDirective &S) {
   if (auto *RC = S.getSingleClause<OMPReplayableClause>()) {
     ReplayableCond = RC->getCondition();
     if (!ReplayableCond) {
-      ReplayableCond =
-        IntegerLiteral::Create(
-            getContext(), llvm::APInt(32, 1),
-            getContext().getIntTypeForBitwidth(32, /*Signed=*/0),
-            SourceLocation());
+      ReplayableCond = IntegerLiteral::Create(
+          getContext(), llvm::APInt(32, 1),
+          getContext().getIntTypeForBitwidth(32, /*Signed=*/0),
+          SourceLocation());
     }
   }
   auto &&BodyGen = [CS](CodeGenFunction &CGF, PrePostActionTy &) {
     CGF.EmitStmt(CS->getCapturedStmt());
   };
-  auto &&TaskGen = [&S, SharedsTy, CapturedStruct,
-                    IfCond, ReplayableCond](CodeGenFunction &CGF,
-                            llvm::Function *OutlinedFn,
-                            const OMPTaskDataTy &Data) {
+  auto &&TaskGen = [&S, SharedsTy, CapturedStruct, IfCond, ReplayableCond](
+                       CodeGenFunction &CGF, llvm::Function *OutlinedFn,
+                       const OMPTaskDataTy &Data) {
     CGF.CGM.getOpenMPRuntime().emitTaskCall(CGF, S.getBeginLoc(), S, OutlinedFn,
                                             SharedsTy, CapturedStruct, IfCond,
                                             ReplayableCond, Data);
@@ -5898,11 +5895,10 @@ void CodeGenFunction::EmitOMPTaskwaitDirective(const OMPTaskwaitDirective &S) {
   if (auto *RC = S.getSingleClause<OMPReplayableClause>()) {
     ReplayableCond = RC->getCondition();
     if (!ReplayableCond) {
-      ReplayableCond =
-        IntegerLiteral::Create(
-            getContext(), llvm::APInt(32, 1),
-            getContext().getIntTypeForBitwidth(32, /*Signed=*/0),
-            SourceLocation());
+      ReplayableCond = IntegerLiteral::Create(
+          getContext(), llvm::APInt(32, 1),
+          getContext().getIntTypeForBitwidth(32, /*Signed=*/0),
+          SourceLocation());
     }
   }
   CGM.getOpenMPRuntime().emitTaskwaitCall(*this, S.getBeginLoc(),
@@ -8265,11 +8261,10 @@ void CodeGenFunction::EmitOMPTaskLoopBasedDirective(const OMPLoopDirective &S) {
   if (auto *RC = S.getSingleClause<OMPReplayableClause>()) {
     ReplayableCond = RC->getCondition();
     if (!ReplayableCond) {
-      ReplayableCond =
-        IntegerLiteral::Create(
-            getContext(), llvm::APInt(32, 1),
-            getContext().getIntTypeForBitwidth(32, /*Signed=*/0),
-            SourceLocation());
+      ReplayableCond = IntegerLiteral::Create(
+          getContext(), llvm::APInt(32, 1),
+          getContext().getIntTypeForBitwidth(32, /*Signed=*/0),
+          SourceLocation());
     }
   }
 
@@ -8392,18 +8387,16 @@ void CodeGenFunction::EmitOMPTaskLoopBasedDirective(const OMPLoopDirective &S) {
                                (*LIP)->getType(), S.getBeginLoc()));
     });
   };
-  auto &&TaskGen =
-      [&S, SharedsTy, CapturedStruct, IfCond, ReplayableCond]
-        (CodeGenFunction &CGF, llvm::Function *OutlinedFn,
-         const OMPTaskDataTy &Data) {
-    auto &&CodeGen =
-        [&S, OutlinedFn, SharedsTy, CapturedStruct, IfCond, ReplayableCond,
-         &Data](CodeGenFunction &CGF, PrePostActionTy &) {
+  auto &&TaskGen = [&S, SharedsTy, CapturedStruct, IfCond, ReplayableCond](
+                       CodeGenFunction &CGF, llvm::Function *OutlinedFn,
+                       const OMPTaskDataTy &Data) {
+    auto &&CodeGen = [&S, OutlinedFn, SharedsTy, CapturedStruct, IfCond,
+                      ReplayableCond,
+                      &Data](CodeGenFunction &CGF, PrePostActionTy &) {
       OMPLoopScope PreInitScope(CGF, S);
-      CGF.CGM.getOpenMPRuntime().emitTaskLoopCall(CGF, S.getBeginLoc(), S,
-                                                  OutlinedFn, SharedsTy,
-                                                  CapturedStruct, IfCond,
-                                                  ReplayableCond, Data);
+      CGF.CGM.getOpenMPRuntime().emitTaskLoopCall(
+          CGF, S.getBeginLoc(), S, OutlinedFn, SharedsTy, CapturedStruct,
+          IfCond, ReplayableCond, Data);
     };
     CGF.CGM.getOpenMPRuntime().emitInlinedDirective(CGF, OMPD_taskloop,
                                                     CodeGen);
