@@ -11455,10 +11455,6 @@ StmtResult SemaOpenMP::ActOnOpenMPErrorDirective(ArrayRef<OMPClause *> Clauses,
   return OMPErrorDirective::Create(getASTContext(), StartLoc, EndLoc, Clauses);
 }
 
-static OpenMPDirectiveKind getOpenMPCaptureRegionForClause(
-    OpenMPDirectiveKind DKind, OpenMPClauseKind CKind, unsigned OpenMPVersion,
-    OpenMPDirectiveKind NameModifier = OMPD_unknown);
-
 StmtResult
 SemaOpenMP::ActOnOpenMPTaskwaitDirective(ArrayRef<OMPClause *> Clauses,
                                          SourceLocation StartLoc,
@@ -17022,7 +17018,7 @@ OMPClause *SemaOpenMP::ActOnOpenMPSingleExprClause(OpenMPClauseKind Kind,
 // be captured.
 static OpenMPDirectiveKind getOpenMPCaptureRegionForClause(
     OpenMPDirectiveKind DKind, OpenMPClauseKind CKind, unsigned OpenMPVersion,
-    OpenMPDirectiveKind NameModifier) {
+    OpenMPDirectiveKind NameModifier = OMPD_unknown) {
   assert(isAllowedClauseForDirective(DKind, CKind, OpenMPVersion) &&
          "Invalid directive with CKind-clause");
 
