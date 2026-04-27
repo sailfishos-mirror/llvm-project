@@ -927,6 +927,31 @@ class AMDGPUAVGlobalLoad : Intrinsic <
 
 def int_amdgcn_av_global_load_b128 : AMDGPUAVGlobalLoad;
 
+class AMDGPUAVFlatStore : Intrinsic <
+  [],
+  [flat_ptr_ty,            // Base flat pointer to store to
+   llvm_v4i32_ty,          // Data to store
+   llvm_metadata_ty],      // Scope
+  [ IntrWriteMem, WriteOnly<ArgIndex<0>>, NoCapture<ArgIndex<0>>,
+    NonNull<ArgIndex<0>>, IntrWillReturn, IntrNoCallback, IntrNoFree ],
+  "",
+  [SDNPMemOperand, SDNPMayStore]
+>;
+
+def int_amdgcn_av_flat_store_b128 : AMDGPUAVFlatStore;
+
+class AMDGPUAVFlatLoad : Intrinsic <
+  [llvm_v4i32_ty],
+  [flat_ptr_ty,            // Base flat pointer to load from
+   llvm_metadata_ty],      // Scope
+  [ IntrReadMem, ReadOnly<ArgIndex<0>>, NoCapture<ArgIndex<0>>,
+    NonNull<ArgIndex<0>>, IntrWillReturn, IntrNoCallback, IntrNoFree ],
+  "",
+  [SDNPMemOperand, SDNPMayLoad]
+>;
+
+def int_amdgcn_av_flat_load_b128 : AMDGPUAVFlatLoad;
+
 } // TargetPrefix = "amdgcn"
 
 // New-style image intrinsics

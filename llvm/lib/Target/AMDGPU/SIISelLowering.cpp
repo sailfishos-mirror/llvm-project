@@ -1719,8 +1719,11 @@ void SITargetLowering::getTgtMemIntrinsic(SmallVectorImpl<IntrinsicInfo> &Infos,
     return;
   }
   case Intrinsic::amdgcn_av_global_load_b128:
-  case Intrinsic::amdgcn_av_global_store_b128: {
-    bool IsStore = IntrID == Intrinsic::amdgcn_av_global_store_b128;
+  case Intrinsic::amdgcn_av_global_store_b128:
+  case Intrinsic::amdgcn_av_flat_load_b128:
+  case Intrinsic::amdgcn_av_flat_store_b128: {
+    bool IsStore = IntrID == Intrinsic::amdgcn_av_global_store_b128 ||
+                   IntrID == Intrinsic::amdgcn_av_flat_store_b128;
     Info.opc = IsStore ? ISD::INTRINSIC_VOID : ISD::INTRINSIC_W_CHAIN;
     Info.memVT = MVT::v4i32;
     Info.ptrVal = CI.getArgOperand(0);
@@ -1857,6 +1860,8 @@ bool SITargetLowering::getAddrModeArguments(const IntrinsicInst *II,
   case Intrinsic::amdgcn_global_store_async_from_lds_b128:
   case Intrinsic::amdgcn_av_global_load_b128:
   case Intrinsic::amdgcn_av_global_store_b128:
+  case Intrinsic::amdgcn_av_flat_load_b128:
+  case Intrinsic::amdgcn_av_flat_store_b128:
     Ptr = II->getArgOperand(0);
     break;
   case Intrinsic::amdgcn_load_to_lds:

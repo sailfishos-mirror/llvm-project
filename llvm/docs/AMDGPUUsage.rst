@@ -1782,26 +1782,39 @@ The AMDGPU backend implements the following LLVM IR intrinsics.
 
    List AMDGPU intrinsics.
 
-'``llvm.amdgcn.av.global``' Intrinsics
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+'``llvm.amdgcn.av``' Intrinsics
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The '``llvm.amdgcn.av.global``' intrinsics are used to perform load and store
-operations on global memory, with explicit control on how their side-effects
-propagate through the system. They take a *scope* argument as a string metadata,
-which indicates the scope within which these side-effects are guaranteed to be
-observable. [TODO: The exact semantics as a memory consistency model is a work
-in progress.]
+The '``llvm.amdgcn.av``' intrinsics perform load and store operations on flat or
+global memory, with explicit control on how their side-effects propagate through
+the system. They take a *scope* argument as a string metadata, which indicates
+the scope within which these side-effects are guaranteed to be observable.
+[TODO: The exact semantics as a memory consistency model is a work in progress.]
+
+The ``av.global`` variants take a global pointer (``addrspace(1)``) and select
+``global_load``/``global_store`` instructions. The ``av.flat`` variants take a
+flat pointer (``addrspace(0)``) and select ``flat_load``/``flat_store``
+instructions. The cache policy bits are the same in both cases.
 
 .. code-block:: llvm
 
    <4 x i32> @llvm.amdgcn.av.global.load.b128(
-       ptr addrspace(1), ; source
-       metadata)         ; scope    - e.g. '!0' where '!0 = !{!"wavegroup"}'
+       ptr addrspace(1), ; source (global)
+       metadata)         ; scope    - e.g. '!0' where '!0 = !{!"workgroup"}'
 
    void @llvm.amdgcn.av.global.store.b128(
-       ptr addrspace(1), ; destination
+       ptr addrspace(1), ; destination (global)
        <4 x i32>,        ; value
-       metadata)         ; scope    - e.g. '!0' where '!0 = !{!"wavegroup"}'
+       metadata)         ; scope
+
+   <4 x i32> @llvm.amdgcn.av.flat.load.b128(
+       ptr,              ; source (flat)
+       metadata)         ; scope
+
+   void @llvm.amdgcn.av.flat.store.b128(
+       ptr,              ; destination (flat)
+       <4 x i32>,        ; value
+       metadata)         ; scope
 
 Implementation Details
 ++++++++++++++++++++++
@@ -1811,7 +1824,11 @@ not rely on the expansions described below. The only reliable user-level
 guarantees are those provided by the memory consistency model, which is
 currently a work in progress.
 
-.. table:: AMDGPU Load-Visible Impelementation
+The tables below show the cache policy bits for the ``av.global`` variants.
+The ``av.flat`` variants use the corresponding ``flat_load``/``flat_store``
+instructions with the same cache policy bits.
+
+.. table:: AMDGPU Load-Visible Implementation
 
    ============== ========================== ========================== ========================== ========================== ==========================
    targets        instruction                           ``"wavefront"``            ``"workgroup"``                ``"agent"``      ``""`` (empty string)
@@ -1829,7 +1846,7 @@ currently a work in progress.
    gfx125*        ``global_load_b128``                             (CU)    ``scope:SCOPE_SE`` (SE)  ``scope:SCOPE_DEV`` (DEV)  ``scope:SCOPE_SYS`` (SYS)
    ============== ========================== ========================== ========================== ========================== ==========================
 
-.. table:: AMDGPU Store-Available Impelementation
+.. table:: AMDGPU Store-Available Implementation
 
    ============== ========================== ========================== ========================== ========================== ==========================
    targets        instruction                           ``"wavefront"``            ``"workgroup"``                ``"agent"``      ``""`` (empty string)
