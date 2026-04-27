@@ -24,7 +24,7 @@ namespace detail {
 /// The structure to keep dimension and references to ranges unified for
 /// all dimensions.
 struct UnifiedRangeView {
-  /// Default contructed view matches the single task execution range.
+  /// Default constructed view matches the single task execution range.
   UnifiedRangeView() = default;
   UnifiedRangeView(const UnifiedRangeView &Desc) = default;
   UnifiedRangeView(UnifiedRangeView &&Desc) = default;
