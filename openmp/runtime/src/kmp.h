@@ -4500,37 +4500,25 @@ KMP_EXPORT void __kmpc_init_nest_lock_with_hint(ident_t *loc, kmp_int32 gtid,
                                                 uintptr_t hint);
 #if OMP_TASKGRAPH_EXPERIMENTAL
 KMP_EXPORT void __kmpc_taskgraph(ident_t *loc_ref, kmp_int32 gtid,
-                                 std::atomic<void*> *tdg_handle,
+                                 std::atomic<void *> *tdg_handle,
                                  kmp_uint32 graph_id, kmp_int32 graph_reset,
                                  kmp_int32 nogroup, void (*entry)(void *),
                                  void *args);
-KMP_EXPORT kmp_uint32 __kmpc_taskgraph_task(ident_t *loc_ref, kmp_int32 gtid,
-                                            kmp_task_t *new_task,
-                                            kmp_int32 flags,
-                                            size_t sizeof_kmp_task_t,
-                                            void* shareds,
-                                            size_t sizeof_shareds,
-                                            kmp_int32 ndeps,
-                                            kmp_depend_info_t *dep_list);
-KMP_EXPORT kmp_uint32 __kmpc_taskgraph_taskloop(ident_t *loc_ref,
-                                                kmp_int32 gtid,
-                                                kmp_task_t *new_task,
-                                                kmp_int32 flags,
-                                                size_t sizeof_kmp_task_t,
-                                                void *shareds,
-                                                size_t sizeof_shareds,
-                                                kmp_int32 if_val,
-                                                kmp_uint64 *lb, kmp_uint64 *ub,
-                                                kmp_int64 st, kmp_int32 nogroup,
-                                                kmp_int32 sched,
-                                                kmp_uint64 grainsize,
-                                                kmp_int32 modifier,
-                                                void *task_dup);
+KMP_EXPORT kmp_uint32 __kmpc_taskgraph_task(
+    ident_t *loc_ref, kmp_int32 gtid, kmp_task_t *new_task, kmp_int32 flags,
+    size_t sizeof_kmp_task_t, void *shareds, size_t sizeof_shareds,
+    kmp_int32 ndeps, kmp_depend_info_t *dep_list);
+KMP_EXPORT kmp_uint32 __kmpc_taskgraph_taskloop(
+    ident_t *loc_ref, kmp_int32 gtid, kmp_task_t *new_task, kmp_int32 flags,
+    size_t sizeof_kmp_task_t, void *shareds, size_t sizeof_shareds,
+    kmp_int32 if_val, kmp_uint64 *lb, kmp_uint64 *ub, kmp_int64 st,
+    kmp_int32 nogroup, kmp_int32 sched, kmp_uint64 grainsize,
+    kmp_int32 modifier, void *task_dup);
 KMP_EXPORT void __kmpc_taskgraph_taskwait(ident_t *loc_ref, kmp_int32 gtid,
                                           kmp_int32 ndeps,
                                           kmp_depend_info_t *dep_list,
                                           kmp_int32 has_no_wait);
-KMP_EXPORT void* __kmpc_taskgraph_taskred_init(kmp_int32 gtid, kmp_int32 num,
+KMP_EXPORT void *__kmpc_taskgraph_taskred_init(kmp_int32 gtid, kmp_int32 num,
                                                void *data);
 #endif
 /* Interface to fast scalable reduce methods routines */
