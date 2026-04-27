@@ -4446,6 +4446,11 @@ static void genOMP(lower::AbstractConverter &converter, lower::SymMap &symTable,
 
   llvm::SmallVector<const parser::OmpDirectiveSpecification *> candidates;
   llvm::SmallVector<llvm::omp::VariantMatchInfo, 4> vmis;
+  struct DynamicCandidate {
+    const parser::OmpDirectiveSpecification *dirSpec = nullptr;
+    const parser::ScalarExpr *condExpr = nullptr;
+  };
+  llvm::SmallVector<DynamicCandidate> dynamicCandidates;
   // A null directive specification represents either the implicit `nothing`
   // variant or the absence of an explicit otherwise/default clause.
   const parser::OmpDirectiveSpecification *fallback = nullptr;
@@ -4497,9 +4502,16 @@ static void genOMP(lower::AbstractConverter &converter, lower::SymMap &symTable,
       makeVariantMatchInfo(vmi, *ctxSel, semaCtx,
                            converter.genLocation(clause.source), dynCondExpr);
 
-      if (dynCondExpr)
-        TODO(converter.genLocation(clause.source),
-             "dynamic user condition in METADIRECTIVE");
+      // Check if this variant has a dynamic user condition.
+      if (dynCondExpr) {
+        // For dynamic candidates, verify that the non-user parts (device,
+        // implementation) still match statically before keeping the candidate.
+        if (!llvm::omp::isVariantApplicableInContext(
+                vmi, ompCtx, /*DeviceOrImplementationSetOnly=*/true))
+          continue;
+        dynamicCandidates.push_back({variant, dynCondExpr});
+        continue;
+      }
 
       if (!llvm::omp::isVariantApplicableInContext(vmi, ompCtx))
         continue;
@@ -4542,18 +4554,53 @@ static void genOMP(lower::AbstractConverter &converter, lower::SymMap &symTable,
                    queue.begin());
   };
 
-  const parser::OmpDirectiveSpecification *selected = fallback;
-  if (candidates.size() == 1) {
-    selected = candidates.front();
-  } else if (!candidates.empty()) {
-    int bestIdx = llvm::omp::getBestVariantMatchForContext(vmis, ompCtx);
-    if (bestIdx >= 0) {
-      assert(static_cast<size_t>(bestIdx) < candidates.size() &&
-             "best variant index out of range");
-      selected = candidates[bestIdx];
+  auto selectStaticBest = [&]() -> const parser::OmpDirectiveSpecification * {
+    if (candidates.size() == 1)
+      return candidates.front();
+    if (!candidates.empty()) {
+      int bestIdx = llvm::omp::getBestVariantMatchForContext(vmis, ompCtx);
+      if (bestIdx >= 0) {
+        assert(static_cast<size_t>(bestIdx) < candidates.size() &&
+               "best variant index out of range");
+        return candidates[bestIdx];
+      }
     }
+    return fallback;
+  };
+
+  // If no dynamic candidates, do pure static resolution.
+  if (dynamicCandidates.empty()) {
+    genVariant(selectStaticBest());
+    return;
   }
-  genVariant(selected);
+
+  // Dynamic resolution: build a fir.if chain for user conditions.
+  // Candidates are tested in declaration order. The final else branch
+  // falls back to the best static match, an explicit otherwise/default
+  // clause, or an implicit no-op.
+  mlir::Location loc = converter.genLocation(meta.v.source);
+  lower::StatementContext stmtCtx;
+  const parser::OmpDirectiveSpecification *staticFallback = selectStaticBest();
+
+  for (auto [i, cand] : llvm::enumerate(dynamicCandidates)) {
+    assert(cand.condExpr && "dynamic candidate must have condition expr");
+    const auto *typedExpr = semantics::GetExpr(semaCtx, *cand.condExpr);
+    assert(typedExpr && "missing typed expression for user condition");
+    mlir::Value condVal =
+        fir::getBase(converter.genExprValue(*typedExpr, stmtCtx, &loc));
+
+    if (condVal.getType() != builder.getI1Type())
+      condVal = builder.createConvert(loc, builder.getI1Type(), condVal);
+
+    auto ifOp =
+        fir::IfOp::create(builder, loc, condVal, /*withElseRegion=*/true);
+    builder.setInsertionPointToStart(&ifOp.getThenRegion().front());
+    genVariant(cand.dirSpec);
+
+    builder.setInsertionPointToStart(&ifOp.getElseRegion().front());
+    if (i == dynamicCandidates.size() - 1)
+      genVariant(staticFallback);
+  }
 }
 
 static void genOMP(lower::AbstractConverter &converter, lower::SymMap &symTable,
