@@ -1777,6 +1777,24 @@ The AMDGPU backend implements the following LLVM IR intrinsics.
                                                    * :ref:`Synchronization Scope<amdgpu-intrinsics-syncscope-metadata-operand>`.
                                                      Note that the scope used must ensure that the L2 cache will be hit.
 
+  llvm.amdgcn.ds.atomic.barrier.arrive.rtn.b64     Available starting GFX12.5.
+                                                   Corresponds to ``ds_atomic_barrier_arrive_rtn_b64``.
+
+                                                   For the purposes of the memory model, this is a relaxed atomic
+                                                   read-modify-write operation in the local address space.
+                                                   It remains in order with other operations that use ``DScnt``.
+
+  llvm.amdgcn.ds.atomic.async.barrier.arrive.b64   Available starting GFX12.5.
+                                                   Corresponds to ``ds_atomic_async_barrier_arrive_rtn_b64``.
+
+                                                   For the purposes of the memory model, this is an asynchronous
+                                                   relaxed atomic read-modify-write operation in the local address space,
+                                                   and it remains in order with other operations that use ``ASYNCcnt``.
+
+                                                   **NOTE:** Asynchronous operations are currently not
+                                                   covered by the memory model (and thus this operation cannot currently
+                                                   pair with fences); this is a work in progress.
+
   ==============================================   ==========================================================
 
 .. TODO::
