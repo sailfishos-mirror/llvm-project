@@ -40,6 +40,7 @@ namespace {
 class BarrierLatency : public ScheduleDAGMutation {
 private:
   SmallSet<SyncScope::ID, 4> IgnoredScopes;
+  SmallVector<SUnit *, 8> OutstandingTDM;
 
 public:
   BarrierLatency(MachineFunction *MF) {
@@ -73,10 +74,26 @@ void addLatencyToEdge(SDep &PredDep, SUnit &SU, unsigned Latency) {
   SU.setDepthDirty();
 }
 
+void setLatencyForEdge(SDep &PredDep, SUnit &SU, unsigned Latency) {
+  SUnit *PredSU = PredDep.getSUnit();
+  SDep ForwardD = PredDep;
+  ForwardD.setSUnit(&SU);
+  for (SDep &SuccDep : PredSU->Succs) {
+    if (SuccDep == ForwardD) {
+      SuccDep.setLatency(Latency);
+      break;
+    }
+  }
+  PredDep.setLatency(Latency);
+  PredSU->setDepthDirty();
+  SU.setDepthDirty();
+}
+
 void BarrierLatency::apply(ScheduleDAGInstrs *DAG) {
   const SIInstrInfo *TII = static_cast<const SIInstrInfo *>(DAG->TII);
   constexpr unsigned FenceLatency = 2000;
   const unsigned BarrierSignalWaitLatency = BarrierSignalWaitLatencyOpt;
+  OutstandingTDM.clear();
 
   for (SUnit &SU : DAG->SUnits) {
     const MachineInstr *MI = SU.getInstr();
@@ -106,6 +123,53 @@ void BarrierLatency::apply(ScheduleDAGInstrs *DAG) {
         const MachineInstr *PredMI = PredSU->getInstr();
         if (TII->isBarrierStart(PredMI->getOpcode())) {
           addLatencyToEdge(PredDep, SU, BarrierSignalWaitLatency);
+        }
+      }
+    } else if (TII->isLDSDMA(*MI)) {
+      if (MI->getDesc().TSFlags & SIInstrFlags::TENSOR_CNT)
+        OutstandingTDM.push_back(&SU);
+      for (SDep &PredDep : SU.Preds) {
+        if (PredDep.getKind() != SDep::Kind::Data)
+          continue;
+
+        Register DepReg = PredDep.getReg();
+        if (DepReg == AMDGPU::TENSORcnt || DepReg == AMDGPU::ASYNCcnt)
+          setLatencyForEdge(PredDep, SU, 1);
+      }
+    } else if (Op == AMDGPU::S_WAIT_TENSORCNT) {
+      auto needWaitFor = [this](SUnit *SU, int64_t Count) {
+        if (OutstandingTDM.size() <= static_cast<uint64_t>(Count))
+          return false;
+
+        int64_t Counter = 0;
+        auto I = OutstandingTDM.rbegin(), E = OutstandingTDM.rend();
+        for (; I != E; I++) {
+          if (Counter >= Count)
+            return true;
+
+          if (SU->NodeNum == (*I)->NodeNum)
+            return false;
+
+          ++Counter;
+        }
+        llvm_unreachable("Malformed Outstanding TDM");
+      };
+
+      int64_t WaitVal = MI->getOperand(0).getImm();
+      for (SDep &PredDep : SU.Preds) {
+        if (PredDep.getKind() != SDep::Kind::Data)
+          continue;
+
+        Register DepReg = PredDep.getReg();
+        if (DepReg != AMDGPU::TENSORcnt)
+          continue;
+
+        SUnit *PredSU = PredDep.getSUnit();
+        assert(PredSU->getInstr()->getDesc().TSFlags &
+               SIInstrFlags::TENSOR_CNT);
+
+        if (!needWaitFor(PredSU, WaitVal)) {
+          setLatencyForEdge(PredDep, SU, 1);
         }
       }
     }
