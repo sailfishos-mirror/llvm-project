@@ -850,9 +850,7 @@ unsigned CandidateHeuristics::getStructuralStallCycles(SchedBoundary &Zone,
     }
   }
 
-  // Query HazardRecognizer for sequence-dependent hazard penalties.
-  if (!DAG->hasVRegLiveness() && Zone.HazardRec &&
-      Zone.HazardRec->isEnabled()) {
+  if (Zone.HazardRec && Zone.HazardRec->isEnabled()) {
     auto *HR = static_cast<GCNHazardRecognizer *>(Zone.HazardRec);
     Stall = std::max(Stall, HR->getHazardWaitStates(MI));
   }
