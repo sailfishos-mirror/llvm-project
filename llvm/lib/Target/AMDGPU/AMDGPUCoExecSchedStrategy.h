@@ -89,6 +89,11 @@ struct RooflineResult {
   // 0=CTRL, 1=VALU, 2=TRANS, 3=SALU, 4=DS, 5=VMEM, 6=SMEM, 7=WMMA
   unsigned ConsumerCount[8] = {};
 
+  // Per-class consumers that the max-flow could not place into a slot.
+  // ExposedByClass[k] = max(0, ConsumerCount[k] - flow assigned to k).
+  // Same indexing as ConsumerCount.
+  unsigned ExposedByClass[8] = {};
+
   bool isValid() const { return TotalSlots > 0; }
 
   float getSlotUtilization() const {
@@ -133,6 +138,13 @@ private:
   unsigned BufferSize = 0;
   /// How many cycles it takes for an instruction to clear the buffer.
   unsigned BufferCycles = 0;
+  /// Estimated cycles of this flavor that will execute outside any coexec
+  /// window (i.e. cannot be hidden behind a producer's shadow). Populated
+  /// once at region init from either a hand-ordered allocation or the
+  /// roofline solver, then decremented as instructions of this flavor are
+  /// scheduled outside an active window. Read by the critical-resource sort
+  /// when CoexecExposedSort != Off.
+  unsigned RemainingExposed = 0;
 
 public:
   HardwareUnitInfo() {}
@@ -157,6 +169,13 @@ public:
   void setBufferSize(unsigned Size) { BufferSize = Size; }
 
   unsigned getBufferSize() { return BufferSize; }
+
+  unsigned getRemainingExposed() const { return RemainingExposed; }
+  void setExposedCount(unsigned N) { RemainingExposed = N; }
+  void reduceRemainingExposed() {
+    if (RemainingExposed)
+      --RemainingExposed;
+  }
 
   /// \returns the next cycle where there is space in the buffer.
   unsigned getBufferAvailableCycle(unsigned CurrCycle) {
@@ -206,6 +225,7 @@ public:
     ProducesCoexecWindow = false;
     BufferSize = 0;
     BufferCycles = 0;
+    RemainingExposed = 0;
   }
 
   /// \returns the next SU in PrioritySUs that is not ready. If \p LookDeep is
@@ -399,6 +419,17 @@ protected:
   /// instructions by class, then solves a bipartite max-flow to find
   /// the maximum number of fillable slots.
   void computeRooflineCoExec();
+
+  /// Populate per-HWUI RemainingExposed using a hand-ordered allocation
+  /// (DS, SALU, TRANS, VALU compete for WMMA shadow + MultiVALU shadow).
+  /// Mirrors the prior PipelinedScheduler heuristic, including the DSBound
+  /// guard which leaves all exposed counts at 0 for DS-bound regions.
+  void initExposedGreedy();
+
+  /// Populate per-HWUI RemainingExposed from RooflineResult::ExposedByClass
+  /// (per-class flow recovered from the max-flow solver). Covers every
+  /// flavor mapped by flavorToCoExecMask.
+  void initExposedRoofline();
 
   RooflineResult Roofline;
 

@@ -15,6 +15,7 @@
 #include "GCNHazardRecognizer.h"
 #include "GCNSubtarget.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/Format.h"
 #include "llvm/Support/MathExtras.h"
@@ -27,6 +28,24 @@ using namespace llvm::AMDGPU;
 
 // BFS depth limit for lookahead search (search-budget, not hardware-derived).
 static constexpr unsigned ShadowMixLookaheadDepth = 8;
+
+namespace {
+enum class CoexecExposedMode { Off, Greedy, Roofline };
+} // namespace
+
+static cl::opt<CoexecExposedMode> CoexecExposedSort(
+    "amdgpu-coexec-exposed-sort", cl::Hidden,
+    cl::init(CoexecExposedMode::Off),
+    cl::desc("Prioritize HardwareUnits with non-zero exposed cycles in the "
+             "coexec scheduler's critical-resource sort."),
+    cl::values(
+        clEnumValN(CoexecExposedMode::Off, "off",
+                   "Disabled (default; sort behavior unchanged)."),
+        clEnumValN(CoexecExposedMode::Greedy, "greedy",
+                   "Hand-ordered slot allocation (DS, SALU, TRANS, VALU)."),
+        clEnumValN(CoexecExposedMode::Roofline, "roofline",
+                   "Per-class exposed cycles derived from the roofline "
+                   "max-flow solution.")));
 
 namespace {
 
@@ -74,16 +93,28 @@ unsigned coexecBitIndex(uint8_t Bit) {
 struct TinyMaxFlow {
   static constexpr unsigned MaxNodes = 20;
   int Capacity[MaxNodes][MaxNodes];
+  /// Snapshot of forward capacities recorded by addEdge(), used to recover
+  /// per-edge flow after solve() (flow = Original - residual capacity).
+  int Original[MaxNodes][MaxNodes];
   unsigned NumNodes = 0;
 
   void init(unsigned N) {
     assert(N <= MaxNodes);
     NumNodes = N;
     memset(Capacity, 0, sizeof(Capacity));
+    memset(Original, 0, sizeof(Original));
   }
 
   void addEdge(unsigned From, unsigned To, int Cap) {
     Capacity[From][To] += Cap;
+    Original[From][To] += Cap;
+  }
+
+  /// Forward flow on the original edge (From, To) after solve(): the BFS
+  /// drains Capacity[From][To] by exactly the flow it pushes, so the
+  /// difference recovers it.
+  int getFlow(unsigned From, unsigned To) const {
+    return Original[From][To] - Capacity[From][To];
   }
 
   int solve() {
@@ -506,6 +537,16 @@ void CandidateHeuristics::updateForScheduling(SUnit *SU,
   // Mix snapshot is now stale; tryShadowMix will refresh on its next call.
   MixInfo.invalidate();
 
+  // Decrement RemainingExposed for this flavor only when this SU was not
+  // hidden inside an active window. Producers are never "hidden" by
+  // someone else's shadow.
+  if (CoexecExposedSort != CoexecExposedMode::Off) {
+    bool InShadow =
+        CurrentWindow.IsActive && !HWUI->producesCoexecWindow();
+    if (!InShadow)
+      HWUI->reduceRemainingExposed();
+  }
+
   // --- Window lifecycle management (bumpNode) ---
 
   // Check if the current window has expired.
@@ -556,6 +597,16 @@ void CandidateHeuristics::initialize(ScheduleDAGMI *SchedDAG,
   collectRegionSummary();
   MixInfo.reset();
   computeRooflineCoExec();
+  switch (CoexecExposedSort) {
+  case CoexecExposedMode::Off:
+    break;
+  case CoexecExposedMode::Greedy:
+    initExposedGreedy();
+    break;
+  case CoexecExposedMode::Roofline:
+    initExposedRoofline();
+    break;
+  }
   LLVM_DEBUG(dumpRegionSummary());
   CurrentWindow.clear();
   NextWindow.clear();
@@ -679,13 +730,17 @@ void CandidateHeuristics::dumpRegionSummary() {
          << " (" << DAG->SUnits.size() << " SUs) ===\n";
 
   dbgs() << "\nHWUI Resource Pressure:\n";
+  bool ShowExposed = CoexecExposedSort != CoexecExposedMode::Off;
   for (auto &HWUI : HWUInfo) {
     if (HWUI.getTotalCycles() == 0)
       continue;
 
     StringRef Name = getFlavorName(HWUI.getType());
     dbgs() << "  " << Name << ": " << HWUI.getTotalCycles() << " cycles, "
-           << HWUI.size() << " instrs\n";
+           << HWUI.size() << " instrs";
+    if (ShowExposed)
+      dbgs() << ", exposed=" << HWUI.getRemainingExposed();
+    dbgs() << "\n";
   }
   dbgs() << "\n";
 
@@ -803,14 +858,170 @@ void CandidateHeuristics::computeRooflineCoExec() {
 
   Roofline.MaxFilledSlots = MF.solve();
   Roofline.LowerBoundStalls = Roofline.TotalSlots - Roofline.MaxFilledSlots;
+
+  // Recover per-class fill from the solver and derive exposed counts.
+  for (unsigned I = 0; I < C; ++I) {
+    unsigned BitIdx = ActiveClasses[I];
+    unsigned ClassNode = 1 + I;
+    unsigned Fill = 0;
+    for (unsigned J = 0; J < T; ++J)
+      Fill += MF.getFlow(ClassNode, 1 + C + J);
+    unsigned Nk = Roofline.ConsumerCount[BitIdx];
+    Roofline.ExposedByClass[BitIdx] = (Fill >= Nk) ? 0 : Nk - Fill;
+  }
+}
+
+void CandidateHeuristics::initExposedGreedy() {
+  // Hand-ordered allocation of WMMA + MultiVALU shadow slots to filler
+  // flavors, matching the prior PipelinedScheduler heuristic. Whatever
+  // each flavor cannot fit into a shadow slot is its "exposed" count.
+
+  unsigned WMMACycles = HWUInfo[(int)InstructionFlavor::WMMA].getTotalCycles();
+  unsigned DSCycles = HWUInfo[(int)InstructionFlavor::DS].getTotalCycles();
+  unsigned MultiVALUCycles =
+      HWUInfo[(int)InstructionFlavor::MultiCycleVALU].getTotalCycles();
+  unsigned SingleCycleVALUCycles =
+      HWUInfo[(int)InstructionFlavor::SingleCycleVALU].getTotalCycles();
+  unsigned TRANSCycles = HWUInfo[(int)InstructionFlavor::TRANS].getTotalCycles();
+
+  unsigned WMMACount = HWUInfo[(int)InstructionFlavor::WMMA].size();
+  unsigned MultiVALUCount =
+      HWUInfo[(int)InstructionFlavor::MultiCycleVALU].size();
+  unsigned DSCount = HWUInfo[(int)InstructionFlavor::DS].size();
+  unsigned SALUCount = HWUInfo[(int)InstructionFlavor::SALU].size();
+  // FIXME: the prior PipelinedScheduler reads EXPCount from
+  // InstructionFlavor::DS; preserved verbatim for behavior parity. Almost
+  // certainly intended to be TRANS::size().
+  unsigned EXPCount = HWUInfo[(int)InstructionFlavor::DS].size();
+  unsigned SingleCycleVALUCount =
+      HWUInfo[(int)InstructionFlavor::SingleCycleVALU].size();
+
+  // Slot subcategories from the first WMMA's stage template. Assumes a
+  // single WMMA shape per region (matches prior FIXME). Our CoExecInfo
+  // masks coalesce DS-eligible and SALU-eligible E-stages into StageE, and
+  // VALU/TRANS-eligible I-stages into StageI, so we treat all E-slots as
+  // DS-eligible and all I-slots as TRANS-eligible. Coarser than the prior
+  // alternating MemCoExec0/2 split, but the same intent.
+  unsigned ESlotCount = 0;
+  unsigned ISlotCount = 0;
+  if (WMMACount) {
+    for (auto &SU : DAG->SUnits) {
+      if (classifyFlavor(*SU.getInstr(), *SII) != InstructionFlavor::WMMA)
+        continue;
+      CoExecInfo Info = getCoExecInfo(*SU.getInstr(), *SII);
+      for (unsigned S = 0; S < Info.TotalWindow; ++S) {
+        uint8_t Mask = Info.getMask(S);
+        if (Mask == CoExecMask::StageE0)
+          continue;
+        bool HasVALU = Mask & CoExecMask::VALU;
+        bool HasTRANS = Mask & CoExecMask::TRANS;
+        if (HasVALU || HasTRANS)
+          ++ISlotCount;
+        else if (Mask & (CoExecMask::SALU | CoExecMask::MEM))
+          ++ESlotCount;
+      }
+      break;
+    }
+  }
+  unsigned ESlotForDS = ESlotCount;
+  unsigned ISlotForTrans = ISlotCount;
+
+  unsigned WMMAESlot = WMMACount * ESlotCount;
+  unsigned WMMAISlot = WMMACount * ISlotCount;
+  unsigned WMMAESlotForDS = WMMACount * ESlotForDS;
+  unsigned WMMAISlotForTRANS = WMMACount * ISlotForTrans;
+
+  unsigned CoexecWithMultiVALU = MultiVALUCycles - MultiVALUCount;
+
+  // DSBound predicate from the prior heuristic. If true, leave all
+  // exposed counts at 0 (TODO from the original: properly model
+  // DS/Mem-bound regions).
+  bool IsDSBound = DSCycles > WMMACycles + DSCycles + SingleCycleVALUCycles +
+                                  TRANSCycles - 2 * WMMACount;
+  if (IsDSBound)
+    return;
+
+  // Producers are never hidden inside another flavor's shadow.
+  HWUInfo[(int)InstructionFlavor::WMMA].setExposedCount(WMMACount);
+  HWUInfo[(int)InstructionFlavor::MultiCycleVALU].setExposedCount(
+      MultiVALUCount);
+
+  // DS first: WMMA E-slots, then MultiVALU shadow.
+  unsigned DSWMMACoexec = std::min(WMMAESlotForDS, DSCount);
+  WMMAESlot -= DSWMMACoexec;
+  DSCount -= DSWMMACoexec;
+  if (DSCount) {
+    unsigned DSMultiCoexec = std::min(CoexecWithMultiVALU, DSCount);
+    DSCount -= DSMultiCoexec;
+    CoexecWithMultiVALU -= DSMultiCoexec;
+  }
+  HWUInfo[(int)InstructionFlavor::DS].setExposedCount(DSCount);
+
+  // SALU next: remaining E-slots, then MultiVALU shadow.
+  unsigned SALUWMMACoexec = std::min(WMMAESlot, SALUCount);
+  SALUCount -= SALUWMMACoexec;
+  if (SALUCount) {
+    unsigned SALUMultiCoexec = std::min(CoexecWithMultiVALU, SALUCount);
+    SALUCount -= SALUMultiCoexec;
+    // Bug-for-bug port: prior code subtracted the post-decrement SALUCount
+    // (i.e. zero) from CoexecWithMultiVALU, and decremented WMMAESlot
+    // instead. Preserved.
+    CoexecWithMultiVALU -= SALUCount;
+    WMMAESlot -= SALUMultiCoexec;
+  }
+  HWUInfo[(int)InstructionFlavor::SALU].setExposedCount(SALUCount);
+
+  // TRANS: WMMA I-slots that admit TRANS.
+  unsigned EXPWMMACoexec = std::min(WMMAISlotForTRANS, EXPCount);
+  WMMAISlot -= EXPWMMACoexec;
+  EXPCount -= EXPWMMACoexec;
+  HWUInfo[(int)InstructionFlavor::TRANS].setExposedCount(EXPCount);
+
+  // SingleCycleVALU last: remaining I-slots, then TRANS shadow.
+  unsigned VALUWMMACoexec = std::min(WMMAISlot, SingleCycleVALUCount);
+  WMMAISlot -= VALUWMMACoexec;
+  SingleCycleVALUCount -= VALUWMMACoexec;
+  unsigned VALUEXPCoexec = std::min(EXPCount, SingleCycleVALUCount);
+  SingleCycleVALUCount -= VALUEXPCoexec;
+  HWUInfo[(int)InstructionFlavor::SingleCycleVALU].setExposedCount(
+      SingleCycleVALUCount);
+}
+
+void CandidateHeuristics::initExposedRoofline() {
+  // For each HWUI whose flavor maps to a CoExecMask bit, copy the
+  // per-class exposed count produced by the max-flow analysis. Naturally
+  // covers VMEM and DMA (DS bucket) in addition to the greedy mode's
+  // 6 flavors.
+  if (!Roofline.isValid())
+    return;
+  for (auto &HWUI : HWUInfo) {
+    uint8_t Bit = flavorToCoExecMask(HWUI.getType());
+    if (!Bit)
+      continue;
+    HWUI.setExposedCount(Roofline.ExposedByClass[coexecBitIndex(Bit)]);
+  }
 }
 
 void CandidateHeuristics::sortHWUIResources() {
+  bool UseExposed = CoexecExposedSort != CoexecExposedMode::Off;
+
   // Highest priority should be first.
-  llvm::sort(HWUInfo, [](HardwareUnitInfo &A, HardwareUnitInfo &B) {
+  llvm::sort(HWUInfo, [UseExposed](HardwareUnitInfo &A, HardwareUnitInfo &B) {
     // Prefer CoexecWindow producers
     if (A.producesCoexecWindow() != B.producesCoexecWindow())
       return A.producesCoexecWindow();
+
+    // Prefer flavors with non-zero exposed cycles, and within that group
+    // prefer more exposed first. Producers (handled above) are not part of
+    // this comparison.
+    if (UseExposed) {
+      bool AExp = A.getRemainingExposed() > 0;
+      bool BExp = B.getRemainingExposed() > 0;
+      if (AExp != BExp)
+        return AExp;
+      if (A.getRemainingExposed() != B.getRemainingExposed())
+        return A.getRemainingExposed() > B.getRemainingExposed();
+    }
 
     // Prefer more demanded resources
     if (A.getTotalCycles() != B.getTotalCycles())
