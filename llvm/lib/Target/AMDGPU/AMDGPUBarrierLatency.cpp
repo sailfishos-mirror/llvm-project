@@ -165,8 +165,13 @@ void BarrierLatency::apply(ScheduleDAGInstrs *DAG) {
           continue;
 
         SUnit *PredSU = PredDep.getSUnit();
-        assert(PredSU->getInstr()->getDesc().TSFlags &
-               SIInstrFlags::TENSOR_CNT);
+        // The TENSORcnt data dep can be carried by a non-TENSOR_CNT SU
+        // (e.g. an intervening COPY or pseudo). Such predecessors are not
+        // tracked in OutstandingTDM, so needWaitFor cannot reason about
+        // them; skip rather than asserting.
+        if (!(PredSU->getInstr()->getDesc().TSFlags &
+              SIInstrFlags::TENSOR_CNT))
+          continue;
 
         if (!needWaitFor(PredSU, WaitVal)) {
           setLatencyForEdge(PredDep, SU, 1);
