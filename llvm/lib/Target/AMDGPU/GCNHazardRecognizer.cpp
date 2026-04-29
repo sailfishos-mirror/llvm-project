@@ -334,11 +334,11 @@ GCNHazardRecognizer::checkMultiCycleVALUHazard(const MachineInstr &MI) const {
   if (!CyclesUntilVALU)
     return 0;
 
-  // Multi-cycle VALU blocks subsequent VALU (except WMMA/SWMMAC/TRANS).
-  if (!SIInstrInfo::isVALU(MI))
-    return 0;
-  if (SIInstrInfo::isWMMA(MI) || SIInstrInfo::isSWMMAC(MI) ||
-      SIInstrInfo::isTRANS(MI))
+  // Multi-cycle VALU blocks anything on the VALU pipe — VALU, WMMA, SWMMAC,
+  // and TRANS — for RepeatRate-1 cycles. Only off-pipe instructions (MEM,
+  // SALU, control) can fill the shadow.
+  if (!SIInstrInfo::isVALU(MI) && !SIInstrInfo::isWMMA(MI) &&
+      !SIInstrInfo::isSWMMAC(MI) && !SIInstrInfo::isTRANS(MI))
     return 0;
 
   return CyclesUntilVALU;
