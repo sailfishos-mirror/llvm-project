@@ -285,7 +285,10 @@ void GCNHazardRecognizer::updateMultiCycleVALUState(const MachineInstr &MI) {
 
   unsigned RepeatRate = TII.getRepeatRate(MI);
   if (RepeatRate > 1) {
-    CyclesUntilVALU = RepeatRate - 1;
+    // bumpCycle's AdvanceCycle decrements once before the next pick's
+    // hazard check (same convention as CyclesUntilTRANS), so to expose
+    // RepeatRate-1 cycles of shadow we must seed with RepeatRate.
+    CyclesUntilVALU = RepeatRate;
     LLVM_DEBUG_HR(dbgs() << "    Multi-cycle VALU: repeat=" << RepeatRate
                       << ", CyclesUntilVALU=" << CyclesUntilVALU << "\n");
   }
