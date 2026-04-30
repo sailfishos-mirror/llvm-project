@@ -165,6 +165,13 @@ void BarrierLatency::apply(ScheduleDAGInstrs *DAG) {
           continue;
 
         SUnit *PredSU = PredDep.getSUnit();
+
+        // S_WAIT -> S_WAIT edges should not have latency
+        if (PredSU->getInstr()->getOpcode() == AMDGPU::S_WAIT_TENSORCNT) {
+          setLatencyForEdge(PredDep, SU, 1);
+          continue;
+        }
+
         // The TENSORcnt data dep can be carried by a non-TENSOR_CNT SU
         // (e.g. an intervening COPY or pseudo). Such predecessors are not
         // tracked in OutstandingTDM, so needWaitFor cannot reason about
