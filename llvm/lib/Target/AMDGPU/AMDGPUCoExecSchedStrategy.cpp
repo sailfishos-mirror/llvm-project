@@ -1205,7 +1205,7 @@ bool CandidateHeuristics::tryCoexecSlot(
   StallCosts CandStallCost;
 
   unsigned TryStall = getStallCosts(TryCand.SU, *Zone, TryStallCost);
-  unsigned CandStall = getStallCosts(TryCand.SU, *Zone, CandStallCost);
+  unsigned CandStall = getStallCosts(Cand.SU, *Zone, CandStallCost);
 
   if (tryLess(Info.avoidsFlavor(*Stage + TryStall, TryFlavor),
               Info.avoidsFlavor(*Stage + CandStall, CandFlavor), TryCand, Cand,
