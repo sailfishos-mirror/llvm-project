@@ -70,6 +70,11 @@ def Write16PassDGEMM : SchedWrite;
 def WriteXDL1PassWMMA : SchedWrite;
 def WriteXDL2PassWMMA : SchedWrite;
 def WriteXDL4PassWMMA : SchedWrite;
+// Scaled variants: same latency as the corresponding unscaled WMMA, but
+// resource ReleaseAtCycles is reduced by 1 because the next scaled WMMA's
+// LD_SCALE absorbs into the previous WMMA's last I cycle.
+def WriteXDL1PassScaledWMMA : SchedWrite;
+def WriteXDL2PassScaledWMMA : SchedWrite;
 def Write4PassWMMA : SchedWrite;
 def Write8PassWMMA : SchedWrite;
 def Write16PassWMMA : SchedWrite;
@@ -522,9 +527,11 @@ def PredIsNotBothF4_WMMA_SCALE : SchedPredicate<[{
 }]>;
 
 // F8F6F4 WMMA: both F4 = 4 cycles (1-pass), any F6/F8 = 8 cycles (2-pass).
+// Routes through the scaled variants (ReleaseAtCycles - 1) so the next
+// scaled WMMA can issue at the previous WMMA's IS slot without stalling.
 def WriteWMMAScale_16X16X128_F8F6F4 : SchedWriteVariant<[
-    SchedVar<PredIsNotBothF4_WMMA_SCALE, [WriteXDL2PassWMMA]>,
-    SchedVar<NoSchedPred, [WriteXDL1PassWMMA]>
+    SchedVar<PredIsNotBothF4_WMMA_SCALE, [WriteXDL2PassScaledWMMA]>,
+    SchedVar<NoSchedPred, [WriteXDL1PassScaledWMMA]>
 ]>;
 
 multiclass GFX125xCommonWriteRes {
@@ -535,6 +542,17 @@ let ReleaseAtCycles = [8] in
 def : HWWriteRes<WriteXDL2PassWMMA, [HWXDL], 8>;
 let ReleaseAtCycles = [16] in
 def : HWWriteRes<WriteXDL4PassWMMA, [HWXDL], 16>;
+
+// Scaled WMMA variants: the next scaled WMMA's LD_SCALE absorbs into
+// the last I cycle of the previous WMMA's window, so the next WMMA can
+// issue one cycle earlier than the unscaled-pipeline occupancy says.
+// Modeling this as ReleaseAtCycles = N-1 lets the scheduler treat the
+// last I slot (StageIS in CoExecInfo) as a valid issue point for the
+// next WMMA without a structural stall.
+let ReleaseAtCycles = [3] in
+def : HWWriteRes<WriteXDL1PassScaledWMMA, [HWXDL], 4>;
+let ReleaseAtCycles = [7] in
+def : HWWriteRes<WriteXDL2PassScaledWMMA, [HWXDL], 8>;
 
 // RepeatRate = 2 variants
 let RepeatRate = [2, 0] in {
