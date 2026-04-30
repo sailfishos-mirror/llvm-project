@@ -1823,7 +1823,8 @@ HardwareLimits::HardwareLimits(const IsaVersion &IV) {
   KmcntMax = getKmcntBitMask(IV);
   XcntMax = getXcntBitMask(IV);
   AsyncMax = getAsynccntBitMask(IV);
-  VaVdstMax = DepCtr::getVaVdstBitMask();
+  VaVdstRdMax = DepCtr::getVaVdstBitMask();
+  VaVdstWrMax = DepCtr::getVaVdstBitMask();
   VmVsrcMax = DepCtr::getVmVsrcBitMask();
 }
 

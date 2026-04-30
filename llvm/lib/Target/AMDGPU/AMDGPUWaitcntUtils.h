@@ -31,8 +31,9 @@ enum InstCounterType {
   X_CNT,                             // gfx1250.
   ASYNC_CNT,                         // gfx1250.
   NUM_EXTENDED_INST_CNTS,
-  VA_VDST = NUM_EXTENDED_INST_CNTS, // gfx12+ expert mode only.
-  VM_VSRC,                          // gfx12+ expert mode only.
+  VA_VDST_RD = NUM_EXTENDED_INST_CNTS, // gfx12+ expert mode only.
+  VA_VDST_WR,                          // gfx12+ expert mode only.
+  VM_VSRC,                             // gfx12+ expert mode only.
   NUM_EXPERT_INST_CNTS,
   NUM_INST_CNTS = NUM_EXPERT_INST_CNTS
 };
@@ -77,7 +78,8 @@ public:
   // gfx12+ constructor.
   Waitcnt(unsigned LoadCnt, unsigned ExpCnt, unsigned DsCnt, unsigned StoreCnt,
           unsigned SampleCnt, unsigned BvhCnt, unsigned KmCnt, unsigned XCnt,
-          unsigned AsyncCnt, unsigned VaVdst, unsigned VmVsrc)
+          unsigned AsyncCnt, unsigned VaVdstRd, unsigned VaVdstWr,
+          unsigned VmVsrc)
       : Waitcnt() {
     Cnt[LOAD_CNT] = LoadCnt;
     Cnt[DS_CNT] = DsCnt;
@@ -88,7 +90,8 @@ public:
     Cnt[KM_CNT] = KmCnt;
     Cnt[X_CNT] = XCnt;
     Cnt[ASYNC_CNT] = AsyncCnt;
-    Cnt[VA_VDST] = VaVdst;
+    Cnt[VA_VDST_RD] = VaVdstRd;
+    Cnt[VA_VDST_WR] = VaVdstWr;
     Cnt[VM_VSRC] = VmVsrc;
   }
 
@@ -109,7 +112,8 @@ public:
   bool hasWaitStoreCnt() const { return Cnt[STORE_CNT] != ~0u; }
 
   bool hasWaitDepctr() const {
-    return Cnt[VA_VDST] != ~0u || Cnt[VM_VSRC] != ~0u;
+    return Cnt[VA_VDST_RD] != ~0u || Cnt[VA_VDST_WR] != ~0u ||
+           Cnt[VM_VSRC] != ~0u;
   }
 
   Waitcnt combined(const Waitcnt &Other) const {
