@@ -33,7 +33,7 @@ static cl::opt<unsigned> BarrierSignalWaitLatencyOpt(
     "amdgpu-barrier-signal-wait-latency",
     cl::desc("Synthetic latency between S_BARRIER_SIGNAL and S_BARRIER_WAIT "
              "to encourage scheduling independent work between them"),
-    cl::init(16), cl::Hidden);
+    cl::init(35), cl::Hidden);
 
 namespace {
 

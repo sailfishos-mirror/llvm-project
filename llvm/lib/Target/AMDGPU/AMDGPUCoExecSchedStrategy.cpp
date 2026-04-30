@@ -12,9 +12,11 @@
 //===----------------------------------------------------------------------===//
 
 #include "AMDGPUCoExecSchedStrategy.h"
+#include "AMDGPUBarrierLatency.h"
 #include "GCNHazardRecognizer.h"
 #include "GCNSubtarget.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/CodeGen/MachineScheduler.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/Format.h"
@@ -1926,8 +1928,12 @@ llvm::createGCNCoExecMachineScheduler(MachineSchedContext *C) {
   // CoExecScheduler defaults to Loaded DS latency mode.
   SIInstrInfo::setDSLatencyMode(SIInstrInfo::DSLatencyMode::Loaded);
 
-  return new GCNScheduleDAGMILive(
+  const GCNSubtarget &ST = C->MF->getSubtarget<GCNSubtarget>();
+  ScheduleDAGMILive *DAG = new GCNScheduleDAGMILive(
       C, std::make_unique<AMDGPUCoExecSchedStrategy>(C));
+
+  DAG->addMutation(createAMDGPUBarrierLatencyDAGMutation(C->MF));
+  return DAG;
 }
 
 ScheduleDAGInstrs *
