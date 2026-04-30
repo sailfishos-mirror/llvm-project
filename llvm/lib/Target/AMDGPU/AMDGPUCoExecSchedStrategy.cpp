@@ -525,6 +525,13 @@ unsigned CandidateHeuristics::getHWUICyclesForSU(SUnit *SU) {
 
 unsigned CandidateHeuristics::getHWUICyclesForMI(MachineInstr *MI) {
   assert(SchedModel && SchedModel->hasInstrSchedModel());
+
+  // DS load/store latency is variable depending on LDS contention.
+  if (SII->getSubtarget().hasGFX1250Insts() && SII->isDS(*MI)) {
+    if (auto Latency = SIInstrInfo::getDSLatencyMode())
+      return *Latency;
+  }
+
   return getMaxBlockingCycles(SchedModel->resolveSchedClass(MI), MI);
 }
 
@@ -654,6 +661,27 @@ void CandidateHeuristics::initialize(ScheduleDAGMI *SchedDAG,
 unsigned CandidateHeuristics::getCarriedLatency(SUnit *SU) {
   MachineInstr *MI = SU->getInstr();
   unsigned CarriedLatency = 0;
+
+  const InstructionFlavor Flavor = classifyFlavor(*MI, *SII);
+  if (Flavor == InstructionFlavor::Fence) {
+    MachineBasicBlock *MBB = MI->getParent();
+    // Check if we have DS instruciton after a fence in any of the predecessor
+    // blocks, if so, this fence instruction has carried latency.
+    for (auto PredMBB : MBB->predecessors()) {
+      auto I = PredMBB->rbegin();
+      auto E = PredMBB->rend();
+      for (; I != E; I++) {
+        const InstructionFlavor ItFlavor = classifyFlavor(*I, *SII);
+        if (ItFlavor == InstructionFlavor::Fence)
+          break;
+
+        // Found carried latency.
+        if (ItFlavor == InstructionFlavor::DS)
+          return getHWUICyclesForMI(&*I);
+      }
+    }
+  }
+
   for (auto &Op : MI->operands()) {
     if (!Op.isReg())
       continue;
@@ -1164,7 +1192,7 @@ bool CandidateHeuristics::tryEffectiveStall(
 
 bool CandidateHeuristics::tryMemoryPipeline(
     GenericSchedulerBase::SchedCandidate &TryCand,
-    GenericSchedulerBase::SchedCandidate &Cand) {
+    GenericSchedulerBase::SchedCandidate &Cand, SchedBoundary *Zone) {
 
   InstructionFlavor TryFlavor = classifyFlavor(*TryCand.SU->getInstr(), *SII);
 
@@ -1174,6 +1202,21 @@ bool CandidateHeuristics::tryMemoryPipeline(
                              TryFlavor == InstructionFlavor::Fence;
   bool CandIsMemoryPipeline = CandFlavor == InstructionFlavor::DMA ||
                               CandFlavor == InstructionFlavor::Fence;
+
+  if (!(TryIsMemoryPipeline || CandIsMemoryPipeline))
+    return false;
+
+  if (TryIsMemoryPipeline) {
+    StallCosts Costs;
+    getStallCosts(TryCand.SU, *Zone, Costs);
+    TryIsMemoryPipeline &= (Costs.Effective == 0);
+  }
+
+  if (CandIsMemoryPipeline) {
+    StallCosts Costs;
+    getStallCosts(Cand.SU, *Zone, Costs);
+    CandIsMemoryPipeline &= (Costs.Effective == 0);
+  }
 
   if (TryIsMemoryPipeline == CandIsMemoryPipeline)
     return false;
@@ -1188,6 +1231,7 @@ bool CandidateHeuristics::tryMemoryPipeline(
   TryCand.Reason = GenericSchedulerBase::RegCritical;
   return true;
 }
+
 bool CandidateHeuristics::tryCoexecSlot(
     GenericSchedulerBase::SchedCandidate &Cand,
     GenericSchedulerBase::SchedCandidate &TryCand, SchedBoundary *Zone) {
@@ -1844,7 +1888,7 @@ bool AMDGPUCoExecSchedStrategy::tryCandidateCoexec(SchedCandidate &Cand,
       return TryCand.Reason != NoCand;
     }
 
-    if (Heurs.tryMemoryPipeline(TryCand, Cand)) {
+    if (Heurs.tryMemoryPipeline(TryCand, Cand, Zone)) {
       LastAMDGPUReason = AMDGPUSchedReason::MemoryPipeline;
       return TryCand.Reason != NoCand;
     }

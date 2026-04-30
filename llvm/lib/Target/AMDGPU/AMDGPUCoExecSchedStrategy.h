@@ -503,7 +503,8 @@ public:
   ///
   /// TODO -- add better modelling and heuristics for pipelining based scheduling.
   bool tryMemoryPipeline(GenericSchedulerBase::SchedCandidate &TryCand,
-                         GenericSchedulerBase::SchedCandidate &Cand);
+                         GenericSchedulerBase::SchedCandidate &Cand,
+                         SchedBoundary *Zone);
 
   /// Get the roofline co-execution analysis result for the current region.
   const RooflineResult &getRooflineResult() const { return Roofline; }
