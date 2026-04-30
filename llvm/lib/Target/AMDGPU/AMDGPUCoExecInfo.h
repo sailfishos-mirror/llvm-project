@@ -57,6 +57,11 @@ constexpr uint8_t StageE0 = CTRL;             // Issue: control only
 constexpr uint8_t StageE = CTRL | SALU | MEM; // External: mem/salu
 constexpr uint8_t StageI =
     CTRL | SALU | MEM | VALU | TRANS;                // Internal: all ALU
+// Internal + scaled-WMMA absorb: same as StageI but the next scaled
+// WMMA may issue here — its LD_SCALE consumes the I cycle and the matrix
+// multiply lands in the V slot that follows. Used for the last I before
+// V of HasScaling patterns.
+constexpr uint8_t StageIS = StageI | WMMA;           // 0xFF
 constexpr uint8_t StageV = CTRL | SALU | MEM | WMMA; // Vacant: no valu/trans
 constexpr uint8_t StageTR = All & ~TRANS;             // TRANS co-exec: no TRANS
 } // namespace CoExecMask
@@ -190,6 +195,7 @@ enum class CoExecStageType : uint8_t {
   E0,       // Issue cycle - control only
   E,        // External - MEM/SALU allowed
   I,        // Internal - MEM/SALU/VALU allowed
+  IS,       // Internal + scaled-WMMA absorb (I plus next-WMMA issue)
   V,        // Vacant - MEM/SALU/WMMA allowed, no VALU
   TR        // TRANS co-exec - everything except TRANS
 };
@@ -200,6 +206,7 @@ inline const char *getStageTypeName(CoExecStageType T) {
   case CoExecStageType::E0:   return "E0";
   case CoExecStageType::E:    return "E";
   case CoExecStageType::I:    return "I";
+  case CoExecStageType::IS:   return "IS";
   case CoExecStageType::V:    return "V";
   case CoExecStageType::TR:   return "TR";
   }
@@ -350,6 +357,8 @@ struct CoExecInfo {
       return CoExecStageType::E0;
     if (Mask == StageE)
       return CoExecStageType::E;
+    if (Mask == StageIS)
+      return CoExecStageType::IS;
     if (Mask == StageI)
       return CoExecStageType::I;
     if (Mask == StageV)
@@ -395,6 +404,7 @@ struct CoExecInfo {
 
 /// Build CoExecInfo from a pattern string.
 /// Pattern chars: '0'=E0, 'E'=External, 'I'=Internal, 'V'=Vacant,
+///                 'S'=Internal+ScaleWMMAAbsorb (I plus next scaled WMMA),
 ///                 'T'=TRANS co-exec (all except TRANS), 'A'=Any
 ///
 /// Example defining slot preferences with fluent interface:
@@ -451,6 +461,13 @@ inline CoExecInfo CoExecInfo::build(unsigned Occupancy, unsigned TotalWindow,
       Info.Slots[I].Mask = CoExecMask::StageI;
       Info.Slots[I].TypeIndex = ICount++;
       break;
+    case 'S':
+      // I + scaled-WMMA absorb: same I-flavor capacity as 'I' plus the
+      // ability for the next scaled WMMA to issue here. Counts toward
+      // ICount so getTypeIndex(...) reports it as "the Nth I slot".
+      Info.Slots[I].Mask = CoExecMask::StageIS;
+      Info.Slots[I].TypeIndex = ICount++;
+      break;
     case 'V':
       Info.Slots[I].Mask = CoExecMask::StageV;
       Info.Slots[I].TypeIndex = VCount++;
@@ -495,19 +512,21 @@ inline CoExecInfo getCoExecInfo(const MachineInstr &MI,
     }
 
     if (BothF4) {
-      // f4×f4: 4-cycle occupancy, 6-cycle window
-      return CoExecInfo::build(4, 6, "0EEIVV", 3, HasScaling)
+      // f4×f4: 4-cycle occupancy, 6-cycle window. The scaled variant uses
+      // 'S' at the last I — the next scaled WMMA's LD_SCALE absorbs there.
+      const char *Pattern = HasScaling ? "0EESVV" : "0EEIVV";
+      return CoExecInfo::build(4, 6, Pattern, 3, HasScaling)
           .preferring(1, flavorBit(InstructionFlavor::DS))
           .avoiding(2, flavorBit(InstructionFlavor::DS))
           .preferring(3, HasScaling
-                             ? FlavorMasks::None
+                             ? flavorBit(InstructionFlavor::WMMA)
                              : flavorBit(InstructionFlavor::SingleCycleVALU))
-          .avoiding(3, HasScaling ? FlavorMasks::All : FlavorMasks::None)
           .preferring(4, flavorBit(InstructionFlavor::WMMA))
           .preferring(5, flavorBit(InstructionFlavor::WMMA));
     }
-    // f8×*, f6×*, or mixed: 8-cycle occupancy, 10-cycle window
-    return CoExecInfo::build(8, 10, "0EEIEEIIVV", 7, HasScaling)
+    // f8×*, f6×*, or mixed: 8-cycle occupancy, 10-cycle window.
+    const char *Pattern = HasScaling ? "0EEIEEISVV" : "0EEIEEIIVV";
+    return CoExecInfo::build(8, 10, Pattern, 7, HasScaling)
         .preferring(1, flavorBit(InstructionFlavor::DS))
         .avoiding(2, flavorBit(InstructionFlavor::DS))
         .preferring(3, flavorBit(InstructionFlavor::TRANS))
@@ -517,9 +536,8 @@ inline CoExecInfo getCoExecInfo(const MachineInstr &MI,
         .avoiding(6, HasScaling ? flavorBit(InstructionFlavor::TRANS)
                                 : FlavorMasks::None)
         .preferring(7, HasScaling
-                           ? FlavorMasks::None
+                           ? flavorBit(InstructionFlavor::WMMA)
                            : flavorBit(InstructionFlavor::SingleCycleVALU))
-        .avoiding(7, HasScaling ? FlavorMasks::All : FlavorMasks::None)
         .preferring(8, flavorBit(InstructionFlavor::WMMA))
         .preferring(9, flavorBit(InstructionFlavor::WMMA));
   }
@@ -527,13 +545,13 @@ inline CoExecInfo getCoExecInfo(const MachineInstr &MI,
   // FP8/BF8 16x16x64: 4-cycle occupancy, 6-cycle window
   if (Name.contains_insensitive("16x16x64_fp8") ||
       Name.contains_insensitive("16x16x64_bf8")) {
-    return CoExecInfo::build(4, 6, "0EEIVV", 3, HasScaling)
+    const char *Pattern = HasScaling ? "0EESVV" : "0EEIVV";
+    return CoExecInfo::build(4, 6, Pattern, 3, HasScaling)
         .preferring(1, flavorBit(InstructionFlavor::DS))
         .avoiding(2, flavorBit(InstructionFlavor::DS))
         .preferring(3, HasScaling
-                           ? FlavorMasks::None
+                           ? flavorBit(InstructionFlavor::WMMA)
                            : flavorBit(InstructionFlavor::SingleCycleVALU))
-        .avoiding(3, HasScaling ? FlavorMasks::All : FlavorMasks::None)
         .preferring(4, flavorBit(InstructionFlavor::WMMA))
         .preferring(5, flavorBit(InstructionFlavor::WMMA));
   }
@@ -541,7 +559,8 @@ inline CoExecInfo getCoExecInfo(const MachineInstr &MI,
   // F16/BF16 16x16x32: 8-cycle occupancy, 9-cycle window
   if (Name.contains_insensitive("16x16x32_f16") ||
       Name.contains_insensitive("16x16x32_bf16")) {
-    return CoExecInfo::build(8, 9, "0EIIEEIIV", 7, HasScaling)
+    const char *Pattern = HasScaling ? "0EIIEEISV" : "0EIIEEIIV";
+    return CoExecInfo::build(8, 9, Pattern, 7, HasScaling)
         .avoiding(1, flavorBit(InstructionFlavor::DS))
         .preferring(2, flavorBit(InstructionFlavor::SingleCycleVALU))
         .preferring(3, flavorBit(InstructionFlavor::TRANS))
@@ -551,16 +570,16 @@ inline CoExecInfo getCoExecInfo(const MachineInstr &MI,
         .avoiding(6, HasScaling ? flavorBit(InstructionFlavor::TRANS)
                                 : FlavorMasks::None)
         .preferring(7, HasScaling
-                           ? FlavorMasks::None
+                           ? flavorBit(InstructionFlavor::WMMA)
                            : flavorBit(InstructionFlavor::SingleCycleVALU))
-        .avoiding(7, HasScaling ? FlavorMasks::All : FlavorMasks::None)
         .preferring(8, flavorBit(InstructionFlavor::WMMA));
   }
 
   // FP8/BF8 16x16x128: 8-cycle occupancy, 10-cycle window
   if (Name.contains_insensitive("16x16x128_fp8") ||
       Name.contains_insensitive("16x16x128_bf8")) {
-    return CoExecInfo::build(8, 10, "0EEIEEIIVV", 7, HasScaling)
+    const char *Pattern = HasScaling ? "0EEIEEISVV" : "0EEIEEIIVV";
+    return CoExecInfo::build(8, 10, Pattern, 7, HasScaling)
         .preferring(1, flavorBit(InstructionFlavor::DS))
         .avoiding(2, flavorBit(InstructionFlavor::DS))
         .preferring(3, flavorBit(InstructionFlavor::TRANS))
@@ -570,22 +589,21 @@ inline CoExecInfo getCoExecInfo(const MachineInstr &MI,
         .avoiding(6, HasScaling ? flavorBit(InstructionFlavor::TRANS)
                                 : FlavorMasks::None)
         .preferring(7, HasScaling
-                           ? FlavorMasks::None
+                           ? flavorBit(InstructionFlavor::WMMA)
                            : flavorBit(InstructionFlavor::SingleCycleVALU))
-        .avoiding(7, HasScaling ? FlavorMasks::All : FlavorMasks::None)
         .preferring(8, flavorBit(InstructionFlavor::WMMA))
         .preferring(9, flavorBit(InstructionFlavor::WMMA));
   }
 
   // 32x16x128 F4 variants
   if (Name.contains_insensitive("32x16x128_f4")) {
-    return CoExecInfo::build(4, 6, "0EEIVV", 3, HasScaling)
+    const char *Pattern = HasScaling ? "0EESVV" : "0EEIVV";
+    return CoExecInfo::build(4, 6, Pattern, 3, HasScaling)
         .preferring(1, flavorBit(InstructionFlavor::DS))
         .avoiding(2, flavorBit(InstructionFlavor::DS))
         .preferring(3, HasScaling
-                           ? FlavorMasks::None
+                           ? flavorBit(InstructionFlavor::WMMA)
                            : flavorBit(InstructionFlavor::SingleCycleVALU))
-        .avoiding(3, HasScaling ? FlavorMasks::All : FlavorMasks::None)
         .preferring(4, flavorBit(InstructionFlavor::WMMA))
         .preferring(5, flavorBit(InstructionFlavor::WMMA));
   }

@@ -796,7 +796,13 @@ void CandidateHeuristics::computeRooflineCoExec() {
   Roofline = RooflineResult();
 
   // Slot types: map from stage bitmask to count of slots with that mask.
-  DenseMap<uint8_t, unsigned> SlotTypes;
+  // Use uint16_t key (rather than uint8_t) so 0xFF is a usable mask value
+  // — the IS slot's StageIS = StageI | WMMA = 0xFF, and uint8_t's
+  // DenseMapInfo reserves 0xFF as the empty-key sentinel.
+  // FUTURE: if we add a separate ScaleWMMA flavor, the IS slot would be
+  // restricted to it (rather than any WMMA), affecting how the roofline
+  // distributes WMMA flow between IS and V slots.
+  SmallDenseMap<uint16_t, unsigned, 16> SlotTypes;
   unsigned NumWMMAs = 0;
 
   for (auto &SU : DAG->SUnits) {
@@ -847,8 +853,8 @@ void CandidateHeuristics::computeRooflineCoExec() {
   }
 
   // Collect slot types into a vector for indexing.
-  SmallVector<std::pair<uint8_t, unsigned>, 8> SlotTypeVec(SlotTypes.begin(),
-                                                           SlotTypes.end());
+  SmallVector<std::pair<uint16_t, unsigned>, 8> SlotTypeVec(SlotTypes.begin(),
+                                                            SlotTypes.end());
 
   // Build flow network.
   // Nodes: 0=source, 1..C=consumer classes, C+1..C+T=slot types, C+T+1=sink.
@@ -873,7 +879,7 @@ void CandidateHeuristics::computeRooflineCoExec() {
   for (unsigned J = 0; J < T; ++J) {
     unsigned SlotNode = 1 + C + J;
     unsigned Mt = SlotTypeVec[J].second;
-    uint8_t Mask = SlotTypeVec[J].first;
+    uint16_t Mask = SlotTypeVec[J].first;
     MF.addEdge(SlotNode, Sink, Mt);
 
     for (unsigned I = 0; I < C; ++I) {
