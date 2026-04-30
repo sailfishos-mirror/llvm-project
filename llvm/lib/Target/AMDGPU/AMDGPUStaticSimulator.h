@@ -483,7 +483,7 @@ struct PendingMemOp {
 };
 
 namespace MemLimits {
-constexpr unsigned MaxDSInFlight = 10;
+constexpr unsigned MaxDSInFlight = 16;
 constexpr unsigned MaxVMEMInFlight = 16;
 constexpr unsigned MaxSMEMInFlight = 10;
 constexpr unsigned MaxTDMInFlight = 4;

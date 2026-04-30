@@ -24,7 +24,7 @@ namespace llvm {
 // classifyFlavor is declared in AMDGPUCoExecInfo.h but defined in cpp
 namespace AMDGPU {
 namespace DefaultBufferSizes {
-constexpr unsigned DS = 10;
+constexpr unsigned DS = 16;
 } // namespace DefaultBufferSizes
 
 InstructionFlavor classifyFlavor(const MachineInstr &MI,
