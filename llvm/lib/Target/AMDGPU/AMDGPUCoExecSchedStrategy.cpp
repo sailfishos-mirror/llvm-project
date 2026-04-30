@@ -37,7 +37,7 @@ enum class CoexecExposedMode { Off, Greedy, Roofline };
 
 static cl::opt<CoexecExposedMode> CoexecExposedSort(
     "amdgpu-coexec-exposed-sort", cl::Hidden,
-    cl::init(CoexecExposedMode::Off),
+    cl::init(CoexecExposedMode::Roofline),
     cl::desc("Prioritize HardwareUnits with non-zero exposed cycles in the "
              "coexec scheduler's critical-resource sort."),
     cl::values(
