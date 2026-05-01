@@ -83,6 +83,8 @@ def Write16PassWMMA : SchedWrite;
 def Trans32Repeat2 : SchedWrite;     // F32/F16/BF16 transcendentals, latency 8
 def Write64BitRepeat2 : SchedWrite;  // 64-bit shifts/moves, latency 6
 def Write32BitRepeat2 : SchedWrite;  // 64-bit comparisons, latency 5
+def WriteDPPRepeat2 : SchedWrite;    // DPP8/DPP16 instructions, latency 5
+def WriteSwapRepeat2 : SchedWrite;   // V_SWAP_B32/B16/PERMLANE_SWAP instructions, latency 5
 
 // RepeatRate = 4 variants
 def IntMulRepeat4 : SchedWrite;      // Integer multiply, latency 8
@@ -559,6 +561,8 @@ let RepeatRate = [2, 0] in {
 def : HWWriteRes<Trans32Repeat2,    [HWTransVALU, HWRC], 8>;  // F32/F16/BF16 transcendentals
 def : HWWriteRes<Write64BitRepeat2, [HWVALU, HWRC],      6>;  // 64-bit shifts/moves
 def : HWWriteRes<Write32BitRepeat2, [HWVALU, HWRC],      5>;  // 64-bit comparisons
+def : HWWriteRes<WriteDPPRepeat2,   [HWVALU, HWRC],      5>;  // DPP instructions
+def : HWWriteRes<WriteSwapRepeat2,  [HWVALU, HWRC],      5>;  // SWAP instructions
 }
 
 // RepeatRate = 4 variants
@@ -797,6 +801,15 @@ def : InstRW<[DoubleRepeat32], (instregex "^V_FRACT_F64_e(32|64)$",
                                           "^V_MINIMUM_F64_e64$",
                                           "^V_MAXIMUM_F64_e64$")>;
 def : InstRW<[DoubleRepeat32, WriteSALUDummy], (instregex "^V_DIV_SCALE_F64_e64$")>;
+
+// V_SWAP_B32, V_SWAP_B16, and PERMLANE_SWAP instructions
+// Match pseudo instructions
+def : InstRW<[WriteSwapRepeat2, WriteVALUDummy], (instregex "^V_SWAP_B32$",
+                                            "^V_SWAP_B16$",
+                                            "^V_SWAPREL_B32$",
+                                            "^V_PERMLANE32_SWAP_B32_e(32|64)$",
+                                            "^V_PERMLANE16_SWAP_B32_e(32|64)$")>;
+
 } // End GFX125xCommonWriteRes
 
 let SchedModel = GFX1250SpeedModel in {
@@ -808,4 +821,6 @@ def : HWWriteRes<WriteDouble,            [HWVALU, HWRC],   37>;
 def : HWWriteRes<WriteDoubleAdd,         [HWVALU, HWRC],   37>;
 def : HWWriteRes<WriteDoubleCvt,         [HWVALU, HWRC],   37>;
 def : HWWriteRes<WriteTrans64,           [HWVALU, HWTransVALU, HWRC], 38>;
+
+
 } // SchedModel = GFX1250SpeedModel
