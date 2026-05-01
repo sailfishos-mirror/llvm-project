@@ -1978,7 +1978,6 @@ llvm::createGCNCoExecMachineScheduler(MachineSchedContext *C) {
   // CoExecScheduler defaults to Loaded DS latency mode.
   SIInstrInfo::setDSLatencyMode(SIInstrInfo::DSLatencyMode::Loaded);
 
-  const GCNSubtarget &ST = C->MF->getSubtarget<GCNSubtarget>();
   ScheduleDAGMILive *DAG = new GCNScheduleDAGMILive(
       C, std::make_unique<AMDGPUCoExecSchedStrategy>(C));
 
