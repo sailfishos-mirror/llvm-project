@@ -1,0 +1,11 @@
+{
+  "AAI/bf16FA/bf16_fa": 1280,
+  "AAI/bf16_GEMM/bf16_GEMM": 1056,
+  "AAI/fp4_GEMM/fp4_GEMM": 944,
+  "AAI/fp8fp4MOE/fp8fp4_MOE": 1615,
+  "Gluon/bf16FA/bf16_fa": 1345,
+  "Gluon/bf16_GEMM/bf16_GEMM": 2643,
+  "Gluon/fo4_GEMM/fp4_GEMM": 807,
+  "Gluon/fp8_FA/fp8_fa": 1733,
+  "Gluon/fp8_GEMM/fo8_GEMM": 32674
+}
