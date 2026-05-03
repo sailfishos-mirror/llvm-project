@@ -7,6 +7,7 @@ Usage:
     ./perf_test.py --update           # Update baseline with current results
     ./perf_test.py --update-on-pass   # Update baseline only if all tests pass
     ./perf_test.py --verbose          # Show detailed output
+    ./perf_test.py --migration-target # Use note.txt warm cycles as baseline
 """
 
 from __future__ import annotations
@@ -49,6 +50,10 @@ BASELINE_FILE = SCRIPT_DIR / "baseline.json"
 # Pattern to match innermost loop warm cycles
 # Format: ;=== Block (loop): Cold=XXXXcyc Warm=XXXXcyc Trip=XX Scaled=XXXXcyc [header] ===
 WARM_PATTERN = re.compile(r"Block \(loop\):.*Warm=(\d+)cyc")
+
+# Pattern to extract warm cycles from note.txt migration target
+# Format: "XX% xdl util, YYY warm cycles"
+NOTE_WARM_PATTERN = re.compile(r"(\d+)\s*warm cycles")
 
 
 def get_llc_path() -> Path:
@@ -137,6 +142,27 @@ def load_baseline() -> Dict[str, int]:
         return json.load(f)
 
 
+def load_migration_targets() -> Dict[str, int]:
+    """Load migration targets from note.txt files in test directories."""
+    targets = {}
+    mi450_dir = SCRIPT_DIR / "MI450"
+    if not mi450_dir.exists():
+        return targets
+
+    for ll_file in mi450_dir.rglob("*.ll"):
+        test_name = get_test_name(ll_file)
+        note_file = ll_file.parent / "note.txt"
+        if note_file.exists():
+            try:
+                content = note_file.read_text()
+                match = NOTE_WARM_PATTERN.search(content)
+                if match:
+                    targets[test_name] = int(match.group(1))
+            except Exception:
+                pass
+    return targets
+
+
 def save_baseline(baseline: Dict[str, int]) -> None:
     """Save baseline warm cycle counts."""
     with open(BASELINE_FILE, "w") as f:
@@ -144,10 +170,13 @@ def save_baseline(baseline: Dict[str, int]) -> None:
         f.write("\n")
 
 
-def run_tests(verbose: bool = False) -> List[TestResult]:
+def run_tests(verbose: bool = False, migration_target: bool = False) -> List[TestResult]:
     """Run all tests and return results."""
     llc_path = get_llc_path()
-    baseline = load_baseline()
+    if migration_target:
+        baseline = load_migration_targets()
+    else:
+        baseline = load_baseline()
     ll_files = find_test_files()
 
     if not ll_files:
@@ -167,7 +196,7 @@ def run_tests(verbose: bool = False) -> List[TestResult]:
         if error:
             passed = False
         elif baseline_cycles is None:
-            # No baseline yet - pass but note it's new
+            # No baseline/target - pass (target of 0 or more means any result is acceptable)
             passed = True
         else:
             # Pass if cycles improved or stayed the same
@@ -186,7 +215,10 @@ def run_tests(verbose: bool = False) -> List[TestResult]:
             if error:
                 print(f"ERROR: {error}")
             elif baseline_cycles is None:
-                print(f"NEW ({warm_cycles} cycles)")
+                if migration_target:
+                    print(f"NO TARGET ({warm_cycles} cycles)")
+                else:
+                    print(f"NEW ({warm_cycles} cycles)")
             elif passed:
                 delta = result.delta
                 if delta == 0:
@@ -199,23 +231,25 @@ def run_tests(verbose: bool = False) -> List[TestResult]:
     return results
 
 
-def print_summary(results: List[TestResult]) -> None:
+def print_summary(results: List[TestResult], migration_target: bool = False) -> None:
     """Print test summary."""
     passed = sum(1 for r in results if r.passed)
     failed = sum(1 for r in results if not r.passed)
-    new_tests = sum(1 for r in results if r.baseline_cycles is None and r.error is None)
+    no_baseline = sum(1 for r in results if r.baseline_cycles is None and r.error is None)
     errors = sum(1 for r in results if r.error)
 
     print("\n" + "=" * 60)
     print(f"Results: {passed} passed, {failed} failed", end="")
-    if new_tests:
-        print(f", {new_tests} new", end="")
+    if no_baseline:
+        label = "no target" if migration_target else "new"
+        print(f", {no_baseline} {label}", end="")
     if errors:
         print(f", {errors} errors", end="")
     print()
 
     if failed > 0:
-        print("\nFailed tests:")
+        label = "target" if migration_target else "baseline"
+        print(f"\nFailed tests (exceeded {label}):")
         for r in results:
             if not r.passed and not r.error:
                 print(f"  {r.name}: {r.warm_cycles} > {r.baseline_cycles} (+{r.delta} cycles, +{r.delta_percent:.2f}%)")
@@ -247,6 +281,8 @@ def main():
                         help="Show detailed output for each test")
     parser.add_argument("--list", action="store_true",
                         help="List all test files without running")
+    parser.add_argument("--migration-target", action="store_true",
+                        help="Use warm cycles from note.txt files as baseline instead of baseline.json")
     args = parser.parse_args()
 
     if args.list:
@@ -256,11 +292,14 @@ def main():
 
     print(f"Running performance tests...")
     print(f"LLC: {get_llc_path()}")
-    print(f"Baseline: {BASELINE_FILE}")
+    if args.migration_target:
+        print(f"Baseline: migration targets from note.txt files")
+    else:
+        print(f"Baseline: {BASELINE_FILE}")
     print()
 
-    results = run_tests(verbose=args.verbose)
-    print_summary(results)
+    results = run_tests(verbose=args.verbose, migration_target=args.migration_target)
+    print_summary(results, migration_target=args.migration_target)
 
     all_passed = all(r.passed for r in results)
 

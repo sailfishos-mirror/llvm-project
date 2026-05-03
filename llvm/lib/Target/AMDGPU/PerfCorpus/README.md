@@ -72,6 +72,16 @@ Commit the updated `baseline.json` along with your compiler changes.
 ./perf_test.py --list
 ```
 
+### Testing Against Migration Targets
+
+Some test directories contain a `note.txt` file with migration target warm cycles (e.g., "722 warm cycles"). Use `--migration-target` to test against these targets instead of `baseline.json`:
+
+```bash
+./perf_test.py --migration-target --verbose
+```
+
+Tests without a corresponding `note.txt` automatically pass (any cycle count is acceptable).
+
 ## How It Works
 
 The script runs each `.ll` file through `llc` with:
