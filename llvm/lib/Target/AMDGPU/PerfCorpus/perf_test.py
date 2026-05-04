@@ -68,16 +68,16 @@ FLAGS_SECTION_PATTERN = re.compile(r"^Flags:?\s*$", re.MULTILINE)
 
 
 def get_llc_path() -> Path:
-    """Find llc binary, preferring build directory relative to repo."""
+    """Find llc binary, preferring LLC_PATH if set, else build directory."""
+    # Environment variable takes precedence so cross-tree comparisons work.
+    if "LLC_PATH" in os.environ:
+        return Path(os.environ["LLC_PATH"])
+
     # Try relative path from repo root
     repo_root = SCRIPT_DIR.parents[4]  # llvm/lib/Target/AMDGPU/PerfCorpus -> repo root
     build_llc = repo_root / "build" / "bin" / "llc"
     if build_llc.exists():
         return build_llc
-
-    # Try environment variable
-    if "LLC_PATH" in os.environ:
-        return Path(os.environ["LLC_PATH"])
 
     # Try PATH
     try:
