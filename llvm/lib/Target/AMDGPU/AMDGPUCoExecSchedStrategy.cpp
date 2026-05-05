@@ -49,6 +49,12 @@ static cl::opt<CoexecExposedMode> CoexecExposedSort(
                    "Per-class exposed cycles derived from the roofline "
                    "max-flow solution.")));
 
+static cl::opt<bool> BlockCarriedLatency(
+  "amdgpu-block-carried-latency",
+  cl::desc("Whether or not to pad the beginning of blocks with latency from incoming loads"),
+  cl::ReallyHidden,
+  cl::init(false));
+
 namespace {
 
 // Used to disable post-RA scheduling with function level granularity.
@@ -659,6 +665,9 @@ void CandidateHeuristics::initialize(ScheduleDAGMI *SchedDAG,
 }
 
 unsigned CandidateHeuristics::getCarriedLatency(SUnit *SU) {
+  if (!BlockCarriedLatency)
+    return 0;
+
   MachineInstr *MI = SU->getInstr();
   unsigned CarriedLatency = 0;
 
