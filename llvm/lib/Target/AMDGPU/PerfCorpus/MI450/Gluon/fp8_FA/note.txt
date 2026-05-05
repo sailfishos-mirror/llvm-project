@@ -1,2 +1,5 @@
 Migration target -- loop perf:
 30% xdl util, 1685 warm cycles
+
+Flags
+    --amdgpu-block-carried-latency=true

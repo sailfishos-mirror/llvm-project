@@ -1,2 +1,5 @@
 Migration target -- loop perf:
 71% xdl util, 722 warm cycles
+
+Flags:
+    --amdgpu-vgpr-excess-threshold-percent=80

@@ -55,6 +55,10 @@ WARM_PATTERN = re.compile(r"Block \(loop\):.*Warm=(\d+)cyc")
 # Format: "XX% xdl util, YYY warm cycles"
 NOTE_WARM_PATTERN = re.compile(r"(\d+)\s*warm cycles")
 
+# Pattern to match the Flags section header in note.txt
+# Supports both "Flags" and "Flags:" formats
+FLAGS_SECTION_PATTERN = re.compile(r"^Flags:?\s*$", re.MULTILINE)
+
 
 def get_llc_path() -> Path:
     """Find llc binary, preferring build directory relative to repo."""
@@ -95,7 +99,50 @@ def get_test_name(ll_file: Path) -> str:
     return str(rel_path.with_suffix(""))
 
 
-def run_llc(llc_path: Path, ll_file: Path) -> Tuple[Optional[int], Optional[str]]:
+def parse_flags_from_note(note_file: Path) -> List[str]:
+    """Parse flags from a note.txt file's Flags section.
+
+    Flags section format:
+        Flags:
+            --some-flag=value
+            --another-flag
+
+    Returns a list of flag strings.
+    """
+    if not note_file.exists():
+        return []
+
+    try:
+        content = note_file.read_text()
+
+        # Find the Flags section
+        match = FLAGS_SECTION_PATTERN.search(content)
+        if not match:
+            return []
+
+        # Get content after "Flags:" header
+        flags_start = match.end()
+        remaining = content[flags_start:]
+
+        flags = []
+        for line in remaining.split('\n'):
+            # Stop if we hit a non-indented line (next section or empty content)
+            stripped = line.strip()
+            if not stripped:
+                continue
+            # If line doesn't start with whitespace, it's a new section
+            if line and not line[0].isspace():
+                break
+            # Parse the flag (should start with --)
+            if stripped.startswith('--'):
+                flags.append(stripped)
+
+        return flags
+    except Exception:
+        return []
+
+
+def run_llc(llc_path: Path, ll_file: Path, extra_flags: Optional[List[str]] = None) -> Tuple[Optional[int], Optional[str]]:
     """Run llc and extract the warm cycle count for the innermost loop."""
     cmd = [
         str(llc_path),
@@ -108,6 +155,10 @@ def run_llc(llc_path: Path, ll_file: Path) -> Tuple[Optional[int], Optional[str]
         "--enable-post-misched=0",
         "-o", "-",
     ]
+
+    # Add any extra flags from note.txt
+    if extra_flags:
+        cmd.extend(extra_flags)
 
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
@@ -190,7 +241,11 @@ def run_tests(verbose: bool = False, migration_target: bool = False) -> List[Tes
         if verbose:
             print(f"Running: {test_name}...", end=" ", flush=True)
 
-        warm_cycles, error = run_llc(llc_path, ll_file)
+        # Parse any extra flags from note.txt
+        note_file = ll_file.parent / "note.txt"
+        extra_flags = parse_flags_from_note(note_file)
+
+        warm_cycles, error = run_llc(llc_path, ll_file, extra_flags)
         baseline_cycles = baseline.get(test_name)
 
         if error:
