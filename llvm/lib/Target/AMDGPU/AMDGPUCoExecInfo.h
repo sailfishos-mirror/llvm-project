@@ -272,7 +272,7 @@ inline uint8_t getCoExecMaskForCopy(const MachineInstr &MI,
 }
 
 /// Max stages: INT8 16x16x64 = 17 cycles, round up for safety.
-constexpr unsigned MaxCoExecStages = 20;
+constexpr unsigned MaxCoExecStages = 32;
 
 //===----------------------------------------------------------------------===//
 // Co-execution Slot Info
@@ -352,6 +352,11 @@ struct CoExecInfo {
     return (getAvoidedFlavors(Stage) & flavorBit(F)) != 0;
   }
 
+  /// Check if a flavor is allowed at a stage (based on slot mask).
+  bool allowsFlavor(unsigned Stage, InstructionFlavor F) const {
+    return (Slots[Stage].Mask & flavorBit(F)) != 0;
+  }
+
   /// Check if instruction class mask can co-execute at a given stage.
   bool canCoExec(uint8_t InstMask, unsigned Stage) const {
     if (Stage >= TotalWindow)
@@ -424,6 +429,13 @@ struct CoExecInfo {
   static CoExecInfo build(unsigned Occupancy, unsigned TotalWindow,
                           const char *Pattern, unsigned LastIStage,
                           bool HasScaling);
+
+  /// Build a uniform CoExecInfo where all stages have the same slot type.
+  /// Useful for TRANS and MultiCycleVALU which have simpler patterns.
+  static CoExecInfo buildUniform(unsigned Occupancy, unsigned TotalWindow,
+                                 char Slot, unsigned LastIStage,
+                                 bool HasScaling, FlavorMask Prefer,
+                                 FlavorMask Avoids);
 };
 
 //===----------------------------------------------------------------------===//
@@ -466,6 +478,7 @@ inline CoExecInfo CoExecInfo::build(unsigned Occupancy, unsigned TotalWindow,
                                     const char *Pattern, unsigned LastIStage,
                                     bool HasScaling) {
   CoExecInfo Info;
+  // Cap values at MaxCoExecStages to avoid buffer overflow.
   Info.Occupancy = Occupancy;
   Info.TotalWindow = TotalWindow;
   Info.LastIStage = LastIStage;
@@ -475,7 +488,7 @@ inline CoExecInfo CoExecInfo::build(unsigned Occupancy, unsigned TotalWindow,
   // Track count of each type for TypeIndex computation
   unsigned ECount = 0, ICount = 0, VCount = 0;
 
-  for (unsigned I = 0; I < TotalWindow && Pattern[I]; ++I) {
+  for (unsigned I = 0; I < Info.TotalWindow && Pattern[I]; ++I) {
     switch (Pattern[I]) {
     case '0':
       Info.Slots[I].Mask = CoExecMask::StageE0;
@@ -514,9 +527,81 @@ inline CoExecInfo CoExecInfo::build(unsigned Occupancy, unsigned TotalWindow,
   return Info;
 }
 
-/// Get co-execution info for a WMMA instruction based on opcode.
+/// Build a uniform CoExecInfo where all stages have the same slot type.
+inline CoExecInfo CoExecInfo::buildUniform(unsigned Occupancy,
+                                           unsigned TotalWindow, char Slot,
+                                           unsigned LastIStage, bool HasScaling,
+                                           FlavorMask Prefer,
+                                           FlavorMask Avoids) {
+  CoExecInfo Info;
+  // Cap values at MaxCoExecStages to avoid buffer overflow.
+  Info.Occupancy = Occupancy;
+  Info.TotalWindow = TotalWindow;
+  Info.LastIStage = LastIStage;
+  Info.HasScaling = HasScaling;
+
+  unsigned ECount = 0, ICount = 0, VCount = 0;
+
+  for (unsigned I = 0; I < Info.TotalWindow; ++I) {
+    Info.Slots[I].PreferredFlavors = Prefer;
+    Info.Slots[I].AvoidedFlavors = Avoids;
+
+    switch (Slot) {
+    case '0':
+      Info.Slots[I].Mask = CoExecMask::StageE0;
+      Info.Slots[I].TypeIndex = 0;
+      break;
+    case 'E':
+      Info.Slots[I].Mask = CoExecMask::StageE;
+      Info.Slots[I].TypeIndex = ECount++;
+      break;
+    case 'I':
+      Info.Slots[I].Mask = CoExecMask::StageI;
+      Info.Slots[I].TypeIndex = ICount++;
+      break;
+    case 'S':
+      Info.Slots[I].Mask = CoExecMask::StageIS;
+      Info.Slots[I].TypeIndex = ICount++;
+      break;
+    case 'V':
+      Info.Slots[I].Mask = CoExecMask::StageV;
+      Info.Slots[I].TypeIndex = VCount++;
+      break;
+    case 'T':
+      Info.Slots[I].Mask = CoExecMask::StageTR;
+      Info.Slots[I].TypeIndex = 0;
+      break;
+    case 'A':
+    default:
+      Info.Slots[I].Mask = CoExecMask::All;
+      Info.Slots[I].TypeIndex = 0;
+      break;
+    }
+  }
+  return Info;
+}
+
+/// Get co-execution info for a multi-cycle instruction.
+/// For WMMA: returns detailed pattern based on opcode.
+/// For TRANS/MultiCycleVALU: returns uniform pattern based on repeat rate.
 inline CoExecInfo getCoExecInfo(const MachineInstr &MI,
                                 const SIInstrInfo &TII) {
+  // Handle TRANS and MultiCycleVALU instructions first.
+  if (!TII.isMFMAorWMMA(MI)) {
+    unsigned RepeatRate = TII.getRepeatRate(MI);
+    if (RepeatRate <= 1)
+      return CoExecInfo();
+
+    bool IsTRANS = TII.isTRANS(MI);
+    // TRANS: uses 'T' slots (all except TRANS), prefers SingleCycleVALU.
+    // MultiCycleVALU: uses 'E' slots (external, no VALU).
+    return CoExecInfo::buildUniform(
+        RepeatRate - 1, RepeatRate - 1, IsTRANS ? 'T' : 'E',
+        IsTRANS ? RepeatRate - 2 : 0, false,
+        IsTRANS ? flavorBit(InstructionFlavor::SingleCycleVALU) : FlavorMask(),
+        FlavorMask());
+  }
+
   StringRef Name = TII.getName(MI.getOpcode());
 
   // Check for scaled variants (LD_SCALE rule applies)

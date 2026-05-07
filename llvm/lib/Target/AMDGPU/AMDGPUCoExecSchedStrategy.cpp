@@ -343,9 +343,124 @@ WindowSlotDemand::getMostDeficientFlavor(const RegionMixInfo &Mix) const {
 // CoexecWindow
 //===----------------------------------------------------------------------===//
 
+/// Get the co-execution window size for a HardwareUnitInfo by querying
+/// CoExecInfo from a representative instruction.
+static unsigned getCoexecWindowSize(const HardwareUnitInfo &HWUI,
+                                    const SIInstrInfo &SII) {
+  if (!HWUI.producesCoexecWindow())
+    return 0;
+
+  SUnit *RepSU = HWUI.getNextTargetSU(true);
+  if (!RepSU || !RepSU->getInstr())
+    return 0;
+
+  CoExecInfo Info = getCoExecInfo(*RepSU->getInstr(), SII);
+  return Info.TotalWindow;
+}
+
+/// Compute the number of slots that would be missed (unfilled) if we select
+/// the given producer flavor. Lower is better.
+///
+/// For WMMA: slots missed based on E + I slot demand vs ready compatible
+/// fillers. For TRANS/MultiCycleVALU: query CoExecInfo to determine slot
+/// preferences, ensuring each ready instruction is only counted once across
+/// all slots.
+static unsigned computeSlotsMissed(InstructionFlavor Flavor,
+                                   const WindowSlotDemand &RegionDemand,
+                                   const RegionMixInfo &MixInfo,
+                                   const HardwareUnitInfo &HWUI,
+                                   const SIInstrInfo &SII) {
+  if (Flavor == InstructionFlavor::WMMA) {
+    // I-slots accept SingleCycleVALU, TRANS, VMEM.
+    unsigned ReadyICompat =
+        MixInfo.getReadyCount(InstructionFlavor::SingleCycleVALU) +
+        MixInfo.getReadyCount(InstructionFlavor::TRANS) +
+        MixInfo.getReadyCount(InstructionFlavor::VMEM);
+    // E-slots accept DS, SALU.
+    unsigned ReadyECompat = MixInfo.getReadyCount(InstructionFlavor::DS) +
+                            MixInfo.getReadyCount(InstructionFlavor::SALU);
+    unsigned TotalSlots = RegionDemand.ISlots + RegionDemand.ESlots;
+    unsigned TotalReady = std::min(ReadyICompat, RegionDemand.ISlots) +
+                          std::min(ReadyECompat, RegionDemand.ESlots);
+    return TotalSlots > TotalReady ? TotalSlots - TotalReady : 0;
+  }
+
+  // TRANS / MultiCycleVALU: query CoExecInfo for slot structure.
+  SUnit *RepSU = HWUI.getNextTargetSU(true);
+  if (!RepSU || !RepSU->getInstr())
+    return 0;
+
+  CoExecInfo Info = getCoExecInfo(*RepSU->getInstr(), SII);
+  if (Info.TotalWindow == 0)
+    return 0;
+
+  // Track remaining available instructions per flavor. Each instruction can
+  // only fill one slot, so we decrement as we consume them.
+  unsigned Remaining[static_cast<unsigned>(InstructionFlavor::NUM_FLAVORS)];
+  for (unsigned F = 0;
+       F < static_cast<unsigned>(InstructionFlavor::NUM_FLAVORS); ++F)
+    Remaining[F] = MixInfo.getReadyCount(static_cast<InstructionFlavor>(F));
+
+  unsigned SlotsMissed = 0;
+
+  for (unsigned S = 0; S < Info.TotalWindow; ++S) {
+    uint8_t Mask = Info.getMask(S);
+    if (Mask == CoExecMask::StageE0 || Mask == CoExecMask::None)
+      continue;
+
+    // Try to find one instruction to fill this slot.
+    // First check preferred flavors, then fall back to any allowed flavor.
+    bool Filled = false;
+    FlavorMask Preferred = Info.getPreferredFlavors(S);
+
+    // Helper to try consuming one instruction of a given flavor.
+    auto TryConsume = [&](InstructionFlavor F) -> bool {
+      unsigned Idx = static_cast<unsigned>(F);
+      if (Remaining[Idx] > 0) {
+        Remaining[Idx]--;
+        return true;
+      }
+      return false;
+    };
+
+    // Try preferred flavors first.
+    if (Preferred != FlavorMasks::None) {
+      for (unsigned F = 0;
+           F < static_cast<unsigned>(InstructionFlavor::NUM_FLAVORS) && !Filled;
+           ++F) {
+        if ((Preferred & flavorBit(static_cast<InstructionFlavor>(F))) &&
+            TryConsume(static_cast<InstructionFlavor>(F))) {
+          Filled = true;
+          break;
+        }
+      }
+    }
+
+    // If no preferred filler found, try any flavor allowed by the mask.
+    if (!Filled) {
+      for (unsigned F = 0;
+           F < static_cast<unsigned>(InstructionFlavor::NUM_FLAVORS) && !Filled;
+           ++F) {
+        if ((flavorBit(static_cast<InstructionFlavor>(F))) &&
+            TryConsume(static_cast<InstructionFlavor>(F))) {
+          Filled = true;
+          break;
+        }
+      }
+    }
+
+    if (!Filled)
+      SlotsMissed++;
+  }
+
+  return SlotsMissed;
+}
+
 void CoexecWindow::populate(InstructionFlavor PreferredFlavor,
                             const SmallVectorImpl<HardwareUnitInfo> &HWUInfo,
-                            const WindowSlotDemand &RegionDemand) {
+                            const WindowSlotDemand &RegionDemand,
+                            const RegionMixInfo &MixInfo,
+                            const SIInstrInfo &SII) {
   clear();
 
   // If the preferred flavor is a window producer, use it directly.
@@ -353,26 +468,65 @@ void CoexecWindow::populate(InstructionFlavor PreferredFlavor,
     if (HWUI.producesCoexecWindow() && HWUI.getType() == PreferredFlavor &&
         HWUI.size() > 0) {
       ProducerFlavor = PreferredFlavor;
-      // For WMMA, we could compute per-instruction demand, but at populate
-      // time we don't have a specific SUnit yet. Use region-aggregate demand.
       Demand = RegionDemand;
       IsPopulated = Demand.hasSlots();
       return;
     }
   }
 
-  // Otherwise, select the producer with highest resource pressure.
-  unsigned BestCycles = 0;
+  // Otherwise, select the producer based on ready instructions and demand.
+  // Priority:
+  // 1. Producers that are ready AND have satisfied demand
+  //    Tiebreak: first by fewest slots missed, then by largest window size.
+  // 2. Fallback to fewest slots missed, then largest window size.
+
+  InstructionFlavor BestSatisfiedFlavor = InstructionFlavor::Other;
+  unsigned BestSatisfiedSlotsMissed = std::numeric_limits<unsigned>::max();
+  unsigned BestSatisfiedSize = 0;
+
+  InstructionFlavor BestFallbackFlavor = InstructionFlavor::Other;
+  unsigned BestFallbackSlotsMissed = std::numeric_limits<unsigned>::max();
+  unsigned BestFallbackSize = 0;
+
   for (const auto &HWUI : HWUInfo) {
     if (!HWUI.producesCoexecWindow() || HWUI.size() == 0)
       continue;
-    if (HWUI.getTotalCycles() > BestCycles) {
-      BestCycles = HWUI.getTotalCycles();
-      ProducerFlavor = HWUI.getType();
+
+    InstructionFlavor Flavor = HWUI.getType();
+    unsigned Size = getCoexecWindowSize(HWUI, SII);
+    unsigned SlotsMissed =
+        computeSlotsMissed(Flavor, RegionDemand, MixInfo, HWUI, SII);
+
+    // Check if this producer flavor has any ready instructions.
+    unsigned ReadyCount = MixInfo.getReadyCount(Flavor);
+    if (ReadyCount > 0) {
+      // Both producer ready and demand satisfied - best case.
+      // Prefer fewest slots missed, then largest window size.
+      if (SlotsMissed < BestSatisfiedSlotsMissed ||
+          (SlotsMissed == BestSatisfiedSlotsMissed &&
+           Size > BestSatisfiedSize)) {
+        BestSatisfiedSlotsMissed = SlotsMissed;
+        BestSatisfiedSize = Size;
+        BestSatisfiedFlavor = Flavor;
+      }
+    }
+
+    // Track best fallback by fewest slots missed, then largest window size.
+    if (SlotsMissed < BestFallbackSlotsMissed ||
+        (SlotsMissed == BestFallbackSlotsMissed && Size > BestFallbackSize)) {
+      BestFallbackSlotsMissed = SlotsMissed;
+      BestFallbackSize = Size;
+      BestFallbackFlavor = Flavor;
     }
   }
 
-  if (BestCycles > 0) {
+  // Prefer satisfied producers; otherwise fall back.
+  if (BestSatisfiedSize > 0) {
+    ProducerFlavor = BestSatisfiedFlavor;
+    Demand = RegionDemand;
+    IsPopulated = Demand.hasSlots();
+  } else if (BestFallbackSize > 0) {
+    ProducerFlavor = BestFallbackFlavor;
     Demand = RegionDemand;
     IsPopulated = Demand.hasSlots();
   }
@@ -572,7 +726,8 @@ void CandidateHeuristics::updateForScheduling(SUnit *SU,
     CurrentWindow.clear();
     // Try to populate a new current window.
     CoexecWindow Temp;
-    Temp.populate(InstructionFlavor::Other, HWUInfo, RegionSlotDemand);
+    Temp.populate(InstructionFlavor::Other, HWUInfo, RegionSlotDemand, MixInfo,
+                  *SII);
     if (Temp.IsPopulated) {
       CurrentWindow = Temp;
       NextWindow.clear();
@@ -659,7 +814,11 @@ void CandidateHeuristics::initialize(ScheduleDAGMI *SchedDAG,
   });
 
   // Populate the initial window for the first producer.
-  CurrentWindow.populate(InstructionFlavor::Other, HWUInfo, RegionSlotDemand);
+  // Note: At initialization time, MixInfo is reset so no ready counts yet.
+  // The window will be re-populated when scheduling begins and MixInfo is
+  // fresh.
+  CurrentWindow.populate(InstructionFlavor::Other, HWUInfo, RegionSlotDemand,
+                         MixInfo, *SII);
   LLVM_DEBUG({
     if (CurrentWindow.IsPopulated)
       dbgs() << "  Initial window: producer="
@@ -1658,7 +1817,8 @@ bool CandidateHeuristics::tryShadowMix(
   if (CurrentWindow.IsActive && CurrentWindow.Demand.isSatisfied(MixInfo)) {
     // Populate NextWindow if needed.
     if (!NextWindow.IsPopulated)
-      NextWindow.populate(InstructionFlavor::Other, HWUInfo, RegionSlotDemand);
+      NextWindow.populate(InstructionFlavor::Other, HWUInfo, RegionSlotDemand,
+                          MixInfo, *SII);
     if (NextWindow.IsPopulated)
       TargetWindow = &NextWindow;
   }

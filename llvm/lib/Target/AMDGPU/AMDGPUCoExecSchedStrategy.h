@@ -320,10 +320,13 @@ struct CoexecWindow {
 
   /// Populate this window from the best available producer in the region.
   /// If \p PreferredFlavor is a window producer, use that flavor directly.
-  /// Otherwise, select the producer with the highest resource pressure.
+  /// Otherwise, select the producer based on ready instructions and demand
+  /// satisfaction: prefer producers that are ready and have satisfied demand,
+  /// tiebreaking by fewest slots missed, then by largest window size.
   void populate(AMDGPU::InstructionFlavor PreferredFlavor,
                 const SmallVectorImpl<HardwareUnitInfo> &HWUInfo,
-                const WindowSlotDemand &RegionDemand);
+                const WindowSlotDemand &RegionDemand,
+                const RegionMixInfo &MixInfo, const SIInstrInfo &SII);
 
   /// Check if the window has expired given the current \p Cycle.
   bool isExpired(unsigned Cycle) const {
