@@ -1,11 +1,11 @@
 {
-  "AAI/bf16FA/bf16_fa": 1267,
-  "AAI/bf16_GEMM/bf16_GEMM": 1032,
-  "AAI/fp4_GEMM/fp4_GEMM": 940,
-  "AAI/fp8fp4MOE/fp8fp4_MOE": 1631,
-  "Gluon/bf16FA/bf16_fa": 1300,
-  "Gluon/bf16_GEMM/bf16_GEMM": 2060,
-  "Gluon/fo4_GEMM/fp4_GEMM": 851,
-  "Gluon/fp8_FA/fp8_fa": 1774,
-  "Gluon/fp8_GEMM/fo8_GEMM": 25460
+  "AAI/bf16FA/bf16_fa": 1237,
+  "AAI/bf16_GEMM/bf16_GEMM": 1048,
+  "AAI/fp4_GEMM/fp4_GEMM": 948,
+  "AAI/fp8fp4MOE/fp8fp4_MOE": 1621,
+  "Gluon/bf16FA/bf16_fa": 1323,
+  "Gluon/bf16_GEMM/bf16_GEMM": 2061,
+  "Gluon/fo4_GEMM/fp4_GEMM": 847,
+  "Gluon/fp8_FA/fp8_fa": 1793,
+  "Gluon/fp8_GEMM/fo8_GEMM": 1451
 }
