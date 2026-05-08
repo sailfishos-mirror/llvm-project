@@ -525,19 +525,25 @@ inline CoExecInfo getCoExecInfo(const MachineInstr &MI,
           .preferring(5, flavorBit(InstructionFlavor::WMMA));
     }
     // f8×*, f6×*, or mixed: 8-cycle occupancy, 10-cycle window.
+    // Non-scaled: 0EEIEEIIVV - stages 3,6,7 are I slots (VALU/TRANS allowed)
+    // Scaled:     0EEIEEISVV - stage 7 is S slot (scaled WMMA)
     const char *Pattern = HasScaling ? "0EEIEEISVV" : "0EEIEEIIVV";
     return CoExecInfo::build(8, 10, Pattern, 7, HasScaling)
         .preferring(1, flavorBit(InstructionFlavor::DS))
         .avoiding(2, flavorBit(InstructionFlavor::DS))
         .preferring(3, flavorBit(InstructionFlavor::TRANS))
+        .avoiding(3, flavorBit(InstructionFlavor::DS) |
+                         flavorBit(InstructionFlavor::SALU) |
+                         flavorBit(InstructionFlavor::VMEM))
         .preferring(4, flavorBit(InstructionFlavor::DS))
         .avoiding(5, flavorBit(InstructionFlavor::DS))
         .preferring(6, flavorBit(InstructionFlavor::SingleCycleVALU))
         .avoiding(6, HasScaling ? flavorBit(InstructionFlavor::TRANS)
                                 : FlavorMasks::None)
-        .preferring(7, HasScaling
-                           ? flavorBit(InstructionFlavor::WMMA)
-                           : flavorBit(InstructionFlavor::SingleCycleVALU))
+        // Stage 7: For non-scaled, this is an I slot - prefer TRANS here
+        // (last I slot before V slots). For scaled, it's S slot for WMMA.
+        .preferring(7, HasScaling ? flavorBit(InstructionFlavor::WMMA)
+                                  : flavorBit(InstructionFlavor::TRANS))
         .preferring(8, flavorBit(InstructionFlavor::WMMA))
         .preferring(9, flavorBit(InstructionFlavor::WMMA));
   }
@@ -564,14 +570,18 @@ inline CoExecInfo getCoExecInfo(const MachineInstr &MI,
         .avoiding(1, flavorBit(InstructionFlavor::DS))
         .preferring(2, flavorBit(InstructionFlavor::SingleCycleVALU))
         .preferring(3, flavorBit(InstructionFlavor::TRANS))
+        .avoiding(3, flavorBit(InstructionFlavor::DS) |
+                         flavorBit(InstructionFlavor::SALU) |
+                         flavorBit(InstructionFlavor::VMEM))
         .preferring(4, flavorBit(InstructionFlavor::DS))
         .avoiding(5, flavorBit(InstructionFlavor::DS))
         .preferring(6, flavorBit(InstructionFlavor::SingleCycleVALU))
         .avoiding(6, HasScaling ? flavorBit(InstructionFlavor::TRANS)
                                 : FlavorMasks::None)
-        .preferring(7, HasScaling
-                           ? flavorBit(InstructionFlavor::WMMA)
-                           : flavorBit(InstructionFlavor::SingleCycleVALU))
+        // Stage 7: For non-scaled, this is an I slot - prefer TRANS here
+        // (last I slot before V slots). For scaled, it's S slot for WMMA.
+        .preferring(7, HasScaling ? flavorBit(InstructionFlavor::WMMA)
+                                  : flavorBit(InstructionFlavor::TRANS))
         .preferring(8, flavorBit(InstructionFlavor::WMMA));
   }
 
@@ -583,14 +593,18 @@ inline CoExecInfo getCoExecInfo(const MachineInstr &MI,
         .preferring(1, flavorBit(InstructionFlavor::DS))
         .avoiding(2, flavorBit(InstructionFlavor::DS))
         .preferring(3, flavorBit(InstructionFlavor::TRANS))
+        .avoiding(3, flavorBit(InstructionFlavor::DS) |
+                         flavorBit(InstructionFlavor::SALU) |
+                         flavorBit(InstructionFlavor::VMEM))
         .preferring(4, flavorBit(InstructionFlavor::DS))
         .avoiding(5, flavorBit(InstructionFlavor::DS))
         .preferring(6, flavorBit(InstructionFlavor::SingleCycleVALU))
         .avoiding(6, HasScaling ? flavorBit(InstructionFlavor::TRANS)
                                 : FlavorMasks::None)
-        .preferring(7, HasScaling
-                           ? flavorBit(InstructionFlavor::WMMA)
-                           : flavorBit(InstructionFlavor::SingleCycleVALU))
+        // Stage 7: For non-scaled, this is an I slot - prefer TRANS here
+        // (last I slot before V slots). For scaled, it's S slot for WMMA.
+        .preferring(7, HasScaling ? flavorBit(InstructionFlavor::WMMA)
+                                  : flavorBit(InstructionFlavor::TRANS))
         .preferring(8, flavorBit(InstructionFlavor::WMMA))
         .preferring(9, flavorBit(InstructionFlavor::WMMA));
   }

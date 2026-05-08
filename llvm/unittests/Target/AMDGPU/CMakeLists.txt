@@ -22,6 +22,7 @@ set(LLVM_LINK_COMPONENTS
 
 add_llvm_target_unittest(AMDGPUTests
   AMDGPUUnitTests.cpp
+  CoExecInfoTest.cpp
   CSETest.cpp
   DwarfRegMappings.cpp
   ExecMayBeModifiedBeforeAnyUse.cpp
