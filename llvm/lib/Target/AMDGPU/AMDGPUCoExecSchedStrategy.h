@@ -265,6 +265,7 @@ struct RegionMixInfo; // Forward declaration
 struct WindowSlotDemand {
   unsigned ISlots = 0; // Stages accepting VALU/TRANS (CoExecMask::StageI)
   unsigned ESlots = 0; // Stages accepting SALU/DS only (CoExecMask::StageE)
+  unsigned TRSlots = 0; // Stages accepting all but TRANS (CoexecMask::StageTR)
   unsigned VSlots = 0; // Vacant stages (next WMMA only, CoExecMask::StageV)
 
   /// Compute demand from a CoExecInfo template.
@@ -276,7 +277,7 @@ struct WindowSlotDemand {
   /// Return the flavor with the largest gap between demand and ready count.
   AMDGPU::InstructionFlavor getMostDeficientFlavor(const RegionMixInfo &Mix) const;
 
-  bool hasSlots() const { return ISlots > 0 || ESlots > 0; }
+  bool hasSlots() const { return ISlots > 0 || ESlots > 0 || TRSlots > 0; }
 };
 
 //===----------------------------------------------------------------------===//
@@ -325,7 +326,6 @@ struct CoexecWindow {
   /// tiebreaking by fewest slots missed, then by largest window size.
   void populate(AMDGPU::InstructionFlavor PreferredFlavor,
                 const SmallVectorImpl<HardwareUnitInfo> &HWUInfo,
-                const WindowSlotDemand &RegionDemand,
                 const RegionMixInfo &MixInfo, const SIInstrInfo &SII);
 
   /// Check if the window has expired given the current \p Cycle.
@@ -388,9 +388,6 @@ protected:
   SmallVector<HardwareUnitInfo, 8> HWUInfo;
   DenseMap<MachineInstr *, unsigned> CarriedLatencies;
   RegionMixInfo MixInfo;
-  /// Region-aggregate slot demand averaged across all WMMAs. Used as fallback
-  /// when no specific WMMA candidate is in the current comparison.
-  WindowSlotDemand RegionSlotDemand;
   /// Current co-execution window being filled/active.
   CoexecWindow CurrentWindow;
   /// Next window — populated for lookahead when CurrentWindow is satisfied.

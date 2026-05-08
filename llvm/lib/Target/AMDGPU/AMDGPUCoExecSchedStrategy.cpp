@@ -286,6 +286,9 @@ WindowSlotDemand::fromCoExecInfo(const CoExecInfo &Info) {
     case CoExecMask::StageV:
       Demand.VSlots++;
       break;
+    case CoExecMask::StageTR:
+      Demand.TRSlots++;
+      break;
     default:
       // Permissive or unknown stage — count as I-slot (most permissive
       // non-trivial type).
@@ -300,42 +303,59 @@ WindowSlotDemand::fromCoExecInfo(const CoExecInfo &Info) {
 }
 
 bool WindowSlotDemand::isSatisfied(const RegionMixInfo &Mix) const {
+  unsigned ReadyVALU1c = Mix.getReadyCount(InstructionFlavor::SingleCycleVALU);
+  unsigned ReadyTRANS = Mix.getReadyCount(InstructionFlavor::TRANS);
+  unsigned ReadyVMEM = Mix.getReadyCount(InstructionFlavor::VMEM);
+  unsigned ReadyDS = Mix.getReadyCount(InstructionFlavor::DS);
+  unsigned ReadySALU = Mix.getReadyCount(InstructionFlavor::SALU);
+
   // I-slots accept VALU/TRANS/VMEM (all take 1 issue cycle).
-  unsigned ReadyICompat =
-      Mix.getReadyCount(InstructionFlavor::SingleCycleVALU) +
-      Mix.getReadyCount(InstructionFlavor::TRANS) +
-      Mix.getReadyCount(InstructionFlavor::VMEM);
+  unsigned ReadyICompat = ReadyVALU1c + ReadyTRANS + ReadyVMEM;
+
   // E-slots accept SALU/DS.
-  unsigned ReadyECompat =
-      Mix.getReadyCount(InstructionFlavor::DS) +
-      Mix.getReadyCount(InstructionFlavor::SALU);
+  unsigned ReadyECompat = ReadyDS + ReadySALU;
+
+  // TR-slots accept all but TRANS.
+  unsigned ReadyTRCompat = ReadyVALU1c + ReadyVMEM + ReadyDS + ReadySALU;
 
   if (ReadyICompat < ISlots)
     return false;
   if (ReadyECompat < ESlots)
     return false;
+  if (ReadyTRCompat < TRSlots)
+    return false;
+
   return true;
 }
 
 InstructionFlavor
 WindowSlotDemand::getMostDeficientFlavor(const RegionMixInfo &Mix) const {
+  unsigned ReadyVALU1c = Mix.getReadyCount(InstructionFlavor::SingleCycleVALU);
+  unsigned ReadyTRANS = Mix.getReadyCount(InstructionFlavor::TRANS);
+  unsigned ReadyVMEM = Mix.getReadyCount(InstructionFlavor::VMEM);
+  unsigned ReadyDS = Mix.getReadyCount(InstructionFlavor::DS);
+  unsigned ReadySALU = Mix.getReadyCount(InstructionFlavor::SALU);
+
   // Compute deficit for each filler class relative to slot demand.
   // I-slots need VALU/TRANS/VMEM.
   int IDeficit = static_cast<int>(ISlots) -
-                 static_cast<int>(
-                     Mix.getReadyCount(InstructionFlavor::SingleCycleVALU) +
-                     Mix.getReadyCount(InstructionFlavor::TRANS) +
-                     Mix.getReadyCount(InstructionFlavor::VMEM));
-  // E-slots need DS or SALU.
-  int EDeficit = static_cast<int>(ESlots) -
-                 static_cast<int>(
-                     Mix.getReadyCount(InstructionFlavor::DS) +
-                     Mix.getReadyCount(InstructionFlavor::SALU));
+                 static_cast<int>(ReadyVALU1c + ReadyTRANS + ReadyVMEM);
 
-  // Break ties: if both have equal deficit, prefer enabling VALU (typically
-  // scarcer and higher-value for I-slots).
-  if (EDeficit > IDeficit)
+  // E-slots need DS or SALU.
+  int EDeficit =
+      static_cast<int>(ESlots) - static_cast<int>(ReadyDS + ReadySALU);
+
+  int TRDeficit =
+      static_cast<int>(TRSlots) -
+      static_cast<int>(ReadyVALU1c + ReadyDS + ReadySALU + ReadyVMEM);
+
+  int MaxDeficit = std::max({IDeficit, EDeficit, TRDeficit});
+
+  // Break ties: if all have equal deficit, prefer enabling VALU (typically
+  // scarcer and higher-value for I-slots / TR-skits).
+  if (MaxDeficit == EDeficit && EDeficit > IDeficit)
     return InstructionFlavor::DS;
+
   return InstructionFlavor::SingleCycleVALU;
 }
 
@@ -345,13 +365,8 @@ WindowSlotDemand::getMostDeficientFlavor(const RegionMixInfo &Mix) const {
 
 /// Get the co-execution window size for a HardwareUnitInfo by querying
 /// CoExecInfo from a representative instruction.
-static unsigned getCoexecWindowSize(const HardwareUnitInfo &HWUI,
-                                    const SIInstrInfo &SII) {
-  if (!HWUI.producesCoexecWindow())
-    return 0;
-
-  SUnit *RepSU = HWUI.getNextTargetSU(true);
-  if (!RepSU || !RepSU->getInstr())
+static unsigned getCoexecWindowSize(SUnit *RepSU, const SIInstrInfo &SII) {
+  if (!RepSU->getInstr())
     return 0;
 
   CoExecInfo Info = getCoExecInfo(*RepSU->getInstr(), SII);
@@ -365,31 +380,8 @@ static unsigned getCoexecWindowSize(const HardwareUnitInfo &HWUI,
 /// fillers. For TRANS/MultiCycleVALU: query CoExecInfo to determine slot
 /// preferences, ensuring each ready instruction is only counted once across
 /// all slots.
-static unsigned computeSlotsMissed(InstructionFlavor Flavor,
-                                   const WindowSlotDemand &RegionDemand,
-                                   const RegionMixInfo &MixInfo,
-                                   const HardwareUnitInfo &HWUI,
+static unsigned computeSlotsMissed(const RegionMixInfo &MixInfo, SUnit *RepSU,
                                    const SIInstrInfo &SII) {
-  if (Flavor == InstructionFlavor::WMMA) {
-    // I-slots accept SingleCycleVALU, TRANS, VMEM.
-    unsigned ReadyICompat =
-        MixInfo.getReadyCount(InstructionFlavor::SingleCycleVALU) +
-        MixInfo.getReadyCount(InstructionFlavor::TRANS) +
-        MixInfo.getReadyCount(InstructionFlavor::VMEM);
-    // E-slots accept DS, SALU.
-    unsigned ReadyECompat = MixInfo.getReadyCount(InstructionFlavor::DS) +
-                            MixInfo.getReadyCount(InstructionFlavor::SALU);
-    unsigned TotalSlots = RegionDemand.ISlots + RegionDemand.ESlots;
-    unsigned TotalReady = std::min(ReadyICompat, RegionDemand.ISlots) +
-                          std::min(ReadyECompat, RegionDemand.ESlots);
-    return TotalSlots > TotalReady ? TotalSlots - TotalReady : 0;
-  }
-
-  // TRANS / MultiCycleVALU: query CoExecInfo for slot structure.
-  SUnit *RepSU = HWUI.getNextTargetSU(true);
-  if (!RepSU || !RepSU->getInstr())
-    return 0;
-
   CoExecInfo Info = getCoExecInfo(*RepSU->getInstr(), SII);
   if (Info.TotalWindow == 0)
     return 0;
@@ -436,16 +428,17 @@ static unsigned computeSlotsMissed(InstructionFlavor Flavor,
       }
     }
 
+    if (Filled)
+      continue;
+
     // If no preferred filler found, try any flavor allowed by the mask.
-    if (!Filled) {
-      for (unsigned F = 0;
-           F < static_cast<unsigned>(InstructionFlavor::NUM_FLAVORS) && !Filled;
-           ++F) {
-        if ((flavorBit(static_cast<InstructionFlavor>(F))) &&
-            TryConsume(static_cast<InstructionFlavor>(F))) {
-          Filled = true;
-          break;
-        }
+    for (unsigned F = 0;
+         F < static_cast<unsigned>(InstructionFlavor::NUM_FLAVORS) && !Filled;
+         ++F) {
+      if ((flavorBit(static_cast<InstructionFlavor>(F))) &&
+          TryConsume(static_cast<InstructionFlavor>(F))) {
+        Filled = true;
+        break;
       }
     }
 
@@ -458,19 +451,21 @@ static unsigned computeSlotsMissed(InstructionFlavor Flavor,
 
 void CoexecWindow::populate(InstructionFlavor PreferredFlavor,
                             const SmallVectorImpl<HardwareUnitInfo> &HWUInfo,
-                            const WindowSlotDemand &RegionDemand,
                             const RegionMixInfo &MixInfo,
                             const SIInstrInfo &SII) {
   clear();
 
   // If the preferred flavor is a window producer, use it directly.
   for (const auto &HWUI : HWUInfo) {
-    if (HWUI.producesCoexecWindow() && HWUI.getType() == PreferredFlavor &&
-        HWUI.size() > 0) {
-      ProducerFlavor = PreferredFlavor;
-      Demand = RegionDemand;
-      IsPopulated = Demand.hasSlots();
-      return;
+    if (HWUI.getType() == PreferredFlavor && HWUI.producesCoexecWindow()) {
+      SUnit *RepSU = HWUI.getNextTargetSU(true);
+      if (RepSU) {
+        ProducerFlavor = PreferredFlavor;
+        Demand = WindowSlotDemand::fromCoExecInfo(
+            getCoExecInfo(*RepSU->getInstr(), SII));
+        IsPopulated = Demand.hasSlots();
+        return;
+      }
     }
   }
 
@@ -489,18 +484,20 @@ void CoexecWindow::populate(InstructionFlavor PreferredFlavor,
   unsigned BestFallbackSize = 0;
 
   for (const auto &HWUI : HWUInfo) {
-    if (!HWUI.producesCoexecWindow() || HWUI.size() == 0)
+    if (!HWUI.producesCoexecWindow())
+      continue;
+
+    SUnit *RepSU = HWUI.getNextTargetSU(true);
+    if (!RepSU || !RepSU->getInstr())
       continue;
 
     InstructionFlavor Flavor = HWUI.getType();
-    unsigned Size = getCoexecWindowSize(HWUI, SII);
-    unsigned SlotsMissed =
-        computeSlotsMissed(Flavor, RegionDemand, MixInfo, HWUI, SII);
+    unsigned Size = getCoexecWindowSize(RepSU, SII);
+    unsigned SlotsMissed = computeSlotsMissed(MixInfo, RepSU, SII);
 
     // Check if this producer flavor has any ready instructions.
     unsigned ReadyCount = MixInfo.getReadyCount(Flavor);
     if (ReadyCount > 0) {
-      // Both producer ready and demand satisfied - best case.
       // Prefer fewest slots missed, then largest window size.
       if (SlotsMissed < BestSatisfiedSlotsMissed ||
           (SlotsMissed == BestSatisfiedSlotsMissed &&
@@ -509,9 +506,11 @@ void CoexecWindow::populate(InstructionFlavor PreferredFlavor,
         BestSatisfiedSize = Size;
         BestSatisfiedFlavor = Flavor;
       }
+
+      continue;
     }
 
-    // Track best fallback by fewest slots missed, then largest window size.
+    // Producer isn't ready, consider it as a fallback option.
     if (SlotsMissed < BestFallbackSlotsMissed ||
         (SlotsMissed == BestFallbackSlotsMissed && Size > BestFallbackSize)) {
       BestFallbackSlotsMissed = SlotsMissed;
@@ -520,16 +519,25 @@ void CoexecWindow::populate(InstructionFlavor PreferredFlavor,
     }
   }
 
-  // Prefer satisfied producers; otherwise fall back.
-  if (BestSatisfiedSize > 0) {
-    ProducerFlavor = BestSatisfiedFlavor;
-    Demand = RegionDemand;
-    IsPopulated = Demand.hasSlots();
-  } else if (BestFallbackSize > 0) {
-    ProducerFlavor = BestFallbackFlavor;
-    Demand = RegionDemand;
-    IsPopulated = Demand.hasSlots();
+  // If we didn't find any candidate producer, just return the cleared window
+  if (!BestSatisfiedSize && !BestFallbackSize)
+    return;
+
+  ProducerFlavor =
+      (BestSatisfiedSize > 0) ? BestSatisfiedFlavor : BestFallbackFlavor;
+  // If the preferred flavor is a window producer, use it directly.
+  for (const auto &HWUI : HWUInfo) {
+    if (HWUI.getType() == ProducerFlavor && HWUI.producesCoexecWindow()) {
+      SUnit *RepSU = HWUI.getNextTargetSU(true);
+      if (RepSU) {
+        Demand = WindowSlotDemand::fromCoExecInfo(
+            getCoExecInfo(*RepSU->getInstr(), SII));
+        IsPopulated = Demand.hasSlots();
+        return;
+      }
+    }
   }
+  return;
 }
 
 SUnit *HardwareUnitInfo::getNextTargetSU(bool LookDeep) const {
@@ -726,8 +734,7 @@ void CandidateHeuristics::updateForScheduling(SUnit *SU,
     CurrentWindow.clear();
     // Try to populate a new current window.
     CoexecWindow Temp;
-    Temp.populate(InstructionFlavor::Other, HWUInfo, RegionSlotDemand, MixInfo,
-                  *SII);
+    Temp.populate(InstructionFlavor::Other, HWUInfo, MixInfo, *SII);
     if (Temp.IsPopulated) {
       CurrentWindow = Temp;
       NextWindow.clear();
@@ -784,41 +791,11 @@ void CandidateHeuristics::initialize(ScheduleDAGMI *SchedDAG,
   CurrentWindow.clear();
   NextWindow.clear();
 
-  // Compute region-aggregate slot demand from WMMA templates.
-  RegionSlotDemand = WindowSlotDemand();
-  unsigned WMMACount = 0;
-  for (auto &SU : DAG->SUnits) {
-    if (classifyFlavor(*SU.getInstr(), *SII) != InstructionFlavor::WMMA)
-      continue;
-    WindowSlotDemand D =
-        WindowSlotDemand::fromCoExecInfo(getCoExecInfo(*SU.getInstr(), *SII));
-    RegionSlotDemand.ISlots += D.ISlots;
-    RegionSlotDemand.ESlots += D.ESlots;
-    RegionSlotDemand.VSlots += D.VSlots;
-    WMMACount++;
-  }
-  if (WMMACount > 0) {
-    RegionSlotDemand.ISlots =
-        (RegionSlotDemand.ISlots + WMMACount - 1) / WMMACount;
-    RegionSlotDemand.ESlots =
-        (RegionSlotDemand.ESlots + WMMACount - 1) / WMMACount;
-    RegionSlotDemand.VSlots =
-        (RegionSlotDemand.VSlots + WMMACount - 1) / WMMACount;
-  }
-  LLVM_DEBUG({
-    if (RegionSlotDemand.hasSlots())
-      dbgs() << "  RegionSlotDemand: " << RegionSlotDemand.ISlots << " I-slots, "
-             << RegionSlotDemand.ESlots << " E-slots, "
-             << RegionSlotDemand.VSlots << " V-slots (avg over "
-             << WMMACount << " WMMAs)\n";
-  });
-
   // Populate the initial window for the first producer.
   // Note: At initialization time, MixInfo is reset so no ready counts yet.
   // The window will be re-populated when scheduling begins and MixInfo is
   // fresh.
-  CurrentWindow.populate(InstructionFlavor::Other, HWUInfo, RegionSlotDemand,
-                         MixInfo, *SII);
+  CurrentWindow.populate(InstructionFlavor::Other, HWUInfo, MixInfo, *SII);
   LLVM_DEBUG({
     if (CurrentWindow.IsPopulated)
       dbgs() << "  Initial window: producer="
@@ -1804,7 +1781,7 @@ bool CandidateHeuristics::tryShadowMix(
   // ---- Compute template-derived demand ----
   // Use the window's demand if populated; otherwise compute from the
   // producer's CoExecInfo template or fall back to region-aggregate demand.
-  WindowSlotDemand Demand = RegionSlotDemand;
+  WindowSlotDemand Demand = WindowSlotDemand();
   SUnit *ProducerSU = nullptr;
   if (CandIsProducer)
     ProducerSU = Cand.SU;
@@ -1817,8 +1794,7 @@ bool CandidateHeuristics::tryShadowMix(
   if (CurrentWindow.IsActive && CurrentWindow.Demand.isSatisfied(MixInfo)) {
     // Populate NextWindow if needed.
     if (!NextWindow.IsPopulated)
-      NextWindow.populate(InstructionFlavor::Other, HWUInfo, RegionSlotDemand,
-                          MixInfo, *SII);
+      NextWindow.populate(InstructionFlavor::Other, HWUInfo, MixInfo, *SII);
     if (NextWindow.IsPopulated)
       TargetWindow = &NextWindow;
   }
@@ -1826,10 +1802,8 @@ bool CandidateHeuristics::tryShadowMix(
   if (TargetWindow->IsPopulated) {
     Demand = TargetWindow->Demand;
   } else if (ProducerSU) {
-    auto ProducerFlavor = classifyFlavor(*ProducerSU->getInstr(), *SII);
-    if (ProducerFlavor == InstructionFlavor::WMMA)
-      Demand = WindowSlotDemand::fromCoExecInfo(
-          getCoExecInfo(*ProducerSU->getInstr(), *SII));
+    Demand = WindowSlotDemand::fromCoExecInfo(
+        getCoExecInfo(*ProducerSU->getInstr(), *SII));
   }
 
   if (!Demand.hasSlots())
