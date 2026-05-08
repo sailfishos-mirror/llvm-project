@@ -97,8 +97,8 @@ body: |
   ; CHECK-NEXT:   S_BRANCH %bb.1
   ; CHECK-NEXT: {{  $}}
   ; CHECK-NEXT: bb.1:
-  ; CHECK-NEXT:   early-clobber %11:vreg_256_align2 = V_WMMA_SCALE_F32_16X16X128_F8F6F4_f8_f8_w32_threeaddr [[DEF]], [[DEF1]], 0, [[DEF2]], [[DEF3]], [[DEF4]], 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, implicit $exec
   ; CHECK-NEXT:   [[V_EXP_F32_e64_:%[0-9]+]]:vgpr_32 = V_EXP_F32_e64 0, [[DEF5]], 0, 0, implicit $mode, implicit $exec
+  ; CHECK-NEXT:   early-clobber %11:vreg_256_align2 = V_WMMA_SCALE_F32_16X16X128_F8F6F4_f8_f8_w32_threeaddr [[DEF]], [[DEF1]], 0, [[DEF2]], [[DEF3]], [[DEF4]], 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, implicit $exec
   ; CHECK-NEXT:   [[V_ADD_F32_e64_:%[0-9]+]]:vgpr_32 = V_ADD_F32_e64 0, [[DEF6]], 0, [[DEF7]], 0, 0, implicit $mode, implicit $exec
   ; CHECK-NEXT:   [[V_ADD_F32_e64_1:%[0-9]+]]:vgpr_32 = V_ADD_F32_e64 0, [[DEF6]], 0, [[V_ADD_F32_e64_]], 0, 0, implicit $mode, implicit $exec
   ; CHECK-NEXT:   S_ENDPGM 0, implicit [[V_EXP_F32_e64_]], implicit [[V_ADD_F32_e64_]], implicit [[V_ADD_F32_e64_1]], implicit %11
