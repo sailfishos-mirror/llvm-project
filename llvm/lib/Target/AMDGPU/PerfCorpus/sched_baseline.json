@@ -1,5 +1,5 @@
 {
-  "AAI/bf16FA/bf16_fa": 1063,
+  "AAI/bf16FA/bf16_fa": 1065,
   "AAI/bf16_GEMM/bf16_GEMM": 1048,
   "AAI/fp4_GEMM/fp4_GEMM": 750,
   "AAI/fp8fp4MOE/fp8fp4_MOE": 125878,

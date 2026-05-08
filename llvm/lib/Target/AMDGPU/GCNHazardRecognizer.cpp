@@ -387,6 +387,43 @@ GCNHazardRecognizer::checkWMMACoexecSlot(const MachineInstr &MI) const {
   return StallCycles;
 }
 
+unsigned
+GCNHazardRecognizer::checkMultiShadowHazard(const MachineInstr &MI) const {
+  if (!ST.hasGFX1250Insts())
+    return 0;
+
+  // No hazard if not in a WMMA window.
+  if (!CurrentCoExecStage.has_value())
+    return 0;
+
+  if (!CyclesUntilTRANS)
+    return 0;
+
+  if (!SIInstrInfo::isVALU(MI) || SIInstrInfo::isLDSDMA(MI))
+    return 0;
+
+  // We have a VALU instruction that is under both a TRANS and WMMA shadow.
+  // We need to wait for at least one to clear.
+
+  unsigned LookAheadStage = *CurrentCoExecStage + CyclesUntilTRANS;
+  uint8_t InstMask = getCoExecMaskForMI(MI, TII);
+  // Check if the instruction can co-execute at the current stage.
+  if (ActiveCoExecInfo.canCoExec(InstMask, LookAheadStage))
+    return CyclesUntilTRANS;
+
+  // Find next allowed stage and return stall cycles.
+  auto NextStage =
+      ActiveCoExecInfo.findNextAllowedStage(InstMask, LookAheadStage);
+  if (NextStage.has_value()) {
+    unsigned StallCycles = *NextStage - *CurrentCoExecStage;
+    return StallCycles;
+  }
+
+  // No compatible slot in window - stall until window ends.
+  unsigned StallCycles = ActiveCoExecInfo.TotalWindow - *CurrentCoExecStage;
+  return StallCycles;
+}
+
 void GCNHazardRecognizer::EmitInstruction(SUnit *SU) {
   EmitInstruction(SU->getInstr());
 }
@@ -633,6 +670,8 @@ GCNHazardRecognizer::getHazardType(SUnit *SU, int Stalls) {
 
   // Check co-execution slot hazards and pipeline stalls in scheduler modes.
   if (isSchedulerMode()) {
+    if (checkMultiShadowHazard(*MI) > 0)
+      return Hazard;
     if (checkWMMACoexecSlot(*MI) > 0)
       return Hazard;
     if (checkTRANSHazard(*MI) > 0)
@@ -795,6 +834,7 @@ unsigned GCNHazardRecognizer::getHazardWaitStates(MachineInstr *MI) const {
     W = std::max(W, checkTRANSHazard(*MI));
     W = std::max(W, checkMultiCycleVALUHazard(*MI));
     W = std::max(W, checkVALUSGPRHazard(*MI));
+    W = std::max(W, checkMultiShadowHazard(*MI));
     if (isPreRA())
       return W;
   }
