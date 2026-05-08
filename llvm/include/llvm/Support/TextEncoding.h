@@ -146,6 +146,8 @@ public:
       return Result[0];
     return '\0';
   }
+
+  LLVM_ABI static bool isEncodingSupported(StringRef Name);
 };
 
 } // namespace llvm
