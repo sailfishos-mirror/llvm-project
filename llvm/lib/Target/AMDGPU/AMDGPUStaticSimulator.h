@@ -146,6 +146,7 @@ enum class StallReason : uint8_t {
   COEXEC_BLOCKED,       // Blocked by WMMA co-execution rules
   LONG_LAT_VALU,        // Long-latency VALU blocked by WMMA window
   LOLVALU_TRANS_HAZARD, // 1-cycle mutual exclusion: LOLVALU <-> TRANS
+  MULTI_SHADOW_HAZARD,  // WMMA + TRANS + VALU cannot all be active
   VA_SSRC_STALL,        // VA_SSRC: VALU/WMMA with SGPR blocks SALU
   VA_VDST_WAIT,         // VA_VDST: s_wait_alu depctr_va_vdst stall
   RAW_HAZARD,           // RAW: register dependency (scoreboard)
@@ -186,6 +187,8 @@ struct InstrSimInfo {
       return "LongLatVALU blocked";
     case StallReason::LOLVALU_TRANS_HAZARD:
       return "LOLVALU<->TRANS hazard";
+    case StallReason::MULTI_SHADOW_HAZARD:
+      return "WMMA+TRANS+VALU hazard";
     case StallReason::VA_SSRC_STALL:
       return "VA_SSRC blocked";
     case StallReason::VA_VDST_WAIT:
@@ -550,6 +553,7 @@ struct BlockMetrics {
   unsigned RegBankConflictsInWMMAWindow = 0;
   unsigned StallLongLatVALU = 0;
   unsigned StallLOLVALUTRANS = 0;
+  unsigned StallMultiShadow = 0; // WMMA + TRANS + VALU cannot all be active
   unsigned StallVaSSRC = 0;
   unsigned StallVaVdst = 0;
   unsigned StallRAW = 0;

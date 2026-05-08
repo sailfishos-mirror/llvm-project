@@ -826,6 +826,7 @@ struct StallSources {
   unsigned LongLatVALU = 0;
   unsigned LOLVALUTRANSHazard =
       0; // 1-cycle mutual exclusion: LOLVALU <-> TRANS
+  unsigned MultiShadow = 0; // WMMA + TRANS + VALU cannot all be active
   unsigned SSRC = 0;
   unsigned VaVdst = 0;
   unsigned RAW = 0; // RAW: register dependency (all instruction types)
@@ -848,8 +849,8 @@ struct StallSources {
   unsigned total() const {
     unsigned EffectiveRegBank = RegBankInWMMAWindow ? 0 : RegBank;
     return std::max({Unit, VALUSlot, CoExec, DelayAlu, WaitCnt, MemFIFO,
-                     EffectiveRegBank, LongLatVALU, LOLVALUTRANSHazard, SSRC,
-                     VaVdst, RAW, ISFetch});
+                     EffectiveRegBank, LongLatVALU, LOLVALUTRANSHazard,
+                     MultiShadow, SSRC, VaVdst, RAW, ISFetch});
   }
 };
 
@@ -1231,6 +1232,29 @@ StallSources computeStallSources(const MachineInstr &MI, InstClass IC,
         S.HasFUCoExecInteraction = (IssueCycle > State.CurrentCycle);
         IssueCycle += CoExecStall;
       }
+
+      // Multi-shadow hazard: WMMA + TRANS + VALU cannot all execute together.
+      // When both WMMA and TRANS shadows are active, VALU must wait for TRANS
+      // to clear. Note: TRANS itself doesn't have this hazard, only
+      // single-cycle VALU.
+      if (IC == InstClass::VALU) {
+        // Check TRANS shadow at the current would-be issue cycle
+        unsigned TRANSEndCycle =
+            State.LastTRANSCycle != ~0u ? State.LastTRANSCycle + 2 : 0;
+        if (IssueCycle < TRANSEndCycle) {
+          unsigned MultiShadowStall = TRANSEndCycle - IssueCycle;
+          S.MultiShadow = MultiShadowStall;
+          IssueCycle = TRANSEndCycle;
+
+          // After TRANS shadow clears, we may land on an incompatible slot.
+          // Re-check co-execution compatibility at the new cycle.
+          unsigned CoExecStall2 = State.getCoExecStallAt(IC, IssueCycle);
+          if (CoExecStall2 > 0) {
+            S.CoExecFromEffective += CoExecStall2;
+            IssueCycle += CoExecStall2;
+          }
+        }
+      }
     }
     S.CoExec = IssueCycle - State.CurrentCycle;
   }
@@ -1329,6 +1353,8 @@ void attributeStall(const StallSources &S, FunctionalUnit Unit, InstClass IC,
     Metrics.StallLongLatVALU += TotalStall;
   } else if (S.LOLVALUTRANSHazard == TotalStall) {
     Metrics.StallLOLVALUTRANS += TotalStall;
+  } else if (S.MultiShadow == TotalStall) {
+    Metrics.StallMultiShadow += TotalStall;
   } else if (S.SSRC == TotalStall) {
     Metrics.StallVaSSRC += TotalStall;
   } else if (S.VaVdst == TotalStall) {
@@ -1616,6 +1642,7 @@ void logStalls(const StallSources &Stalls, const GPUSimState &State) {
     printStall("WMMACoExecMiss", Stalls.CoExecFromEffective);
     printStall("LongLatVALU", Stalls.LongLatVALU);
     printStall("LOLVALUxTRANS", Stalls.LOLVALUTRANSHazard);
+    printStall("MultiShadow", Stalls.MultiShadow);
     printStall("SSRC", Stalls.SSRC);
     printStall("VaVdst", Stalls.VaVdst);
     printStall("RAW", Stalls.RAW);
@@ -1770,6 +1797,10 @@ static StallReason getDominantStallReason(const StallSources &Stalls) {
   if (Stalls.LOLVALUTRANSHazard > Max) {
     Max = Stalls.LOLVALUTRANSHazard;
     Reason = StallReason::LOLVALU_TRANS_HAZARD;
+  }
+  if (Stalls.MultiShadow > Max) {
+    Max = Stalls.MultiShadow;
+    Reason = StallReason::MULTI_SHADOW_HAZARD;
   }
   if (Stalls.SSRC > 0 && Stalls.SSRC >= Max) {
     Max = Stalls.SSRC;
