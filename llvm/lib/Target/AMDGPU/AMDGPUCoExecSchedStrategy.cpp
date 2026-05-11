@@ -1179,6 +1179,43 @@ unsigned CandidateHeuristics::getStallCosts(SUnit *SU, SchedBoundary &Zone,
   return Costs.Effective;
 }
 
+unsigned CandidateHeuristics::getMissedSlotCost(SUnit *SU,
+                                                SchedBoundary &Zone) {
+  auto *HazardRec = static_cast<GCNHazardRecognizer *>(Zone.HazardRec);
+
+  // Only applies inside active WMMA coexec window.
+  if (!HazardRec->inCoExecWindow())
+    return 0;
+
+  std::optional<unsigned> Stage = HazardRec->getCurrentCoExecStage();
+  if (!Stage.has_value())
+    return 0;
+
+  const CoExecInfo &Info = HazardRec->getActiveCoExecInfo();
+  unsigned CurrentStage = *Stage;
+  unsigned NextStage = CurrentStage + 1;
+
+  // Check if the next slot is an I slot.
+  if (NextStage >= Info.TotalWindow)
+    return 0;
+
+  uint8_t NextMask = Info.getMask(NextStage);
+  bool IsISlot =
+      (NextMask == CoExecMask::StageI || NextMask == CoExecMask::StageIS);
+  if (!IsISlot)
+    return 0;
+
+  // Check if the instruction is DS.
+  InstructionFlavor Flavor = classifyFlavor(*SU->getInstr(), *SII);
+  if (Flavor != InstructionFlavor::DS)
+    return 0;
+
+  // DS can execute in I slots but doesn't benefit from the VALU/TRANS
+  // capability. Scheduling DS when the next slot is an I slot misses
+  // the opportunity to coexecute VALU/TRANS there.
+  return 1;
+}
+
 bool CandidateHeuristics::tryEffectiveStall(
     GenericSchedulerBase::SchedCandidate &TryCand,
     GenericSchedulerBase::SchedCandidate &Cand, SchedBoundary &Zone) {
@@ -1188,21 +1225,41 @@ bool CandidateHeuristics::tryEffectiveStall(
   getStallCosts(TryCand.SU, Zone, TryCosts);
   getStallCosts(Cand.SU, Zone, CandCosts);
 
-  LLVM_DEBUG(if (TryCosts.Effective || CandCosts.Effective) {
+  // Calculate missed slots for both candidates.
+  unsigned TryMissedSlots = getMissedSlotCost(TryCand.SU, Zone);
+  unsigned CandMissedSlots = getMissedSlotCost(Cand.SU, Zone);
+
+  // Combined cost: stalls + missed slots.
+  unsigned TryCost = TryCosts.Effective + TryMissedSlots;
+  unsigned CandCost = CandCosts.Effective + CandMissedSlots;
+
+  LLVM_DEBUG(if (TryCosts.Effective || CandCosts.Effective || TryMissedSlots ||
+                 CandMissedSlots) {
     dbgs() << "Effective stalls: try=" << TryCosts.Effective
            << " (ready=" << TryCosts.Ready << ", struct=" << TryCosts.Structural
            << ", lat=" << TryCosts.Latency << ", carried=" << TryCosts.Carried
            << ", buffer=" << TryCosts.Buffer << ", fence=" << TryCosts.Fence
-           << ") cand=" << CandCosts.Effective
-           << " (ready=" << CandCosts.Ready
+           << ", missedSlots=" << TryMissedSlots
+           << ") cand=" << CandCosts.Effective << " (ready=" << CandCosts.Ready
            << ", struct=" << CandCosts.Structural
            << ", lat=" << CandCosts.Latency << ", carried=" << CandCosts.Carried
            << ", buffer=" << CandCosts.Buffer << ", fence=" << CandCosts.Fence
-           << ")\n";
+           << ", missedSlots=" << CandMissedSlots << ")\n";
   });
 
-  return tryLess(TryCosts.Effective, CandCosts.Effective, TryCand, Cand,
-                 AMDGPUCoExecSchedStrategy::Stall);
+  // Prefer lower combined cost (stalls + missed slots).
+  if (tryLess(TryCost, CandCost, TryCand, Cand,
+              AMDGPUCoExecSchedStrategy::Stall))
+    return true;
+
+  // Tiebreak on missed slots when combined costs are equal.
+  // For now, just prefer the candidate without any missed slots.
+  if (TryCost == CandCost && TryMissedSlots != CandMissedSlots) {
+    return tryLess(TryMissedSlots, CandMissedSlots, TryCand, Cand,
+                   AMDGPUCoExecSchedStrategy::Stall);
+  }
+
+  return false;
 }
 
 bool CandidateHeuristics::tryMemoryPipeline(

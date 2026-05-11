@@ -113,8 +113,8 @@ private:
   /// that would conflict with an active multi-cycle VALU pipeline.
   unsigned checkMultiCycleVALUHazard(const MachineInstr &MI) const;
 
-  /// Check WMMA co-execution slot hazard for pre-RA scheduling.
-  /// Returns stall cycles needed before MI can be issued in the current slot.
+  /// Check if we have both a TRANS and WMMA window active. If so, for VALU
+  /// instructions, return the number of stall cycles until
   unsigned checkMultiShadowHazard(const MachineInstr &MI) const;
 
   /// Update WMMA window state when a WMMA instruction is emitted.

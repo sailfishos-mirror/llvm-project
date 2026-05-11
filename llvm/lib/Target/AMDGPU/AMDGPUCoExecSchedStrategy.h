@@ -485,6 +485,12 @@ public:
 
   unsigned getStallCosts(SUnit *SU, SchedBoundary &Zone, StallCosts &Costs);
 
+  /// Calculate the number of missed slots if we schedule SU now.
+  /// Currently only handles the case where we're in an active WMMA coexec
+  /// window, the next slot is an I slot, and SU is a DS instruction.
+  /// Returns the count of I-slots that would be missed (wasted).
+  unsigned getMissedSlotCost(SUnit *SU, SchedBoundary &Zone);
+
   bool tryEffectiveStall(GenericSchedulerBase::SchedCandidate &TryCand,
                          GenericSchedulerBase::SchedCandidate &Cand,
                          SchedBoundary &Zone);
