@@ -1735,6 +1735,8 @@ public:
                            const MachineInstr &MI,
                            unsigned *PredCost = nullptr) const override;
 
+  unsigned getSchedCyclesForCopy(const MachineInstr &MI) const override;
+
   const MachineOperand &getCalleeOperand(const MachineInstr &MI) const override;
 
   ValueUniformity getValueUniformity(const MachineInstr &MI) const final;

@@ -28,6 +28,7 @@
 #include "SIInstrInfo.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/CodeGen/MachineRegisterInfo.h"
 #include <cstdint>
 #include <optional>
 
@@ -241,6 +242,33 @@ inline char getCoExecMaskChar(uint8_t Mask) {
   case CoExecMask::CTRL:  return 'c';
   default:                return '?';
   }
+}
+
+/// Get the CoExecMask for a COPY instruction based on register classes.
+/// SGPR-to-SGPR uses SALU, everything else (VGPR↔VGPR, cross-class) uses VALU.
+inline uint8_t getCoExecMaskForCopy(const MachineInstr &MI,
+                                    const MachineRegisterInfo &MRI,
+                                    const SIRegisterInfo &TRI) {
+  assert(MI.isCopy());
+  Register Dst = MI.getOperand(0).getReg();
+  Register Src = MI.getOperand(1).getReg();
+
+  auto getRegClass = [&](Register Reg) -> const TargetRegisterClass * {
+    if (Reg.isVirtual())
+      return MRI.getRegClass(Reg);
+    return TRI.getPhysRegBaseClass(Reg);
+  };
+
+  const TargetRegisterClass *DstRC = getRegClass(Dst);
+  const TargetRegisterClass *SrcRC = getRegClass(Src);
+
+  bool DstIsVGPR = DstRC && TRI.isVGPRClass(DstRC);
+  bool SrcIsVGPR = SrcRC && TRI.isVGPRClass(SrcRC);
+
+  // SGPR-to-SGPR is SALU, everything else (VGPR↔VGPR, cross-class) is VALU.
+  if (!DstIsVGPR && !SrcIsVGPR)
+    return CoExecMask::SALU;
+  return CoExecMask::VALU;
 }
 
 /// Max stages: INT8 16x16x64 = 17 cycles, round up for safety.

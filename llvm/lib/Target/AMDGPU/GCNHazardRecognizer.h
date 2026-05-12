@@ -117,6 +117,10 @@ private:
   /// instructions, return the number of stall cycles until
   unsigned checkMultiShadowHazard(const MachineInstr &MI) const;
 
+  /// Check if a wide COPY has enough consecutive co-exec slots.
+  /// Returns stall cycles if insufficient slots are available.
+  unsigned checkWideCopyCoExecSlots(const MachineInstr &MI) const;
+
   /// Update WMMA window state when a WMMA instruction is emitted.
   void updateWMMAWindowState(const MachineInstr &MI);
 

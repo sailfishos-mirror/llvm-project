@@ -1194,29 +1194,60 @@ unsigned CandidateHeuristics::getMissedSlotCost(SUnit *SU,
   if (!Stage.has_value())
     return 0;
 
-  const CoExecInfo &Info = HazardRec->getActiveCoExecInfo();
-  unsigned CurrentStage = *Stage;
-  unsigned NextStage = CurrentStage + 1;
+  auto CheckMSBSlot = [&HazardRec, Stage, this](SUnit *SU) -> unsigned {
+    // Check if the instruction is DS.
+    InstructionFlavor Flavor = classifyFlavor(*SU->getInstr(), *SII);
+    if (Flavor != InstructionFlavor::DS)
+      return 0;
 
-  // Check if the next slot is an I slot.
-  if (NextStage >= Info.TotalWindow)
-    return 0;
+    const CoExecInfo &Info = HazardRec->getActiveCoExecInfo();
+    unsigned CurrentStage = *Stage;
+    unsigned NextStage = CurrentStage + 1;
 
-  uint8_t NextMask = Info.getMask(NextStage);
-  bool IsISlot =
-      (NextMask == CoExecMask::StageI || NextMask == CoExecMask::StageIS);
-  if (!IsISlot)
-    return 0;
+    // Check if the next slot is an I slot.
+    if (NextStage >= Info.TotalWindow)
+      return 0;
 
-  // Check if the instruction is DS.
-  InstructionFlavor Flavor = classifyFlavor(*SU->getInstr(), *SII);
-  if (Flavor != InstructionFlavor::DS)
-    return 0;
+    uint8_t NextMask = Info.getMask(NextStage);
+    bool IsISlot =
+        (NextMask == CoExecMask::StageI || NextMask == CoExecMask::StageIS);
+    if (!IsISlot)
+      return 0;
 
-  // DS can execute in I slots but doesn't benefit from the VALU/TRANS
-  // capability. Scheduling DS when the next slot is an I slot misses
-  // the opportunity to coexecute VALU/TRANS there.
-  return 1;
+    // DS can execute in I slots but doesn't benefit from the VALU/TRANS
+    // capability. Scheduling DS when the next slot is an I slot misses
+    // the opportunity to coexecute VALU/TRANS there.
+    return 1;
+  };
+
+  auto CheckWideCopySlot = [&HazardRec, Stage, this](SUnit *SU) -> unsigned {
+    MachineInstr *MI = SU->getInstr();
+    if (!MI->isCopy())
+      return 0;
+    uint8_t RequiredMask = AMDGPU::getCoExecMaskForCopy(*MI, DAG->MRI, *SRI);
+    if (RequiredMask != CoExecMask::SALU)
+      return 0;
+
+    unsigned CopyInstrs = SII->getSchedCyclesForCopy(*MI);
+
+    const CoExecInfo &Info = HazardRec->getActiveCoExecInfo();
+    unsigned CurrentStage = *Stage;
+    unsigned MissedSlots = 0;
+    unsigned Cutoff = std::min(CurrentStage + CopyInstrs, Info.TotalWindow);
+    for (; CurrentStage < Cutoff; CurrentStage++) {
+      uint8_t NextMask = Info.getMask(CurrentStage);
+      if (NextMask & CoExecMask::VALU || NextMask & CoExecMask::WMMA)
+        ++MissedSlots;
+    }
+
+    return MissedSlots;
+  };
+
+  unsigned MissedSlots = 0;
+  MissedSlots = std::max(CheckMSBSlot(SU), MissedSlots);
+  MissedSlots = std::max(CheckWideCopySlot(SU), MissedSlots);
+
+  return MissedSlots;
 }
 
 bool CandidateHeuristics::tryEffectiveStall(

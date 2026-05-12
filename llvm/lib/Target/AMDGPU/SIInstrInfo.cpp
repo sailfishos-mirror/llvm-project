@@ -10753,6 +10753,39 @@ unsigned SIInstrInfo::getInstrLatency(const InstrItineraryData *ItinData,
   return SchedModel.computeInstrLatency(&MI);
 }
 
+unsigned SIInstrInfo::getSchedCyclesForCopy(const MachineInstr &MI) const {
+  if (!MI.isCopy())
+    return 1;
+
+  const MachineFunction &MF = *MI.getParent()->getParent();
+  const MachineRegisterInfo &MRI = MF.getRegInfo();
+  const MachineOperand &DstOp = MI.getOperand(0);
+  Register Dst = DstOp.getReg();
+
+  // If there's a subreg index, get the actual subreg size, not the full reg
+  // size.
+  unsigned SubReg = DstOp.getSubReg();
+  if (SubReg) {
+    unsigned SubRegSize = RI.getSubRegIdxSize(SubReg);
+    // Each 64-bit chunk requires one move instruction.
+    return (SubRegSize + 63) / 64;
+  }
+
+  const TargetRegisterClass *RC = nullptr;
+  if (Dst.isVirtual())
+    RC = MRI.getRegClass(Dst);
+  else
+    RC = RI.getPhysRegBaseClass(Dst);
+
+  if (!RC)
+    return 1;
+
+  unsigned SizeInBits = RI.getRegSizeInBits(*RC);
+  // Each 64-bit chunk requires one move instruction.
+  // 32-bit=1, 64-bit=1, 96-bit=2, 128-bit=2, 256-bit=4, etc.
+  return (SizeInBits + 63) / 64;
+}
+
 const MachineOperand &
 SIInstrInfo::getCalleeOperand(const MachineInstr &MI) const {
   if (const MachineOperand *CallAddrOp =

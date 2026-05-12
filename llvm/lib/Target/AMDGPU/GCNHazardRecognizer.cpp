@@ -350,8 +350,9 @@ GCNHazardRecognizer::checkMultiCycleVALUHazard(const MachineInstr &MI) const {
 unsigned
 GCNHazardRecognizer::checkWMMACoexecSlot(const MachineInstr &MI) const {
   // No hazard if not in a WMMA window.
-  if (!CurrentCoExecStage.has_value())
+  if (!CurrentCoExecStage.has_value()) {
     return 0;
+  }
 
   unsigned Stage = *CurrentCoExecStage;
   uint8_t InstMask = getCoExecMaskForMI(MI, TII);
@@ -422,6 +423,46 @@ GCNHazardRecognizer::checkMultiShadowHazard(const MachineInstr &MI) const {
   // No compatible slot in window - stall until window ends.
   unsigned StallCycles = ActiveCoExecInfo.TotalWindow - *CurrentCoExecStage;
   return StallCycles;
+}
+
+unsigned
+GCNHazardRecognizer::checkWideCopyCoExecSlots(const MachineInstr &MI) const {
+  if (!MI.isCopy() || !CurrentCoExecStage.has_value())
+    return 0;
+
+  unsigned NumMoves = TII.getSchedCyclesForCopy(MI);
+  if (NumMoves <= 1)
+    return 0;
+
+  uint8_t RequiredMask = AMDGPU::getCoExecMaskForCopy(MI, MF.getRegInfo(), TRI);
+  unsigned Stage = *CurrentCoExecStage;
+  unsigned ConsecutiveSlots = 0;
+
+  // Check if we have N consecutive slots for this copy type.
+  unsigned NumStalls = 0;
+  for (unsigned S = Stage; S < ActiveCoExecInfo.TotalWindow - (NumMoves - 1);
+       ++S) {
+    ConsecutiveSlots = 0;
+    for (unsigned SCand = S; SCand < ActiveCoExecInfo.TotalWindow; ++SCand) {
+      if (ActiveCoExecInfo.canCoExec(RequiredMask, SCand)) {
+        ConsecutiveSlots++;
+        if (ConsecutiveSlots >= NumMoves)
+          return NumStalls; // Found enough consecutive slots.
+      } else {
+        // Not a compatible slot - since we need consecutive, this won't fid.
+        // Slide the window.
+        ++NumStalls;
+        break;
+      }
+    }
+  }
+
+  // Not enough consecutive slots - stall until window ends.
+  DEBUG_WITH_TYPE(DEBUG_TYPE_VERBOSE,
+                  dbgs() << "    Wide COPY needs " << NumMoves
+                         << " slots but only " << ConsecutiveSlots
+                         << " available at stage " << Stage << "\n");
+  return ActiveCoExecInfo.TotalWindow - Stage;
 }
 
 void GCNHazardRecognizer::EmitInstruction(SUnit *SU) {
@@ -674,6 +715,8 @@ GCNHazardRecognizer::getHazardType(SUnit *SU, int Stalls) {
       return Hazard;
     if (checkWMMACoexecSlot(*MI) > 0)
       return Hazard;
+    if (checkWideCopyCoExecSlots(*MI) > 0)
+      return Hazard;
     if (checkTRANSHazard(*MI) > 0)
       return Hazard;
     if (checkMultiCycleVALUHazard(*MI) > 0)
@@ -831,6 +874,7 @@ unsigned GCNHazardRecognizer::getHazardWaitStates(MachineInstr *MI) const {
   // Check co-execution slot hazards and pipeline stalls in scheduler modes.
   if (isSchedulerMode()) {
     W = checkWMMACoexecSlot(*MI);
+    W = std::max(W, checkWideCopyCoExecSlots(*MI));
     W = std::max(W, checkTRANSHazard(*MI));
     W = std::max(W, checkMultiCycleVALUHazard(*MI));
     W = std::max(W, checkVALUSGPRHazard(*MI));
