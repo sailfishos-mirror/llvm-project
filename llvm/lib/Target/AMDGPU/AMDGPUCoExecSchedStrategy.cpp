@@ -31,6 +31,9 @@ using namespace llvm::AMDGPU;
 // BFS depth limit for lookahead search (search-budget, not hardware-derived).
 static constexpr unsigned ShadowMixLookaheadDepth = 8;
 
+// Default VGPR excess threshold percent for coexec scheduler.
+static constexpr unsigned DefaultVGPRExcessThresholdPercent = 100;
+
 namespace {
 enum class CoexecExposedMode { Off, Greedy, Roofline };
 } // namespace
@@ -1753,9 +1756,15 @@ AMDGPUCoExecSchedStrategy::AMDGPUCoExecSchedStrategy(
     const MachineSchedContext *C)
     : GCNSchedStrategy(C) {
   SchedStages.push_back(GCNSchedStageID::ILPInitialSchedule);
+  SchedStages.push_back(GCNSchedStageID::LiveIntervalRPReschedule);
   SchedStages.push_back(GCNSchedStageID::PreRARematerialize);
   // Use more accurate GCN pressure trackers.
   UseGCNTrackers = true;
+  // Default to using VGPRExcessThresholdPercent if it's not already
+  // explicitly set.
+  if (!VGPRExcessThresholdPercent) {
+    VGPRExcessThresholdPercent = DefaultVGPRExcessThresholdPercent;
+  }
 }
 
 void AMDGPUCoExecSchedStrategy::initPolicy(MachineBasicBlock::iterator Begin,

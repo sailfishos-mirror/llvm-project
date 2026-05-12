@@ -32,6 +32,7 @@
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/CodeGen/CalcSpillWeights.h"
+#include "llvm/CodeGen/LiveIntervalUnion.h"
 #include "llvm/CodeGen/MachineBasicBlock.h"
 #include "llvm/CodeGen/MachineBlockFrequencyInfo.h"
 #include "llvm/CodeGen/MachineBranchProbabilityInfo.h"
@@ -101,11 +102,14 @@ struct VGPRThresholdParser : public cl::parser<unsigned> {
 
 } // end anonymous namespace
 
-static cl::opt<unsigned, false, VGPRThresholdParser> VGPRExcessThresholdPercent(
-    "amdgpu-vgpr-excess-threshold-percent", cl::Hidden,
-    cl::desc("Percent of maximum available VGPRs to use as excess RP threshold "
-             "(0 = use default calculation, 1-100 = use percentage)"),
-    cl::init(0));
+static cl::opt<unsigned, false, VGPRThresholdParser>
+    VGPRExcessThresholdPercentOpt(
+        "amdgpu-vgpr-excess-threshold-percent", cl::Hidden,
+        cl::desc(
+            "Percent of maximum available VGPRs to use as excess RP threshold "
+            "(0 = use default calculation, 1-100 = use percentage), "
+            "default: 0 (100 for coexec scheduler)"),
+        cl::init(0));
 
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
 #define DUMP_MAX_REG_PRESSURE
@@ -133,6 +137,11 @@ GCNSchedStrategy::GCNSchedStrategy(const MachineSchedContext *C)
       DownwardTracker(*C->LIS), UpwardTracker(*C->LIS), HasHighPressure(false) {
   if (GCNTrackers.getNumOccurrences() > 0)
     GCNTrackersOverride = GCNTrackers;
+  if (VGPRExcessThresholdPercentOpt.getNumOccurrences() > 0) {
+    // Strategies and stages can control the use of VGPR excess
+    // threshold percent during scheduling.
+    VGPRExcessThresholdPercent = VGPRExcessThresholdPercentOpt;
+  }
 }
 
 void GCNSchedStrategy::initialize(ScheduleDAGMI *DAG) {
@@ -184,16 +193,17 @@ void GCNSchedStrategy::initialize(ScheduleDAGMI *DAG) {
   SGPRExcessLimit -= std::min(SGPRLimitBias + ErrorMargin, SGPRExcessLimit);
 
   // Apply VGPR excess threshold percentage if specified.
-  if (VGPRExcessThresholdPercent > 0) {
+  if (VGPRExcessThresholdPercent && *VGPRExcessThresholdPercent > 0) {
     unsigned OriginalVGPRExcessLimit = VGPRExcessLimit;
-    VGPRExcessLimit = (VGPRExcessLimit * VGPRExcessThresholdPercent + 99) / 100;
+    VGPRExcessLimit =
+        (*VGPRExcessThresholdPercent * VGPRExcessLimit + 99) / 100;
     // If the new excess limit would be below the critical limit, adjust the
     // critical limit as well to maintain the invariant that
     // VGPRCriticalLimit <= VGPRExcessLimit.
     if (VGPRExcessLimit < VGPRCriticalLimit)
       VGPRCriticalLimit = VGPRExcessLimit;
     LLVM_DEBUG(dbgs() << "Applied VGPR excess threshold "
-                      << VGPRExcessThresholdPercent
+                      << *VGPRExcessThresholdPercent
                       << "%, VGPRExcessLimit: " << OriginalVGPRExcessLimit
                       << " -> " << VGPRExcessLimit << "\n");
   } else {
@@ -1016,6 +1026,8 @@ GCNScheduleDAGMILive::createSchedStage(GCNSchedStageID SchedStageID) {
   case GCNSchedStageID::MemoryClauseInitialSchedule:
     return std::make_unique<MemoryClauseInitialScheduleStage>(SchedStageID,
                                                               *this);
+  case GCNSchedStageID::LiveIntervalRPReschedule:
+    return std::make_unique<LiveIntervalRPStage>(SchedStageID, *this);
   }
 
   llvm_unreachable("Unknown SchedStageID.");
@@ -1263,6 +1275,9 @@ raw_ostream &llvm::operator<<(raw_ostream &OS, const GCNSchedStageID &StageID) {
     break;
   case GCNSchedStageID::MemoryClauseInitialSchedule:
     OS << "Max memory clause Initial Schedule";
+    break;
+  case GCNSchedStageID::LiveIntervalRPReschedule:
+    OS << "Live Interval RP Reschedule";
     break;
   }
 
@@ -2174,6 +2189,89 @@ bool ILPInitialScheduleStage::shouldRevertScheduling(unsigned WavesAfter) {
 bool MemoryClauseInitialScheduleStage::shouldRevertScheduling(
     unsigned WavesAfter) {
   return mayCauseSpilling(WavesAfter);
+}
+
+static cl::opt<bool> EnableLiveIntervalRPReschedule(
+    "amdgpu-lirp-reschedule", cl::Hidden,
+    cl::desc("Enable live interval RP reschedule stage"), cl::init(true));
+
+static cl::opt<unsigned> LiveIntervalRPThreshold(
+    "amdgpu-lirp-threshold", cl::Hidden,
+    cl::desc("Percent increase of live interval RP over instant pressure to "
+             "trigger rescheduling"),
+    cl::init(10));
+
+static cl::opt<unsigned> LiveIntervalRPVGPRReduction(
+    "amdgpu-lirp-vgpr-reduction", cl::Hidden,
+    cl::desc(
+        "Reduction factor (percent) for VGPR threshold during live interval RP "
+        "reschedule stage"),
+    cl::init(90));
+
+bool LiveIntervalRPStage::initGCNSchedStage() {
+  if (!EnableLiveIntervalRPReschedule)
+    return false;
+
+  if (!GCNSchedStage::initGCNSchedStage())
+    return false;
+
+  if (!S.VGPRExcessThresholdPercent) {
+    LLVM_DEBUG(
+        dbgs() << "LIRP: expected VGPRExcessThresholdPercent to be enabled, "
+                  "not using live interval RP reschedule stage\n");
+    return false;
+  }
+
+  // Use a tighter VGPRExcessLimit by reducing VGPRExcessThresholdPercent
+  SavedVGPRThresholdPercent = *S.VGPRExcessThresholdPercent;
+  S.VGPRExcessThresholdPercent =
+      (*S.VGPRExcessThresholdPercent * LiveIntervalRPVGPRReduction + 99) / 100;
+  SavedVGPRExcessLimit = S.VGPRExcessLimit;
+
+  LLVM_DEBUG(dbgs() << "LIRP: Starting live interval RP reschedule stage, "
+                    << "VGPRExcessThresholdPercent: "
+                    << SavedVGPRThresholdPercent << " -> "
+                    << *S.VGPRExcessThresholdPercent
+                    << ", VGPRExcessLimit = " << S.VGPRExcessLimit
+                    << ", VGPRCriticalLimit = " << S.VGPRCriticalLimit << "\n");
+  return true;
+}
+
+void LiveIntervalRPStage::finalizeGCNSchedStage() {
+  S.VGPRExcessThresholdPercent = SavedVGPRThresholdPercent;
+  GCNSchedStage::finalizeGCNSchedStage();
+}
+
+bool LiveIntervalRPStage::initGCNRegion() {
+  unsigned InstantRP = DAG.Pressure[RegionIdx].getVGPRNum(ST.hasGFX90AInsts());
+  auto [RegionBegin, RegionEnd] = DAG.Regions[RegionIdx];
+  unsigned LIRP = computeLiveIntervalVGPRPressure(
+      RegionBegin, RegionEnd, DAG.LiveIns[RegionIdx], *DAG.getLIS(),
+      DAG.MF.getRegInfo(), static_cast<const SIRegisterInfo &>(*DAG.TRI));
+
+  LLVM_DEBUG(dbgs() << "LIRP: Region " << RegionIdx
+                    << ": InstantRP=" << InstantRP << ", LIRP=" << LIRP);
+
+  bool DoRescheduling = false;
+  // Lower bound on InstantRP to skip over tiny regions
+  unsigned InstantRPLB = SavedVGPRExcessLimit / 10;
+  // Check if LIRP exceeds the limit or the gap between LIRP and InstantRP
+  // is too large
+  if (LIRP > SavedVGPRExcessLimit) {
+    LLVM_DEBUG(dbgs() << " [LIRP exceeds the limit (" << SavedVGPRExcessLimit
+                      << "), rescheduling]");
+    DoRescheduling = true;
+  } else if (LIRP > InstantRP && InstantRP > InstantRPLB) {
+    unsigned IncreasePercent = ((LIRP - InstantRP) * 100) / InstantRP;
+    if (IncreasePercent > LiveIntervalRPThreshold) {
+      LLVM_DEBUG(dbgs() << " [" << IncreasePercent << "% > "
+                        << LiveIntervalRPThreshold << "%, rescheduling]");
+      DoRescheduling = true;
+    }
+  }
+
+  LLVM_DEBUG(dbgs() << "\n");
+  return DoRescheduling && GCNSchedStage::initGCNRegion();
 }
 
 bool GCNSchedStage::mayCauseSpilling(unsigned WavesAfter) {
