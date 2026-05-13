@@ -172,6 +172,13 @@ struct TinyMaxFlow {
 
 } // namespace
 
+unsigned
+RooflineResult::getWMMACoexecByFlavor(AMDGPU::InstructionFlavor Flavor) {
+  uint8_t Bit = flavorToCoExecMask(Flavor);
+  unsigned Index = coexecBitIndex(Bit);
+  return WMMACoexecByClass[Index];
+}
+
 static SUnit *pickOnlyChoice(SchedBoundary &Zone) {
   // pickOnlyChoice() releases pending instructions and checks for new hazards.
   SUnit *OnlyChoice = Zone.pickOnlyChoice();
@@ -381,10 +388,13 @@ static unsigned getCoexecWindowSize(SUnit *RepSU, const SIInstrInfo &SII) {
 /// preferences, ensuring each ready instruction is only counted once across
 /// all slots.
 static unsigned computeSlotsMissed(const RegionMixInfo &MixInfo, SUnit *RepSU,
-                                   const SIInstrInfo &SII) {
+                                   const SIInstrInfo &SII,
+                                   RooflineResult &Roofline) {
   CoExecInfo Info = getCoExecInfo(*RepSU->getInstr(), SII);
   if (Info.TotalWindow == 0)
     return 0;
+
+  InstructionFlavor Producer = classifyFlavor(*RepSU->getInstr(), SII);
 
   // Track remaining available instructions per flavor. Each instruction can
   // only fill one slot, so we decrement as we consume them.
@@ -394,10 +404,30 @@ static unsigned computeSlotsMissed(const RegionMixInfo &MixInfo, SUnit *RepSU,
     Remaining[F] = MixInfo.getReadyCount(static_cast<InstructionFlavor>(F));
 
   unsigned SlotsMissed = 0;
+  unsigned FilledESlots = 0;
+  unsigned FilledISlots = 0;
+
+  auto adjustFilledSlots = [&](uint8_t Mask) {
+    if (Producer == InstructionFlavor::WMMA) {
+      switch (Mask) {
+      case CoExecMask::StageI: {
+        ++FilledISlots;
+        break;
+      }
+      case CoExecMask::StageE: {
+        ++FilledESlots;
+        break;
+      }
+      default:
+        break;
+      }
+    }
+  };
 
   for (unsigned S = 0; S < Info.TotalWindow; ++S) {
     uint8_t Mask = Info.getMask(S);
-    if (Mask == CoExecMask::StageE0 || Mask == CoExecMask::None)
+    if (Mask == CoExecMask::StageE0 || Mask == CoExecMask::None ||
+        Mask == CoExecMask::StageV)
       continue;
 
     // Try to find one instruction to fill this slot.
@@ -428,8 +458,10 @@ static unsigned computeSlotsMissed(const RegionMixInfo &MixInfo, SUnit *RepSU,
       }
     }
 
-    if (Filled)
+    if (Filled) {
+      adjustFilledSlots(Mask);
       continue;
+    }
 
     // If no preferred filler found, try any flavor allowed by the mask.
     for (unsigned F = 0;
@@ -442,8 +474,38 @@ static unsigned computeSlotsMissed(const RegionMixInfo &MixInfo, SUnit *RepSU,
       }
     }
 
-    if (!Filled)
-      SlotsMissed++;
+    if (Filled) {
+      adjustFilledSlots(Mask);
+      continue;
+    }
+
+    // We missed the slot
+    if (Producer != InstructionFlavor::WMMA) {
+      ++SlotsMissed;
+      continue;
+    }
+
+    // Missed WMMA slot, check if our region roofline supports this slot.
+    switch (Mask) {
+    case CoExecMask::StageI: {
+      unsigned SupportedISlots = Roofline.getWMMAISlotSupplySlots();
+      if (FilledISlots < SupportedISlots) {
+        ++SlotsMissed;
+      }
+      break;
+    }
+    case CoExecMask::StageE: {
+      unsigned SupportedESlots = Roofline.getWMMAESlotSupplySlots();
+      if (FilledESlots < SupportedESlots) {
+        ++SlotsMissed;
+      }
+      break;
+    }
+    default: {
+      ++SlotsMissed;
+      break;
+    }
+    }
   }
 
   return SlotsMissed;
@@ -452,7 +514,7 @@ static unsigned computeSlotsMissed(const RegionMixInfo &MixInfo, SUnit *RepSU,
 void CoexecWindow::populate(InstructionFlavor PreferredFlavor,
                             const SmallVectorImpl<HardwareUnitInfo> &HWUInfo,
                             const RegionMixInfo &MixInfo,
-                            const SIInstrInfo &SII) {
+                            const SIInstrInfo &SII, RooflineResult &Roofline) {
   clear();
 
   // If the preferred flavor is a window producer, use it directly.
@@ -463,6 +525,8 @@ void CoexecWindow::populate(InstructionFlavor PreferredFlavor,
         ProducerFlavor = PreferredFlavor;
         Demand = WindowSlotDemand::fromCoExecInfo(
             getCoExecInfo(*RepSU->getInstr(), SII));
+        if (HWUI.getType() == InstructionFlavor::WMMA)
+          Demand.clamp(Roofline);
         IsPopulated = Demand.hasSlots();
         return;
       }
@@ -493,7 +557,7 @@ void CoexecWindow::populate(InstructionFlavor PreferredFlavor,
 
     InstructionFlavor Flavor = HWUI.getType();
     unsigned Size = getCoexecWindowSize(RepSU, SII);
-    unsigned SlotsMissed = computeSlotsMissed(MixInfo, RepSU, SII);
+    unsigned SlotsMissed = computeSlotsMissed(MixInfo, RepSU, SII, Roofline);
 
     // Check if this producer flavor has any ready instructions.
     unsigned ReadyCount = MixInfo.getReadyCount(Flavor);
@@ -533,6 +597,8 @@ void CoexecWindow::populate(InstructionFlavor PreferredFlavor,
         Demand = WindowSlotDemand::fromCoExecInfo(
             getCoExecInfo(*RepSU->getInstr(), SII));
         IsPopulated = Demand.hasSlots();
+        if (HWUI.getType() == InstructionFlavor::WMMA)
+          Demand.clamp(Roofline);
         return;
       }
     }
@@ -734,7 +800,7 @@ void CandidateHeuristics::updateForScheduling(SUnit *SU,
     CurrentWindow.clear();
     // Try to populate a new current window.
     CoexecWindow Temp;
-    Temp.populate(InstructionFlavor::Other, HWUInfo, MixInfo, *SII);
+    Temp.populate(InstructionFlavor::Other, HWUInfo, MixInfo, *SII, Roofline);
     if (Temp.IsPopulated) {
       CurrentWindow = Temp;
       NextWindow.clear();
@@ -795,7 +861,8 @@ void CandidateHeuristics::initialize(ScheduleDAGMI *SchedDAG,
   // Note: At initialization time, MixInfo is reset so no ready counts yet.
   // The window will be re-populated when scheduling begins and MixInfo is
   // fresh.
-  CurrentWindow.populate(InstructionFlavor::Other, HWUInfo, MixInfo, *SII);
+  CurrentWindow.populate(InstructionFlavor::Other, HWUInfo, MixInfo, *SII,
+                         Roofline);
   LLVM_DEBUG({
     if (CurrentWindow.IsPopulated)
       dbgs() << "  Initial window: producer="
@@ -982,6 +1049,8 @@ void CandidateHeuristics::computeRooflineCoExec() {
     Roofline.TotalConsumers++;
   }
 
+  Roofline.WMMACount = NumWMMAs;
+
   // WMMAs can also consume V-stage slots of preceding WMMAs.
   if (NumWMMAs > 1)
     Roofline.ConsumerCount[coexecBitIndex(CoExecMask::WMMA)] += NumWMMAs - 1;
@@ -1052,6 +1121,7 @@ void CandidateHeuristics::computeRooflineCoExec() {
       Fill += MF.getFlow(ClassNode, 1 + C + J);
     unsigned Nk = Roofline.ConsumerCount[BitIdx];
     Roofline.ExposedByClass[BitIdx] = (Fill >= Nk) ? 0 : Nk - Fill;
+    Roofline.WMMACoexecByClass[BitIdx] = Fill;
   }
 }
 
@@ -1132,6 +1202,7 @@ void CandidateHeuristics::initExposedGreedy() {
 
   // DS first: WMMA E-slots, then MultiVALU shadow.
   unsigned DSWMMACoexec = std::min(WMMAESlotForDS, DSCount);
+
   WMMAESlot -= DSWMMACoexec;
   DSCount -= DSWMMACoexec;
   if (DSCount) {
@@ -1140,6 +1211,9 @@ void CandidateHeuristics::initExposedGreedy() {
     CoexecWithMultiVALU -= DSMultiCoexec;
   }
   HWUInfo[(int)InstructionFlavor::DS].setExposedCount(DSCount);
+
+  uint8_t Bit = flavorToCoExecMask(InstructionFlavor::DS);
+  Roofline.WMMACoexecByClass[coexecBitIndex(Bit)] = DSWMMACoexec;
 
   // SALU next: remaining E-slots, then MultiVALU shadow.
   unsigned SALUWMMACoexec = std::min(WMMAESlot, SALUCount);
@@ -1153,12 +1227,20 @@ void CandidateHeuristics::initExposedGreedy() {
     CoexecWithMultiVALU -= SALUCount;
     WMMAESlot -= SALUMultiCoexec;
   }
+
+  Bit = flavorToCoExecMask(InstructionFlavor::SALU);
+  Roofline.WMMACoexecByClass[coexecBitIndex(Bit)] = SALUWMMACoexec;
+
   HWUInfo[(int)InstructionFlavor::SALU].setExposedCount(SALUCount);
 
   // TRANS: WMMA I-slots that admit TRANS.
   unsigned EXPWMMACoexec = std::min(WMMAISlotForTRANS, EXPCount);
   WMMAISlot -= EXPWMMACoexec;
   EXPCount -= EXPWMMACoexec;
+
+  Bit = flavorToCoExecMask(InstructionFlavor::TRANS);
+  Roofline.WMMACoexecByClass[coexecBitIndex(Bit)] = EXPWMMACoexec;
+
   HWUInfo[(int)InstructionFlavor::TRANS].setExposedCount(EXPCount);
 
   // SingleCycleVALU last: remaining I-slots, then TRANS shadow.
@@ -1167,6 +1249,10 @@ void CandidateHeuristics::initExposedGreedy() {
   SingleCycleVALUCount -= VALUWMMACoexec;
   unsigned VALUEXPCoexec = std::min(EXPCount, SingleCycleVALUCount);
   SingleCycleVALUCount -= VALUEXPCoexec;
+
+  Bit = flavorToCoExecMask(InstructionFlavor::SingleCycleVALU);
+  Roofline.WMMACoexecByClass[coexecBitIndex(Bit)] = VALUWMMACoexec;
+
   HWUInfo[(int)InstructionFlavor::SingleCycleVALU].setExposedCount(
       SingleCycleVALUCount);
 }
@@ -1740,7 +1826,8 @@ bool CandidateHeuristics::tryShadowMix(
   if (CurrentWindow.IsActive && CurrentWindow.Demand.isSatisfied(MixInfo)) {
     // Populate NextWindow if needed.
     if (!NextWindow.IsPopulated)
-      NextWindow.populate(InstructionFlavor::Other, HWUInfo, MixInfo, *SII);
+      NextWindow.populate(InstructionFlavor::Other, HWUInfo, MixInfo, *SII,
+                          Roofline);
     if (NextWindow.IsPopulated)
       TargetWindow = &NextWindow;
   }

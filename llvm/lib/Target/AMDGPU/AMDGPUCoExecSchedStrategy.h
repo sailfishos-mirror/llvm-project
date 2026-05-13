@@ -93,8 +93,30 @@ struct RooflineResult {
   // ExposedByClass[k] = max(0, ConsumerCount[k] - flow assigned to k).
   // Same indexing as ConsumerCount.
   unsigned ExposedByClass[8] = {};
+  unsigned WMMACoexecByClass[8] = {};
+  unsigned WMMACount = 0;
 
   bool isValid() const { return TotalSlots > 0; }
+
+  unsigned getWMMACoexecByFlavor(AMDGPU::InstructionFlavor Flavor);
+
+  unsigned getWMMAISlotSupplySlots() {
+    if (WMMACount == 0)
+      return 0;
+    unsigned TotalISupply =
+        getWMMACoexecByFlavor(AMDGPU::InstructionFlavor::SingleCycleVALU) +
+        getWMMACoexecByFlavor(AMDGPU::InstructionFlavor::TRANS);
+    return (TotalISupply + WMMACount - 1) / WMMACount;
+  }
+
+  unsigned getWMMAESlotSupplySlots() {
+    if (WMMACount == 0)
+      return 0;
+    unsigned TotalISupply =
+        getWMMACoexecByFlavor(AMDGPU::InstructionFlavor::SALU) +
+        getWMMACoexecByFlavor(AMDGPU::InstructionFlavor::DS);
+    return (TotalISupply + WMMACount - 1) / WMMACount;
+  }
 
   float getSlotUtilization() const {
     if (TotalSlots == 0)
@@ -278,6 +300,11 @@ struct WindowSlotDemand {
   AMDGPU::InstructionFlavor getMostDeficientFlavor(const RegionMixInfo &Mix) const;
 
   bool hasSlots() const { return ISlots > 0 || ESlots > 0 || TRSlots > 0; }
+
+  void clamp(RooflineResult &Roofline) {
+    ISlots = std::min(ISlots, Roofline.getWMMAISlotSupplySlots());
+    ESlots = std::min(ESlots, Roofline.getWMMAESlotSupplySlots());
+  }
 };
 
 //===----------------------------------------------------------------------===//
@@ -326,7 +353,8 @@ struct CoexecWindow {
   /// tiebreaking by fewest slots missed, then by largest window size.
   void populate(AMDGPU::InstructionFlavor PreferredFlavor,
                 const SmallVectorImpl<HardwareUnitInfo> &HWUInfo,
-                const RegionMixInfo &MixInfo, const SIInstrInfo &SII);
+                const RegionMixInfo &MixInfo, const SIInstrInfo &SII,
+                RooflineResult &Roofline);
 
   /// Check if the window has expired given the current \p Cycle.
   bool isExpired(unsigned Cycle) const {
