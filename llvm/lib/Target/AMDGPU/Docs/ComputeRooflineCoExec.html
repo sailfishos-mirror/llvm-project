@@ -1,0 +1,1575 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>computeRooflineCoExec - Interactive Explanation</title>
+    <style>
+        :root {
+            --bg-primary: #000000;
+            --bg-secondary: #111111;
+            --bg-tertiary: #1a1a1a;
+            --text-primary: #eee;
+            --text-secondary: #aaa;
+            --accent: #ed1c24;
+            --accent-secondary: #ed1c24;
+            --green: #4ade80;
+            --yellow: #fbbf24;
+            --purple: #ed1c24;
+            --amd-red: #ed1c24;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            padding: 20px;
+        }
+
+        .amd-logo {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            opacity: 0.9;
+        }
+
+        .amd-logo svg {
+            width: 80px;
+            height: auto;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            color: var(--amd-red);
+            margin-bottom: 10px;
+            font-size: 2em;
+        }
+
+        h2 {
+            color: var(--amd-red);
+            margin: 20px 0 10px;
+            font-size: 1.4em;
+            border-bottom: 2px solid var(--amd-red);
+            padding-bottom: 5px;
+        }
+
+        h3 {
+            color: var(--amd-red);
+            margin: 15px 0 8px;
+            font-size: 1.1em;
+        }
+
+        .intro {
+            background: var(--bg-secondary);
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            border-left: 4px solid var(--accent);
+        }
+
+        .section {
+            background: var(--bg-secondary);
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        @media (max-width: 900px) {
+            .grid-2 {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        code {
+            background: var(--bg-tertiary);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.9em;
+        }
+
+        pre {
+            background: var(--bg-tertiary);
+            padding: 15px;
+            border-radius: 8px;
+            overflow-x: auto;
+            font-size: 0.85em;
+            margin: 10px 0;
+        }
+
+        .slot {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 40px;
+            height: 40px;
+            margin: 2px;
+            border-radius: 6px;
+            font-weight: bold;
+            font-size: 14px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .slot:hover {
+            transform: scale(1.1);
+            box-shadow: 0 0 10px rgba(255,255,255,0.3);
+        }
+
+        .slot-e0 { background: #444; color: #888; }
+        .slot-e { background: #2563eb; }
+        .slot-i { background: #7c3aed; }
+        .slot-v { background: #dc2626; }
+        .slot-is { background: linear-gradient(135deg, #7c3aed, #dc2626); }
+        .slot-filled { border: 3px solid var(--green); }
+        .slot-empty { opacity: 0.5; }
+
+        .consumer {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 35px;
+            height: 35px;
+            margin: 2px;
+            border-radius: 50%;
+            font-weight: bold;
+            font-size: 11px;
+        }
+
+        .consumer-valu { background: #22c55e; }
+        .consumer-trans { background: #f97316; }
+        .consumer-salu { background: #06b6d4; }
+        .consumer-ds { background: #8b5cf6; }
+        .consumer-vmem { background: #ec4899; }
+        .consumer-smem { background: #14b8a6; }
+        .consumer-wmma { background: #ef4444; }
+        .consumer-placed { border: 2px solid white; }
+        .consumer-exposed { border: 2px dashed var(--yellow); }
+
+        .legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin: 10px 0;
+            padding: 10px;
+            background: var(--bg-tertiary);
+            border-radius: 8px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 0.85em;
+        }
+
+        .legend-box {
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin: 15px 0;
+        }
+
+        .stat-box {
+            background: var(--bg-tertiary);
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 2em;
+            font-weight: bold;
+            color: var(--accent-secondary);
+        }
+
+        .stat-label {
+            color: var(--text-secondary);
+            font-size: 0.85em;
+        }
+
+        button {
+            background: var(--accent);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1em;
+            margin: 5px;
+            transition: background 0.2s;
+        }
+
+        button:hover {
+            background: #b51820;
+        }
+
+        button.secondary {
+            background: var(--bg-tertiary);
+            border: 1px solid #333;
+        }
+
+        button.secondary:hover {
+            background: #2a2a2a;
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        button.large {
+            padding: 15px 30px;
+            font-size: 1.1em;
+        }
+
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin: 15px 0;
+            align-items: center;
+        }
+
+        select, input {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            border: 1px solid #333;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 1em;
+        }
+
+        .tooltip {
+            position: fixed;
+            background: var(--bg-secondary);
+            border: 1px solid var(--accent);
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 0.85em;
+            max-width: 250px;
+            z-index: 1000;
+            pointer-events: none;
+            display: none;
+        }
+
+        .highlight { color: var(--accent-secondary); }
+        .highlight-green { color: var(--green); }
+        .highlight-yellow { color: var(--yellow); }
+
+        .step-by-step {
+            background: var(--bg-tertiary);
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+        }
+
+        .step {
+            padding: 10px;
+            margin: 5px 0;
+            border-left: 3px solid var(--bg-secondary);
+            transition: border-color 0.3s, background 0.3s;
+        }
+
+        .step.active {
+            border-left-color: var(--accent);
+            background: rgba(237, 28, 36, 0.1);
+        }
+
+        .mask-bits {
+            font-family: monospace;
+            display: inline-flex;
+            gap: 2px;
+        }
+
+        .mask-bit {
+            width: 20px;
+            height: 20px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--bg-secondary);
+            border-radius: 3px;
+            font-size: 0.7em;
+        }
+
+        .mask-bit.set {
+            background: var(--green);
+            color: #000;
+        }
+
+        canvas {
+            max-width: 100%;
+            background: var(--bg-tertiary);
+            border-radius: 8px;
+        }
+
+        .example-selector {
+            display: flex;
+            gap: 10px;
+            margin: 15px 0;
+            flex-wrap: wrap;
+        }
+
+        .example-btn {
+            padding: 8px 15px;
+            background: var(--bg-tertiary);
+            border: 2px solid transparent;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+            color: var(--text-primary);
+        }
+
+        .example-btn:hover {
+            background: rgba(237, 28, 36, 0.1);
+        }
+
+        .example-btn.active {
+            border-color: var(--accent);
+            background: rgba(237, 28, 36, 0.2);
+        }
+
+        .progress-bar {
+            height: 20px;
+            background: var(--bg-tertiary);
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+
+        .progress-fill {
+            height: 100%;
+            transition: width 0.5s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75em;
+            font-weight: bold;
+        }
+
+        .fill-green { background: var(--green); color: #000; }
+        .fill-yellow { background: var(--yellow); color: #000; }
+        .fill-red { background: var(--accent); }
+
+        .animation-status {
+            padding: 15px;
+            background: var(--bg-tertiary);
+            border-radius: 8px;
+            margin-top: 15px;
+            border-left: 4px solid var(--accent-secondary);
+        }
+
+        .animation-status.finding-path {
+            border-left-color: var(--yellow);
+        }
+
+        .animation-status.pushing-flow {
+            border-left-color: var(--green);
+        }
+
+        .animation-status.complete {
+            border-left-color: var(--accent);
+        }
+
+        .step-indicator {
+            display: inline-block;
+            padding: 5px 12px;
+            background: var(--accent);
+            border-radius: 20px;
+            font-size: 0.9em;
+            margin-right: 10px;
+        }
+
+        .animation-controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-top: 15px;
+            padding: 15px;
+            background: var(--bg-tertiary);
+            border-radius: 8px;
+        }
+
+        .iteration-info {
+            padding: 10px 15px;
+            background: var(--bg-secondary);
+            border-radius: 6px;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <!-- AMD Logo -->
+    <div class="amd-logo">
+        <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+            <!-- AMD Arrow -->
+            <polygon points="85,15 100,15 100,0" fill="#ed1c24"/>
+            <!-- Main shape -->
+            <path d="M0,100 L0,25 L25,0 L100,0 L100,100 Z" fill="none" stroke="#ed1c24" stroke-width="3"/>
+            <!-- AMD Text -->
+            <text x="50" y="62" text-anchor="middle" fill="#ed1c24" font-family="Arial Black, sans-serif" font-size="24" font-weight="bold">AMD</text>
+        </svg>
+    </div>
+
+    <div class="container">
+        <h1>computeRooflineCoExec() - Interactive Explanation</h1>
+
+        <div class="intro">
+            <p><strong>Purpose:</strong> This method analyzes a scheduling region <em>before</em> scheduling to calculate the theoretical maximum instruction hiding (co-execution) achievable. It uses a <span class="highlight"><a href="https://en.wikipedia.org/wiki/Maximum_flow_problem" target="_blank" style="color: var(--accent-secondary);">max-flow algorithm</a></span> to optimally match consumer instructions to available co-execution slots.</p>
+            <p style="margin-top:10px"><strong>Why "Roofline"?</strong> Like roofline models for memory/compute bounds, this establishes an <span class="highlight-green">upper bound</span> on performance — the best possible slot utilization given the instruction mix.</p>
+        </div>
+
+        <h2>1. Understanding Co-Execution Slots</h2>
+        <div class="section">
+            <p>WMMA (Wave Matrix Multiply-Accumulate) instructions take many cycles. During execution, other instructions can execute in parallel in <strong>co-execution slots</strong>.</p>
+
+            <h3>WMMA Stage Pattern Example: <code>0EIIEEIIEEIIEEIIV</code></h3>
+            <p>This 17-cycle pattern for <code>V_WMMA_16x16x64_IU8</code> shows which instructions can co-execute at each cycle:</p>
+
+            <div id="slot-pattern" style="margin: 20px 0;"></div>
+
+            <div class="legend">
+                <div class="legend-item"><div class="legend-box slot-e0"></div> E0 (CTRL only) - skipped in roofline</div>
+                <div class="legend-item"><div class="legend-box slot-e"></div> E (SALU, MEM)</div>
+                <div class="legend-item"><div class="legend-box slot-i"></div> I (SALU, MEM, VALU, TRANS)</div>
+                <div class="legend-item"><div class="legend-box slot-v"></div> V (SALU, MEM, next WMMA)</div>
+                <div class="legend-item"><div class="legend-box slot-is"></div> IS (I + next scaled WMMA)</div>
+            </div>
+
+            <h3>CoExecMask Bit Definitions</h3>
+            <pre>namespace CoExecMask {
+  CTRL  = 1 << 0  // Control instructions (s_delay_alu)
+  VALU  = 1 << 1  // Vector ALU
+  TRANS = 1 << 2  // Transcendentals (v_exp, v_log)
+  SALU  = 1 << 3  // Scalar ALU
+  DS    = 1 << 4  // LDS read/write
+  VMEM  = 1 << 5  // Global memory
+  SMEM  = 1 << 6  // Scalar memory
+  WMMA  = 1 << 7  // Next WMMA instruction
+
+  StageE0 = CTRL                    // 0x01
+  StageE  = CTRL | SALU | MEM       // 0x79
+  StageI  = CTRL | SALU | MEM | VALU | TRANS  // 0x7F
+  StageV  = CTRL | SALU | MEM | WMMA // 0xF9
+}</pre>
+
+            <div id="mask-visualizer" style="margin: 15px 0;"></div>
+        </div>
+
+        <h2>2. Algorithm Overview</h2>
+        <div class="section">
+            <div class="step-by-step">
+                <div class="step" id="step1">
+                    <strong>Step 1: Count Slot Types</strong><br>
+                    Scan all WMMAs, enumerate their stage patterns, collect slots into a map keyed by mask. Skip E0 stages (filled by hazard recognizer).
+                </div>
+                <div class="step" id="step2">
+                    <strong>Step 2: Count Consumers</strong><br>
+                    Classify all non-WMMA instructions by flavor (VALU, TRANS, SALU, DS, VMEM, SMEM) and count each type.
+                </div>
+                <div class="step" id="step3">
+                    <strong>Step 3: Build Flow Network</strong><br>
+                    Construct a bipartite graph: Source → Consumer Classes → Slot Types → Sink. Edge capacities reflect counts and compatibility.
+                </div>
+                <div class="step" id="step4">
+                    <strong>Step 4: Solve Max-Flow</strong><br>
+                    Run <a href="https://en.wikipedia.org/wiki/Edmonds%E2%80%93Karp_algorithm" target="_blank" style="color: var(--accent-secondary);">Edmonds-Karp</a> (BFS-based <a href="https://en.wikipedia.org/wiki/Ford%E2%80%93Fulkerson_algorithm" target="_blank" style="color: var(--accent-secondary);">Ford-Fulkerson</a>) to find maximum matching of consumers to slots.
+                </div>
+                <div class="step" id="step5">
+                    <strong>Step 5: Compute Results</strong><br>
+                    MaxFilledSlots = flow value. LowerBoundStalls = TotalSlots - MaxFilledSlots. ExposedByClass = unfilled per consumer type.
+                </div>
+            </div>
+        </div>
+
+        <h2>3. Interactive Example</h2>
+        <div class="section">
+            <div class="example-selector" id="example-selector">
+                <button class="example-btn active" onclick="loadExample('balanced')">Balanced Mix</button>
+                <button class="example-btn" onclick="loadExample('valu-heavy')">VALU-Heavy</button>
+                <button class="example-btn" onclick="loadExample('mem-heavy')">Memory-Heavy</button>
+                <button class="example-btn" onclick="loadExample('starved')">Slot-Starved</button>
+                <button class="example-btn" onclick="loadExample('custom')">Custom</button>
+            </div>
+
+            <div id="custom-inputs" style="display:none; margin: 15px 0;">
+                <h3>Custom Configuration</h3>
+                <div class="grid-2">
+                    <div>
+                        <label>Number of WMMAs: <input type="number" id="wmma-count" min="1" max="10" value="2"></label><br>
+                        <label>WMMA Pattern:
+                            <select id="wmma-pattern">
+                                <option value="0EIIEEIIEEIIEEIIV">16x16x64_IU8 (17 cycles)</option>
+                                <option value="0EEIIEEIIV">16x16x128_F8 (10 cycles)</option>
+                                <option value="0EEIIEEIV">16x16x128_F4 (9 cycles)</option>
+                            </select>
+                        </label>
+                    </div>
+                    <div>
+                        <label>VALU count: <input type="number" id="valu-count" min="0" max="50" value="10"></label>
+                        <label>TRANS count: <input type="number" id="trans-count" min="0" max="20" value="4"></label><br>
+                        <label>SALU count: <input type="number" id="salu-count" min="0" max="30" value="6"></label>
+                        <label>DS count: <input type="number" id="ds-count" min="0" max="20" value="4"></label><br>
+                        <label>VMEM count: <input type="number" id="vmem-count" min="0" max="20" value="2"></label>
+                        <label>SMEM count: <input type="number" id="smem-count" min="0" max="20" value="2"></label>
+                    </div>
+                </div>
+                <button onclick="runCustomExample()">Run Analysis</button>
+            </div>
+
+            <div class="grid-2">
+                <div>
+                    <h3>Region Contents</h3>
+                    <div id="region-contents"></div>
+
+                    <h3>Slot Types Generated</h3>
+                    <div id="slot-types"></div>
+                </div>
+                <div>
+                    <h3>Consumer Instructions</h3>
+                    <div id="consumers"></div>
+                </div>
+            </div>
+
+            <h3>Results</h3>
+            <div class="stats" id="results-stats"></div>
+
+            <h3>Slot Utilization</h3>
+            <div id="utilization-bar"></div>
+
+            <h3>Per-Class Analysis</h3>
+            <div id="per-class-analysis"></div>
+        </div>
+
+        <h2>4. Flow Network Visualization</h2>
+        <div class="section">
+            <p>The algorithm models slot assignment as a <strong>max-flow problem</strong>:</p>
+            <canvas id="flow-canvas" width="900" height="450"></canvas>
+
+            <div class="animation-controls" id="animation-controls">
+                <button id="start-btn" onclick="startAnimation()">Start Step-by-Step</button>
+                <button id="next-btn" onclick="nextStep()" disabled>Next Step</button>
+                <button class="secondary" onclick="resetFlow()">Reset</button>
+                <button class="secondary" onclick="showFinalFlow()">Show Final Result</button>
+                <div class="iteration-info" id="iteration-info" style="display: none;">
+                    Iteration: <span id="current-iteration">0</span> / <span id="total-iterations">0</span>
+                    | Total Flow: <span id="current-flow">0</span>
+                </div>
+            </div>
+
+            <div id="flow-explanation"></div>
+        </div>
+
+        <h2>5. TinyMaxFlow Implementation</h2>
+        <div class="section">
+            <p>The algorithm uses a compact <a href="https://en.wikipedia.org/wiki/Edmonds%E2%80%93Karp_algorithm" target="_blank" style="color: var(--accent-secondary);">Edmonds-Karp</a> implementation (BFS-based <a href="https://en.wikipedia.org/wiki/Ford%E2%80%93Fulkerson_algorithm" target="_blank" style="color: var(--accent-secondary);">Ford-Fulkerson</a>):</p>
+
+            <h3>Data Structure</h3>
+            <pre>struct TinyMaxFlow {
+  static constexpr unsigned MaxNodes = 20;
+  int Capacity[MaxNodes][MaxNodes];   // Residual capacity graph
+  int Original[MaxNodes][MaxNodes];   // Snapshot for flow recovery
+  unsigned NumNodes = 0;
+  int Parent[MaxNodes];               // BFS parent pointers
+
+  void init(unsigned N) {
+    NumNodes = N;
+    memset(Capacity, 0, sizeof(Capacity));
+    memset(Original, 0, sizeof(Original));
+  }
+
+  void addEdge(unsigned From, unsigned To, int Cap) {
+    Capacity[From][To] += Cap;
+    Original[From][To] += Cap;
+  }
+};</pre>
+
+            <h3>findAugmentingPath() - BFS from Source to Sink</h3>
+            <pre>// Returns true if a path exists from Source (0) to Sink (NumNodes-1)
+// Populates Parent[] array to reconstruct the path
+bool findAugmentingPath() {
+  unsigned Source = 0;
+  unsigned Sink = NumNodes - 1;
+
+  // Initialize parent pointers to -1 (unvisited)
+  memset(Parent, -1, sizeof(Parent));
+  Parent[Source] = Source;  // Mark source as visited
+
+  // BFS queue
+  std::queue&lt;unsigned&gt; Q;
+  Q.push(Source);
+
+  while (!Q.empty() && Parent[Sink] == -1) {
+    unsigned U = Q.front();
+    Q.pop();
+
+    // Explore all neighbors with positive residual capacity
+    for (unsigned V = 0; V &lt; NumNodes; ++V) {
+      if (Parent[V] == -1 && Capacity[U][V] &gt; 0) {
+        Parent[V] = U;      // Record how we reached V
+        Q.push(V);
+      }
+    }
+  }
+
+  return Parent[Sink] != -1;  // Did we reach the sink?
+}</pre>
+
+            <h3>findBottleneck() - Minimum capacity along the path</h3>
+            <pre>// Walk backward from Sink to Source using Parent[]
+// Return the minimum edge capacity (the bottleneck)
+int findBottleneck() {
+  unsigned Source = 0;
+  unsigned Sink = NumNodes - 1;
+  int PathFlow = std::numeric_limits&lt;int&gt;::max();
+
+  // Traverse path backward: Sink ← ... ← Source
+  for (unsigned V = Sink; V != Source; V = Parent[V]) {
+    unsigned U = Parent[V];
+    PathFlow = std::min(PathFlow, Capacity[U][V]);
+  }
+
+  return PathFlow;
+}</pre>
+
+            <h3>updateResidual() - Push flow and update capacities</h3>
+            <pre>// Push pathFlow units along the path found by BFS
+// Key insight: decrease forward capacity, INCREASE reverse capacity
+// The reverse capacity enables "undoing" flow in future iterations
+void updateResidual(int PathFlow) {
+  unsigned Source = 0;
+  unsigned Sink = NumNodes - 1;
+
+  for (unsigned V = Sink; V != Source; V = Parent[V]) {
+    unsigned U = Parent[V];
+    Capacity[U][V] -= PathFlow;  // Reduce forward capacity
+    Capacity[V][U] += PathFlow;  // Add reverse capacity (for backflow)
+  }
+}</pre>
+
+            <h3>Complete solve() and getFlow()</h3>
+            <pre>int solve() {
+  unsigned Source = 0;
+  unsigned Sink = NumNodes - 1;
+  int TotalFlow = 0;
+
+  // Repeat: find path, push flow, until no path exists
+  while (findAugmentingPath()) {
+    int PathFlow = findBottleneck();
+    updateResidual(PathFlow);
+    TotalFlow += PathFlow;
+  }
+
+  return TotalFlow;
+}
+
+// Recover per-edge flow after solve():
+// Flow = (original capacity) - (remaining capacity)
+int getFlow(unsigned From, unsigned To) const {
+  return Original[From][To] - Capacity[From][To];
+}</pre>
+
+            <h3>Additional Resources</h3>
+            <ul style="margin-left: 20px; margin-top: 10px;">
+                <li><a href="https://en.wikipedia.org/wiki/Maximum_flow_problem" target="_blank" style="color: var(--accent-secondary);">Maximum Flow Problem</a> - Wikipedia overview</li>
+                <li><a href="https://en.wikipedia.org/wiki/Edmonds%E2%80%93Karp_algorithm" target="_blank" style="color: var(--accent-secondary);">Edmonds-Karp Algorithm</a> - BFS-based Ford-Fulkerson with O(VE²) complexity</li>
+                <li><a href="https://en.wikipedia.org/wiki/Ford%E2%80%93Fulkerson_algorithm" target="_blank" style="color: var(--accent-secondary);">Ford-Fulkerson Algorithm</a> - The general augmenting path method</li>
+                <li><a href="https://cp-algorithms.com/graph/edmonds_karp.html" target="_blank" style="color: var(--accent-secondary);">CP-Algorithms: Edmonds-Karp</a> - Detailed implementation guide</li>
+            </ul>
+        </div>
+
+        <h2>6. Key Insights</h2>
+        <div class="section">
+            <div class="grid-2">
+                <div class="stat-box">
+                    <h3 style="color: var(--green);">Why Max-Flow?</h3>
+                    <p>Greedy assignment fails when slot types overlap. E.g., TRANS can go in I-slots, but so can VALU. Max-flow finds the globally optimal assignment.</p>
+                </div>
+                <div class="stat-box">
+                    <h3 style="color: var(--yellow);">E0 Skipped</h3>
+                    <p>E0 slots only accept CTRL instructions (s_delay_alu). The hazard recognizer inserts these, so roofline excludes them from fillable slots.</p>
+                </div>
+                <div class="stat-box">
+                    <h3 style="color: var(--accent);">WMMA as Consumer</h3>
+                    <p>With N WMMAs, N-1 can fill V-slots of preceding WMMAs. This is why <code>ConsumerCount[WMMA] += NumWMMAs - 1</code>.</p>
+                </div>
+                <div class="stat-box">
+                    <h3 style="color: var(--purple);">ExposedByClass</h3>
+                    <p>Instructions that couldn't be placed in any slot are "exposed" — they add to critical path and can't be hidden.</p>
+                </div>
+            </div>
+        </div>
+
+        <h2>7. How Scheduling Uses This</h2>
+        <div class="section">
+            <p>The roofline provides:</p>
+            <ul style="margin-left: 20px;">
+                <li><strong>LowerBoundStalls:</strong> Minimum unavoidable stalls (unfillable slots)</li>
+                <li><strong>ExposedByClass:</strong> Which instruction types are bottlenecked</li>
+                <li><strong>Heuristic guidance:</strong> Prioritize scheduling exposed classes that match available slots</li>
+            </ul>
+            <p style="margin-top: 15px;">If VALU is exposed but SALU is not, the scheduler knows to prioritize VALU instructions for I-slots over SALU (which can also use E-slots).</p>
+        </div>
+    </div>
+
+    <div class="tooltip" id="tooltip"></div>
+
+    <script>
+        const slotMasks = {
+            '0': { name: 'E0', mask: 0x01, accepts: ['CTRL'], class: 'slot-e0' },
+            'E': { name: 'E', mask: 0x79, accepts: ['CTRL', 'SALU', 'DS', 'VMEM', 'SMEM'], class: 'slot-e' },
+            'I': { name: 'I', mask: 0x7F, accepts: ['CTRL', 'SALU', 'DS', 'VMEM', 'SMEM', 'VALU', 'TRANS'], class: 'slot-i' },
+            'V': { name: 'V', mask: 0xF9, accepts: ['CTRL', 'SALU', 'DS', 'VMEM', 'SMEM', 'WMMA'], class: 'slot-v' },
+            'S': { name: 'IS', mask: 0xFF, accepts: ['ALL + scaled WMMA'], class: 'slot-is' }
+        };
+
+        const consumerBits = {
+            CTRL: 0, VALU: 1, TRANS: 2, SALU: 3, DS: 4, VMEM: 5, SMEM: 6, WMMA: 7
+        };
+
+        const consumerColors = {
+            VALU: 'consumer-valu',
+            TRANS: 'consumer-trans',
+            SALU: 'consumer-salu',
+            DS: 'consumer-ds',
+            VMEM: 'consumer-vmem',
+            SMEM: 'consumer-smem',
+            WMMA: 'consumer-wmma'
+        };
+
+        const consumerHexColors = {
+            VALU: '#22c55e',
+            TRANS: '#f97316',
+            SALU: '#06b6d4',
+            DS: '#8b5cf6',
+            VMEM: '#ec4899',
+            SMEM: '#14b8a6',
+            WMMA: '#ef4444'
+        };
+
+        // Render slot pattern
+        function renderSlotPattern() {
+            const container = document.getElementById('slot-pattern');
+            const pattern = '0EIIEEIIEEIIEEIIV';
+            let html = '<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 5px;">';
+
+            pattern.split('').forEach((char, idx) => {
+                const slot = slotMasks[char];
+                html += `<div class="slot ${slot.class}"
+                    onmouseover="showSlotTooltip(event, '${char}', ${idx})"
+                    onmouseout="hideTooltip()">
+                    ${char}
+                </div>`;
+            });
+
+            html += '</div>';
+            html += '<p style="margin-top: 10px; color: var(--text-secondary);">Hover over slots to see what can execute there</p>';
+            container.innerHTML = html;
+        }
+
+        function showSlotTooltip(event, char, cycle) {
+            const slot = slotMasks[char];
+            const tooltip = document.getElementById('tooltip');
+            tooltip.innerHTML = `
+                <strong>Cycle ${cycle}: Stage ${slot.name}</strong><br>
+                Mask: 0x${slot.mask.toString(16).toUpperCase()}<br>
+                Accepts: ${slot.accepts.join(', ')}
+            `;
+            tooltip.style.display = 'block';
+            tooltip.style.left = (event.pageX + 10) + 'px';
+            tooltip.style.top = (event.pageY + 10) + 'px';
+        }
+
+        function hideTooltip() {
+            document.getElementById('tooltip').style.display = 'none';
+        }
+
+        // Mask visualizer
+        function renderMaskVisualizer() {
+            const container = document.getElementById('mask-visualizer');
+            const stages = ['E0', 'E', 'I', 'V'];
+
+            let html = '<table style="border-collapse: collapse; width: 100%;">';
+            html += '<tr><th style="text-align:left; padding:5px;">Stage</th>';
+            ['WMMA', 'SMEM', 'VMEM', 'DS', 'SALU', 'TRANS', 'VALU', 'CTRL'].forEach(bit => {
+                html += `<th style="padding:5px; font-size:0.75em;">${bit}</th>`;
+            });
+            html += '</tr>';
+
+            const maskValues = { 'E0': 0x01, 'E': 0x79, 'I': 0x7F, 'V': 0xF9 };
+
+            stages.forEach(stage => {
+                const mask = maskValues[stage];
+                html += `<tr><td style="padding:5px;"><strong>${stage}</strong> (0x${mask.toString(16).toUpperCase()})</td>`;
+                for (let i = 7; i >= 0; i--) {
+                    const isSet = mask & (1 << i);
+                    html += `<td style="padding:5px;"><div class="mask-bit ${isSet ? 'set' : ''}">${isSet ? '1' : '0'}</div></td>`;
+                }
+                html += '</tr>';
+            });
+
+            html += '</table>';
+            container.innerHTML = html;
+        }
+
+        // Examples
+        const examples = {
+            balanced: {
+                wmmaCount: 2,
+                pattern: '0EIIEEIIEEIIEEIIV',
+                consumers: { VALU: 10, TRANS: 4, SALU: 6, DS: 4, VMEM: 2, SMEM: 2 }
+            },
+            'valu-heavy': {
+                wmmaCount: 2,
+                pattern: '0EIIEEIIEEIIEEIIV',
+                consumers: { VALU: 25, TRANS: 2, SALU: 4, DS: 2, VMEM: 1, SMEM: 1 }
+            },
+            'mem-heavy': {
+                wmmaCount: 2,
+                pattern: '0EIIEEIIEEIIEEIIV',
+                consumers: { VALU: 5, TRANS: 1, SALU: 4, DS: 12, VMEM: 8, SMEM: 4 }
+            },
+            starved: {
+                wmmaCount: 1,
+                pattern: '0EIIEEIIEEIIEEIIV',
+                consumers: { VALU: 20, TRANS: 8, SALU: 10, DS: 5, VMEM: 3, SMEM: 2 }
+            }
+        };
+
+        let currentExample = null;
+        let currentFlowState = null;
+        let animationState = null;
+
+        function loadExample(name) {
+            document.querySelectorAll('.example-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+
+            document.getElementById('custom-inputs').style.display = name === 'custom' ? 'block' : 'none';
+
+            if (name === 'custom') return;
+
+            currentExample = examples[name];
+            runAnalysis(currentExample);
+            resetAnimationState();
+        }
+
+        function runCustomExample() {
+            currentExample = {
+                wmmaCount: parseInt(document.getElementById('wmma-count').value),
+                pattern: document.getElementById('wmma-pattern').value,
+                consumers: {
+                    VALU: parseInt(document.getElementById('valu-count').value),
+                    TRANS: parseInt(document.getElementById('trans-count').value),
+                    SALU: parseInt(document.getElementById('salu-count').value),
+                    DS: parseInt(document.getElementById('ds-count').value),
+                    VMEM: parseInt(document.getElementById('vmem-count').value),
+                    SMEM: parseInt(document.getElementById('smem-count').value)
+                }
+            };
+            runAnalysis(currentExample);
+            resetAnimationState();
+        }
+
+        function getSlotTypes(example) {
+            const slotTypes = {};
+            let totalSlots = 0;
+            const pattern = example.pattern;
+
+            for (let i = 0; i < pattern.length; i++) {
+                const char = pattern[i];
+                if (char === '0') continue;
+                const mask = slotMasks[char].mask;
+                slotTypes[mask] = (slotTypes[mask] || 0) + example.wmmaCount;
+                totalSlots += example.wmmaCount;
+            }
+
+            return { slotTypes, totalSlots };
+        }
+
+        function getConsumers(example) {
+            const consumers = { ...example.consumers };
+            if (example.wmmaCount > 1) {
+                consumers.WMMA = (consumers.WMMA || 0) + (example.wmmaCount - 1);
+            }
+            return consumers;
+        }
+
+        function runAnalysis(example) {
+            const { slotTypes, totalSlots } = getSlotTypes(example);
+            const consumers = getConsumers(example);
+            const result = solveMaxFlow(slotTypes, consumers);
+
+            currentFlowState = { slotTypes, consumers, result, totalSlots };
+
+            renderRegionContents(example);
+            renderSlotTypes(slotTypes);
+            renderConsumers(consumers);
+            renderResults(totalSlots, result);
+            renderFlowNetwork(slotTypes, consumers, result, {});
+        }
+
+        function solveMaxFlow(slotTypes, consumers) {
+            const activeClasses = Object.keys(consumers).filter(k => consumers[k] > 0);
+            const slotTypeList = Object.entries(slotTypes);
+
+            const C = activeClasses.length;
+            const T = slotTypeList.length;
+            const numNodes = 1 + C + T + 1;
+
+            const capacity = Array(numNodes).fill(null).map(() => Array(numNodes).fill(0));
+            const original = Array(numNodes).fill(null).map(() => Array(numNodes).fill(0));
+
+            const source = 0;
+            const sink = numNodes - 1;
+
+            activeClasses.forEach((cls, i) => {
+                const classNode = 1 + i;
+                const count = consumers[cls];
+                capacity[source][classNode] = count;
+                original[source][classNode] = count;
+            });
+
+            slotTypeList.forEach(([maskStr, count], j) => {
+                const mask = parseInt(maskStr);
+                const slotNode = 1 + C + j;
+                capacity[slotNode][sink] = count;
+                original[slotNode][sink] = count;
+
+                activeClasses.forEach((cls, i) => {
+                    const bit = consumerBits[cls];
+                    if (mask & (1 << bit)) {
+                        const classNode = 1 + i;
+                        const edgeCap = Math.min(consumers[cls], count);
+                        capacity[classNode][slotNode] = edgeCap;
+                        original[classNode][slotNode] = edgeCap;
+                    }
+                });
+            });
+
+            let totalFlow = 0;
+            const iterations = [];
+
+            // Deep copy for animation
+            const animCapacity = capacity.map(row => [...row]);
+
+            while (true) {
+                const parent = Array(numNodes).fill(-1);
+                parent[source] = source;
+                const queue = [source];
+                let head = 0;
+                const visited = [source];
+
+                while (head < queue.length && parent[sink] === -1) {
+                    const u = queue[head++];
+                    for (let v = 0; v < numNodes; v++) {
+                        if (parent[v] === -1 && animCapacity[u][v] > 0) {
+                            parent[v] = u;
+                            queue.push(v);
+                            visited.push(v);
+                        }
+                    }
+                }
+
+                if (parent[sink] === -1) break;
+
+                const path = [];
+                for (let v = sink; v !== source; v = parent[v]) {
+                    path.unshift({ from: parent[v], to: v });
+                }
+
+                let pathFlow = Infinity;
+                for (let v = sink; v !== source; v = parent[v]) {
+                    pathFlow = Math.min(pathFlow, animCapacity[parent[v]][v]);
+                }
+
+                iterations.push({
+                    path: [...path],
+                    pathFlow,
+                    visited: [...visited],
+                    capacityBefore: animCapacity.map(row => [...row]),
+                    flowBefore: totalFlow
+                });
+
+                for (let v = sink; v !== source; v = parent[v]) {
+                    const u = parent[v];
+                    animCapacity[u][v] -= pathFlow;
+                    animCapacity[v][u] += pathFlow;
+                }
+
+                totalFlow += pathFlow;
+
+                // Store capacity after for this iteration
+                iterations[iterations.length - 1].capacityAfter = animCapacity.map(row => [...row]);
+                iterations[iterations.length - 1].flowAfter = totalFlow;
+            }
+
+            const flowPerClass = {};
+            activeClasses.forEach((cls, i) => {
+                const classNode = 1 + i;
+                let fill = 0;
+                slotTypeList.forEach((_, j) => {
+                    const slotNode = 1 + C + j;
+                    fill += original[classNode][slotNode] - animCapacity[classNode][slotNode];
+                });
+                flowPerClass[cls] = fill;
+            });
+
+            return {
+                maxFlow: totalFlow,
+                flowPerClass,
+                activeClasses,
+                slotTypeList,
+                capacity: animCapacity,
+                original,
+                iterations,
+                C,
+                T,
+                numNodes
+            };
+        }
+
+        function renderRegionContents(example) {
+            const container = document.getElementById('region-contents');
+            let html = '<div style="display: flex; flex-wrap: wrap; gap: 5px; align-items: center;">';
+
+            for (let i = 0; i < example.wmmaCount; i++) {
+                html += `<div class="consumer consumer-wmma" title="WMMA ${i+1}">W</div>`;
+            }
+
+            html += `<span style="margin-left: 10px; color: var(--text-secondary);">× ${example.wmmaCount} WMMA (pattern: ${example.pattern})</span>`;
+            html += '</div>';
+            container.innerHTML = html;
+        }
+
+        function renderSlotTypes(slotTypes) {
+            const container = document.getElementById('slot-types');
+            let html = '<div style="display: flex; flex-wrap: wrap; gap: 15px;">';
+
+            Object.entries(slotTypes).forEach(([mask, count]) => {
+                const maskNum = parseInt(mask);
+                let stageName = 'Unknown';
+                let slotClass = 'slot-e';
+
+                if (maskNum === 0x79) { stageName = 'E'; slotClass = 'slot-e'; }
+                else if (maskNum === 0x7F) { stageName = 'I'; slotClass = 'slot-i'; }
+                else if (maskNum === 0xF9) { stageName = 'V'; slotClass = 'slot-v'; }
+                else if (maskNum === 0xFF) { stageName = 'IS'; slotClass = 'slot-is'; }
+
+                html += `<div style="text-align: center;">
+                    <div class="slot ${slotClass}">${stageName}</div>
+                    <div style="font-size: 0.85em; color: var(--text-secondary);">×${count}</div>
+                </div>`;
+            });
+
+            html += '</div>';
+            container.innerHTML = html;
+        }
+
+        function renderConsumers(consumers) {
+            const container = document.getElementById('consumers');
+            let html = '<div style="display: flex; flex-wrap: wrap; gap: 15px;">';
+
+            Object.entries(consumers).forEach(([cls, count]) => {
+                if (count === 0) return;
+                const colorClass = consumerColors[cls] || 'consumer-valu';
+                html += `<div style="text-align: center;">
+                    <div class="consumer ${colorClass}">${cls.substring(0, 2)}</div>
+                    <div style="font-size: 0.85em; color: var(--text-secondary);">${cls}: ${count}</div>
+                </div>`;
+            });
+
+            html += '</div>';
+            container.innerHTML = html;
+        }
+
+        function renderResults(totalSlots, result) {
+            const maxFilled = result.maxFlow;
+            const lowerBoundStalls = totalSlots - maxFilled;
+            const utilization = totalSlots > 0 ? (maxFilled / totalSlots * 100).toFixed(1) : 0;
+
+            const statsContainer = document.getElementById('results-stats');
+            statsContainer.innerHTML = `
+                <div class="stat-box">
+                    <div class="stat-value">${totalSlots}</div>
+                    <div class="stat-label">Total Slots</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value" style="color: var(--green);">${maxFilled}</div>
+                    <div class="stat-label">Max Filled (Flow)</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value" style="color: var(--yellow);">${lowerBoundStalls}</div>
+                    <div class="stat-label">Lower Bound Stalls</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value">${utilization}%</div>
+                    <div class="stat-label">Utilization</div>
+                </div>
+            `;
+
+            const utilBar = document.getElementById('utilization-bar');
+            const fillClass = utilization >= 80 ? 'fill-green' : (utilization >= 50 ? 'fill-yellow' : 'fill-red');
+            utilBar.innerHTML = `
+                <div class="progress-bar">
+                    <div class="progress-fill ${fillClass}" style="width: ${utilization}%">${utilization}% filled</div>
+                </div>
+            `;
+
+            const perClass = document.getElementById('per-class-analysis');
+            let html = '<table style="width: 100%; border-collapse: collapse;">';
+            html += '<tr><th style="text-align:left; padding:8px;">Class</th><th>Count</th><th>Placed</th><th>Exposed</th></tr>';
+
+            result.activeClasses.forEach(cls => {
+                const count = currentFlowState.consumers[cls] || 0;
+                const placed = result.flowPerClass[cls] || 0;
+                const exposed = Math.max(0, count - placed);
+                const colorClass = consumerColors[cls] || '';
+
+                html += `<tr>
+                    <td style="padding:8px;"><span class="consumer ${colorClass}" style="width:25px;height:25px;font-size:10px;">${cls.substring(0,2)}</span> ${cls}</td>
+                    <td style="text-align:center;">${count}</td>
+                    <td style="text-align:center; color: var(--green);">${placed}</td>
+                    <td style="text-align:center; color: ${exposed > 0 ? 'var(--yellow)' : 'var(--text-secondary)'};">${exposed}</td>
+                </tr>`;
+            });
+
+            html += '</table>';
+            perClass.innerHTML = html;
+        }
+
+        function renderFlowNetwork(slotTypes, consumers, result, highlight) {
+            const canvas = document.getElementById('flow-canvas');
+            const ctx = canvas.getContext('2d');
+
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            const activeClasses = result.activeClasses;
+            const slotTypeList = result.slotTypeList;
+            const C = activeClasses.length;
+            const T = slotTypeList.length;
+
+            const sourceX = 80, sourceY = canvas.height / 2;
+            const sinkX = canvas.width - 80, sinkY = canvas.height / 2;
+
+            const capacityToUse = highlight.capacitySnapshot || result.original;
+
+            const consumerNodes = activeClasses.map((cls, i) => ({
+                x: 250,
+                y: 60 + (canvas.height - 120) * (i / Math.max(C - 1, 1)),
+                label: cls,
+                count: consumers[cls],
+                nodeId: 1 + i
+            }));
+
+            const slotNodes = slotTypeList.map(([mask, count], j) => {
+                const maskNum = parseInt(mask);
+                let label = `0x${maskNum.toString(16).toUpperCase()}`;
+                if (maskNum === 0x79) label = 'E';
+                else if (maskNum === 0x7F) label = 'I';
+                else if (maskNum === 0xF9) label = 'V';
+                else if (maskNum === 0xFF) label = 'IS';
+
+                return {
+                    x: canvas.width - 250,
+                    y: 60 + (canvas.height - 120) * (j / Math.max(T - 1, 1)),
+                    label,
+                    count,
+                    mask: maskNum,
+                    nodeId: 1 + C + j
+                };
+            });
+
+            function isInPath(from, to) {
+                if (!highlight.path) return false;
+                return highlight.path.some(e => e.from === from && e.to === to);
+            }
+
+            function isVisited(nodeId) {
+                if (!highlight.visited) return false;
+                return highlight.visited.includes(nodeId);
+            }
+
+            function getFlow(from, to) {
+                return result.original[from][to] - capacityToUse[from][to];
+            }
+
+            // Draw edges: Source -> consumers
+            consumerNodes.forEach(node => {
+                const inPath = isInPath(0, node.nodeId);
+                const flow = highlight.showFlow !== false ? getFlow(0, node.nodeId) : 0;
+
+                ctx.strokeStyle = inPath ? '#fbbf24' : (flow > 0 ? '#4ade80' : '#4a5568');
+                ctx.lineWidth = inPath ? 4 : (flow > 0 ? 2 + flow * 0.5 : 2);
+                ctx.globalAlpha = inPath ? 1 : (flow > 0 ? 1 : 0.6);
+
+                ctx.beginPath();
+                ctx.moveTo(sourceX + 25, sourceY);
+                ctx.lineTo(node.x - 35, node.y);
+                ctx.stroke();
+
+                if (inPath) drawArrowHead(ctx, sourceX + 25, sourceY, node.x - 35, node.y);
+                ctx.globalAlpha = 1;
+            });
+
+            // Draw edges: Consumers -> slots
+            consumerNodes.forEach((cNode, i) => {
+                const cls = cNode.label;
+                const bit = consumerBits[cls];
+
+                slotNodes.forEach((sNode, j) => {
+                    if (sNode.mask & (1 << bit)) {
+                        const flow = highlight.showFlow !== false ? getFlow(cNode.nodeId, sNode.nodeId) : 0;
+                        const inPath = isInPath(cNode.nodeId, sNode.nodeId);
+
+                        if (inPath) {
+                            ctx.strokeStyle = '#fbbf24';
+                            ctx.lineWidth = 4;
+                            ctx.globalAlpha = 1;
+                        } else if (flow > 0) {
+                            ctx.strokeStyle = '#4ade80';
+                            ctx.lineWidth = 2 + flow * 0.5;
+                            ctx.globalAlpha = 1;
+                        } else {
+                            ctx.strokeStyle = '#4a5568';
+                            ctx.lineWidth = 1;
+                            ctx.globalAlpha = 0.3;
+                        }
+
+                        ctx.beginPath();
+                        ctx.moveTo(cNode.x + 35, cNode.y);
+                        ctx.lineTo(sNode.x - 35, sNode.y);
+                        ctx.stroke();
+
+                        if (inPath) drawArrowHead(ctx, cNode.x + 35, cNode.y, sNode.x - 35, sNode.y);
+
+                        if (flow > 0 && !inPath) {
+                            ctx.fillStyle = '#4ade80';
+                            ctx.font = 'bold 12px monospace';
+                            const midX = (cNode.x + sNode.x) / 2;
+                            const midY = (cNode.y + sNode.y) / 2;
+                            ctx.fillText(flow.toString(), midX - 5, midY - 5);
+                        }
+
+                        ctx.globalAlpha = 1;
+                    }
+                });
+            });
+
+            // Draw edges: Slots -> sink
+            slotNodes.forEach(node => {
+                const inPath = isInPath(node.nodeId, result.numNodes - 1);
+                const flow = highlight.showFlow !== false ? getFlow(node.nodeId, result.numNodes - 1) : 0;
+
+                ctx.strokeStyle = inPath ? '#fbbf24' : (flow > 0 ? '#4ade80' : '#4a5568');
+                ctx.lineWidth = inPath ? 4 : (flow > 0 ? 2 + flow * 0.5 : 2);
+                ctx.globalAlpha = inPath ? 1 : (flow > 0 ? 1 : 0.6);
+
+                ctx.beginPath();
+                ctx.moveTo(node.x + 35, node.y);
+                ctx.lineTo(sinkX - 25, sinkY);
+                ctx.stroke();
+
+                if (inPath) drawArrowHead(ctx, node.x + 35, node.y, sinkX - 25, sinkY);
+                ctx.globalAlpha = 1;
+            });
+
+            // Draw nodes
+            const sourceVisited = isVisited(0) || (highlight.path && highlight.path.length > 0);
+            ctx.fillStyle = sourceVisited ? '#fbbf24' : '#4ade80';
+            ctx.beginPath();
+            ctx.arc(sourceX, sourceY, 25, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#000';
+            ctx.font = 'bold 14px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('SRC', sourceX, sourceY + 5);
+
+            const sinkVisited = isVisited(result.numNodes - 1);
+            ctx.fillStyle = sinkVisited ? '#fbbf24' : '#ed1c24';
+            ctx.beginPath();
+            ctx.arc(sinkX, sinkY, 25, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#fff';
+            ctx.fillText('SINK', sinkX, sinkY + 5);
+
+            consumerNodes.forEach(node => {
+                const visited = isVisited(node.nodeId);
+                ctx.fillStyle = visited ? '#fbbf24' : (consumerHexColors[node.label] || '#2563eb');
+                ctx.beginPath();
+                ctx.arc(node.x, node.y, 30, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.fillStyle = visited ? '#000' : '#fff';
+                ctx.font = 'bold 12px sans-serif';
+                ctx.fillText(node.label, node.x, node.y + 4);
+                ctx.font = '10px sans-serif';
+                ctx.fillText(`(${node.count})`, node.x, node.y + 18);
+            });
+
+            slotNodes.forEach(node => {
+                const visited = isVisited(node.nodeId);
+                ctx.fillStyle = visited ? '#fbbf24' : '#7c3aed';
+                ctx.beginPath();
+                ctx.arc(node.x, node.y, 30, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.fillStyle = visited ? '#000' : '#fff';
+                ctx.font = 'bold 12px sans-serif';
+                ctx.fillText(node.label, node.x, node.y + 4);
+                ctx.font = '10px sans-serif';
+                ctx.fillText(`(${node.count})`, node.x, node.y + 18);
+            });
+
+            ctx.textAlign = 'left';
+            ctx.font = '11px sans-serif';
+            ctx.fillStyle = '#aaa';
+
+            if (highlight.totalFlow !== undefined) {
+                ctx.fillStyle = '#4ade80';
+                ctx.fillText(`Total Flow: ${highlight.totalFlow}`, 10, canvas.height - 30);
+            }
+
+            ctx.fillStyle = '#aaa';
+            ctx.fillText('Yellow = current path | Green = assigned flow | Node labels show capacity', 10, canvas.height - 10);
+        }
+
+        function drawArrowHead(ctx, fromX, fromY, toX, toY) {
+            const headLen = 12;
+            const angle = Math.atan2(toY - fromY, toX - fromX);
+
+            ctx.beginPath();
+            ctx.moveTo(toX, toY);
+            ctx.lineTo(toX - headLen * Math.cos(angle - Math.PI / 6), toY - headLen * Math.sin(angle - Math.PI / 6));
+            ctx.lineTo(toX - headLen * Math.cos(angle + Math.PI / 6), toY - headLen * Math.sin(angle + Math.PI / 6));
+            ctx.closePath();
+            ctx.fillStyle = '#fbbf24';
+            ctx.fill();
+        }
+
+        // Animation state management
+        function resetAnimationState() {
+            animationState = null;
+            document.getElementById('start-btn').disabled = false;
+            document.getElementById('next-btn').disabled = true;
+            document.getElementById('iteration-info').style.display = 'none';
+            document.getElementById('flow-explanation').innerHTML = '';
+
+            if (currentFlowState) {
+                const { slotTypes, consumers, result } = currentFlowState;
+                renderFlowNetwork(slotTypes, consumers, result, { showFlow: false });
+            }
+        }
+
+        function startAnimation() {
+            if (!currentFlowState) return;
+
+            const { result } = currentFlowState;
+
+            animationState = {
+                currentIteration: 0,
+                phase: 'bfs', // 'bfs' or 'push'
+                totalFlow: 0,
+                totalIterations: result.iterations.length
+            };
+
+            document.getElementById('start-btn').disabled = true;
+            document.getElementById('next-btn').disabled = false;
+            document.getElementById('iteration-info').style.display = 'block';
+            document.getElementById('total-iterations').textContent = result.iterations.length;
+            document.getElementById('current-iteration').textContent = '0';
+            document.getElementById('current-flow').textContent = '0';
+
+            document.getElementById('flow-explanation').innerHTML = `
+                <div class="animation-status">
+                    <strong>Edmonds-Karp Algorithm Started</strong><br>
+                    Click <strong>"Next Step"</strong> to begin finding augmenting paths.<br>
+                    The algorithm will use BFS to find paths from Source to Sink.
+                </div>
+            `;
+
+            const { slotTypes, consumers, result: r } = currentFlowState;
+            renderFlowNetwork(slotTypes, consumers, r, { showFlow: false });
+        }
+
+        function nextStep() {
+            if (!currentFlowState || !animationState) return;
+
+            const { slotTypes, consumers, result } = currentFlowState;
+            const { iterations } = result;
+
+            if (animationState.currentIteration >= iterations.length) {
+                // Algorithm complete
+                document.getElementById('next-btn').disabled = true;
+                renderFlowNetwork(slotTypes, consumers, result, {
+                    showFlow: true,
+                    totalFlow: result.maxFlow,
+                    capacitySnapshot: result.capacity
+                });
+
+                document.getElementById('flow-explanation').innerHTML = `
+                    <div class="animation-status complete">
+                        <strong>Algorithm Complete!</strong><br>
+                        No more augmenting paths found from Source to Sink.<br>
+                        <span style="color: var(--green); font-size: 1.2em;">Maximum Flow: ${result.maxFlow} instructions can be hidden in co-execution slots.</span>
+                    </div>
+                `;
+                return;
+            }
+
+            const iter = iterations[animationState.currentIteration];
+
+            if (animationState.phase === 'bfs') {
+                // Show BFS exploration and path
+                renderFlowNetwork(slotTypes, consumers, result, {
+                    visited: iter.visited,
+                    path: iter.path,
+                    showFlow: true,
+                    totalFlow: animationState.totalFlow,
+                    capacitySnapshot: iter.capacityBefore
+                });
+
+                const pathDesc = buildPathDescription(iter.path, result);
+
+                document.getElementById('flow-explanation').innerHTML = `
+                    <div class="animation-status finding-path">
+                        <span class="step-indicator">Iteration ${animationState.currentIteration + 1} - BFS</span>
+                        <strong>Found Augmenting Path!</strong><br>
+                        <div style="margin: 10px 0; padding: 10px; background: #1a1a1a; border-radius: 6px; font-family: monospace;">
+                            ${pathDesc}
+                        </div>
+                        Bottleneck capacity: <strong style="color: var(--yellow);">${iter.pathFlow}</strong><br>
+                        <em>Click "Next Step" to push flow along this path.</em>
+                    </div>
+                `;
+
+                animationState.phase = 'push';
+                document.getElementById('current-iteration').textContent = animationState.currentIteration + 1;
+
+            } else {
+                // Push flow phase
+                animationState.totalFlow += iter.pathFlow;
+
+                renderFlowNetwork(slotTypes, consumers, result, {
+                    showFlow: true,
+                    totalFlow: animationState.totalFlow,
+                    capacitySnapshot: iter.capacityAfter
+                });
+
+                document.getElementById('flow-explanation').innerHTML = `
+                    <div class="animation-status pushing-flow">
+                        <span class="step-indicator">Iteration ${animationState.currentIteration + 1} - Push</span>
+                        <strong>Flow Pushed!</strong><br>
+                        Pushed <strong style="color: var(--green);">${iter.pathFlow}</strong> unit(s) of flow along the path.<br>
+                        Updated residual capacities.<br>
+                        <div style="margin-top: 10px;">
+                            Total flow so far: <strong style="color: var(--green); font-size: 1.2em;">${animationState.totalFlow}</strong>
+                        </div>
+                        <em>${animationState.currentIteration + 1 < iterations.length ? 'Click "Next Step" to search for another path.' : 'Click "Next Step" to check for more paths.'}</em>
+                    </div>
+                `;
+
+                document.getElementById('current-flow').textContent = animationState.totalFlow;
+
+                animationState.currentIteration++;
+                animationState.phase = 'bfs';
+            }
+        }
+
+        function buildPathDescription(path, result) {
+            const parts = ['<span style="color: #4ade80;">SRC</span>'];
+
+            path.forEach(edge => {
+                let nodeName = '';
+                if (edge.to === result.numNodes - 1) {
+                    nodeName = '<span style="color: #ed1c24;">SINK</span>';
+                } else if (edge.to <= result.C) {
+                    const cls = result.activeClasses[edge.to - 1];
+                    const color = consumerHexColors[cls] || '#fff';
+                    nodeName = `<span style="color: ${color};">${cls}</span>`;
+                } else {
+                    const slotIdx = edge.to - 1 - result.C;
+                    const mask = parseInt(result.slotTypeList[slotIdx][0]);
+                    let label = 'Slot';
+                    if (mask === 0x79) label = 'E-slot';
+                    else if (mask === 0x7F) label = 'I-slot';
+                    else if (mask === 0xF9) label = 'V-slot';
+                    nodeName = `<span style="color: #7c3aed;">${label}</span>`;
+                }
+                parts.push(nodeName);
+            });
+
+            return parts.join(' → ');
+        }
+
+        function resetFlow() {
+            resetAnimationState();
+        }
+
+        function showFinalFlow() {
+            if (!currentFlowState) return;
+
+            resetAnimationState();
+
+            const { slotTypes, consumers, result, totalSlots } = currentFlowState;
+
+            document.getElementById('start-btn').disabled = false;
+            document.getElementById('next-btn').disabled = true;
+
+            renderFlowNetwork(slotTypes, consumers, result, {
+                showFlow: true,
+                totalFlow: result.maxFlow,
+                capacitySnapshot: result.capacity
+            });
+
+            document.getElementById('flow-explanation').innerHTML = `
+                <div class="animation-status complete">
+                    <strong>Final Result</strong><br>
+                    Maximum Flow: <span style="color: var(--green); font-size: 1.2em;">${result.maxFlow}</span> / ${totalSlots} slots filled<br>
+                    Lower Bound Stalls: <span style="color: var(--yellow);">${totalSlots - result.maxFlow}</span><br>
+                    Algorithm completed in <strong>${result.iterations.length}</strong> iterations.
+                </div>
+            `;
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            renderSlotPattern();
+            renderMaskVisualizer();
+            currentExample = examples['balanced'];
+            runAnalysis(currentExample);
+        });
+
+        renderSlotPattern();
+        renderMaskVisualizer();
+        currentExample = examples['balanced'];
+        runAnalysis(currentExample);
+    </script>
+</body>
+</html>
