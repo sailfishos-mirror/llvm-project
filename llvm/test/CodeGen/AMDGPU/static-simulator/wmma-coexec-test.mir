@@ -366,4 +366,3 @@ body: |
     $vgpr32_vgpr33_vgpr34_vgpr35 = V_CVT_SCALE_PK8_F16_FP8_e64 $vgpr24_vgpr25, $vgpr26, 0, implicit $mode, implicit $exec
     S_ENDPGM 0, implicit $vgpr35
 ...
-

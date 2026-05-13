@@ -1036,18 +1036,18 @@ static void computeWMMAScaleStall(const GPUSimState &State,
                                   unsigned &IssueCycle, StallSources &S) {
   unsigned ScaleReadCycle = IssueCycle;
 
-  // Scale read needs VALU resource free
-  ScaleReadCycle = std::max(ScaleReadCycle, State.VALUResourceBusyUntil);
-
   // In WMMA window: scale read must be in I-slot
   if (State.inWMMAWindow()) {
     unsigned CoExecStall = State.getCoExecStall(InstClass::VALU);
-    ScaleReadCycle = std::max(ScaleReadCycle, State.CurrentCycle + CoExecStall);
+    ScaleReadCycle = State.CurrentCycle + CoExecStall;
   }
+
+  // Scale read needs VALU resource free
+  ScaleReadCycle = std::max(ScaleReadCycle, State.VALUResourceBusyUntil);
 
   // WMMA phase needs XDL at (ScaleReadCycle + 1)
   unsigned WMMAStartCycle = ScaleReadCycle + 1;
-  unsigned XDLFreeAt = State.getUnitBusyUntil(FunctionalUnit::XDL);
+  unsigned XDLFreeAt = std::max(State.getUnitBusyUntil(FunctionalUnit::XDL), IssueCycle);
 
   if (WMMAStartCycle < XDLFreeAt) {
     // Delay scale read so WMMA starts when XDL is free
