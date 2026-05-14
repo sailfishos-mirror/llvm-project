@@ -23,7 +23,6 @@ class MCSymbol;
 class formatted_raw_ostream;
 
 namespace AMDGPU {
-
 struct AMDGPUMCKernelCodeT;
 struct MCKernelDescriptor;
 namespace HSAMD {
