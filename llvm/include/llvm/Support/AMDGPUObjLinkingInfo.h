@@ -61,6 +61,9 @@ enum class InfoKind : uint8_t {
   /// Occupancy used to compile the function.
   /// [u32]
   INFO_OCCUPANCY = 11,
+  /// Wavefront size (32 or 64) used to compile the function.
+  /// [u32]
+  INFO_WAVE_SIZE = 12,
 };
 
 /// Per-function flags packed into INFO_FLAGS entries.

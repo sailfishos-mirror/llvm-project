@@ -24,6 +24,12 @@ class formatted_raw_ostream;
 
 namespace AMDGPU {
 
+/// Map an ELF EF_AMDGPU_MACH_* value to the corresponding GPU name.
+/// Declared here (and defined in AMDGPUTargetStreamer.cpp) so that
+/// cross-component consumers like LLD can call it via forward declaration
+/// without depending on target-private headers.
+StringRef getArchNameFromElfMach(unsigned ElfMach);
+
 struct AMDGPUMCKernelCodeT;
 struct MCKernelDescriptor;
 namespace HSAMD {
@@ -36,6 +42,7 @@ struct FuncInfo {
   uint32_t NumAccVGPR = 0;
   uint32_t PrivateSegmentSize = 0;
   uint32_t Occupancy = 0;
+  uint32_t WaveSize = 0;
   bool UsesVCC = false;
   bool UsesFlatScratch = false;
   bool HasDynStack = false;

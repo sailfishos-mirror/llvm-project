@@ -25,6 +25,7 @@
 #include "llvm/MC/MCInstrInfo.h"
 #include "llvm/MC/MCRegisterInfo.h"
 #include "llvm/MC/MCSubtargetInfo.h"
+#include "llvm/Support/AMDGPUIsaInfo.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/TargetParser/AMDGPUTargetParser.h"
 #include <optional>
@@ -1569,6 +1570,26 @@ unsigned getAllocatedNumVGPRBlocks(const MCSubtargetInfo &STI,
   return getGranulatedNumRegisterBlocks(
       NumVGPRs,
       getVGPRAllocGranule(STI, DynamicVGPRBlockSize, EnableWavefrontSize32));
+}
+
+bool isLocalMemorySizeCompatibleWithOccupancy(const MCSubtargetInfo &STI,
+                                              uint64_t LDSBytes,
+                                              unsigned Occupancy) {
+  if (Occupancy == 0 || Occupancy > getMaxWavesPerEU(STI))
+    return false;
+
+  uint64_t Granularity = uint64_t(getLdsDwGranularity(STI)) * sizeof(uint32_t);
+  uint64_t AlignedLDSBytes = alignTo(LDSBytes, Granularity);
+  if (AlignedLDSBytes > getAddressableLocalMemorySize(STI))
+    return false;
+
+  uint64_t WavesPerWorkgroup =
+      getWavesPerWorkGroup(STI, getMaxFlatWorkGroupSize());
+  uint64_t RequiredWavesPerCU = uint64_t(Occupancy) * getEUsPerCU(STI);
+  uint64_t WorkGroupsPerCU =
+      std::max<uint64_t>(divideCeil(RequiredWavesPerCU, WavesPerWorkgroup), 1);
+
+  return AlignedLDSBytes <= getLocalMemorySize(STI) / WorkGroupsPerCU;
 }
 } // end namespace IsaInfo
 

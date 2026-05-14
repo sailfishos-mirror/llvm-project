@@ -53,7 +53,7 @@ bool AMDGPUTargetStreamer::EmitHSAMetadataV3(StringRef HSAMetadataString) {
   return EmitHSAMetadata(HSAMetadataDoc, false);
 }
 
-StringRef AMDGPUTargetStreamer::getArchNameFromElfMach(unsigned ElfMach) {
+StringRef AMDGPU::getArchNameFromElfMach(unsigned ElfMach) {
   AMDGPU::GPUKind AK;
 
   // clang-format off
@@ -144,6 +144,10 @@ StringRef AMDGPUTargetStreamer::getArchNameFromElfMach(unsigned ElfMach) {
   if (GPUName != "")
     return GPUName;
   return getArchNameR600(AK);
+}
+
+StringRef AMDGPUTargetStreamer::getArchNameFromElfMach(unsigned ElfMach) {
+  return AMDGPU::getArchNameFromElfMach(ElfMach);
 }
 
 unsigned AMDGPUTargetStreamer::getElfMach(StringRef GPU) {
@@ -760,6 +764,8 @@ void AMDGPUTargetAsmStreamer::emitAMDGPUInfo(
          << '\n';
       if (Info->Occupancy)
         OS << "\t\t.amdgpu_occupancy " << Info->Occupancy << '\n';
+      if (Info->WaveSize)
+        OS << "\t\t.amdgpu_wave_size " << Info->WaveSize << '\n';
     }
     for (MCSymbol *Res : Uses)
       OS << "\t\t.amdgpu_use " << Res->getName() << '\n';
@@ -1236,6 +1242,8 @@ void AMDGPUTargetELFStreamer::emitAMDGPUInfo(
                    Info->PrivateSegmentSize);
       if (Info->Occupancy)
         EmitU32Entry(AMDGPU::InfoKind::INFO_OCCUPANCY, Info->Occupancy);
+      if (Info->WaveSize)
+        EmitU32Entry(AMDGPU::InfoKind::INFO_WAVE_SIZE, Info->WaveSize);
     }
 
     for (MCSymbol *Res : Uses)

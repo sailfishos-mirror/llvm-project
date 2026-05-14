@@ -958,6 +958,7 @@ bool AMDGPUAsmPrinter::runOnMachineFunction(MachineFunction &MF) {
          /*NumAccVGPR=*/static_cast<uint32_t>(RU.NumAGPR),
          /*PrivateSegmentSize=*/static_cast<uint32_t>(RU.PrivateSegmentSize),
          /*Occupancy=*/Occupancy,
+         /*WaveSize=*/static_cast<uint32_t>(STM.getWavefrontSize()),
          /*UsesVCC=*/RU.UsesVCC,
          /*UsesFlatScratch=*/RU.UsesFlatScratch,
          /*HasDynStack=*/RU.HasDynamicallySizedStack,

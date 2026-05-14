@@ -6936,6 +6936,12 @@ bool AMDGPUAsmParser::ParseDirectiveAMDGPUInfo() {
         return true;
       FI.Occupancy = static_cast<uint32_t>(Val);
       HasScalarAttrs = true;
+    } else if (Dir == "wave_size") {
+      int64_t Val;
+      if (getParser().parseAbsoluteExpression(Val))
+        return true;
+      FI.WaveSize = static_cast<uint32_t>(Val);
+      HasScalarAttrs = true;
     } else if (Dir == "use") {
       StringRef ResName;
       if (getParser().parseIdentifier(ResName))
