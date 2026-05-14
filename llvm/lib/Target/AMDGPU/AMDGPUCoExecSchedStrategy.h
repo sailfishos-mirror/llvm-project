@@ -125,6 +125,8 @@ struct RooflineResult {
   }
 };
 
+class CandidateHeuristics;
+
 //===----------------------------------------------------------------------===//
 // Hardware Unit Information
 //===----------------------------------------------------------------------===//
@@ -168,6 +170,8 @@ private:
   /// when CoexecExposedSort != Off.
   unsigned RemainingExposed = 0;
 
+  unsigned RemainingCycles = 0;
+
 public:
   HardwareUnitInfo() {}
 
@@ -198,6 +202,9 @@ public:
     if (RemainingExposed)
       --RemainingExposed;
   }
+
+  unsigned getRemainingCycles() const { return RemainingCycles; }
+  void setRemainingCycles(unsigned N) { RemainingExposed = N; }
 
   /// \returns the next cycle where there is space in the buffer.
   unsigned getBufferAvailableCycle(unsigned CurrCycle) {
@@ -248,6 +255,7 @@ public:
     BufferSize = 0;
     BufferCycles = 0;
     RemainingExposed = 0;
+    RemainingCycles = 0;
   }
 
   /// \returns the next SU in PrioritySUs that is not ready. If \p LookDeep is
@@ -385,15 +393,22 @@ struct CoexecWindow {
 /// first, or the value is stale.
 struct RegionMixInfo {
   unsigned ReadyCount[static_cast<unsigned>(AMDGPU::InstructionFlavor::NUM_FLAVORS)] = {};
+  unsigned ReadyCycles[static_cast<unsigned>(
+      AMDGPU::InstructionFlavor::NUM_FLAVORS)] = {};
   unsigned ScheduledCount[static_cast<unsigned>(AMDGPU::InstructionFlavor::NUM_FLAVORS)] = {};
 
   void reset();
   void recordScheduled(AMDGPU::InstructionFlavor Flavor);
   void invalidate() { SnapshotDirty = true; }
-  void refreshFromBoundary(SchedBoundary &Zone, const SIInstrInfo &SII);
+  void refreshFromBoundary(SchedBoundary &Zone, const SIInstrInfo &SII,
+                           CandidateHeuristics *Heurs);
 
   unsigned getReadyCount(AMDGPU::InstructionFlavor F) const {
     return ReadyCount[static_cast<unsigned>(F)];
+  }
+
+  unsigned getReadyCycles(AMDGPU::InstructionFlavor F) const {
+    return ReadyCycles[static_cast<unsigned>(F)];
   }
 
 private:
@@ -461,13 +476,6 @@ protected:
 
   RooflineResult Roofline;
 
-  /// Compute the blocking cycles for the appropriate HardwareUnit given an \p
-  /// SU
-  unsigned getHWUICyclesForSU(SUnit *SU);
-  /// Compute the blocking cycles for the appropriate HardwareUnit given an \p
-  /// MI
-  unsigned getHWUICyclesForMI(MachineInstr *MI);
-
   /// Estimate the block carried latency from loads for a given \p SU. This is
   /// essentially global scheduling info that our local scheduling
   /// infrastructure lacks the necessary infrastructure to accurately measure.
@@ -500,6 +508,13 @@ public:
   /// mapped HardwareUnit.
   HardwareUnitInfo *getHWUIFromFlavor(AMDGPU::InstructionFlavor Flavor);
 
+  /// Compute the blocking cycles for the appropriate HardwareUnit given an \p
+  /// SU
+  unsigned getHWUICyclesForSU(SUnit *SU);
+  /// Compute the blocking cycles for the appropriate HardwareUnit given an \p
+  /// MI
+  unsigned getHWUICyclesForMI(MachineInstr *MI);
+
   /// Update the state to reflect that \p SU is going to be scheduled.
   /// \p Zone provides cycle information for window lifecycle management.
   void updateForScheduling(SUnit *SU, SchedBoundary *Zone);
@@ -507,7 +522,7 @@ public:
   /// Sort the HWUInfo vector. After sorting, the HardwareUnits that are highest
   /// priority are first. Priority is determined by maximizing coexecution and
   /// keeping the critical HardwareUnit busy.
-  void sortHWUIResources();
+  void sortHWUIResources(SchedBoundary *Zone, bool UseDependencySort = false);
 
   unsigned getStructuralStallCycles(SchedBoundary &Zone, SUnit *SU);
 

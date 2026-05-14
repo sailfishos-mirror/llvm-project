@@ -238,6 +238,7 @@ void RegionMixInfo::reset() {
       static_cast<unsigned>(InstructionFlavor::NUM_FLAVORS);
   for (unsigned I = 0; I < N; ++I) {
     ReadyCount[I] = 0;
+    ReadyCycles[I] = 0;
     ScheduledCount[I] = 0;
   }
   SnapshotDirty = true;
@@ -248,13 +249,16 @@ void RegionMixInfo::recordScheduled(InstructionFlavor Flavor) {
 }
 
 void RegionMixInfo::refreshFromBoundary(SchedBoundary &Zone,
-                                        const SIInstrInfo &SII) {
+                                        const SIInstrInfo &SII,
+                                        CandidateHeuristics *Heurs) {
   if (!SnapshotDirty)
     return;
   constexpr unsigned N =
       static_cast<unsigned>(InstructionFlavor::NUM_FLAVORS);
-  for (unsigned I = 0; I < N; ++I)
+  for (unsigned I = 0; I < N; ++I) {
     ReadyCount[I] = 0;
+    ReadyCycles[I] = 0;
+  }
 
   // Snapshot Available + Pending: both have NumPredsLeft == 0 (DAG-ready).
   // Pending entries would cause a structural stall this cycle but are still
@@ -263,6 +267,7 @@ void RegionMixInfo::refreshFromBoundary(SchedBoundary &Zone,
     unsigned Idx =
         static_cast<unsigned>(classifyFlavor(*SU->getInstr(), SII));
     ReadyCount[Idx]++;
+    ReadyCycles[Idx] += Heurs->getHWUICyclesForSU(SU);
   };
   for (SUnit *SU : Zone.Available.elements())
     Bump(SU);
@@ -662,6 +667,9 @@ void HardwareUnitInfo::insert(SUnit *SU, unsigned BlockingCycles) {
 }
 
 void HardwareUnitInfo::markScheduled(SUnit *SU, unsigned BlockingCycles) {
+  if (RemainingCycles)
+    RemainingCycles -= BlockingCycles;
+
   // We may want to ignore some HWUIs (e.g. InstructionFlavor::Other). To do so,
   // we just clear the HWUI. However, we still have instructions which map to
   // this HWUI. Don't bother managing the state for these HWUI.
@@ -701,6 +709,8 @@ void HardwareUnitInfo::markScheduled(SUnit *SU, unsigned BlockingCycles) {
 }
 
 void HardwareUnitInfo::finalizeCycles() {
+  RemainingCycles = TotalCycles;
+
   if (BufferSize <= 1 || AllSUs.empty())
     return;
 
@@ -1299,12 +1309,34 @@ void CandidateHeuristics::initExposedRoofline() {
   }
 }
 
-void CandidateHeuristics::sortHWUIResources() {
+void CandidateHeuristics::sortHWUIResources(SchedBoundary *Zone,
+                                            bool UseDependencySort) {
   bool UseExposed = CoexecExposedSort != CoexecExposedMode::Off;
+  if (UseDependencySort)
+    MixInfo.refreshFromBoundary(*Zone, *SII, this);
 
   // Highest priority should be first.
-  llvm::sort(HWUInfo, [UseExposed](HardwareUnitInfo &A, HardwareUnitInfo &B) {
+  llvm::sort(HWUInfo, [UseExposed, UseDependencySort,
+                       this](HardwareUnitInfo &A, HardwareUnitInfo &B) {
     // Prefer CoexecWindow producers
+
+    if (UseDependencySort) {
+      unsigned AReadyCycles = MixInfo.getReadyCycles(A.getType());
+      unsigned ARemainingCycles = A.getRemainingCycles();
+      unsigned AUnreadyCycles = ARemainingCycles > AReadyCycles
+                                    ? (ARemainingCycles - AReadyCycles)
+                                    : 0;
+
+      unsigned BReadyCycles = MixInfo.getReadyCycles(B.getType());
+      unsigned BRemainingCycles = B.getRemainingCycles();
+      unsigned BUnreadyCycles = BRemainingCycles > BReadyCycles
+                                    ? (BRemainingCycles - BReadyCycles)
+                                    : 0;
+
+      if (AUnreadyCycles != BUnreadyCycles)
+        return AUnreadyCycles > BUnreadyCycles;
+    }
+
     if (A.producesCoexecWindow() != B.producesCoexecWindow())
       return A.producesCoexecWindow();
 
@@ -1731,7 +1763,9 @@ bool CandidateHeuristics::tryCriticalResource(
     // Otherwise, both use the critical resource
     // For longer latency InstructionFlavors, we should prioritize first by
     // their enablement of critical resources
-    if (HWUI.getType() == InstructionFlavor::DS) {
+    if (HWUI.getType() == InstructionFlavor::DS ||
+        HWUI.getType() == InstructionFlavor::SALU ||
+        HWUI.getType() == InstructionFlavor::SingleCycleVALU) {
       if (tryCriticalResourceDependency(TryCand, Cand, Zone))
         return true;
     }
@@ -1829,7 +1863,7 @@ bool CandidateHeuristics::tryShadowMix(
 
   // Refresh ready-mix snapshot from the boundary's queues. No-op if the
   // snapshot is still valid (cleared on schedNode).
-  MixInfo.refreshFromBoundary(*Zone, *SII);
+  MixInfo.refreshFromBoundary(*Zone, *SII, this);
 
   // Determine if either candidate is a window producer.
   HardwareUnitInfo *CandHWUI = getHWUIFromFlavor(CandFlavor);
@@ -2222,12 +2256,13 @@ bool AMDGPUCoExecSchedStrategy::tryCandidateCoexec(SchedCandidate &Cand,
       return TryCand.Reason != NoCand;
     }
 
-    Heurs.sortHWUIResources();
+    Heurs.sortHWUIResources(Zone);
     if (Heurs.tryCriticalResource(TryCand, Cand, Zone)) {
       LastAMDGPUReason = AMDGPUSchedReason::CritResourceBalance;
       return TryCand.Reason != NoCand;
     }
 
+    Heurs.sortHWUIResources(Zone, true);
     if (Heurs.tryCriticalResourceDependency(TryCand, Cand, Zone)) {
       LastAMDGPUReason = AMDGPUSchedReason::CritResourceDep;
       return TryCand.Reason != NoCand;
