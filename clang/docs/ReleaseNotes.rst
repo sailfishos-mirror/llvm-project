@@ -71,6 +71,9 @@ C/C++ Language Potentially Breaking Changes
   Clang would previously ``break`` out of the ``while`` loop, whereas GCC (since version 9) would
   ``break`` out of the ``for`` loop here. Now, Clang and GCC both break out of the ``for`` loop.
 
+- Clang now requires the option ``-fsignaling-nans`` whenever support for
+  signaling NaNs is required.
+
 C++ Specific Potentially Breaking Changes
 -----------------------------------------
 
