@@ -1055,6 +1055,19 @@ void CandidateHeuristics::computeRooflineCoExec() {
   if (NumWMMAs > 1)
     Roofline.ConsumerCount[coexecBitIndex(CoExecMask::WMMA)] += NumWMMAs - 1;
 
+  // TRANS shadow producer (excess-capacity model).
+  // Each TRANS executes in 2 cycles; its 2nd cycle is a free StageTR slot
+  // when the TRANS doesn't fit into a WMMA I/IS slot (which would absorb
+  // it into the window). Per SPG §5.3.5.2.2, the shadow accepts core/side
+  // MACC + off-pipe ops (modeled by StageTR = All & ~TRANS). Count only
+  // the excess so we don't double-count TRANS that land in WMMA windows.
+  unsigned WMMAIcap =
+      SlotTypes[CoExecMask::StageI] + SlotTypes[CoExecMask::StageIS];
+  unsigned NumTRANS =
+      Roofline.ConsumerCount[coexecBitIndex(CoExecMask::TRANS)];
+  if (NumTRANS > WMMAIcap)
+    SlotTypes[CoExecMask::StageTR] += NumTRANS - WMMAIcap;
+
   // Compute total slots.
   for (auto &[Mask, Count] : SlotTypes)
     Roofline.TotalSlots += Count;
