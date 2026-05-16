@@ -1038,6 +1038,20 @@ void CandidateHeuristics::computeRooflineCoExec() {
       continue;
     }
 
+    if (Flavor == InstructionFlavor::MultiCycleVALU) {
+      // Producer: multi-cycle VALU (CVT etc) cannot issue within a WMMA
+      // window — it has its own window. RepeatRate cycles total: 1 issue
+      // cycle (self-filled by the CVT itself) plus (RepeatRate-1) shadow
+      // cycles where math SIMD is blocked but SALU/MEM/CTRL can still
+      // issue (StageE-like). Add only the shadow slots to the supply;
+      // the issue cycle is consumed by the producer itself. Don't count
+      // this MI as a consumer either.
+      unsigned RR = SII->getRepeatRate(MI);
+      if (RR > 1)
+        SlotTypes[CoExecMask::StageE] += RR - 1;
+      continue;
+    }
+
     // Consumer: map to CoExecMask bit.
     uint8_t Bit = flavorToCoExecMask(Flavor);
     // Catch SMEM instructions that classifyFlavor maps to Other.
