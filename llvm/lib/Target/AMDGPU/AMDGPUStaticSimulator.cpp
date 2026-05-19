@@ -1033,8 +1033,8 @@ static unsigned computeVALUResourceStall(InstClass IC, const GPUSimState &State,
 // Compute WMMA_SCALE timing using decomposition model:
 // Scale Read (1-cycle VALU) followed by WMMA (XDL)
 static void computeWMMAScaleStall(const GPUSimState &State,
-                                  unsigned &IssueCycle, StallSources &S) {
-  unsigned ScaleReadCycle = IssueCycle;
+                                  unsigned &WNNAIssueCycle, StallSources &S) {
+  unsigned ScaleReadCycle = WNNAIssueCycle;
 
   // In WMMA window: scale read must be in I-slot
   if (State.inWMMAWindow()) {
@@ -1047,7 +1047,7 @@ static void computeWMMAScaleStall(const GPUSimState &State,
 
   // WMMA phase needs XDL at (ScaleReadCycle + 1)
   unsigned WMMAStartCycle = ScaleReadCycle + 1;
-  unsigned XDLFreeAt = std::max(State.getUnitBusyUntil(FunctionalUnit::XDL), IssueCycle);
+  unsigned XDLFreeAt = std::max(State.getUnitBusyUntil(FunctionalUnit::XDL), WNNAIssueCycle);
 
   if (WMMAStartCycle < XDLFreeAt) {
     // Delay scale read so WMMA starts when XDL is free
@@ -1074,9 +1074,9 @@ static void computeWMMAScaleStall(const GPUSimState &State,
     }
   }
 
-  IssueCycle = ScaleReadCycle;
+  WNNAIssueCycle = ScaleReadCycle;
   S.WMMAStartCycle = WMMAStartCycle;
-  S.VALUSlot = IssueCycle - State.CurrentCycle;
+  S.VALUSlot = WNNAIssueCycle - State.CurrentCycle;
 }
 
 // Compute scoreboard-based RAW stalls for ALL instruction types.

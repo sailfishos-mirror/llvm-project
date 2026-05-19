@@ -1,21 +1,11 @@
 {
-  "AAI/bf16FA/bf16_fa": 1176,
+  "AAI/bf16FA/bf16_fa": 1173,
   "AAI/bf16_GEMM/bf16_GEMM": 1026,
-<<<<<<< HEAD
-  "AAI/fp4_GEMM/fp4_GEMM": 865,
-  "AAI/fp8fp4MOE/fp8fp4_MOE": 1636,
-  "Gluon/bf16FA/bf16_fa": 1257,
+  "AAI/fp4_GEMM/fp4_GEMM": 859,
+  "AAI/fp8fp4MOE/fp8fp4_MOE": 1627,
+  "Gluon/bf16FA/bf16_fa": 1258,
   "Gluon/bf16_GEMM/bf16_GEMM": 2057,
-  "Gluon/fo4_GEMM/fp4_GEMM": 834,
-  "Gluon/fp8_FA/fp8_fa": 1717,
-  "Gluon/fp8_GEMM/fo8_GEMM": 27141
-=======
-  "AAI/fp4_GEMM/fp4_GEMM": 823,
-  "AAI/fp8fp4MOE/fp8fp4_MOE": 1579,
-  "Gluon/bf16FA/bf16_fa": 1310,
-  "Gluon/bf16_GEMM/bf16_GEMM": 2055,
-  "Gluon/fo4_GEMM/fp4_GEMM": 713,
-  "Gluon/fp8_FA/fp8_fa": 1721,
-  "Gluon/fp8_GEMM/fo8_GEMM": 1339
->>>>>>> 829f601da217 ([AMDGPU] Do not require ld_scale read cycle to be greater than IssueCycle)
+  "Gluon/fo4_GEMM/fp4_GEMM": 714,
+  "Gluon/fp8_FA/fp8_fa": 1698,
+  "Gluon/fp8_GEMM/fo8_GEMM": 27120
 }
