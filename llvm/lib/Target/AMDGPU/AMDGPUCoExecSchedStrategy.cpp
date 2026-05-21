@@ -28,9 +28,6 @@ using namespace llvm::AMDGPU;
 
 #define DEBUG_TYPE "machine-scheduler"
 
-// BFS depth limit for lookahead search (search-budget, not hardware-derived).
-static constexpr unsigned ShadowMixLookaheadDepth = 8;
-
 // Default VGPR excess threshold percent for coexec scheduler.
 static constexpr unsigned DefaultVGPRExcessThresholdPercent = 100;
 
@@ -1854,6 +1851,17 @@ bool CandidateHeuristics::wouldHelpEnable(SUnit *SU, SUnit *TargetSU) {
 // ShadowMix Heuristic
 //===----------------------------------------------------------------------===//
 
+// BFS depth limit for the ShadowMix lookahead.
+static constexpr unsigned ShadowMixLookaheadDepth = 8;
+
+// Per-tryShadowMix cap on IsReachable calls inside the inner enablement
+// scan. The scan iterates pending SUnits of the needed flavor and runs up
+// to two IsReachable calls per SUnit; without a cap this is O(N^2) DFS per
+// pickNode comparison and dominates compile time on large DAGs. After the
+// budget is exhausted we bail out of the lookahead (the greedy fallback
+// below still runs). Set to 0 to disable the scan entirely.
+static constexpr unsigned ShadowMixIsReachableBudget = 16;
+
 bool CandidateHeuristics::tryShadowMix(
     GenericSchedulerBase::SchedCandidate &TryCand,
     GenericSchedulerBase::SchedCandidate &Cand, SchedBoundary *Zone) {
@@ -1972,35 +1980,54 @@ bool CandidateHeuristics::tryShadowMix(
 
   // BFS lookahead — check if one candidate is on the path to a pending
   // filler of the needed flavor. Exclude producers from scoring.
+  //
+  // The per-pending-SU scan calls IsReachable, which runs a DFS through the
+  // topological-order window. On large DAGs that is O(N) per call, and
+  // unbounded iteration here dominated compile time. ShadowMixIsReachableBudget
+  // caps the scan; the greedy fallback below still picks a producer when one
+  // is present.
   auto NearestDist =
       findNearestPendingByFlavor(NeededFlavor, ShadowMixLookaheadDepth);
-  if (NearestDist) {
-    for (auto &SU : DAG->SUnits) {
-      if (!SU.getInstr() || SU.isScheduled || SU.isTopReady())
-        continue;
-      if (classifyFlavor(*SU.getInstr(), *SII) != NeededFlavor)
-        continue;
+  if (NearestDist && ShadowMixIsReachableBudget > 0) {
+    // Bail early if neither candidate can possibly contribute: producers
+    // short-circuit their wouldHelpEnable check to false, so the loop body
+    // would never decide anything and we would burn the budget for nothing.
+    if (!CandMatchesProducer || !TryCandMatchesProducer) {
+      unsigned RemainingBudget = ShadowMixIsReachableBudget;
+      for (auto &SU : DAG->SUnits) {
+        if (!SU.getInstr() || SU.isScheduled || SU.isTopReady())
+          continue;
+        if (classifyFlavor(*SU.getInstr(), *SII) != NeededFlavor)
+          continue;
 
-      bool CandHelps = !CandMatchesProducer && wouldHelpEnable(Cand.SU, &SU);
-      bool TryCandHelps =
-          !TryCandMatchesProducer && wouldHelpEnable(TryCand.SU, &SU);
+        // Each surviving iteration costs up to two IsReachable calls. Stop
+        // probing once the budget cannot cover another pair.
+        if (RemainingBudget < 2)
+          break;
+        RemainingBudget -= 2;
 
-      if (CandHelps == TryCandHelps)
-        continue;
+        bool CandHelps =
+            !CandMatchesProducer && wouldHelpEnable(Cand.SU, &SU);
+        bool TryCandHelps =
+            !TryCandMatchesProducer && wouldHelpEnable(TryCand.SU, &SU);
 
-      if (TryCandHelps) {
-        LLVM_DEBUG(dbgs() << "ShadowMix lookahead: SU(" << TryCand.SU->NodeNum
+        if (CandHelps == TryCandHelps)
+          continue;
+
+        if (TryCandHelps) {
+          LLVM_DEBUG(dbgs() << "ShadowMix lookahead: SU(" << TryCand.SU->NodeNum
+                            << ") helps enable " << getFlavorName(NeededFlavor)
+                            << " SU(" << SU.NodeNum << ")\n");
+          TryCand.Reason = GenericSchedulerBase::RegCritical;
+          return true;
+        }
+        LLVM_DEBUG(dbgs() << "ShadowMix lookahead: SU(" << Cand.SU->NodeNum
                           << ") helps enable " << getFlavorName(NeededFlavor)
                           << " SU(" << SU.NodeNum << ")\n");
-        TryCand.Reason = GenericSchedulerBase::RegCritical;
+        if (Cand.Reason > GenericSchedulerBase::RegCritical)
+          Cand.Reason = GenericSchedulerBase::RegCritical;
         return true;
       }
-      LLVM_DEBUG(dbgs() << "ShadowMix lookahead: SU(" << Cand.SU->NodeNum
-                        << ") helps enable " << getFlavorName(NeededFlavor)
-                        << " SU(" << SU.NodeNum << ")\n");
-      if (Cand.Reason > GenericSchedulerBase::RegCritical)
-        Cand.Reason = GenericSchedulerBase::RegCritical;
-      return true;
     }
   }
 
