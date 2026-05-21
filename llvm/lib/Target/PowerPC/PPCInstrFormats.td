@@ -2387,7 +2387,8 @@ class Z23Form_FRTB5_R1_RMC2<bits<6> opcode, bits<8> xo, dag OOL, dag IOL,
 //===----------------------------------------------------------------------===//
 // EmitTimePseudo won't have encoding information for the [MC]CodeEmitter
 // stuff
-class PPCEmitTimePseudo<dag OOL, dag IOL, string asmstr, list<dag> pattern>
+class PPCEmitTimePseudo<dag OOL, dag IOL, list<dag> pattern = [],
+                         string asmstr = "#" # NAME>
     : I<0, OOL, IOL, asmstr, NoItinerary> {
   let isCodeGenOnly = 1;
   let PPC64 = 0;
