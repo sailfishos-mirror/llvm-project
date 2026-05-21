@@ -1529,7 +1529,7 @@ class VOP3PWMMA_Profile<list<ValueType> ArgTy, bit _IsSWMMAC, int _IndexType,
                                          !eq(ArgTy[1], v48i32), !eq(ArgTy[1], v64i32)));
 
   bit IsC_F64 = !eq(ArgTy[3], v8f64);
-  bit IsC_F32 = !or(!eq(ArgTy[3], v8f32), !eq(ArgTy[3], v4f32));
+  bit IsC_F32 = !or(!eq(ArgTy[3], v16f32), !eq(ArgTy[3], v8f32), !eq(ArgTy[3], v4f32));
   bit IsC_BF16 = !or(!eq(ArgTy[3], v8i16), !eq(ArgTy[3], v4i16),
                      !eq(ArgTy[3], v8bf16), !eq(ArgTy[3], v4bf16));
   bit IsC_F16 = !or(!eq(ArgTy[3], v8f16), !eq(ArgTy[3], v4f16));
