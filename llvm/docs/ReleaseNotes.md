@@ -219,6 +219,7 @@ Changes to LLVM infrastructure
 * Adds experimental assembler support for the 'Zvvfmm` (RISC-V Floating-Point Matrix Multiply-Accumulate) extension.
 * Adds support for 'Ziccid' (Instruction/Data Coherence and Consistency) extension.
 * Adds experimental assembler support for the `Xqccmt` (Qualcomm 16-bit Table Jump) vendor extension.
+* `-mcpu=sifive-870` has been renamed `-mcpu=sifive-p870-d`.
 
 ### Changes to the WebAssembly Backend
 
