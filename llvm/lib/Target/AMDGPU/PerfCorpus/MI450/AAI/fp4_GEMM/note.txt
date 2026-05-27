@@ -6,4 +6,4 @@ Sched Perf
 
 
 Flags
-    --amdgpu-block-carried-latency=true
+    --amdgpu-block-carried-latency=all

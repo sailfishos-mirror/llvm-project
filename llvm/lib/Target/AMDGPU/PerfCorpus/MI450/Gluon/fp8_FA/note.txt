@@ -5,4 +5,4 @@ Sched Perf
 1552 warm cycles
 
 Flags
-    --amdgpu-block-carried-latency=true
+    --amdgpu-block-carried-latency=all

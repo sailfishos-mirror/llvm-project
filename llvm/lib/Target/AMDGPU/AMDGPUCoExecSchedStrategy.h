@@ -175,6 +175,11 @@ private:
 public:
   HardwareUnitInfo() {}
 
+  auto begin() { return AllSUs.begin(); }
+  auto end() { return AllSUs.end(); }
+  auto rbegin() { return AllSUs.rbegin(); }
+  auto rend() { return AllSUs.rend(); }
+
   unsigned size() const { return AllSUs.size(); }
 
   unsigned getTotalCycles() const { return TotalCycles; }

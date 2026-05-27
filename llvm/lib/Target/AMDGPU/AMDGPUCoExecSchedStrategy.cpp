@@ -49,11 +49,22 @@ static cl::opt<CoexecExposedMode> CoexecExposedSort(
                    "Per-class exposed cycles derived from the roofline "
                    "max-flow solution.")));
 
-static cl::opt<bool> BlockCarriedLatency(
-  "amdgpu-block-carried-latency",
-  cl::desc("Whether or not to pad the beginning of blocks with latency from incoming loads"),
-  cl::ReallyHidden,
-  cl::init(false));
+namespace {
+enum class CarriedLatency { Off, Fence, All };
+} // namespace
+
+static cl::opt<CarriedLatency> BlockCarriedLatency(
+    "amdgpu-block-carried-latency", cl::Hidden,
+    cl::init(CarriedLatency::Off),
+    cl::desc("Prioritize HardwareUnits with non-zero exposed cycles in the "
+             "coexec scheduler's critical-resource sort."),
+    cl::values(
+        clEnumValN(CarriedLatency::Off, "off",
+                   "Disabled- do not pad latency."),
+        clEnumValN(CarriedLatency::Fence, "fence",
+                   "Only pad latency for memory fence (e.g. those surrounding barrier_signal/wait)."),
+        clEnumValN(CarriedLatency::All, "all",
+                   "Pad latency for any SU with an incoming ds_load dependency.")));
 
 namespace {
 
@@ -864,6 +875,32 @@ void CandidateHeuristics::initialize(ScheduleDAGMI *SchedDAG,
   CurrentWindow.clear();
   NextWindow.clear();
 
+  if (!BlockCarriedLatency.getNumOccurrences()) {
+    auto WMMAHWUI = getHWUIFromFlavor(InstructionFlavor::WMMA);
+
+    bool MustHaveDSAfter = true;
+    for (SUnit *SU : *WMMAHWUI) {
+      bool HasDSSucc= false;
+      for (auto &Succ : SU->Succs) {
+        if (classifyFlavor(*Succ.getSUnit()->getInstr(), *SII) == InstructionFlavor::DS) {
+          HasDSSucc = true;
+          break;
+        }
+      }
+
+      if (!HasDSSucc) {
+        MustHaveDSAfter = false;
+        break;
+      }
+
+    }
+
+    if (MustHaveDSAfter)
+      BlockCarriedLatency = CarriedLatency::Fence;
+  }
+
+
+
   // Populate the initial window for the first producer.
   // Note: At initialization time, MixInfo is reset so no ready counts yet.
   // The window will be re-populated when scheduling begins and MixInfo is
@@ -878,7 +915,7 @@ void CandidateHeuristics::initialize(ScheduleDAGMI *SchedDAG,
 }
 
 unsigned CandidateHeuristics::getCarriedLatency(SUnit *SU) {
-  if (!BlockCarriedLatency)
+  if (BlockCarriedLatency == CarriedLatency::Off)
     return 0;
 
   MachineInstr *MI = SU->getInstr();
@@ -903,6 +940,9 @@ unsigned CandidateHeuristics::getCarriedLatency(SUnit *SU) {
       }
     }
   }
+
+  if (BlockCarriedLatency == CarriedLatency::Fence)
+    return 0;
 
   for (auto &Op : MI->operands()) {
     if (!Op.isReg())
