@@ -21,6 +21,8 @@
 
 namespace llvm {
 
+class MachineLoopInfo;
+
 // classifyFlavor is declared in AMDGPUCoExecInfo.h but defined in cpp
 namespace AMDGPU {
 namespace DefaultBufferSizes {
@@ -441,6 +443,49 @@ protected:
   /// Next window — populated for lookahead when CurrentWindow is satisfied.
   CoexecWindow NextWindow;
 
+  /// Recorded next-iter consumer position per loop-carried lane slice.
+  /// Keyed by vreg, each entry holds a small list of (lane mask, slot)
+  /// pairs — one entry per LC slice on that vreg that has been observed
+  /// at the top of the next iteration. The SlotIndex is the consumer MI's
+  /// register slot at the time the slice was discovered; ScheduleDAGMI
+  /// keeps LIS up to date as instructions are moved, so SlotIndex order
+  /// reflects scheduled program order. Masks here are a subset of the
+  /// masks in LoopCarriedDSReadDefLanes for the same Reg.
+  DenseMap<Register, SmallVector<std::pair<LaneBitmask, SlotIndex>, 2>>
+      LoopTopVGPRConsumerPos;
+
+  /// Lane slices on each vreg that are defined by a DS_READ in the current
+  /// region's MBB and whose only in-MBB uses precede that DS_READ in MIR
+  /// order (so the real consumer crosses the back-edge). Slices for the
+  /// same Reg are pairwise disjoint.
+  DenseMap<Register, SmallVector<LaneBitmask, 2>> LoopCarriedDSReadDefLanes;
+
+  /// Total number of LC slices across all vregs (sum of inner vector
+  /// sizes in LoopCarriedDSReadDefLanes). Set once by the seeder; used
+  /// by recordLoopTopConsumption to early-exit once every slice has a
+  /// recorded next-iter consumer slot.
+  unsigned LoopCarriedSliceCount = 0;
+
+  /// Running total of LC slices that have been recorded with a next-iter
+  /// consumer slot (one per (Reg, mask) entry in LoopTopVGPRConsumerPos).
+  /// Drives the early-exit in recordLoopTopConsumption.
+  unsigned RecordedConsumerSliceCount = 0;
+
+  /// Reset cross-iter DSRead consumption-tracking state.
+  void resetDSReadByConsumerOrderState() {
+    LoopTopVGPRConsumerPos.clear();
+    LoopCarriedDSReadDefLanes.clear();
+    LoopCarriedSliceCount = 0;
+    RecordedConsumerSliceCount = 0;
+  }
+
+  /// Walk the current region's MBB and populate LoopCarriedDSReadDefs.
+  void seedLoopCarriedDSReadDefs();
+
+  /// Record consumption of DSRead along the backedge for wait count
+  /// reduction as we schedule instructions.
+  void recordLoopTopConsumption(SUnit *SU);
+
   // Treat structural, latency, buffer-full, carried-latency, and fence stalls
   // as a single scheduling cost for the current cycle.
   struct StallCosts {
@@ -503,11 +548,17 @@ protected:
   /// enable \p TargetSU.
   bool wouldHelpEnable(SUnit *SU, SUnit *TargetSU);
 
+  /// MachineLoopInfo for the current function. May be null; only consulted
+  /// by the loop-body gate of the DS_READ-by-consumer-order tie-breaker,
+  /// which falls back to a self-edge check when MLI is unavailable.
+  const MachineLoopInfo *MLI = nullptr;
+
 public:
   CandidateHeuristics() = default;
 
   void initialize(ScheduleDAGMI *DAG, const TargetSchedModel *SchedModel,
-                  const TargetRegisterInfo *TRI);
+                  const TargetRegisterInfo *TRI,
+                  const MachineLoopInfo *MLI = nullptr);
 
   /// Given a \p Flavor , find the corresponding HardwareUnit. \returns the
   /// mapped HardwareUnit.
@@ -589,6 +640,14 @@ public:
   bool tryShadowMix(GenericSchedulerBase::SchedCandidate &TryCand,
                     GenericSchedulerBase::SchedCandidate &Cand,
                     SchedBoundary *Zone);
+
+  /// Tie-break between two ready DS_READ candidates by the recorded
+  /// next-iter consumer position. Called from tryCriticalResourceDependency
+  /// as the cross-loop-edge extension to its in-iter DS_READ → WMMA
+  /// prioritization. Sets Reason = RegCritical on the winner.
+  bool
+  tryLoopCarriedDSReadOrder(GenericSchedulerBase::SchedCandidate &TryCand,
+                            GenericSchedulerBase::SchedCandidate &Cand) const;
 
   void dumpRegionSummary();
 };
