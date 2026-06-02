@@ -132,14 +132,7 @@ void BarrierLatency::apply(ScheduleDAGInstrs *DAG) {
         OutstandingTDM.push_back(&SU);
       if (MI->getDesc().TSFlags & SIInstrFlags::ASYNC_CNT)
         OutstandingAsync.clear();
-      for (SDep &PredDep : SU.Preds) {
-        if (PredDep.getKind() != SDep::Kind::Data)
-          continue;
 
-        Register DepReg = PredDep.getReg();
-        if (DepReg == AMDGPU::TENSORcnt || DepReg == AMDGPU::ASYNCcnt)
-          setLatencyForEdge(PredDep, SU, 1);
-      }
     } else if (Op == AMDGPU::S_WAIT_TENSORCNT) {
       auto needWaitFor = [this](SUnit *SU, int64_t Count) {
         if (OutstandingTDM.size() <= static_cast<uint64_t>(Count))
@@ -169,12 +162,6 @@ void BarrierLatency::apply(ScheduleDAGInstrs *DAG) {
           continue;
 
         SUnit *PredSU = PredDep.getSUnit();
-
-        // S_WAIT -> S_WAIT edges should not have latency
-        if (PredSU->getInstr()->getOpcode() == AMDGPU::S_WAIT_TENSORCNT) {
-          setLatencyForEdge(PredDep, SU, 1);
-          continue;
-        }
 
         // The TENSORcnt data dep can be carried by a non-TENSOR_CNT SU
         // (e.g. an intervening COPY or pseudo). Such predecessors are not
@@ -217,12 +204,6 @@ void BarrierLatency::apply(ScheduleDAGInstrs *DAG) {
           continue;
 
         SUnit *PredSU = PredDep.getSUnit();
-
-        // S_WAIT -> S_WAIT edges should not have latency
-        if (PredSU->getInstr()->getOpcode() == AMDGPU::S_WAIT_ASYNCCNT) {
-          setLatencyForEdge(PredDep, SU, 1);
-          continue;
-        }
 
         // The TENSORcnt data dep can be carried by a non-TENSOR_CNT SU
         // (e.g. an intervening COPY or pseudo). Such predecessors are not
