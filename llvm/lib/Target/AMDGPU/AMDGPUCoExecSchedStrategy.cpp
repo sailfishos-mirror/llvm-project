@@ -15,12 +15,17 @@
 #include "AMDGPUBarrierLatency.h"
 #include "GCNHazardRecognizer.h"
 #include "GCNSubtarget.h"
+#include "SIRegisterInfo.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/DenseSet.h"
+#include "llvm/CodeGen/MachineLoopInfo.h"
+#include "llvm/CodeGen/MachineRegisterInfo.h"
 #include "llvm/CodeGen/MachineScheduler.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/Format.h"
 #include "llvm/Support/MathExtras.h"
+#include <optional>
 #include <queue>
 
 using namespace llvm;
@@ -801,6 +806,11 @@ void CandidateHeuristics::updateForScheduling(SUnit *SU,
   // Mix snapshot is now stale; tryShadowMix will refresh on its next call.
   MixInfo.invalidate();
 
+  // Record consumption of loop-carried DS_READs. The recorder is
+  // per-first-use only and self-terminates once every loop-carried vreg
+  // has a position.
+  recordLoopTopConsumption(SU);
+
   // Decrement RemainingExposed for this flavor only when this SU was not
   // hidden inside an active window. Producers are never "hidden" by
   // someone else's shadow.
@@ -838,13 +848,15 @@ void CandidateHeuristics::updateForScheduling(SUnit *SU,
 
 void CandidateHeuristics::initialize(ScheduleDAGMI *SchedDAG,
                                      const TargetSchedModel *TargetSchedModel,
-                                     const TargetRegisterInfo *TRI) {
+                                     const TargetRegisterInfo *TRI,
+                                     const MachineLoopInfo *LoopInfo) {
   DAG = SchedDAG;
   SchedModel = TargetSchedModel;
   assert(SchedModel && SchedModel->hasInstrSchedModel());
 
   SRI = static_cast<const SIRegisterInfo *>(TRI);
   SII = static_cast<const SIInstrInfo *>(DAG->TII);
+  MLI = LoopInfo;
 
   HWUInfo.resize((int)InstructionFlavor::NUM_FLAVORS);
 
@@ -912,6 +924,306 @@ void CandidateHeuristics::initialize(ScheduleDAGMI *SchedDAG,
       dbgs() << "  Initial window: producer="
              << getFlavorName(CurrentWindow.ProducerFlavor) << "\n";
   });
+
+  resetDSReadByConsumerOrderState();
+
+  // Decide whether this scheduling region is the entire schedulable body
+  // of a single-block natural loop.
+  auto checkWholeLoopBodyRegion = [&]() -> bool {
+    if (DAG->SUnits.empty())
+      return false;
+    MachineInstr *FirstMI = DAG->SUnits.front().getInstr();
+    MachineBasicBlock *MBB = FirstMI ? FirstMI->getParent() : nullptr;
+    if (!MBB || DAG->begin() != MBB->begin())
+      return false;
+    auto Term = MBB->getFirstTerminator();
+    if (DAG->end() != MBB->end() && DAG->end() != Term)
+      return false;
+    assert(MLI && "MachineScheduler requires MachineLoopInfo");
+    const MachineLoop *L = MLI->getLoopFor(MBB);
+    return L && L->getNumBlocks() == 1;
+  };
+
+  if (checkWholeLoopBodyRegion())
+    seedLoopCarriedDSReadDefs();
+}
+
+// Per-vreg lane slice with bookkeeping used by the seeder's two-pass scan.
+// Slices on the same vreg are pairwise disjoint at all times — every time
+// we observe an operand touching a fresh lane subset, we split overlapping
+// slices so the touched lanes become their own slice(s).
+namespace {
+struct SeedLaneSlice {
+  LaneBitmask Mask;
+  std::optional<unsigned> FirstUsePos;
+  std::optional<unsigned> LastUsePos;
+  std::optional<unsigned> LastDSReadDefPos;
+};
+
+// Split Slices for Reg so that every lane in TouchMask ends up in some
+// slice that is fully contained in TouchMask. Existing slices are split
+// in place; new slices are appended for lanes not yet covered. Returns
+// (via Hits) the indices of every slice that now lies fully inside
+// TouchMask — the caller updates those slices with the current operand's
+// position info.
+void splitSlicesForMask(SmallVectorImpl<SeedLaneSlice> &Slices,
+                        LaneBitmask TouchMask,
+                        SmallVectorImpl<unsigned> &Hits) {
+  Hits.clear();
+  LaneBitmask Remaining = TouchMask;
+  // Snapshot the original length; any slice we push_back is a freshly
+  // split-off outside portion that doesn't overlap TouchMask, so we
+  // don't need to revisit it.
+  unsigned OldN = Slices.size();
+  for (unsigned I = 0; I < OldN; ++I) {
+    LaneBitmask Inside = Slices[I].Mask & TouchMask;
+    if (Inside.none())
+      continue;
+    LaneBitmask Outside = Slices[I].Mask & ~TouchMask;
+    if (Outside.any()) {
+      // Carve the slice into Inside (kept in slot I) and Outside (new
+      // tail entry). The tail inherits the existing bookkeeping so the
+      // unrelated lanes keep their history.
+      SeedLaneSlice Tail = Slices[I];
+      Tail.Mask = Outside;
+      Slices[I].Mask = Inside;
+      Slices.push_back(Tail);
+    }
+    Hits.push_back(I);
+    Remaining &= ~Inside;
+    if (Remaining.none())
+      break;
+  }
+  if (Remaining.any()) {
+    SeedLaneSlice Fresh;
+    Fresh.Mask = Remaining;
+    Slices.push_back(Fresh);
+    Hits.push_back(Slices.size() - 1);
+  }
+}
+} // namespace
+
+void CandidateHeuristics::seedLoopCarriedDSReadDefs() {
+  assert(LoopCarriedDSReadDefLanes.empty() &&
+         "expected fresh state from per-region reset");
+  assert(LoopCarriedSliceCount == 0 && "expected fresh slice counter");
+  assert(!DAG->SUnits.empty() && "expected non-empty DAG SU list");
+  MachineInstr *FirstMI = DAG->SUnits.front().getInstr();
+  assert(FirstMI && "front SUnit must have an instruction");
+  MachineBasicBlock *MBB = FirstMI->getParent();
+  assert(MBB && "front SUnit's instruction must have a parent MBB");
+
+  // Two-pass approach with lane precision: each vreg owns a list of disjoint
+  // lane slices, each tracking (FirstUse, LastUse, LastDSReadDef) for the
+  // lanes it covers. The first pass walks operands and splits slices on
+  // demand so every operand's lane footprint can be attributed to a set of
+  // fully-contained slices. The second pass applies the LC test per slice.
+  DenseMap<Register, SmallVector<SeedLaneSlice, 4>> Info;
+  const MachineRegisterInfo &MRI = DAG->MRI;
+  SmallVector<unsigned, 4> Hits;
+
+  // First pass
+  unsigned Pos = 0;
+  for (const MachineInstr &MI : *MBB) {
+    if (MI.isMetaInstruction())
+      continue;
+    const bool IsDSRead = SII->isDS(MI) && MI.mayLoad();
+    for (const MachineOperand &MO : MI.operands()) {
+      if (!MO.isReg() || !MO.getReg().isVirtual())
+        continue;
+      Register Reg = MO.getReg();
+      LaneBitmask TouchMask = MO.getSubReg() == 0
+                                  ? MRI.getMaxLaneMaskForVReg(Reg)
+                                  : SRI->getSubRegIndexLaneMask(MO.getSubReg());
+      if (TouchMask.none())
+        continue;
+      auto &Slices = Info[Reg];
+      splitSlicesForMask(Slices, TouchMask, Hits);
+      const bool IsUse = MO.isUse();
+      const bool IsDSReadDef = IsDSRead && MO.isDef();
+      for (unsigned Idx : Hits) {
+        SeedLaneSlice &S = Slices[Idx];
+        if (IsUse) {
+          if (!S.FirstUsePos)
+            S.FirstUsePos = Pos;
+          S.LastUsePos = Pos;
+        }
+        if (IsDSReadDef)
+          S.LastDSReadDefPos = Pos;
+      }
+    }
+    ++Pos;
+  }
+  // Second pass: per-slice loop-carried test.
+  for (auto &[Reg, Slices] : Info) {
+    SmallVector<LaneBitmask, 2> LCLanes;
+    for (const SeedLaneSlice &S : Slices) {
+      if (!S.LastDSReadDefPos || !S.FirstUsePos)
+        continue; // no def or no use covering these lanes
+      if (*S.LastUsePos > *S.LastDSReadDefPos)
+        continue; // some in-iter consumer reads these lanes after the def
+      if (*S.FirstUsePos >= *S.LastDSReadDefPos)
+        continue; // every observed use is after the def, no back-edge user
+      LCLanes.push_back(S.Mask);
+    }
+    if (!LCLanes.empty()) {
+      LoopCarriedSliceCount += LCLanes.size();
+      LoopCarriedDSReadDefLanes.try_emplace(Reg, std::move(LCLanes));
+    }
+  }
+  LLVM_DEBUG({
+    if (!LoopCarriedDSReadDefLanes.empty()) {
+      dbgs() << "  DSReadByConsumerOrder: loop-carried DS_READ slices ("
+             << LoopCarriedSliceCount << " across "
+             << LoopCarriedDSReadDefLanes.size() << " vregs):";
+      for (const auto &[Reg, Lanes] : LoopCarriedDSReadDefLanes) {
+        dbgs() << " " << printReg(Reg, SRI) << "[";
+        for (unsigned I = 0; I < Lanes.size(); ++I) {
+          if (I)
+            dbgs() << "|";
+          dbgs() << PrintLaneMask(Lanes[I]);
+        }
+        dbgs() << "]";
+      }
+      dbgs() << "\n";
+    }
+  });
+}
+
+// If SU is the first consumer of a DS_READ-defined lane slice from the
+// previous iteration, record the consumer MI's SlotIndex for that slice.
+// Each (Reg, slice-mask) gets at most one slot; the slot is the
+// consumer MI's register slot at the time of discovery. ScheduleDAGMI
+// keeps LiveIntervals in sync as instructions are scheduled, so the
+// recorded SlotIndex orders consumers by scheduled position.
+void CandidateHeuristics::recordLoopTopConsumption(SUnit *SU) {
+  if (LoopCarriedDSReadDefLanes.empty())
+    return;
+  // Once every loop-carried slice has a recorded consumer slot, the
+  // tie-break has all the ordering info it needs; further calls are
+  // pure overhead.
+  if (RecordedConsumerSliceCount >= LoopCarriedSliceCount)
+    return;
+  MachineInstr *MI = SU ? SU->getInstr() : nullptr;
+  if (!MI)
+    return;
+  // Single SlotIndex per consumer MI: all operands of this MI share it.
+  const SlotIndex ConsumerSlot =
+      DAG->getLIS()->getInstructionIndex(*MI).getRegSlot();
+  const MachineRegisterInfo &MRI = DAG->MRI;
+  for (const MachineOperand &MO : MI->uses()) {
+    if (!MO.isReg() || !MO.isUse())
+      continue;
+    Register Reg = MO.getReg();
+    if (!Reg.isVirtual())
+      continue;
+    auto LCIt = LoopCarriedDSReadDefLanes.find(Reg);
+    if (LCIt == LoopCarriedDSReadDefLanes.end())
+      continue;
+    LaneBitmask UseMask = MO.getSubReg() == 0
+                              ? MRI.getMaxLaneMaskForVReg(Reg)
+                              : SRI->getSubRegIndexLaneMask(MO.getSubReg());
+    if (UseMask.none())
+      continue;
+    auto &Recorded = LoopTopVGPRConsumerPos[Reg];
+    for (LaneBitmask LCMask : LCIt->second) {
+      if ((LCMask & UseMask).none())
+        continue;
+      bool Already = llvm::any_of(
+          Recorded, [&](const auto &P) { return P.first == LCMask; });
+      if (Already)
+        continue;
+      Recorded.emplace_back(LCMask, ConsumerSlot);
+      ++RecordedConsumerSliceCount;
+      LLVM_DEBUG(dbgs() << "  DSReadByConsumerOrder: SU(" << SU->NodeNum
+                        << ") consumes " << printReg(Reg, SRI)
+                        << " lanes=" << PrintLaneMask(LCMask) << " at slot "
+                        << ConsumerSlot << "\n");
+    }
+  }
+}
+
+// Look up the recorded next-iter consumer slot for a DS_READ's defined
+// lanes. For each def operand we intersect its lane mask against the
+// recorded consumer slices on the same vreg and take the earliest
+// matching slot — i.e. the position of the EARLIEST next-iter consumer
+// that reads any lane this DS_READ produces. Returns std::nullopt if MI
+// is not a DS load or none of its defined lanes are tracked.
+static std::optional<SlotIndex> lookupDSReadConsumerPos(
+    const MachineInstr *MI, const SIInstrInfo &SII, const SIRegisterInfo &SRI,
+    const MachineRegisterInfo &MRI,
+    const DenseMap<Register, SmallVector<std::pair<LaneBitmask, SlotIndex>, 2>>
+        &Map) {
+  if (!MI || !SII.isDS(*MI) || !MI->mayLoad())
+    return std::nullopt;
+  std::optional<SlotIndex> Best;
+  for (const MachineOperand &MO : MI->defs()) {
+    Register Reg = MO.getReg();
+    if (!Reg.isVirtual())
+      continue;
+    auto It = Map.find(Reg);
+    if (It == Map.end())
+      continue;
+    LaneBitmask DefMask = MO.getSubReg() == 0
+                              ? MRI.getMaxLaneMaskForVReg(Reg)
+                              : SRI.getSubRegIndexLaneMask(MO.getSubReg());
+    if (DefMask.none())
+      continue;
+    for (const auto &[SliceMask, Pos] : It->second) {
+      if ((SliceMask & DefMask).none())
+        continue;
+      if (!Best || SlotIndex::isEarlierInstr(Pos, *Best))
+        Best = Pos;
+    }
+  }
+  return Best;
+}
+
+// Fallback for tryCriticalResourceDependency when the in-iter DS_READ →
+// WMMA prioritization (the HWUI loop above) did not cast a vote: cover the
+// DS_READ → loop_edge → WMMA case by preferring the loop-carried DS_READ
+// whose destination vreg is consumed earliest at the top of the next
+// iteration.
+bool CandidateHeuristics::tryLoopCarriedDSReadOrder(
+    GenericSchedulerBase::SchedCandidate &TryCand,
+    GenericSchedulerBase::SchedCandidate &Cand) const {
+  if (LoopCarriedDSReadDefLanes.empty())
+    return false;
+
+  MachineInstr *TryMI = TryCand.SU ? TryCand.SU->getInstr() : nullptr;
+  MachineInstr *CandMI = Cand.SU ? Cand.SU->getInstr() : nullptr;
+  if (!TryMI || !CandMI)
+    return false;
+  if (!SII->isDS(*TryMI) || !TryMI->mayLoad())
+    return false;
+  if (!SII->isDS(*CandMI) || !CandMI->mayLoad())
+    return false;
+
+  std::optional<SlotIndex> TryPos = lookupDSReadConsumerPos(
+      TryMI, *SII, *SRI, DAG->MRI, LoopTopVGPRConsumerPos);
+  std::optional<SlotIndex> CandPos = lookupDSReadConsumerPos(
+      CandMI, *SII, *SRI, DAG->MRI, LoopTopVGPRConsumerPos);
+  // Require both candidates to have a recorded next-iter consumer
+  // position. Asymmetric case happens but appears rarely hitting
+  // this code path.
+  if (!TryPos || !CandPos)
+    return false;
+  if (*TryPos == *CandPos)
+    return false; // Same consumer MI; defer to later tie-breakers.
+
+  if (SlotIndex::isEarlierInstr(*TryPos, *CandPos)) {
+    TryCand.Reason = GenericSchedulerBase::RegCritical;
+    LLVM_DEBUG(dbgs() << "  LoopCarriedDSReadOrder: TryCand wins (" << *TryPos
+                      << " < " << *CandPos << ", SU(" << TryCand.SU->NodeNum
+                      << ") beats SU(" << Cand.SU->NodeNum << "))\n");
+    return true;
+  }
+  if (Cand.Reason > GenericSchedulerBase::RegCritical)
+    Cand.Reason = GenericSchedulerBase::RegCritical;
+  LLVM_DEBUG(dbgs() << "  LoopCarriedDSReadOrder: Cand wins (" << *CandPos
+                    << " < " << *TryPos << ", SU(" << Cand.SU->NodeNum
+                    << ") beats SU(" << TryCand.SU->NodeNum << "))\n");
+  return true;
 }
 
 unsigned CandidateHeuristics::getCarriedLatency(SUnit *SU) {
@@ -1772,6 +2084,16 @@ bool CandidateHeuristics::tryCriticalResourceDependency(
     if (Enabled)
       return true;
   }
+
+  // Fallback after the in-iter DS_READ → WMMA prioritization above: if
+  // neither candidate enables a same-iteration WMMA, cover the
+  // DS_READ → loop_edge → next-iter-consumer case using the recorded
+  // LoopTopVGPRConsumerPos map. Same principle — schedule the DS_READ
+  // whose result is needed soonest first — but the consumer is in the
+  // next iteration and so is not visible via in-iter DAG reachability.
+  if (tryLoopCarriedDSReadOrder(TryCand, Cand))
+    return true;
+
   return false;
 }
 
@@ -2125,7 +2447,8 @@ void AMDGPUCoExecSchedStrategy::initialize(ScheduleDAGMI *DAG) {
   RegionPolicy.OnlyBottomUp = false;
 
   GCNSchedStrategy::initialize(DAG);
-  Heurs.initialize(DAG, SchedModel, TRI);
+  assert(Context && Context->MLI && "MachineScheduler context must supply MLI");
+  Heurs.initialize(DAG, SchedModel, TRI, Context->MLI);
 
   // Replace the default hazard recognizer with our PreRA one.
   // This must happen after GCNSchedStrategy::initialize() because
