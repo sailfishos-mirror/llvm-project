@@ -54,6 +54,13 @@ static cl::opt<CoexecExposedMode> CoexecExposedSort(
                    "Per-class exposed cycles derived from the roofline "
                    "max-flow solution.")));
 
+static cl::opt<unsigned> VALUVMEMPadding(
+  "amdgpu-valu-vmem-latency",
+  cl::desc("How many cycles to schedule between VALU and VMEM/DS instructions which use the VGPR."),
+  cl::ReallyHidden,
+  cl::init(30));
+
+
 namespace {
 enum class CarriedLatency { Off, Fence, All };
 } // namespace
@@ -1798,6 +1805,37 @@ unsigned CandidateHeuristics::getStallCosts(SUnit *SU, SchedBoundary &Zone,
     return FenceStallFinish <= CurrCycle ? 0 : FenceStallFinish - CurrCycle;
   };
 
+  auto getVALUToMemStalls = [this, &CurrCycle](SUnit *SU) -> unsigned {
+    if (!SII->getSubtarget().hasGFX1250Insts())
+      return 0;
+
+    InstructionFlavor Flavor = classifyFlavor(*SU->getInstr(), *SII);
+    if (Flavor != InstructionFlavor::DS && Flavor != InstructionFlavor::VMEM &&
+        Flavor != InstructionFlavor::DMA)
+      return 0;
+
+    unsigned MaxStall = 0;
+    for (const SDep &Pred : SU->Preds) {
+      if (Pred.getKind() != SDep::Data)
+        continue;
+
+      SUnit *PredSU = Pred.getSUnit();
+      InstructionFlavor PredFlavor = classifyFlavor(*PredSU->getInstr(), *SII);
+      if (PredFlavor != InstructionFlavor::SingleCycleVALU &&
+          PredFlavor != InstructionFlavor::TRANS &&
+          PredFlavor != InstructionFlavor::MultiCycleVALU &&
+          PredFlavor != InstructionFlavor::WMMA)
+        continue;
+
+      unsigned TargetCycle = PredSU->TopReadyCycle + VALUVMEMPadding;
+      if (TargetCycle > CurrCycle)
+        MaxStall = std::max(MaxStall, TargetCycle - CurrCycle);
+    }
+    return MaxStall;
+  };
+
+
+
   unsigned ReadyCycle = Zone.isTop() ? SU->TopReadyCycle : SU->BotReadyCycle;
   Costs.Ready = ReadyCycle > CurrCycle ? ReadyCycle - CurrCycle : 0;
   Costs.Structural = getStructuralStallCycles(Zone, SU);
@@ -1807,8 +1845,9 @@ unsigned CandidateHeuristics::getStallCosts(SUnit *SU, SchedBoundary &Zone,
       CarriedLatency > CurrCycle ? CarriedLatency - CurrCycle : 0;
   Costs.Buffer = getBufferFullStalls(SU);
   Costs.Fence = getFenceStalls(SU);
+  Costs.RAWVdst = getVALUToMemStalls(SU);
   Costs.Effective = std::max({Costs.Ready, Costs.Structural, Costs.Latency,
-                              Costs.Carried, Costs.Buffer, Costs.Fence});
+                              Costs.Carried, Costs.Buffer, Costs.Fence, Costs.RAWVdst});
   return Costs.Effective;
 }
 
@@ -1903,12 +1942,12 @@ bool CandidateHeuristics::tryEffectiveStall(
            << " (ready=" << TryCosts.Ready << ", struct=" << TryCosts.Structural
            << ", lat=" << TryCosts.Latency << ", carried=" << TryCosts.Carried
            << ", buffer=" << TryCosts.Buffer << ", fence=" << TryCosts.Fence
-           << ", missedSlots=" << TryMissedSlots
+           << ", rawvdst=" << TryCosts.RAWVdst << ", missedSlots=" << CandMissedSlots
            << ") cand=" << CandCosts.Effective << " (ready=" << CandCosts.Ready
            << ", struct=" << CandCosts.Structural
            << ", lat=" << CandCosts.Latency << ", carried=" << CandCosts.Carried
            << ", buffer=" << CandCosts.Buffer << ", fence=" << CandCosts.Fence
-           << ", missedSlots=" << CandMissedSlots << ")\n";
+           << ", rawvdst=" << CandCosts.RAWVdst << ", missedSlots=" << CandMissedSlots << ")\n";
   });
 
   // Prefer lower combined cost (stalls + missed slots).

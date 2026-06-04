@@ -495,6 +495,7 @@ protected:
     unsigned Carried = 0;
     unsigned Buffer = 0;
     unsigned Fence = 0;
+    unsigned RAWVdst = 0;
     unsigned Effective = 0;
   };
 
