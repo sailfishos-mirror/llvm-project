@@ -94,6 +94,11 @@ static cl::opt<bool> DisableFDivExpand(
   cl::ReallyHidden,
   cl::init(false));
 
+static cl::opt<bool> FoldSlidingWindowShuffles(
+    "amdgpu-codegenprepare-fold-sliding-window-shuffles",
+    cl::desc("Fold sliding window shuffle chains in AMDGPUCodeGenPrepare"),
+    cl::ReallyHidden, cl::init(true));
+
 class AMDGPUCodeGenPrepareImpl
     : public InstVisitor<AMDGPUCodeGenPrepareImpl, bool> {
 public:
@@ -258,6 +263,7 @@ public:
   bool visitPHINode(PHINode &I);
   bool visitAddrSpaceCastInst(AddrSpaceCastInst &I);
 
+  bool visitShuffleVectorInst(ShuffleVectorInst &I);
   bool visitIntrinsicInst(IntrinsicInst &I);
   bool visitFMinLike(IntrinsicInst &I);
   bool visitSqrt(IntrinsicInst &I);
@@ -2043,6 +2049,118 @@ bool AMDGPUCodeGenPrepareImpl::visitAddrSpaceCastInst(AddrSpaceCastInst &I) {
   auto *Intrin = B.CreateIntrinsic(
       I.getType(), Intrinsic::amdgcn_addrspacecast_nonnull, {I.getOperand(0)});
   I.replaceAllUsesWith(Intrin);
+  DeadVals.push_back(&I);
+  return true;
+}
+
+/// Fold sliding window shuffle chains that reconstruct an original operand.
+/// The pattern is: shuffle(shuffle(A,B,M), shuffle(B,C,M), M) = B
+/// where M is a "sliding window" mask like <2,3,4,5> on <4 x i8> vectors.
+/// This extracts the upper half of the first operand and lower half of second.
+/// When chained: the outer shuffle extracts from the middle of both inner
+/// shuffles, which reconstructs the shared middle operand B.
+///
+/// Also handles the case where operands are phi nodes, where ALL incoming
+/// values are sliding window shuffles with shared middle operands.
+bool AMDGPUCodeGenPrepareImpl::visitShuffleVectorInst(ShuffleVectorInst &I) {
+  if (!FoldSlidingWindowShuffles)
+    return false;
+
+  auto *VecTy = dyn_cast<FixedVectorType>(I.getType());
+  if (!VecTy)
+    return false;
+
+  unsigned NumElts = VecTy->getNumElements();
+
+  // Check for sliding window mask: <N/2, N/2+1, ..., N-1, N, N+1, ..., N+N/2-1>
+  // This takes upper half of first operand and lower half of second.
+  auto isSlidingWindowMask = [NumElts](ArrayRef<int> Mask) {
+    if (Mask.size() != NumElts)
+      return false;
+    unsigned HalfElts = NumElts / 2;
+    for (unsigned i = 0; i < NumElts; ++i) {
+      int Expected = HalfElts + i;
+      if (Mask[i] != Expected)
+        return false;
+    }
+    return true;
+  };
+
+  ArrayRef<int> OuterMask = I.getShuffleMask();
+  if (!isSlidingWindowMask(OuterMask))
+    return false;
+
+  Value *OuterV0 = I.getOperand(0);
+  Value *OuterV1 = I.getOperand(1);
+
+  // Try to match the pattern directly on shuffles.
+  ArrayRef<int> InnerMask0, InnerMask1;
+  Value *A, *B0, *B1, *C;
+  if (match(OuterV0, m_Shuffle(m_Value(A), m_Value(B0), m_Mask(InnerMask0))) &&
+      match(OuterV1, m_Shuffle(m_Value(B1), m_Value(C), m_Mask(InnerMask1))) &&
+      isSlidingWindowMask(InnerMask0) && isSlidingWindowMask(InnerMask1) &&
+      B0 == B1) {
+    LLVM_DEBUG(dbgs() << "AMDGPU CGP: Folding sliding window shuffle chain to "
+                         "shared operand: "
+                      << I << "\n");
+    I.replaceAllUsesWith(B0);
+    DeadVals.push_back(&I);
+    return true;
+  }
+
+  // Try to match through phi nodes: both operands are phis where every incoming
+  // value is a sliding window shuffle, and for each corresponding pair of
+  // incoming values, they share a middle operand.
+  auto *Phi0 = dyn_cast<PHINode>(OuterV0);
+  auto *Phi1 = dyn_cast<PHINode>(OuterV1);
+  if (!Phi0 || !Phi1)
+    return false;
+
+  // Phis must have same number of incoming values from same blocks.
+  if (Phi0->getNumIncomingValues() != Phi1->getNumIncomingValues())
+    return false;
+
+  // Check that for each incoming block, both phi values are sliding window
+  // shuffles with a shared middle operand.
+  SmallVector<std::pair<BasicBlock *, Value *>> SharedMiddleOps;
+  for (unsigned i = 0, e = Phi0->getNumIncomingValues(); i != e; ++i) {
+    BasicBlock *BB0 = Phi0->getIncomingBlock(i);
+    Value *V0 = Phi0->getIncomingValue(i);
+
+    // Find matching incoming value from Phi1 for the same block.
+    int Idx1 = Phi1->getBasicBlockIndex(BB0);
+    if (Idx1 < 0)
+      return false;
+    Value *V1 = Phi1->getIncomingValue(Idx1);
+
+    // Both must be shuffles with sliding window mask.
+    ArrayRef<int> Mask0, Mask1;
+    Value *A0, *B0i, *B1i, *C0;
+    if (!match(V0, m_Shuffle(m_Value(A0), m_Value(B0i), m_Mask(Mask0))) ||
+        !match(V1, m_Shuffle(m_Value(B1i), m_Value(C0), m_Mask(Mask1))))
+      return false;
+
+    if (!isSlidingWindowMask(Mask0) || !isSlidingWindowMask(Mask1))
+      return false;
+
+    // Shared middle operand: second operand of V0 == first operand of V1.
+    if (B0i != B1i)
+      return false;
+
+    SharedMiddleOps.push_back({BB0, B0i});
+  }
+
+  // All incoming pairs matched. Create a new phi with the shared middle ops.
+  IRBuilder<> Builder(Phi0);
+  PHINode *NewPhi =
+      Builder.CreatePHI(VecTy, SharedMiddleOps.size(), "sliding.mid");
+  for (auto &[BB, Val] : SharedMiddleOps)
+    NewPhi->addIncoming(Val, BB);
+
+  LLVM_DEBUG(dbgs() << "AMDGPU CGP: Folding sliding window shuffle through "
+                       "phis: "
+                    << I << "\n");
+  I.replaceAllUsesWith(NewPhi);
   DeadVals.push_back(&I);
   return true;
 }
