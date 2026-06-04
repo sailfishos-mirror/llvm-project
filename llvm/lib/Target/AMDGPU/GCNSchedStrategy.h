@@ -81,7 +81,6 @@ protected:
                             GCNDownwardRPTracker &DownwardTracker,
                             GCNUpwardRPTracker &UpwardTracker,
                             ScheduleDAGMI *DAG, const SIRegisterInfo *SRI);
-
   std::vector<unsigned> Pressure;
 
   std::vector<unsigned> MaxPressure;
@@ -790,6 +789,7 @@ public:
   bool initGCNSchedStage() override;
   void finalizeGCNSchedStage() override;
   bool initGCNRegion() override;
+  void finalizeGCNRegion() override;
 
   LiveIntervalRPStage(GCNSchedStageID StageID, GCNScheduleDAGMILive &DAG)
       : GCNSchedStage(StageID, DAG) {}
@@ -797,6 +797,7 @@ public:
 private:
   unsigned SavedVGPRThresholdPercent = 0;
   unsigned SavedVGPRExcessLimit = 0;
+  unsigned SavedVGPRCriticalLimit = 0;
 };
 
 class GCNPostScheduleDAGMILive final : public ScheduleDAGMI {

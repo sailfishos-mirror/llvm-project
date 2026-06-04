@@ -2213,6 +2213,13 @@ static cl::opt<unsigned> LiveIntervalRPVGPRReduction(
         "reschedule stage"),
     cl::init(90));
 
+static cl::opt<unsigned> LiveIntervalRPVGPRReductionEpilogue(
+    "amdgpu-lirp-vgpr-reduction-epilogue", cl::Hidden,
+    cl::desc(
+        "Reduction factor (percent) for VGPR threshold during live interval RP "
+        "reschedule stage for exit blocks"),
+    cl::init(60));
+
 bool LiveIntervalRPStage::initGCNSchedStage() {
   if (!EnableLiveIntervalRPReschedule)
     return false;
@@ -2226,24 +2233,11 @@ bool LiveIntervalRPStage::initGCNSchedStage() {
                   "not using live interval RP reschedule stage\n");
     return false;
   }
-
-  // Use a tighter VGPRExcessLimit by reducing VGPRExcessThresholdPercent
-  SavedVGPRThresholdPercent = *S.VGPRExcessThresholdPercent;
-  S.VGPRExcessThresholdPercent =
-      (*S.VGPRExcessThresholdPercent * LiveIntervalRPVGPRReduction + 99) / 100;
   SavedVGPRExcessLimit = S.VGPRExcessLimit;
-
-  LLVM_DEBUG(dbgs() << "LIRP: Starting live interval RP reschedule stage, "
-                    << "VGPRExcessThresholdPercent: "
-                    << SavedVGPRThresholdPercent << " -> "
-                    << *S.VGPRExcessThresholdPercent
-                    << ", VGPRExcessLimit = " << S.VGPRExcessLimit
-                    << ", VGPRCriticalLimit = " << S.VGPRCriticalLimit << "\n");
   return true;
 }
 
 void LiveIntervalRPStage::finalizeGCNSchedStage() {
-  S.VGPRExcessThresholdPercent = SavedVGPRThresholdPercent;
   GCNSchedStage::finalizeGCNSchedStage();
 }
 
@@ -2256,6 +2250,23 @@ bool LiveIntervalRPStage::initGCNRegion() {
 
   LLVM_DEBUG(dbgs() << "LIRP: Region " << RegionIdx
                     << ": InstantRP=" << InstantRP << ", LIRP=" << LIRP);
+
+  bool IsReturnBlock = RegionBegin->getParent()->isReturnBlock();
+  // Use a tighter VGPRExcessLimit by reducing VGPRExcessThresholdPercent
+  unsigned BlockReduction = IsReturnBlock ? LiveIntervalRPVGPRReductionEpilogue
+                                          : LiveIntervalRPVGPRReduction;
+  SavedVGPRThresholdPercent = *S.VGPRExcessThresholdPercent;
+  SavedVGPRExcessLimit = S.VGPRExcessLimit;
+  SavedVGPRCriticalLimit = S.VGPRCriticalLimit;
+  S.VGPRExcessThresholdPercent =
+      (*S.VGPRExcessThresholdPercent * BlockReduction + 99) / 100;
+
+  LLVM_DEBUG(dbgs() << "LIRP: Live interval RP reschedule stage on Region: "
+                    << RegionIdx << "VGPRExcessThresholdPercent: "
+                    << SavedVGPRThresholdPercent << " -> "
+                    << S.VGPRExcessThresholdPercent
+                    << ", VGPRExcessLimit = " << S.VGPRExcessLimit
+                    << ", VGPRCriticalLimit = " << S.VGPRCriticalLimit << "\n");
 
   bool DoRescheduling = false;
   // Lower bound on InstantRP to skip over tiny regions
@@ -2276,7 +2287,22 @@ bool LiveIntervalRPStage::initGCNRegion() {
   }
 
   LLVM_DEBUG(dbgs() << "\n");
-  return DoRescheduling && GCNSchedStage::initGCNRegion();
+  bool WillReschedule = DoRescheduling && GCNSchedStage::initGCNRegion();
+  if (!WillReschedule) {
+    S.VGPRExcessLimit = SavedVGPRExcessLimit;
+    S.VGPRCriticalLimit = SavedVGPRCriticalLimit;
+    S.VGPRExcessThresholdPercent = SavedVGPRThresholdPercent;
+    return false;
+  }
+
+  return true;
+}
+
+void LiveIntervalRPStage::finalizeGCNRegion() {
+  S.VGPRExcessLimit = SavedVGPRExcessLimit;
+  S.VGPRCriticalLimit = SavedVGPRCriticalLimit;
+  S.VGPRExcessThresholdPercent = SavedVGPRThresholdPercent;
+  GCNSchedStage::finalizeGCNRegion();
 }
 
 bool GCNSchedStage::mayCauseSpilling(unsigned WavesAfter) {
