@@ -159,6 +159,8 @@ def run_llc(llc_path: Path, ll_file: Path, extra_flags: Optional[List[str]] = No
         "--amdgpu-sched-strategy=coexec",
         "--amdgpu-enable-static-simulator=1",
         "--fp-contract=fast",
+        "--amdgpu-expert-scheduling-mode",
+        "--amdgpu-anti-hints-for-va-vdst",
         "--enable-post-misched=0",
         "-o", "-",
     ]
