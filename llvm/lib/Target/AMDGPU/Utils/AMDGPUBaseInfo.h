@@ -1106,8 +1106,7 @@ struct HardwareLimits {
   unsigned KmcntMax;     // gfx12+ only.
   unsigned XcntMax;      // gfx1250.
   unsigned AsyncMax;     // gfx1250.
-  unsigned VaVdstRdMax;  // gfx12+ expert mode only.
-  unsigned VaVdstWrMax;  // gfx12+ expert mode only.
+  unsigned VaVdstMax;    // gfx12+ expert mode only.
   unsigned VmVsrcMax;    // gfx12+ expert mode only.
 
   HardwareLimits() = default;
