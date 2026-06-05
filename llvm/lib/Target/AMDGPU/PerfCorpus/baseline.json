@@ -1,11 +1,11 @@
 {
-  "AAI/bf16FA/bf16_fa": 1191,
+  "AAI/bf16FA/bf16_fa": 1380,
   "AAI/bf16_GEMM/bf16_GEMM": 1026,
-  "AAI/fp4_GEMM/fp4_GEMM": 783,
-  "AAI/fp8fp4MOE/fp8fp4_MOE": 1627,
+  "AAI/fp4_GEMM/fp4_GEMM": 623,
+  "AAI/fp8fp4MOE/fp8fp4_MOE": 591,
   "Gluon/bf16FA/bf16_fa": 1406,
   "Gluon/bf16_GEMM/bf16_GEMM": 2063,
   "Gluon/fo4_GEMM/fp4_GEMM": 720,
   "Gluon/fp8_FA/fp8_fa": 1773,
-  "Gluon/fp8_GEMM/fo8_GEMM": 5855
+  "Gluon/fp8_GEMM/fo8_GEMM": 1154
 }
