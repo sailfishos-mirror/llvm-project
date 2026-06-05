@@ -22,6 +22,7 @@
 #include "llvm/Analysis/MustExecute.h"
 #include "llvm/Analysis/OptimizationRemarkEmitter.h"
 #include "llvm/Analysis/ScalarEvolutionExpressions.h"
+#include "llvm/Analysis/ScalarEvolutionPatternMatch.h"
 #include "llvm/Analysis/TargetLibraryInfo.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/Analysis/ValueTracking.h"
@@ -1624,6 +1625,123 @@ bool LoopVectorizationLegality::canVectorizeLoopNestCFG(
   return Result;
 }
 
+/// Helper struct for m_UncountableCondition.
+template <typename PTy, typename LTy, typename RTy>
+struct UncountableConditionMatch {
+  PTy Ptr;
+  LTy Load;
+  RTy CmpTerm;
+
+  UncountableConditionMatch(const PTy &Ptr, const LTy &Load, const RTy &CmpTerm)
+      : Ptr(Ptr), Load(Load), CmpTerm(CmpTerm) {}
+
+  template <typename ITy> bool match(ITy *V) const {
+    Value *P, *L, *R;
+    if (!PatternMatch::match(V, m_OneUse(m_ICmp(m_Value(L), m_Value(R)))))
+      return false;
+
+    if (!PatternMatch::match(L, m_OneUse(m_Load(m_Value(P))))) {
+      std::swap(L, R);
+      if (!PatternMatch::match(L, m_OneUse(m_Load(m_Value(P)))))
+        return false;
+    }
+
+    return Ptr.match(P) && Load.match(L) && CmpTerm.match(R);
+  }
+};
+
+/// Matches an exit condition formed by comparing a value loaded from memory
+/// with another term. Binds the pointer, load, and the other comparison term.
+template <typename PtrTy, typename LoadTy, typename TermTy>
+static auto m_UncountableCondition(const PtrTy &Ptr, const LoadTy &Load,
+                                   const TermTy &Term) {
+  return UncountableConditionMatch<PtrTy, LoadTy, TermTy>(Ptr, Load, Term);
+}
+
+/// Helper struct for m_CountableCondition.
+template <typename CmpTy> struct CountableConditionMatch {
+  CmpTy CountedCmp;
+  ScalarEvolution *SE;
+  Loop *L;
+
+  CountableConditionMatch(const CmpTy &CountedCmp, ScalarEvolution *SE, Loop *L)
+      : CountedCmp(CountedCmp), SE(SE), L(L) {}
+
+  template <typename ITy> bool match(ITy *V) const {
+    Value *Add;
+    Value *Cmp;
+    Value *Limit;
+    if (!PatternMatch::match(
+            V, m_Value(Cmp, m_c_ICmp(m_Value(Add, m_Add(m_Value(), m_Value())),
+                                     m_Value(Limit)))))
+      return false;
+
+    if (!L->isLoopInvariant(Limit))
+      return false;
+
+    using namespace llvm::SCEVPatternMatch;
+    return SCEVPatternMatch::match(SE->getSCEV(Add),
+                                   m_scev_AffineAddRec(m_SCEV(), m_scev_One(),
+                                                       m_SpecificLoop(L))) &&
+           CountedCmp.match(Cmp);
+  }
+};
+
+/// Matches an exit condition formed by comparing the current value of a
+/// affine add recurrence in the given loop with a stride of 1 against a
+/// loop-invariant term. Binds the comparison for the condition.
+template <typename CountedTy>
+static auto m_CountableCondition(const CountedTy &CountedCmp,
+                                 ScalarEvolution *SE, Loop *L) {
+  return CountableConditionMatch<CountedTy>(CountedCmp, SE, L);
+}
+
+/// Helper struct for m_CombinedCondition.
+template <typename PtrTy, typename LoadTy, typename TermTy, typename CmpTy>
+struct CombinedConditionMatch {
+  UncountableConditionMatch<PtrTy, LoadTy, TermTy> UncountableCond;
+  CountableConditionMatch<CmpTy> CountableCond;
+
+  CombinedConditionMatch(const PtrTy &Ptr, const LoadTy &Load,
+                         const TermTy &Term, const CmpTy &CountedCmp,
+                         ScalarEvolution *SE, Loop *L)
+      : UncountableCond(m_UncountableCondition(Ptr, Load, Term)),
+        CountableCond(m_CountableCondition(CountedCmp, SE, L)) {}
+
+  template <typename ITy> bool match(ITy *V) const {
+    Value *L, *R;
+    if (!PatternMatch::match(V, m_OneUse(m_LogicalOr(m_Value(L), m_Value(R)))))
+      return false;
+
+    return (UncountableCond.match(L) && CountableCond.match(R)) ||
+           (UncountableCond.match(R) && CountableCond.match(L));
+  }
+};
+
+/// Matches a combined exit condition consisting of an uncountable condition and
+/// a countable condition, combined by an or.  Binds the pointer, load, the
+/// second comparison term for the uncountable condition, and the comparison for
+/// the countable condition.
+template <typename PtrTy, typename LoadTy, typename TermTy, typename CmpTy>
+static auto m_CombinedCondition(const PtrTy &Ptr, const LoadTy &Load,
+                                const TermTy &Term, const CmpTy &CountedCmp,
+                                ScalarEvolution *SE, Loop *L) {
+  return CombinedConditionMatch<PtrTy, LoadTy, TermTy, CmpTy>(
+      Ptr, Load, Term, CountedCmp, SE, L);
+}
+
+Value *LoopVectorizationLegality::findCountableComparisonInCombinedCondition(
+    Value *Cond) const {
+  Value *CountableCmp;
+  if (match(Cond,
+            m_CombinedCondition(m_Value(), m_Value(), m_Value(),
+                                m_Value(CountableCmp), PSE.getSE(), TheLoop))) {
+    return CountableCmp;
+  }
+
+  return nullptr;
+}
+
 bool LoopVectorizationLegality::isVectorizableEarlyExitLoop() {
   BasicBlock *LatchBB = TheLoop->getLoopLatch();
   if (!LatchBB) {
@@ -1675,16 +1793,28 @@ bool LoopVectorizationLegality::isVectorizableEarlyExitLoop() {
   }
 
   // The latch block must have a countable exit.
-  if (isa<SCEVCouldNotCompute>(
-          PSE.getSE()->getPredicatedExitCount(TheLoop, LatchBB, &Predicates))) {
+  if (isa<SCEVCouldNotCompute>(PSE.getSE()->getPredicatedExitCount(
+          TheLoop, LatchBB, &Predicates, ScalarEvolution::SymbolicMaximum))) {
     reportVectorizationFailure(
         "Cannot determine exact exit count for latch block",
         "Cannot vectorize early exit loop",
         "UnknownLatchExitCountEarlyExitLoop", ORE, TheLoop);
     return false;
   }
-  assert(llvm::is_contained(CountableExitingBlocks, LatchBB) &&
-         "Latch block not found in list of countable exits!");
+
+  if (!is_contained(CountableExitingBlocks, LatchBB)) {
+    // If not a separate counted exit in the latch, then check for a combined
+    // countable and uncountable exit.
+    auto *Br = dyn_cast<CondBrInst>(LatchBB->getTerminator());
+    if (!Br || !match(Br->getCondition(),
+                      m_CombinedCondition(m_Value(), m_Value(), m_Value(),
+                                          m_Value(), PSE.getSE(), TheLoop))) {
+      reportVectorizationFailure(
+          "Latch block does not have a countable exit condition",
+          "NoCountableConditionInLatchBlock", ORE, TheLoop);
+      return false;
+    }
+  }
 
   // Check to see if there are instructions that could potentially generate
   // exceptions or have side-effects.
@@ -1762,6 +1892,13 @@ bool LoopVectorizationLegality::isVectorizableEarlyExitLoop() {
     }
   }
 
+  // We're only handling combined exit conditions via masking at present, which
+  // is used for loops with side effects.
+  // TODO: Support readonly loops with combined exit conditions.
+  // TODO: Decouple style from the presence of side effects.
+  if (!llvm::is_contained(CountableExitingBlocks, LatchBB) && !HasSideEffects)
+    return false;
+
   [[maybe_unused]] const SCEV *SymbolicMaxBTC =
       PSE.getSymbolicMaxBackedgeTakenCount();
   // Since we have an exact exit count for the latch and the early exit
@@ -1788,19 +1925,26 @@ bool LoopVectorizationLegality::canUncountableExitConditionLoadBeMoved(
   auto *Br = cast<CondBrInst>(ExitingBlock->getTerminator());
 
   using namespace llvm::PatternMatch;
-  Instruction *L = nullptr;
-  Value *Ptr = nullptr;
-  Value *R = nullptr;
-  // The exit-condition load can appear on either side of the icmp.
+  Value *Ptr, *L, *R;
+  // We want to match either an uncounted condition (loaded value compared
+  // against a loop invariant value) or the combination (via logical or) of
+  // an uncounted condition with a counted condition (integer comparison of
+  // an induction variable for which we can identify an add recurrence within
+  // this loop).
   if (!match(Br->getCondition(),
-             m_OneUse(m_c_ICmp(m_OneUse(m_Instruction(L, m_Load(m_Value(Ptr)))),
-                               m_Value(R))))) {
+             m_CombineOr(
+                 m_UncountableCondition(m_Value(Ptr), m_Value(L), m_Value(R)),
+                 m_CombinedCondition(m_Value(Ptr), m_Value(L), m_Value(R),
+                                     m_Value(), PSE.getSE(), TheLoop)))) {
     reportVectorizationFailure(
         "Early exit loop with store but no supported condition load",
         "NoConditionLoadForEarlyExitLoop", ORE, TheLoop);
     return false;
   }
 
+  // Bail if the uncountable exit load is compared against a non-invariant
+  // value.
+  // TODO: Remove this restriction.
   if (!TheLoop->isLoopInvariant(R)) {
     reportVectorizationFailure(
         "Early exit loop with store but no supported condition load",
@@ -1920,24 +2064,17 @@ bool LoopVectorizationLegality::canVectorize(bool UseVPlanNativePath) {
       return false;
   }
 
-  if (isa<SCEVCouldNotCompute>(PSE.getBackedgeTakenCount())) {
-    if (TheLoop->getExitingBlock()) {
+  if (isa<SCEVCouldNotCompute>(PSE.getBackedgeTakenCount()) &&
+      !isVectorizableEarlyExitLoop()) {
+    assert(UncountableExitType == UncountableExitTrait::None &&
+           "Must be false without vectorizable early-exit loop");
+    if (TheLoop->getExitingBlock())
       reportVectorizationFailure("Cannot vectorize uncountable loop",
                                  "UnsupportedUncountableLoop", ORE, TheLoop);
-      if (DoExtraAnalysis)
-        Result = false;
-      else
-        return false;
-    } else {
-      if (!isVectorizableEarlyExitLoop()) {
-        assert(UncountableExitType == UncountableExitTrait::None &&
-               "Must be false without vectorizable early-exit loop");
-        if (DoExtraAnalysis)
-          Result = false;
-        else
-          return false;
-      }
-    }
+    if (DoExtraAnalysis)
+      Result = false;
+    else
+      return false;
   }
 
   // Go over each instruction and look at memory deps.

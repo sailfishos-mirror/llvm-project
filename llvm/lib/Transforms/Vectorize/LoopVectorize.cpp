@@ -2737,8 +2737,23 @@ void LoopVectorizationCostModel::collectLoopUniforms(ElementCount VF) {
     if (Legal->hasUncountableEarlyExit() && TheLoop->getLoopLatch() != E)
       continue;
     auto *Cmp = dyn_cast<Instruction>(E->getTerminator()->getOperand(0));
-    if (Cmp && TheLoop->contains(Cmp) && Cmp->hasOneUse())
-      AddToWorklistIfAllowed(Cmp);
+    if (!Cmp || !TheLoop->contains(Cmp) || !Cmp->hasOneUse())
+      continue;
+
+    // If we have an exit condition that is actually two conditions (one counted
+    // and the other uncounted) combined via an or, only add the counted
+    // comparison as a uniform value.
+    if (Legal->hasUncountableExitWithSideEffects() &&
+        TheLoop->getLoopLatch() == E) {
+      if (Value *Counted =
+              Legal->findCountableComparisonInCombinedCondition(Cmp)) {
+        AddToWorklistIfAllowed(cast<Instruction>(Counted));
+        continue;
+      }
+    }
+
+    // Normal exit comparisons are uniform.
+    AddToWorklistIfAllowed(Cmp);
   }
 
   auto PrevVF = VF.divideCoefficientBy(2);
@@ -6597,6 +6612,10 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlan1() {
     return nullptr;
 
   RUN_VPLAN_PASS(VPlanTransforms::addMiddleCheck, *VPlan0);
+
+  if (!RUN_VPLAN_PASS(VPlanTransforms::splitCombinedExits, *VPlan0, PSE,
+                      OrigLoop))
+    return nullptr;
 
   // If we're vectorizing a loop with an uncountable exit, make sure that the
   // recipes are safe to handle.
