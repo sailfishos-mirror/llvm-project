@@ -314,6 +314,8 @@ struct SIMachineFunctionInfo final : public yaml::MachineFunctionInfo {
 
   unsigned NumKernargPreloadSGPRs = 0;
 
+  unsigned MinNumAGPRs = ~0u;
+
   SIMachineFunctionInfo() = default;
   SIMachineFunctionInfo(const llvm::SIMachineFunctionInfo &,
                         const TargetRegisterInfo &TRI,
@@ -371,6 +373,7 @@ template <> struct MappingTraits<SIMachineFunctionInfo> {
                        MFI.ScratchReservedForDynamicVGPRs, 0);
     YamlIO.mapOptional("numKernargPreloadSGPRs", MFI.NumKernargPreloadSGPRs, 0);
     YamlIO.mapOptional("isWholeWaveFunction", MFI.IsWholeWaveFunction, false);
+    YamlIO.mapOptional("minNumAGPRs", MFI.MinNumAGPRs, ~0u);
   }
 };
 
@@ -761,6 +764,16 @@ public:
                                 SGPRSaveKind::SPILL_TO_VGPR_LANE &&
                             SI.second.getIndex() == FI;
                    }) != PrologEpilogSGPRSpills.end();
+  }
+
+  // Remove if an entry created for \p Reg.
+  void removePrologEpilogSGPRSpillEntry(Register Reg) {
+    auto I = find_if(PrologEpilogSGPRSpills,
+                     [&Reg](const auto &Spill) { return Spill.first == Reg; });
+    if (I == PrologEpilogSGPRSpills.end())
+      return;
+
+    PrologEpilogSGPRSpills.erase(I);
   }
 
   const PrologEpilogSGPRSaveRestoreInfo &

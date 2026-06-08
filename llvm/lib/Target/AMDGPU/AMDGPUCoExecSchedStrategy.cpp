@@ -632,7 +632,7 @@ void CoexecWindow::populate(InstructionFlavor PreferredFlavor,
 }
 
 SUnit *HardwareUnitInfo::getNextTargetSU(bool LookDeep) const {
-  for (auto *PrioritySU : PrioritySUs) {
+  for (SUnit *PrioritySU : PrioritySUs) {
     if (!PrioritySU->isTopReady())
       return PrioritySU;
   }
@@ -658,12 +658,8 @@ SUnit *HardwareUnitInfo::getNextTargetSU(bool LookDeep) const {
 }
 
 void HardwareUnitInfo::insert(SUnit *SU, unsigned BlockingCycles) {
-#ifndef NDEBUG
-  bool Inserted = AllSUs.insert(SU);
-  assert(Inserted);
-#else
-  AllSUs.insert(SU);
-#endif
+  if (!AllSUs.insert(SU))
+    llvm_unreachable("HardwareUnit already contains SU!");
 
   TotalCycles += BlockingCycles;
 
@@ -754,7 +750,7 @@ void HardwareUnitInfo::finalizeCycles() {
 
 HardwareUnitInfo *
 CandidateHeuristics::getHWUIFromFlavor(InstructionFlavor Flavor) {
-  for (auto &HWUICand : HWUInfo) {
+  for (HardwareUnitInfo &HWUICand : HWUInfo) {
     if (HWUICand.getType() == Flavor) {
       return &HWUICand;
     }
@@ -1717,7 +1713,8 @@ void CandidateHeuristics::sortHWUIResources(SchedBoundary *Zone,
       return A.size() < B.size();
 
     // Default to Flavor order
-    return (unsigned)A.getType() < (unsigned)B.getType();
+    return static_cast<unsigned>(A.getType()) <
+           static_cast<unsigned>(B.getType());
   });
 }
 
@@ -2456,6 +2453,7 @@ AMDGPUCoExecSchedStrategy::AMDGPUCoExecSchedStrategy(
     const MachineSchedContext *C)
     : GCNSchedStrategy(C) {
   SchedStages.push_back(GCNSchedStageID::ILPInitialSchedule);
+  SchedStages.push_back(GCNSchedStageID::RewriteMFMAForm);
   SchedStages.push_back(GCNSchedStageID::LiveIntervalRPReschedule);
   SchedStages.push_back(GCNSchedStageID::PreRARematerialize);
   // Use more accurate GCN pressure trackers.
