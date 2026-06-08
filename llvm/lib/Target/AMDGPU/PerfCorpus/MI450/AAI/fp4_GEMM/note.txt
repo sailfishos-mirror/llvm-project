@@ -4,6 +4,3 @@ Migration target -- loop perf:
 Sched Perf
 732 warm cycles
 
-
-Flags
-    --amdgpu-block-carried-latency=all
