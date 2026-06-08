@@ -48,7 +48,7 @@ enum class AMDGPUSchedReason : uint8_t {
   NUM_REASONS
 };
 
-inline StringRef getReasonName(AMDGPUSchedReason R) {
+constexpr StringRef getReasonName(AMDGPUSchedReason R) {
   switch (R) {
   case AMDGPUSchedReason::None:
     return "None";
@@ -65,7 +65,7 @@ inline StringRef getReasonName(AMDGPUSchedReason R) {
   case AMDGPUSchedReason::ShadowMix:
     return "ShadowMix";
   case AMDGPUSchedReason::NUM_REASONS:
-    return "???";
+    llvm_unreachable("Unknown AMDGPUSchedReason");
   }
   llvm_unreachable("Unknown AMDGPUSchedReason");
 }
@@ -146,18 +146,18 @@ private:
   /// more regular HardwareUnit access patterns. SUs are prioritized based on
   /// depth for top-down scheduling.
   SmallSetVector<SUnit *, 16> PrioritySUs;
-  /// All the SUs in the region that consume this resource
+  /// All the SUs in the region that consume this resource.
   SmallSetVector<SUnit *, 16> AllSUs;
   /// All the SUs for this HardwareUnit that have already been scheduled.
   SmallVector<SUnit *, 16> ScheduledSUs;
   /// The total number of busy cycles for this HardwareUnit for a given region.
   unsigned TotalCycles = 0;
-  // InstructionFlavor mapping
+  /// InstructionFlavor mapping.
   AMDGPU::InstructionFlavor Type;
-  // Whether or not instructions on this HardwareUnit may produce a window in
-  // which instructions in other HardwareUnits can coexecute. For example, WMMA
-  // / MFMA instructions may take multiple cycles, which may be overlapped with
-  // instructions on other HardwareUnits
+  /// Whether or not instructions on this HardwareUnit may produce a window in
+  /// which instructions in other HardwareUnits can coexecute. For example, WMMA
+  /// / MFMA instructions may take multiple cycles, which may be overlapped with
+  /// instructions on other HardwareUnits.
   bool ProducesCoexecWindow = false;
   /// How many instructions can be held simultaneously for this HardwareUnit.
   /// A value of 0 or 1 means that there is no buffer.
@@ -236,13 +236,12 @@ public:
     return ScheduledSUs[ScheduledCount - 1];
   }
 
-  /// \returns true if there is a difference in priority between \p SU and \p
-  /// Other. If so, \returns the SUnit with higher priority. This
-  /// method looks through the PrioritySUs to determine if one SU is more
+  /// \returns the SUnit with higher priority or nullptr if they are the same.
+  /// This method looks through the PrioritySUs to determine if one SU is more
   /// prioritized than the other. If neither are in the PrioritySUs list, then
   /// neither have priority over each other.
   SUnit *getHigherPriority(SUnit *SU, SUnit *Other) const {
-    for (auto *SUOrder : PrioritySUs) {
+    for (SUnit *SUOrder : PrioritySUs) {
       if (SUOrder == SU)
         return SU;
 
@@ -275,12 +274,12 @@ public:
   /// long latency (e.g. memory instructions). If we have many long latency
   /// dependencies, it is beneficial to enable SUs multiple levels ahead.
   SUnit *getNextTargetSU(bool LookDeep = false) const;
-  /// Insert the \p SU into the AllSUs and account its \p BlockingCycles into
+  /// Insert the \p SU into AllSUs and account its \p BlockingCycles into
   /// the TotalCycles. This maintains the list of PrioritySUs.
   void insert(SUnit *SU, unsigned BlockingCycles);
-  /// Update the state for \p SU being scheduled by removing it from the AllSus
+  /// Update the state for \p SU being scheduled by removing it from the AllSUs
   /// and reducing its \p BlockingCycles from the TotalCycles. This maintains
-  /// the list of PrioritySUS.
+  /// the list of PrioritySUs.
   void markScheduled(SUnit *SU, unsigned BlockingCycles);
   /// After we've collected all the region pressure for this HWUI, correct for
   /// any specifics of the behavior of this resource. For example, if we the
