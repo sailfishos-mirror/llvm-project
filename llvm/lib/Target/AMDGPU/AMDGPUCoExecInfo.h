@@ -40,31 +40,34 @@ namespace AMDGPU {
 // Co-execution Bitmasks
 //===----------------------------------------------------------------------===//
 
+using CoExecMaskT = uint16_t;
+
 /// Bitmask for instruction types allowed to co-execute at a stage.
 namespace CoExecMask {
-constexpr uint8_t None = 0;
-constexpr uint8_t CTRL = 1 << 0;  // Control: s_delay_alu, s_set_vgpr_msb
-constexpr uint8_t VALU = 1 << 1;  // Vector ALU
-constexpr uint8_t TRANS = 1 << 2; // Transcendentals (V_EXP etc)
-constexpr uint8_t SALU = 1 << 3;  // Scalar ALU
-constexpr uint8_t DS = 1 << 4;    // LDS read/write
-constexpr uint8_t VMEM = 1 << 5;  // Global memory
-constexpr uint8_t SMEM = 1 << 6;  // Scalar memory
-constexpr uint8_t WMMA = 1 << 7;  // Next WMMA (V stages only)
-constexpr uint8_t All = 0xFF;
+constexpr CoExecMaskT None = 0;
+constexpr CoExecMaskT CTRL = 1 << 0;  // Control: s_delay_alu, s_set_vgpr_msb
+constexpr CoExecMaskT VALU = 1 << 1;  // Vector ALU
+constexpr CoExecMaskT TRANS = 1 << 2; // Transcendentals (V_EXP etc)
+constexpr CoExecMaskT SALU = 1 << 3;  // Scalar ALU
+constexpr CoExecMaskT DS = 1 << 4;    // LDS read/write
+constexpr CoExecMaskT VMEM = 1 << 5;  // Global memory
+constexpr CoExecMaskT SMEM = 1 << 6;  // Scalar memory
+constexpr CoExecMaskT WMMA = 1 << 7;  // Next WMMA (V stages only)
+constexpr CoExecMaskT All = 0xFFFF;
 
-constexpr uint8_t MEM = DS | VMEM | SMEM;
-constexpr uint8_t StageE0 = CTRL;             // Issue: control only
-constexpr uint8_t StageE = CTRL | SALU | MEM; // External: mem/salu
-constexpr uint8_t StageI =
-    CTRL | SALU | MEM | VALU | TRANS;                // Internal: all ALU
+constexpr CoExecMaskT MEM = DS | VMEM | SMEM;
+constexpr CoExecMaskT StageE0 = CTRL;             // Issue: control only
+constexpr CoExecMaskT StageE = CTRL | SALU | MEM; // External: mem/salu
+constexpr CoExecMaskT StageI =
+    CTRL | SALU | MEM | VALU | TRANS; // Internal: all ALU
 // Internal + scaled-WMMA absorb: same as StageI but the next scaled
 // WMMA may issue here — its LD_SCALE consumes the I cycle and the matrix
 // multiply lands in the V slot that follows. Used for the last I before
 // V of HasScaling patterns.
-constexpr uint8_t StageIS = StageI | WMMA;           // 0xFF
-constexpr uint8_t StageV = CTRL | SALU | MEM | WMMA; // Vacant: no valu/trans
-constexpr uint8_t StageTR = All & ~TRANS;             // TRANS co-exec: no TRANS
+constexpr CoExecMaskT StageIS = StageI | WMMA;
+constexpr CoExecMaskT StageV =
+    CTRL | SALU | MEM | WMMA;                 // Vacant: no valu/trans
+constexpr CoExecMaskT StageTR = All & ~TRANS; // TRANS co-exec: no TRANS
 } // namespace CoExecMask
 
 //===----------------------------------------------------------------------===//
@@ -215,7 +218,7 @@ inline const char *getStageTypeName(CoExecStageType T) {
 }
 
 /// Return a human-readable name for a CoExecMask bitmask value.
-inline const char *getCoExecMaskName(uint8_t Mask) {
+inline const char *getCoExecMaskName(CoExecMaskT Mask) {
   switch (Mask) {
   case CoExecMask::CTRL:  return "CTRL";
   case CoExecMask::VALU:  return "VALU";
@@ -230,7 +233,7 @@ inline const char *getCoExecMaskName(uint8_t Mask) {
 }
 
 /// Return a single character for a CoExecMask value (for visual window logs).
-inline char getCoExecMaskChar(uint8_t Mask) {
+inline char getCoExecMaskChar(CoExecMaskT Mask) {
   switch (Mask) {
   case CoExecMask::WMMA:  return 'W';
   case CoExecMask::VALU:  return 'V';
@@ -246,9 +249,9 @@ inline char getCoExecMaskChar(uint8_t Mask) {
 
 /// Get the CoExecMask for a COPY instruction based on register classes.
 /// SGPR-to-SGPR uses SALU, everything else (VGPR↔VGPR, cross-class) uses VALU.
-inline uint8_t getCoExecMaskForCopy(const MachineInstr &MI,
-                                    const MachineRegisterInfo &MRI,
-                                    const SIRegisterInfo &TRI) {
+inline CoExecMaskT getCoExecMaskForCopy(const MachineInstr &MI,
+                                        const MachineRegisterInfo &MRI,
+                                        const SIRegisterInfo &TRI) {
   assert(MI.isCopy());
   Register Dst = MI.getOperand(0).getReg();
   Register Src = MI.getOperand(1).getReg();
@@ -280,7 +283,7 @@ constexpr unsigned MaxCoExecStages = 32;
 
 /// Per-slot info including capabilities and scheduling preferences.
 struct CoExecSlotInfo {
-  uint8_t Mask = CoExecMask::All; // What CAN execute (correctness)
+  CoExecMaskT Mask = CoExecMask::All; // What CAN execute (correctness)
   FlavorMask PreferredFlavors = FlavorMasks::None; // Flavors to prefer here
   FlavorMask AvoidedFlavors = FlavorMasks::None;   // Flavors to avoid here
   uint8_t TypeIndex = 0; // Index within type (0=first E, etc)
@@ -313,7 +316,7 @@ struct CoExecInfo {
   }
 
   /// Get capability mask for a stage.
-  uint8_t getMask(unsigned Stage) const {
+  CoExecMaskT getMask(unsigned Stage) const {
     return Stage < MaxCoExecStages ? Slots[Stage].Mask : CoExecMask::All;
   }
 
@@ -358,14 +361,14 @@ struct CoExecInfo {
   }
 
   /// Check if instruction class mask can co-execute at a given stage.
-  bool canCoExec(uint8_t InstMask, unsigned Stage) const {
+  bool canCoExec(CoExecMaskT InstMask, unsigned Stage) const {
     if (Stage >= TotalWindow)
       return true;
     return (Slots[Stage].Mask & InstMask) != 0;
   }
 
   /// Find next stage where instruction class is allowed.
-  std::optional<unsigned> findNextAllowedStage(uint8_t InstMask,
+  std::optional<unsigned> findNextAllowedStage(CoExecMaskT InstMask,
                                                unsigned FromStage) const {
     for (unsigned I = FromStage; I < TotalWindow; ++I) {
       if ((Slots[I].Mask & InstMask) != 0)
@@ -374,7 +377,7 @@ struct CoExecInfo {
     return std::nullopt;
   }
 
-  unsigned getCoExecStageCount(uint8_t InstMask) const {
+  unsigned getCoExecStageCount(CoExecMaskT InstMask) const {
     unsigned Counter = 0;
     for (unsigned I = 0; I < TotalWindow; ++I) {
       if ((Slots[I].Mask & InstMask) != 0)
@@ -384,7 +387,7 @@ struct CoExecInfo {
   }
 
   /// Get stage type from mask for display.
-  static CoExecStageType getStageType(uint8_t Mask) {
+  static CoExecStageType getStageType(CoExecMaskT Mask) {
     using namespace CoExecMask;
     if (Mask == StageE0)
       return CoExecStageType::E0;

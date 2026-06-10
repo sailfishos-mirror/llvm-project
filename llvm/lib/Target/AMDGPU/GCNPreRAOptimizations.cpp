@@ -336,8 +336,8 @@ bool GCNPreRAOptimizationsImpl::run(MachineFunction &MF) {
       SmallVector<Register, 4> Regs;
       unsigned HazardSlots;
       unsigned HazardConsumerSince = 0;
-      uint8_t HazardSlotMask;
-      uint8_t ConsumerMask;
+      AMDGPU::CoExecMaskT HazardSlotMask;
+      AMDGPU::CoExecMaskT ConsumerMask;
     };
 
     auto getCoexecMaskForMI = [](const MachineInstr &MI) {
@@ -463,9 +463,9 @@ bool GCNPreRAOptimizationsImpl::run(MachineFunction &MF) {
             AMDGPU::CoExecInfo CEI = AMDGPU::getCoExecInfo(MI, *TII);
             unsigned VALUSlots =
                 CEI.getCoExecStageCount(AMDGPU::CoExecMask::VALU);
-            uint8_t SlotMask =
+            AMDGPU::CoExecMaskT SlotMask =
                 AMDGPU::CoExecMask::VALU | AMDGPU::CoExecMask::TRANS;
-            uint8_t ConsumerMask =
+            AMDGPU::CoExecMaskT ConsumerMask =
                 SlotMask | AMDGPU::CoExecMask::VMEM | AMDGPU::CoExecMask::DS;
             LastMFMAOrWMMA = {std::move(MFMARegisters), VALUSlots, 0u, SlotMask,
                               ConsumerMask};
@@ -481,15 +481,15 @@ bool GCNPreRAOptimizationsImpl::run(MachineFunction &MF) {
 
           if (!TRANSRegisters.empty()) {
             unsigned RepeatRate = TII->getRepeatRate(MI);
-            uint8_t SlotMask = AMDGPU::CoExecMask::VALU;
-            uint8_t ConsumerMask =
+            AMDGPU::CoExecMaskT SlotMask = AMDGPU::CoExecMask::VALU;
+            AMDGPU::CoExecMaskT ConsumerMask =
                 SlotMask | AMDGPU::CoExecMask::VMEM | AMDGPU::CoExecMask::DS;
             LastTRANS = {std::move(TRANSRegisters), RepeatRate - 1, 0u,
                          SlotMask, ConsumerMask};
           }
         }
 
-        uint8_t MIMask = getCoexecMaskForMI(MI);
+        AMDGPU::CoExecMaskT MIMask = getCoexecMaskForMI(MI);
 
         updateHintSource(LastMFMAOrWMMA, MIMask, MI);
         updateHintSource(LastTRANS, MIMask, MI);

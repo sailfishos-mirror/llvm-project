@@ -298,8 +298,8 @@ public:
   }
 
   /// Get the CoExecMask for a given instruction.
-  static uint8_t getCoExecMaskForMI(const MachineInstr &MI,
-                                    const SIInstrInfo &TII);
+  static AMDGPU::CoExecMaskT getCoExecMaskForMI(const MachineInstr &MI,
+                                                const SIInstrInfo &TII);
 
   // We can only issue one instruction per cycle.
   bool atIssueLimit() const override { return true; }

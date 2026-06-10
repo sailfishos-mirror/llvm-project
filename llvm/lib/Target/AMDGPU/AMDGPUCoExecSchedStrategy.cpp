@@ -92,7 +92,7 @@ public:
 
 /// Map an InstructionFlavor to its CoExecMask bit for the roofline analysis.
 /// Returns 0 for flavors that cannot fill co-exec slots.
-uint8_t flavorToCoExecMask(InstructionFlavor F) {
+CoExecMaskT flavorToCoExecMask(InstructionFlavor F) {
   switch (F) {
   case InstructionFlavor::SingleCycleVALU:
   case InstructionFlavor::MultiCycleVALU:
@@ -114,9 +114,11 @@ uint8_t flavorToCoExecMask(InstructionFlavor F) {
 }
 
 /// Get the bit index (0-7) for a single CoExecMask bit.
-unsigned coexecBitIndex(uint8_t Bit) {
+unsigned coexecBitIndex(CoExecMaskT Bit) {
   assert(Bit && (Bit & (Bit - 1)) == 0 && "Must be a single bit");
-  return llvm::countr_zero(Bit);
+  auto Ret = llvm::countr_zero(Bit);
+  assert(Ret < 8 && "Encountered an unsupported CoExecMask");
+  return Ret;
 }
 
 /// Tiny max-flow solver (Edmonds-Karp) for the roofline bipartite matching.
@@ -194,7 +196,7 @@ struct TinyMaxFlow {
 
 unsigned
 RooflineResult::getWMMACoexecByFlavor(AMDGPU::InstructionFlavor Flavor) {
-  uint8_t Bit = flavorToCoExecMask(Flavor);
+  CoExecMaskT Bit = flavorToCoExecMask(Flavor);
   unsigned Index = coexecBitIndex(Bit);
   return WMMACoexecByClass[Index];
 }
@@ -304,7 +306,7 @@ WindowSlotDemand
 WindowSlotDemand::fromCoExecInfo(const CoExecInfo &Info) {
   WindowSlotDemand Demand;
   for (unsigned S = 0; S < Info.TotalWindow; ++S) {
-    uint8_t Mask = Info.getMask(S);
+    CoExecMaskT Mask = Info.getMask(S);
     switch (Mask) {
     case CoExecMask::StageE0:
       // Control-only stage, no filler needed.
@@ -432,7 +434,7 @@ static unsigned computeSlotsMissed(const RegionMixInfo &MixInfo, SUnit *RepSU,
   unsigned FilledESlots = 0;
   unsigned FilledISlots = 0;
 
-  auto adjustFilledSlots = [&](uint8_t Mask) {
+  auto adjustFilledSlots = [&](CoExecMaskT Mask) {
     if (Producer == InstructionFlavor::WMMA) {
       switch (Mask) {
       case CoExecMask::StageI: {
@@ -450,7 +452,7 @@ static unsigned computeSlotsMissed(const RegionMixInfo &MixInfo, SUnit *RepSU,
   };
 
   for (unsigned S = 0; S < Info.TotalWindow; ++S) {
-    uint8_t Mask = Info.getMask(S);
+    CoExecMaskT Mask = Info.getMask(S);
     if (Mask == CoExecMask::StageE0 || Mask == CoExecMask::None ||
         Mask == CoExecMask::StageV)
       continue;
@@ -1373,13 +1375,12 @@ void CandidateHeuristics::computeRooflineCoExec() {
   Roofline = RooflineResult();
 
   // Slot types: map from stage bitmask to count of slots with that mask.
-  // Use uint16_t key (rather than uint8_t) so 0xFF is a usable mask value
-  // — the IS slot's StageIS = StageI | WMMA = 0xFF, and uint8_t's
-  // DenseMapInfo reserves 0xFF as the empty-key sentinel.
+  // Use bigger data types as the key, because DenseMapInfo reserve all-ones
+  // value as the empty-key sentinel.
   // FUTURE: if we add a separate ScaleWMMA flavor, the IS slot would be
   // restricted to it (rather than any WMMA), affecting how the roofline
   // distributes WMMA flow between IS and V slots.
-  SmallDenseMap<uint16_t, unsigned, 16> SlotTypes;
+  SmallDenseMap<uint32_t, unsigned, 16> SlotTypes;
   unsigned NumWMMAs = 0;
 
   for (auto &SU : DAG->SUnits) {
@@ -1390,7 +1391,7 @@ void CandidateHeuristics::computeRooflineCoExec() {
       // Producer: enumerate coexec slots from this WMMA's stage pattern.
       CoExecInfo Info = getCoExecInfo(MI, *SII);
       for (unsigned S = 0; S < Info.TotalWindow; ++S) {
-        uint8_t Mask = Info.getMask(S);
+        CoExecMaskT Mask = Info.getMask(S);
         // Skip E0 stages (CTRL-only, filled by hazard recognizer).
         if (Mask == CoExecMask::StageE0)
           continue;
@@ -1415,7 +1416,7 @@ void CandidateHeuristics::computeRooflineCoExec() {
     }
 
     // Consumer: map to CoExecMask bit.
-    uint8_t Bit = flavorToCoExecMask(Flavor);
+    CoExecMaskT Bit = flavorToCoExecMask(Flavor);
     // Catch SMEM instructions that classifyFlavor maps to Other.
     if (!Bit && SII->isSMRD(MI))
       Bit = CoExecMask::SMEM;
@@ -1490,7 +1491,7 @@ void CandidateHeuristics::computeRooflineCoExec() {
 
     for (unsigned I = 0; I < C; ++I) {
       unsigned BitIdx = ActiveClasses[I];
-      uint8_t ClassBit = 1u << BitIdx;
+      CoExecMaskT ClassBit = 1u << BitIdx;
       if (Mask & ClassBit) {
         unsigned Nk = Roofline.ConsumerCount[BitIdx];
         MF.addEdge(1 + I, SlotNode, std::min(Nk, Mt));
@@ -1553,7 +1554,7 @@ void CandidateHeuristics::initExposedGreedy() {
         continue;
       CoExecInfo Info = getCoExecInfo(*SU.getInstr(), *SII);
       for (unsigned S = 0; S < Info.TotalWindow; ++S) {
-        uint8_t Mask = Info.getMask(S);
+        CoExecMaskT Mask = Info.getMask(S);
         if (Mask == CoExecMask::StageE0)
           continue;
         bool HasVALU = Mask & CoExecMask::VALU;
@@ -1601,7 +1602,7 @@ void CandidateHeuristics::initExposedGreedy() {
   }
   HWUInfo[(int)InstructionFlavor::DS].setExposedCount(DSCount);
 
-  uint8_t Bit = flavorToCoExecMask(InstructionFlavor::DS);
+  CoExecMaskT Bit = flavorToCoExecMask(InstructionFlavor::DS);
   Roofline.WMMACoexecByClass[coexecBitIndex(Bit)] = DSWMMACoexec;
 
   // SALU next: remaining E-slots, then MultiVALU shadow.
@@ -1654,7 +1655,7 @@ void CandidateHeuristics::initExposedRoofline() {
   if (!Roofline.isValid())
     return;
   for (auto &HWUI : HWUInfo) {
-    uint8_t Bit = flavorToCoExecMask(HWUI.getType());
+    CoExecMaskT Bit = flavorToCoExecMask(HWUI.getType());
     if (!Bit)
       continue;
     HWUI.setExposedCount(Roofline.ExposedByClass[coexecBitIndex(Bit)]);
@@ -1874,7 +1875,7 @@ unsigned CandidateHeuristics::getMissedSlotCost(SUnit *SU,
     if (NextStage >= Info.TotalWindow)
       return 0;
 
-    uint8_t NextMask = Info.getMask(NextStage);
+    CoExecMaskT NextMask = Info.getMask(NextStage);
     bool IsISlot =
         (NextMask == CoExecMask::StageI || NextMask == CoExecMask::StageIS);
     if (!IsISlot)
@@ -1890,7 +1891,8 @@ unsigned CandidateHeuristics::getMissedSlotCost(SUnit *SU,
     MachineInstr *MI = SU->getInstr();
     if (!MI->isCopy())
       return 0;
-    uint8_t RequiredMask = AMDGPU::getCoExecMaskForCopy(*MI, DAG->MRI, *SRI);
+    CoExecMaskT RequiredMask =
+        AMDGPU::getCoExecMaskForCopy(*MI, DAG->MRI, *SRI);
     if (RequiredMask != CoExecMask::SALU)
       return 0;
 
@@ -1901,7 +1903,7 @@ unsigned CandidateHeuristics::getMissedSlotCost(SUnit *SU,
     unsigned MissedSlots = 0;
     unsigned Cutoff = std::min(CurrentStage + CopyInstrs, Info.TotalWindow);
     for (; CurrentStage < Cutoff; CurrentStage++) {
-      uint8_t NextMask = Info.getMask(CurrentStage);
+      CoExecMaskT NextMask = Info.getMask(CurrentStage);
       if (NextMask & CoExecMask::VALU || NextMask & CoExecMask::WMMA)
         ++MissedSlots;
     }

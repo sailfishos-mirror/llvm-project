@@ -319,7 +319,7 @@ enum class StageType : uint8_t {
 /// Simulator-specific extensions to CoExecInfo with InstClass support.
 struct SimCoExecInfo : public CoExecInfo {
   /// Get the mask bit for an instruction class
-  static uint8_t getMaskForIC(InstClass IC) {
+  static CoExecMaskT getMaskForIC(InstClass IC) {
     switch (IC) {
     case InstClass::VALU:
       return CoExecMask::VALU;
@@ -362,7 +362,7 @@ struct SimCoExecInfo : public CoExecInfo {
   /// Find the next stage (>= CurrentStage) where IC can co-execute.
   std::optional<unsigned> findNextAllowedStage(InstClass IC,
                                                unsigned CurrentStage) const {
-    uint8_t Needed = getMaskForIC(IC);
+    CoExecMaskT Needed = getMaskForIC(IC);
     if (Needed == 0)
       return std::nullopt;
 
@@ -1453,7 +1453,7 @@ struct GPUSimState {
 
     unsigned Stage = *StageOpt;
 
-    uint8_t Mask = SimCoExecInfo::getMaskForIC(IC);
+    CoExecMaskT Mask = SimCoExecInfo::getMaskForIC(IC);
     if (Info.canCoExec(Mask, Stage))
       return 0;
 

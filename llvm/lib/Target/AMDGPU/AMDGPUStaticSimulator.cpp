@@ -1379,7 +1379,7 @@ void trackWMMACoExec(InstClass IC, const StallSources &S, GPUSimState &State,
     // Track I-slot utilization
     auto StageOpt = State.getWMMAStage();
     if (StageOpt) {
-      uint8_t StageMask = State.ActiveWMMA.Info.getMask(*StageOpt);
+      CoExecMaskT StageMask = State.ActiveWMMA.Info.getMask(*StageOpt);
       bool IsISlot = (StageMask & CoExecMask::VALU) != 0;
 
       if (IsISlot && S.CoExec == 0) {
@@ -1664,7 +1664,7 @@ void logStalls(const StallSources &Stalls, const GPUSimState &State) {
         State.ActiveWMMA.getCurrentStage(Stalls.EffectiveCycle);
     dbgs() << "    (Base stall lands at cycle " << Stalls.EffectiveCycle;
     if (EffectiveStage) {
-      uint8_t Mask = State.ActiveWMMA.Info.getMask(*EffectiveStage);
+      CoExecMaskT Mask = State.ActiveWMMA.Info.getMask(*EffectiveStage);
       CoExecStageType StageType = CoExecInfo::getStageType(Mask);
       const char *StageName = StageType == CoExecStageType::E0  ? "E0"
                               : StageType == CoExecStageType::E ? "E"
@@ -1689,7 +1689,7 @@ void logWMMAWindow(const GPUSimState &State, InstClass IC) {
   dbgs() << "  WMMA Window: [" << (Stage ? *Stage : ~0U) << "/"
          << State.ActiveWMMA.Info.TotalWindow << "]";
   if (Stage) {
-    uint8_t Mask = State.ActiveWMMA.Info.getMask(*Stage);
+    CoExecMaskT Mask = State.ActiveWMMA.Info.getMask(*Stage);
     CoExecStageType ST = CoExecInfo::getStageType(Mask);
     const char *StageNames[] = {"?", "E0", "E", "I", "V"};
     dbgs() << " " << StageNames[(int)ST];
@@ -1764,7 +1764,7 @@ WMMAWindowCapture captureWMMAWindowState(const GPUSimState &State,
   Capture.TotalWindow = State.ActiveWMMA.Info.TotalWindow;
 
   if (Capture.Stage) {
-    uint8_t Mask = State.ActiveWMMA.Info.getMask(*Capture.Stage);
+    CoExecMaskT Mask = State.ActiveWMMA.Info.getMask(*Capture.Stage);
     Capture.StageType = CoExecInfo::getStageType(Mask);
   }
   return Capture;

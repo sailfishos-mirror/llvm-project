@@ -294,8 +294,9 @@ void GCNHazardRecognizer::updateMultiCycleVALUState(const MachineInstr &MI) {
   }
 }
 
-uint8_t GCNHazardRecognizer::getCoExecMaskForMI(const MachineInstr &MI,
-                                                const SIInstrInfo &TII) {
+AMDGPU::CoExecMaskT
+GCNHazardRecognizer::getCoExecMaskForMI(const MachineInstr &MI,
+                                        const SIInstrInfo &TII) {
   using namespace AMDGPU::CoExecMask;
 
   if (SIInstrInfo::isWMMA(MI) || SIInstrInfo::isSWMMAC(MI))
@@ -355,7 +356,7 @@ GCNHazardRecognizer::checkWMMACoexecSlot(const MachineInstr &MI) const {
   }
 
   unsigned Stage = *CurrentCoExecStage;
-  uint8_t InstMask = getCoExecMaskForMI(MI, TII);
+  AMDGPU::CoExecMaskT InstMask = getCoExecMaskForMI(MI, TII);
   // Check if the instruction can co-execute at the current stage.
   if (ActiveCoExecInfo.canCoExec(InstMask, Stage))
     return 0;
@@ -407,7 +408,7 @@ GCNHazardRecognizer::checkMultiShadowHazard(const MachineInstr &MI) const {
   // We need to wait for at least one to clear.
 
   unsigned LookAheadStage = *CurrentCoExecStage + CyclesUntilTRANS;
-  uint8_t InstMask = getCoExecMaskForMI(MI, TII);
+  AMDGPU::CoExecMaskT InstMask = getCoExecMaskForMI(MI, TII);
   // Check if the instruction can co-execute at the current stage.
   if (ActiveCoExecInfo.canCoExec(InstMask, LookAheadStage))
     return CyclesUntilTRANS;
@@ -434,7 +435,8 @@ GCNHazardRecognizer::checkWideCopyCoExecSlots(const MachineInstr &MI) const {
   if (NumMoves <= 1)
     return 0;
 
-  uint8_t RequiredMask = AMDGPU::getCoExecMaskForCopy(MI, MF.getRegInfo(), TRI);
+  AMDGPU::CoExecMaskT RequiredMask =
+      AMDGPU::getCoExecMaskForCopy(MI, MF.getRegInfo(), TRI);
   unsigned Stage = *CurrentCoExecStage;
   unsigned ConsecutiveSlots = 0;
 
