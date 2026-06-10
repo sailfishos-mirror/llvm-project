@@ -62,6 +62,18 @@ static cl::opt<unsigned>
                          cl::desc("Lookback window for VA_VDST anti-hints"),
                          cl::init(32));
 
+static cl::opt<bool>
+    EnableAntiHintsForAddr("amdgpu-anti-hints-for-addr", cl::Hidden,
+                           cl::desc("Enable Anti-Hints between memory address "
+                                    "operands and subsequent VGPR writes to "
+                                    "avoid wait xcnt"),
+                           cl::init(true));
+
+static cl::opt<unsigned>
+    AddrAntiHintWindow("amdgpu-addr-anti-hint-window", cl::Hidden,
+                       cl::desc("Window size for address anti-hints"),
+                       cl::init(16));
+
 namespace {
 
 class GCNPreRAOptimizationsImpl {
@@ -544,6 +556,69 @@ bool GCNPreRAOptimizationsImpl::run(MachineFunction &MF) {
               MRI->addRegAllocationAntiHints(DSDestReg, VALUSrcReg);
               MRI->addRegAllocationAntiHints(VALUSrcReg, DSDestReg);
             }
+          }
+        }
+      }
+    }
+  }
+
+  // Add anti-hints between address operands of non-DS memory instructions
+  // (global/buffer loads) and subsequent VGPR writes. This helps avoid
+  // wait xcnt instructions that would otherwise be needed when a subsequent
+  // instruction overwrites the address register before the memory operation
+  // completes.
+  if (EnableAntiHintsForAddr && ST.hasGFX1250Insts()) {
+    const unsigned LookbackWindow = AddrAntiHintWindow;
+
+    for (const MachineBasicBlock &MBB : MF) {
+      // Track recent memory instruction address operands
+      SmallVector<Register, 64> RecentAddrRegs;
+
+      for (const MachineInstr &MI : MBB) {
+        if (MI.isDebugInstr())
+          continue;
+
+        // Check if this is a non-DS memory operation (FLAT/Global/Scratch/VMEM)
+        bool IsNonDSMemOp = TII->isFLAT(MI) || TII->isFLATGlobal(MI) ||
+                            TII->isFLATScratch(MI) || TII->isVMEM(MI);
+
+        if (IsNonDSMemOp) {
+          // Collect address operand (vaddr) for this memory instruction
+          if (const MachineOperand *VAddr =
+                  TII->getNamedOperand(MI, AMDGPU::OpName::vaddr)) {
+            if (VAddr->isReg() && VAddr->getReg().isVirtual()) {
+              Register AddrReg = VAddr->getReg();
+              const TargetRegisterClass *RC = MRI->getRegClass(AddrReg);
+              if (TRI->hasVGPRs(RC)) {
+                if (!llvm::is_contained(RecentAddrRegs, AddrReg)) {
+                  RecentAddrRegs.push_back(AddrReg);
+                  if (RecentAddrRegs.size() > LookbackWindow)
+                    RecentAddrRegs.erase(RecentAddrRegs.begin());
+                }
+              }
+            }
+          }
+          continue;
+        }
+
+        // For any instruction that writes a VGPR, add anti-hints between
+        // the written register and recent address registers
+        if (RecentAddrRegs.empty())
+          continue;
+
+        for (const MachineOperand &MO : MI.defs()) {
+          if (!MO.isReg() || !MO.getReg().isVirtual())
+            continue;
+          Register DefReg = MO.getReg();
+          const TargetRegisterClass *RC = MRI->getRegClass(DefReg);
+          if (!TRI->hasVGPRs(RC))
+            continue;
+
+          for (Register AddrReg : RecentAddrRegs) {
+            if (AddrReg == DefReg)
+              continue;
+            MRI->addRegAllocationAntiHints(DefReg, AddrReg);
+            MRI->addRegAllocationAntiHints(AddrReg, DefReg);
           }
         }
       }
