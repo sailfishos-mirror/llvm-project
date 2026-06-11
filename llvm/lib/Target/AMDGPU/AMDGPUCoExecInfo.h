@@ -728,14 +728,25 @@ inline CoExecInfo getCoExecInfo(const MachineInstr &MI,
   // 32x16x128 F4 variants
   if (Name.contains_insensitive("32x16x128_f4")) {
     const char *Pattern = HasScaling ? "0EEIEIESVV" : "0EEIEIEIVV";
-      return CoExecInfo::build(8, 6, Pattern, 7, HasScaling)
+    return CoExecInfo::build(8, 6, Pattern, 7, HasScaling)
         .preferring(1, flavorBit(InstructionFlavor::DS))
         .avoiding(2, flavorBit(InstructionFlavor::DS))
-        .preferring(3, HasScaling
-                           ? flavorBit(InstructionFlavor::WMMA)
-                           : flavorBit(InstructionFlavor::SingleCycleVALU))
-        .preferring(4, flavorBit(InstructionFlavor::WMMA))
-        .preferring(5, flavorBit(InstructionFlavor::WMMA));
+        .preferring(3, flavorBit(InstructionFlavor::TRANS))
+        .avoiding(3, flavorBit(InstructionFlavor::DS) |
+                         flavorBit(InstructionFlavor::SALU) |
+                         flavorBit(InstructionFlavor::VMEM))
+        .avoiding(4, flavorBit(InstructionFlavor::DS))
+        .preferring(5, flavorBit(InstructionFlavor::TRANS))
+        .avoiding(5, flavorBit(InstructionFlavor::DS) |
+                         flavorBit(InstructionFlavor::SALU) |
+                         flavorBit(InstructionFlavor::VMEM))
+        .avoiding(6, flavorBit(InstructionFlavor::DS))
+        // Stage 7: For non-scaled, this is an I slot - prefer TRANS here
+        // (last I slot before V slots). For scaled, it's S slot for WMMA.
+        .preferring(7, HasScaling ? flavorBit(InstructionFlavor::WMMA)
+                                  : flavorBit(InstructionFlavor::TRANS))
+        .preferring(8, flavorBit(InstructionFlavor::WMMA))
+        .preferring(9, flavorBit(InstructionFlavor::WMMA));
   }
 
   // Default fallback: permissive 8-cycle pattern

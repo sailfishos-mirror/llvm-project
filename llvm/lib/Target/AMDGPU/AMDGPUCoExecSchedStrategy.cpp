@@ -60,7 +60,6 @@ static cl::opt<unsigned> VALUVMEMPadding(
   cl::ReallyHidden,
   cl::init(30));
 
-
 namespace {
 enum class CarriedLatency { Off, Fence, All };
 } // namespace
