@@ -98,6 +98,8 @@ struct RooflineResult {
   unsigned WMMACoexecByClass[8] = {};
   unsigned WMMACount = 0;
 
+  unsigned WMMACorrectionPercent = 75;
+
   bool isValid() const { return TotalSlots > 0; }
 
   unsigned getWMMACoexecByFlavor(AMDGPU::InstructionFlavor Flavor);
@@ -105,19 +107,21 @@ struct RooflineResult {
   unsigned getWMMAISlotSupplySlots() {
     if (WMMACount == 0)
       return 0;
+    unsigned WMMACorrection = WMMACount * WMMACorrectionPercent / 100;
     unsigned TotalISupply =
         getWMMACoexecByFlavor(AMDGPU::InstructionFlavor::SingleCycleVALU) +
         getWMMACoexecByFlavor(AMDGPU::InstructionFlavor::TRANS);
-    return (TotalISupply + WMMACount - 1) / WMMACount;
+    return (TotalISupply + WMMACorrection) / WMMACount;
   }
 
   unsigned getWMMAESlotSupplySlots() {
     if (WMMACount == 0)
       return 0;
-    unsigned TotalISupply =
+    unsigned WMMACorrection = WMMACount * WMMACorrectionPercent / 100;
+    unsigned TotalESupply =
         getWMMACoexecByFlavor(AMDGPU::InstructionFlavor::SALU) +
         getWMMACoexecByFlavor(AMDGPU::InstructionFlavor::DS);
-    return (TotalISupply + WMMACount - 1) / WMMACount;
+    return (TotalESupply + WMMACorrection) / WMMACount;
   }
 
   float getSlotUtilization() const {
