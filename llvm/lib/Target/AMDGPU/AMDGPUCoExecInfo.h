@@ -754,7 +754,7 @@ inline CoExecInfo getCoExecInfo(const MachineInstr &MI,
   // 32x16x128 F4 variants
   if (Name.contains_insensitive("32x16x128_f4")) {
     const char *Pattern = HasScaling ? "0EEIEIESVV" : "0EEIEIEIVV";
-    return CoExecInfo::build(8, 6, Pattern, 7, HasScaling)
+    return CoExecInfo::build(8, 10, Pattern, 7, HasScaling)
         .preferring(1, flavorBit(InstructionFlavor::DS))
         .avoiding(2, flavorBit(InstructionFlavor::DS))
         .preferring(3, flavorBit(InstructionFlavor::TRANS))
