@@ -13,6 +13,7 @@
 
 #include "GCNSubtarget.h"
 #include "AMDGPUCallLowering.h"
+#include "AMDGPUCoExecInfo.h"
 #include "AMDGPUInstructionSelector.h"
 #include "AMDGPULegalizerInfo.h"
 #include "AMDGPURegisterBankInfo.h"
@@ -795,6 +796,30 @@ void GCNSubtarget::adjustSchedDependency(
     if (auto Latency = SIInstrInfo::getDSLatencyMode()) {
       Dep.setLatency(*Latency);
       return;
+    }
+  }
+
+  // For GFX1250: VALU/WMMA writes VGPR that VMEM/DS reads has specific latency.
+  // Only increase the latency if the current edge has lower latency.
+  if (hasGFX1250Insts()) {
+    bool UseIsMemory =
+        InstrInfo.isDS(*UseI) || InstrInfo.isVMEM(*UseI) ||
+        InstrInfo.isFLAT(*UseI) || InstrInfo.isFLATGlobal(*UseI) ||
+        InstrInfo.isFLATScratch(*UseI) || InstrInfo.isLDSDMA(*UseI);
+    if (UseIsMemory) {
+      bool DefIsWMMA = InstrInfo.isMFMAorWMMA(*DefI);
+      bool DefIsVALU = InstrInfo.isVALU(*DefI) && !DefIsWMMA;
+
+      unsigned MinLatency = 0;
+      if (DefIsWMMA)
+        MinLatency = AMDGPU::VALUToMemLatency::WMMA;
+      else if (DefIsVALU)
+        MinLatency = AMDGPU::VALUToMemLatency::VALU;
+
+      if (MinLatency && Dep.getLatency() < MinLatency) {
+        Dep.setLatency(MinLatency);
+        return;
+      }
     }
   }
 

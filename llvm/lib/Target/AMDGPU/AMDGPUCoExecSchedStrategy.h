@@ -232,13 +232,16 @@ public:
   }
 
   /// \returns the most recently scheduled SU for this HardwareUnit.
-  SUnit *getLastScheduledSU() {
+  SUnit *getLastScheduledSU() const {
     unsigned ScheduledCount = ScheduledSUs.size();
     if (!ScheduledCount)
       return nullptr;
 
     return ScheduledSUs[ScheduledCount - 1];
   }
+
+  /// \returns the list of scheduled SUs in scheduling order.
+  ArrayRef<SUnit *> getScheduledSUs() const { return ScheduledSUs; }
 
   /// \returns the SUnit with higher priority or nullptr if they are the same.
   /// This method looks through the PrioritySUs to determine if one SU is more

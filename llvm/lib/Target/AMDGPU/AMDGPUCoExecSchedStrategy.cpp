@@ -54,11 +54,6 @@ static cl::opt<CoexecExposedMode> CoexecExposedSort(
                    "Per-class exposed cycles derived from the roofline "
                    "max-flow solution.")));
 
-static cl::opt<unsigned> VALUVMEMPadding(
-  "amdgpu-valu-vmem-latency",
-  cl::desc("How many cycles to schedule between VALU and VMEM/DS instructions which use the VGPR."),
-  cl::ReallyHidden,
-  cl::init(30));
 
 namespace {
 enum class CarriedLatency { Off, Fence, All };
@@ -1802,6 +1797,9 @@ unsigned CandidateHeuristics::getStallCosts(SUnit *SU, SchedBoundary &Zone,
     return FenceStallFinish <= CurrCycle ? 0 : FenceStallFinish - CurrCycle;
   };
 
+  // For RAW dependencies between VALU and VMEM / DS, check if there is an
+  // intervening WMMA, if so, then add a stall cost between that first
+  // intervening WMMA and the VMEM / DS to cope with vdst OOO pessimism.
   auto getVALUToMemStalls = [this, &CurrCycle](SUnit *SU) -> unsigned {
     if (!SII->getSubtarget().hasGFX1250Insts())
       return 0;
@@ -1812,19 +1810,47 @@ unsigned CandidateHeuristics::getStallCosts(SUnit *SU, SchedBoundary &Zone,
       return 0;
 
     unsigned MaxStall = 0;
+
+    HardwareUnitInfo *WMMAHWUI =
+        const_cast<CandidateHeuristics *>(this)->getHWUIFromFlavor(
+            InstructionFlavor::WMMA);
+    ArrayRef<SUnit *> ScheduledWMMAs =
+        WMMAHWUI ? WMMAHWUI->getScheduledSUs() : ArrayRef<SUnit *>();
+
     for (const SDep &Pred : SU->Preds) {
       if (Pred.getKind() != SDep::Data)
         continue;
 
       SUnit *PredSU = Pred.getSUnit();
       InstructionFlavor PredFlavor = classifyFlavor(*PredSU->getInstr(), *SII);
-      if (PredFlavor != InstructionFlavor::SingleCycleVALU &&
-          PredFlavor != InstructionFlavor::TRANS &&
-          PredFlavor != InstructionFlavor::MultiCycleVALU &&
-          PredFlavor != InstructionFlavor::WMMA)
+
+      // Only consider VALU (non-WMMA) predecessors for the in-between check.
+      bool IsVALU = PredFlavor == InstructionFlavor::SingleCycleVALU ||
+                    PredFlavor == InstructionFlavor::TRANS ||
+                    PredFlavor == InstructionFlavor::MultiCycleVALU;
+
+      if (!IsVALU)
         continue;
 
-      unsigned TargetCycle = PredSU->TopReadyCycle + VALUVMEMPadding;
+      // Find the first WMMA scheduled after this VALU predecessor.
+      SUnit *FirstWMMAAfterVALU = nullptr;
+      for (SUnit *WMMASU : ScheduledWMMAs) {
+        if (WMMASU->TopReadyCycle > PredSU->TopReadyCycle) {
+          FirstWMMAAfterVALU = WMMASU;
+          break;
+        }
+      }
+
+      unsigned TargetCycle;
+      if (FirstWMMAAfterVALU) {
+        // WMMA was scheduled after this VALU predecessor.
+        TargetCycle =
+            FirstWMMAAfterVALU->TopReadyCycle + VALUToMemLatency::WMMA;
+      } else {
+        // No WMMA in between - use VALU latency.
+        TargetCycle = PredSU->TopReadyCycle + VALUToMemLatency::VALU;
+      }
+
       if (TargetCycle > CurrCycle)
         MaxStall = std::max(MaxStall, TargetCycle - CurrCycle);
     }

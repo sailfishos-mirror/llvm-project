@@ -71,6 +71,17 @@ constexpr CoExecMaskT StageTR = All & ~TRANS; // TRANS co-exec: no TRANS
 } // namespace CoExecMask
 
 //===----------------------------------------------------------------------===//
+// VALU to Memory Latency (GFX1250)
+//===----------------------------------------------------------------------===//
+
+/// Latency in cycles for VALU/WMMA writes to VGPR that VMEM/DS reads.
+/// These values apply to GFX1250 and define the RAW hazard latency.
+namespace VALUToMemLatency {
+constexpr unsigned VALU = 16; // Non-WMMA VALU -> VMEM/DS
+constexpr unsigned WMMA = 24; // WMMA -> VMEM/DS
+} // namespace VALUToMemLatency
+
+//===----------------------------------------------------------------------===//
 // Instruction Flavor Classification
 //===----------------------------------------------------------------------===//
 
@@ -144,6 +155,21 @@ inline StringRef getFlavorShortName(InstructionFlavor F) {
     return "?";
   }
   llvm_unreachable("Unknown InstructionFlavor");
+}
+
+/// Returns the VALU->Memory latency for a given instruction flavor.
+/// Returns 0 for flavors that don't have this RAW hazard.
+inline unsigned getVALUToMemLatency(InstructionFlavor Flavor) {
+  switch (Flavor) {
+  case InstructionFlavor::SingleCycleVALU:
+  case InstructionFlavor::MultiCycleVALU:
+  case InstructionFlavor::TRANS:
+    return VALUToMemLatency::VALU;
+  case InstructionFlavor::WMMA:
+    return VALUToMemLatency::WMMA;
+  default:
+    return 0;
+  }
 }
 
 /// Bitmask type for flavor sets. Supports up to 16 flavors.
