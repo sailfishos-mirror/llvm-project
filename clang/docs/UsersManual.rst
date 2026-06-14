@@ -1901,9 +1901,7 @@ for more details.
    architecture does not implement signaling NaNs according to IEEE-754. On the
    supporting architectures, it can enable additional optimization opportunities.
 
-   If more than one option is specified, the last one takes effect. If none is
-   specified, the compiler assumes ``-fno-signaling-nans``, unless the code is
-   compiled as strictfp functions, in which case ``-fsignaling-nans`` is assumed.
+   If more than one option is specified, the last one takes effect.
 
 .. option:: -ffp-model=<value>
 
