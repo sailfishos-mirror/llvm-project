@@ -1726,6 +1726,8 @@ for more details.
 
    * ``-ffp-contract=fast``
 
+   * ``-fno-signaling-nans``
+
    Note: ``-ffast-math`` causes ``crtfastmath.o`` to be linked with code unless
    ``-shared`` or ``-mno-daz-ftz`` is present. See
    :ref:`crtfastmath.o` for more details.
@@ -1759,8 +1761,6 @@ for more details.
    Also, this option resets following options to their target-dependent defaults.
 
    * ``-f[no-]math-errno``
-
-   * ``-fno-signaling-nans``
 
    There is ambiguity about how ``-ffp-contract``, ``-ffast-math``,
    and ``-fno-fast-math`` behave when combined. To keep the value of
@@ -2015,9 +2015,7 @@ for more details.
    architecture does not implement signaling NaNs according to IEEE-754. On the
    supporting architectures, it can enable additional optimization opportunities.
 
-   If more than one option is specified, the last one takes effect. If none is
-   specified, the compiler assumes ``-fno-signaling-nans``, unless the code is
-   compiled as strictfp functions, in which case ``-fsignaling-nans`` is assumed.
+   If more than one option is specified, the last one takes effect.
 
 .. option:: -ffp-model=<value>
 
