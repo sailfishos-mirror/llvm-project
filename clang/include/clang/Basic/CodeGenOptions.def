@@ -543,6 +543,7 @@ CODEGENOPT(ZOSPPA1Name, 1, 1, Benign)
 /// separate options for positive and negative settings, this allows us to
 /// represent "unspecified" setting.
 CODEGENOPT(SignalingNans, 1, 0, Benign)
+CODEGENOPT(NoSignalingNans, 1, 0, Benign)
 
 /// FIXME: Make DebugOptions its own top-level .def file.
 #include "DebugOptions.def"
