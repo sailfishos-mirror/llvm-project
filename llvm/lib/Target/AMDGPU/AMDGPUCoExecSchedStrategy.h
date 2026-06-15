@@ -29,6 +29,10 @@ namespace DefaultBufferSizes {
 constexpr unsigned DS = 16;
 } // namespace DefaultBufferSizes
 
+
+enum class CarriedLatency : uint8_t { Off, Fence, All };
+
+
 InstructionFlavor classifyFlavor(const MachineInstr &MI,
                                  const SIInstrInfo &SII);
 } // namespace AMDGPU
@@ -442,6 +446,7 @@ protected:
   const SIRegisterInfo *SRI;
   const TargetSchedModel *SchedModel;
   SmallVector<HardwareUnitInfo, 8> HWUInfo;
+  AMDGPU::CarriedLatency RegionCarriedLatency = AMDGPU::CarriedLatency::Off;
   DenseMap<MachineInstr *, unsigned> CarriedLatencies;
   RegionMixInfo MixInfo;
   /// Current co-execution window being filled/active.

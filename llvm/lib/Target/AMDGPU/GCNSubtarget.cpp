@@ -53,6 +53,13 @@ static cl::opt<unsigned>
                  cl::desc("Number of addresses from which to enable MIMG NSA."),
                  cl::init(2), cl::Hidden);
 
+static cl::opt<bool> EnableCoExecFriendlyISel(
+    "amdgpu-coexec-friendly-isel",
+    cl::desc("Avoid selecting multi-rate (repeat-rate-32) 64-bit VALU "
+             "instructions during SelectionDAG ISel (CoExec scheduler "
+             "friendly); equivalent to -mattr=+coexec-friendly-isel"),
+    cl::init(true), cl::Hidden);
+
 GCNSubtarget::~GCNSubtarget() = default;
 
 GCNSubtarget &GCNSubtarget::initializeSubtargetDependencies(const Triple &TT,
@@ -89,6 +96,11 @@ GCNSubtarget &GCNSubtarget::initializeSubtargetDependencies(const Triple &TT,
   FullFS += FS;
 
   ParseSubtargetFeatures(GPU, /*TuneCPU*/ GPU, FullFS);
+
+  // Allow forcing CoExec-friendly ISel from the command line so it can be
+  // enabled without threading +coexec-friendly-isel through -mattr.
+  if (EnableCoExecFriendlyISel)
+    HasCoExecFriendlyISelMode = true;
 
   // Implement the "generic" processors, which acts as the default when no
   // generation features are enabled (e.g for -mcpu=''). HSA OS defaults to

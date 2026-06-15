@@ -54,22 +54,17 @@ static cl::opt<CoexecExposedMode> CoexecExposedSort(
                    "Per-class exposed cycles derived from the roofline "
                    "max-flow solution.")));
 
-
-namespace {
-enum class CarriedLatency { Off, Fence, All };
-} // namespace
-
-static cl::opt<CarriedLatency> BlockCarriedLatency(
+static cl::opt<AMDGPU::CarriedLatency> BlockCarriedLatency(
     "amdgpu-block-carried-latency", cl::Hidden,
-    cl::init(CarriedLatency::Off),
+    cl::init(AMDGPU::CarriedLatency::Off),
     cl::desc("Prioritize HardwareUnits with non-zero exposed cycles in the "
              "coexec scheduler's critical-resource sort."),
     cl::values(
-        clEnumValN(CarriedLatency::Off, "off",
+        clEnumValN(AMDGPU::CarriedLatency::Off, "off",
                    "Disabled- do not pad latency."),
-        clEnumValN(CarriedLatency::Fence, "fence",
+        clEnumValN(AMDGPU::CarriedLatency::Fence, "fence",
                    "Only pad latency for memory fence (e.g. those surrounding barrier_signal/wait)."),
-        clEnumValN(CarriedLatency::All, "all",
+        clEnumValN(AMDGPU::CarriedLatency::All, "all",
                    "Pad latency for any SU with an incoming ds_load dependency.")));
 
 namespace {
@@ -885,11 +880,13 @@ void CandidateHeuristics::initialize(ScheduleDAGMI *SchedDAG,
   LLVM_DEBUG(dumpRegionSummary());
   CurrentWindow.clear();
   NextWindow.clear();
+  RegionCarriedLatency = BlockCarriedLatency.getNumOccurrences() ? BlockCarriedLatency : AMDGPU::CarriedLatency::Off;
+
 
   if (!BlockCarriedLatency.getNumOccurrences()) {
     auto WMMAHWUI = getHWUIFromFlavor(InstructionFlavor::WMMA);
 
-    bool MustHaveDSAfter = true;
+    bool MustHaveDSAfter = WMMAHWUI->size();
     for (SUnit *SU : *WMMAHWUI) {
       bool HasDSSucc= false;
       for (auto &Succ : SU->Succs) {
@@ -906,8 +903,9 @@ void CandidateHeuristics::initialize(ScheduleDAGMI *SchedDAG,
 
     }
 
-    if (MustHaveDSAfter)
-      BlockCarriedLatency = CarriedLatency::Fence;
+    if (MustHaveDSAfter) {
+      RegionCarriedLatency = CarriedLatency::Fence;
+    }
   }
 
 

@@ -384,54 +384,6 @@ bool AMDGPUDAGToDAGISel::preprocessZeroExtend(SDNode *N) const {
   return true;
 }
 
-// Rewrite the smin as (select (setcc x, y, setlt), x, y).
-static bool downcastSMin(SDNode *N, SelectionDAG &DAG,
-                                     const TargetLowering &TLI) {
-
-  SDValue SMin = SDValue(N, 0);
-
-  SDLoc DL(SMin);
-  if (N->getValueSizeInBits(0) != 64)
-    return false;
-  SDValue X = SMin.getOperand(0);
-  SDValue Y = SMin.getOperand(1);
-
-  // ISD::SELECT for i64 on SI is Custom-lowered during legalize-ops (see
-  // SITargetLowering::LowerSELECT), but we are past legalization here. Mirror
-  // that expansion so the resulting nodes are all selectable: split each i64
-  // operand into a v2i32 pair, do two i32 selects, then rebuild the i64.
-  EVT SetCCVT = TLI.getSetCCResultType(DAG.getDataLayout(), *DAG.getContext(),
-                                       MVT::i64);
-  SDValue Cmp = DAG.getSetCC(DL, SetCCVT, X, Y, ISD::SETLT);
-  SDValue Cond = DAG.getFreeze(Cmp);
-  SDValue Zero = DAG.getConstant(0, DL, MVT::i32);
-  SDValue One = DAG.getConstant(1, DL, MVT::i32);
-  SDValue XV = DAG.getBitcast(MVT::v2i32, X);
-  SDValue YV = DAG.getBitcast(MVT::v2i32, Y);
-  SDValue XLo = DAG.getNode(ISD::EXTRACT_VECTOR_ELT, DL, MVT::i32, XV, Zero);
-  SDValue YLo = DAG.getNode(ISD::EXTRACT_VECTOR_ELT, DL, MVT::i32, YV, Zero);
-  SDValue Lo = DAG.getSelect(DL, MVT::i32, Cond, XLo, YLo);
-  SDValue XHi = DAG.getNode(ISD::EXTRACT_VECTOR_ELT, DL, MVT::i32, XV, One);
-  SDValue YHi = DAG.getNode(ISD::EXTRACT_VECTOR_ELT, DL, MVT::i32, YV, One);
-  SDValue Hi = DAG.getSelect(DL, MVT::i32, Cond, XHi, YHi);
-  SDValue Pair = DAG.getBuildVector(MVT::v2i32, DL, {Lo, Hi});
-  SDValue Sel = DAG.getBitcast(MVT::i64, Pair);
-
-  LLVM_DEBUG({
-    dbgs() << "AMDGPU PreprocessISelDAG: rewriting SMIN feeding "
-             "amdgcn.global.prefetch\n";
-    dbgs() << "  smin:    ";
-    SMin.getNode()->dump();
-    dbgs() << "  -> setcc:";
-    Cmp.getNode()->dump();
-    dbgs() << "  -> sel:  ";
-    Sel.getNode()->dump();
-  });
-  DAG.ReplaceAllUsesOfValueWith(SMin, Sel);
-  return true;
-}
-
-
 void AMDGPUDAGToDAGISel::PreprocessISelDAG() {
   SelectionDAG::allnodes_iterator Position = CurDAG->allnodes_end();
 
@@ -445,10 +397,6 @@ void AMDGPUDAGToDAGISel::PreprocessISelDAG() {
     case ISD::BUILD_VECTOR: {
       if (Subtarget->d16PreservesUnusedBits())
         MadeChange |= matchLoadD16FromBuildVector(N);
-      break;
-    }
-    case ISD::SMIN: {
-      MadeChange |= downcastSMin(N, *CurDAG, *TLI);
       break;
     }
     case ISD::ZERO_EXTEND: {
