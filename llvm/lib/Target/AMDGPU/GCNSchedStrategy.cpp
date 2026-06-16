@@ -2211,7 +2211,7 @@ static cl::opt<unsigned> LiveIntervalRPVGPRReductionEpilogue(
     cl::desc(
         "Reduction factor (percent) for VGPR threshold during live interval RP "
         "reschedule stage for exit blocks"),
-    cl::init(60));
+    cl::init(70));
 
 bool LiveIntervalRPStage::initGCNSchedStage() {
   if (!EnableLiveIntervalRPReschedule)
