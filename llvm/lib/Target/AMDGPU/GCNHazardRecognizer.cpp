@@ -296,7 +296,7 @@ void GCNHazardRecognizer::updateMultiCycleVALUState(const MachineInstr &MI) {
 
 AMDGPU::CoExecMaskT
 GCNHazardRecognizer::getCoExecMaskForMI(const MachineInstr &MI,
-                                        const SIInstrInfo &TII) {
+                                        const SIInstrInfo &TII) const {
   using namespace AMDGPU::CoExecMask;
 
   if (SIInstrInfo::isWMMA(MI) || SIInstrInfo::isSWMMAC(MI))
@@ -314,6 +314,9 @@ GCNHazardRecognizer::getCoExecMaskForMI(const MachineInstr &MI,
   if (SIInstrInfo::isSALU(MI))
     return SALU;
 
+  if (MI.isCopy()) {
+    return AMDGPU::getCoExecMaskForCopy(MI, MF.getRegInfo(), TRI);
+  }
   // Control instructions (s_delay_alu, s_waitcnt, etc.) - always allowed.
   return CTRL;
 }

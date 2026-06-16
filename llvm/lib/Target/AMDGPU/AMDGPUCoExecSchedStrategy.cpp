@@ -237,6 +237,15 @@ InstructionFlavor llvm::AMDGPU::classifyFlavor(const MachineInstr &MI,
   if (SII.isSALU(MI))
     return InstructionFlavor::SALU;
 
+  if (MI.isCopy()) {
+    const MachineFunction *MF = MI.getMF();
+    assert(MF);
+    const MachineRegisterInfo &MRI = MF->getRegInfo();
+    CoExecMaskT Mask = getCoExecMaskForCopy(MI, MRI, SII.getRegisterInfo());
+    return Mask == CoExecMask::SALU ? InstructionFlavor::SALU
+                                    : InstructionFlavor::SingleCycleVALU;
+  }
+
   return InstructionFlavor::Other;
 }
 
