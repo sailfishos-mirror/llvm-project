@@ -1147,6 +1147,8 @@ bool DevirtModule::tryFindVirtualCallTargets(
     // target.
     auto *GV = dyn_cast<GlobalValue>(C);
     assert(GV);
+    if (auto *GA = dyn_cast<GlobalAlias>(GV))
+      GV = GA->getAliaseeObject();
     TargetsForSlot.push_back({GV, &TM});
   }
 
@@ -1203,7 +1205,21 @@ bool DevirtIndex::tryFindVirtualCallTargets(
       if (mustBeUnreachableFunction(VTP.FuncVI))
         continue;
 
-      TargetsForSlot.push_back(VTP.FuncVI);
+      ValueInfo TheFn = VTP.FuncVI;
+      // If this is an alias to an internal-linkage symbol, we expect it to have
+      // one summary (the alias). This would be an artifact of handing internal
+      // linkage vtable entries during split module bitcode writing.
+      if (TheFn.getSummaryList().size() == 1) {
+        if (auto *AS =
+                dyn_cast<AliasSummary>(TheFn.getSummaryList()[0].get())) {
+          TheFn = AS->getAliaseeVI();
+          assert(TheFn.hasLocal() &&
+                 "The presence of an alias in the vtable is expected only as a "
+                 "result of split module bitcode writing. The aliased symbol "
+                 "should be internal linkage.");
+        }
+      }
+      TargetsForSlot.push_back(TheFn);
     }
   }
 
@@ -2261,10 +2277,13 @@ void DevirtModule::importResolution(VTableSlot Slot, VTableSlotInfo &SlotInfo) {
     assert(!Res.SingleImplName.empty());
     // The type of the function in the declaration is irrelevant because every
     // call site will cast it to the correct type.
-    Constant *SingleImpl =
-        cast<Constant>(M.getOrInsertFunction(Res.SingleImplName,
-                                             Type::getVoidTy(M.getContext()))
-                           .getCallee());
+    Value *SingleImplVal =
+        M.getOrInsertFunction(Res.SingleImplName,
+                              Type::getVoidTy(M.getContext()))
+            .getCallee();
+    if (auto *A = dyn_cast<GlobalAlias>(SingleImplVal->stripPointerCasts()))
+      SingleImplVal = A->getAliaseeObject();
+    Constant *SingleImpl = cast<Constant>(SingleImplVal);
 
     // This is the import phase so we should not be exporting anything.
     bool IsExported = false;
