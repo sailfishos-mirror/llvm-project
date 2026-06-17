@@ -890,6 +890,9 @@ void CandidateHeuristics::initialize(ScheduleDAGMI *SchedDAG,
     for (SUnit *SU : *WMMAHWUI) {
       bool HasDSSucc= false;
       for (auto &Succ : SU->Succs) {
+        // Skip boundary nodes (e.g. ExitSU) which have no MachineInstr.
+        if (!Succ.getSUnit()->getInstr())
+          continue;
         if (classifyFlavor(*Succ.getSUnit()->getInstr(), *SII) == InstructionFlavor::DS) {
           HasDSSucc = true;
           break;
