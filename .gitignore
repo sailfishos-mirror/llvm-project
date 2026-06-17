@@ -27,7 +27,7 @@
 /*/CMakeUserPresets.json
 
 # Nested build directory
-/build*
+/build_*
 
 #==============================================================================#
 # Explicit files to ignore (only matches one).
@@ -54,6 +54,7 @@ autoconf/autom4te.cache
 /.idea
 /cmake-build*
 # Coding assistants' stuff
+.agents/
 /CLAUDE.md
 /instructions.md
 .claude/
@@ -65,6 +66,12 @@ AGENTS.md
 .cursor
 .cursorignore
 .cursorindexingignore
+/.opencode/
+/.nvim/
+/.nvimlog
+/dhw-extension/
+/install*/
+/tmp/
 
 #==============================================================================#
 # Directories to ignore (do not add trailing '/'s, they skip symlinks).
