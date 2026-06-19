@@ -9468,6 +9468,7 @@ define amdgpu_kernel void @atomic_sub_i16_soffset__amdgpu_no_remote_memory(ptr a
 ; SI-NEXT:    v_or_b32_e32 v0, v2, v0
 ; SI-NEXT:    v_mov_b32_e32 v3, v1
 ; SI-NEXT:    v_mov_b32_e32 v2, v0
+; SI-NEXT:    s_waitcnt vmcnt(0) lgkmcnt(0)
 ; SI-NEXT:    buffer_atomic_cmpswap v[2:3], off, s[0:3], 0 glc
 ; SI-NEXT:    s_waitcnt vmcnt(0)
 ; SI-NEXT:    buffer_wbinvl1
@@ -9507,6 +9508,7 @@ define amdgpu_kernel void @atomic_sub_i16_soffset__amdgpu_no_remote_memory(ptr a
 ; VI-NEXT:    v_or_b32_e32 v0, v2, v0
 ; VI-NEXT:    v_mov_b32_e32 v3, v1
 ; VI-NEXT:    v_mov_b32_e32 v2, v0
+; VI-NEXT:    s_waitcnt vmcnt(0) lgkmcnt(0)
 ; VI-NEXT:    buffer_atomic_cmpswap v[2:3], off, s[0:3], 0 glc
 ; VI-NEXT:    s_waitcnt vmcnt(0)
 ; VI-NEXT:    buffer_wbinvl1_vol
@@ -9542,6 +9544,7 @@ define amdgpu_kernel void @atomic_sub_i16_soffset__amdgpu_no_remote_memory(ptr a
 ; GFX9-NEXT:    v_subrev_u32_e32 v0, s6, v1
 ; GFX9-NEXT:    v_and_b32_e32 v0, s4, v0
 ; GFX9-NEXT:    v_and_or_b32 v0, v1, s5, v0
+; GFX9-NEXT:    s_waitcnt vmcnt(0) lgkmcnt(0)
 ; GFX9-NEXT:    global_atomic_cmpswap v0, v2, v[0:1], s[0:1] glc
 ; GFX9-NEXT:    s_waitcnt vmcnt(0)
 ; GFX9-NEXT:    buffer_wbinvl1_vol
@@ -9581,6 +9584,8 @@ define amdgpu_kernel void @atomic_sub_i16_soffset__amdgpu_no_remote_memory(ptr a
 ; GFX11-NEXT:    v_and_b32_e32 v0, s2, v0
 ; GFX11-NEXT:    s_delay_alu instid0(VALU_DEP_1)
 ; GFX11-NEXT:    v_and_or_b32 v0, v1, s3, v0
+; GFX11-NEXT:    s_waitcnt vmcnt(0) lgkmcnt(0)
+; GFX11-NEXT:    s_waitcnt_vscnt null, 0x0
 ; GFX11-NEXT:    global_atomic_cmpswap_b32 v0, v2, v[0:1], s[0:1] glc
 ; GFX11-NEXT:    s_waitcnt vmcnt(0)
 ; GFX11-NEXT:    buffer_gl1_inv
@@ -9628,6 +9633,7 @@ define amdgpu_kernel void @atomic_sub_i8_soffset__amdgpu_no_remote_memory(ptr ad
 ; SI-NEXT:    v_or_b32_e32 v0, v2, v0
 ; SI-NEXT:    v_mov_b32_e32 v3, v1
 ; SI-NEXT:    v_mov_b32_e32 v2, v0
+; SI-NEXT:    s_waitcnt vmcnt(0) lgkmcnt(0)
 ; SI-NEXT:    buffer_atomic_cmpswap v[2:3], off, s[0:3], 0 glc
 ; SI-NEXT:    s_waitcnt vmcnt(0)
 ; SI-NEXT:    buffer_wbinvl1
@@ -9667,6 +9673,7 @@ define amdgpu_kernel void @atomic_sub_i8_soffset__amdgpu_no_remote_memory(ptr ad
 ; VI-NEXT:    v_or_b32_e32 v0, v2, v0
 ; VI-NEXT:    v_mov_b32_e32 v3, v1
 ; VI-NEXT:    v_mov_b32_e32 v2, v0
+; VI-NEXT:    s_waitcnt vmcnt(0) lgkmcnt(0)
 ; VI-NEXT:    buffer_atomic_cmpswap v[2:3], off, s[0:3], 0 glc
 ; VI-NEXT:    s_waitcnt vmcnt(0)
 ; VI-NEXT:    buffer_wbinvl1_vol
@@ -9702,6 +9709,7 @@ define amdgpu_kernel void @atomic_sub_i8_soffset__amdgpu_no_remote_memory(ptr ad
 ; GFX9-NEXT:    v_subrev_u32_e32 v0, s6, v1
 ; GFX9-NEXT:    v_and_b32_e32 v0, s4, v0
 ; GFX9-NEXT:    v_and_or_b32 v0, v1, s5, v0
+; GFX9-NEXT:    s_waitcnt vmcnt(0) lgkmcnt(0)
 ; GFX9-NEXT:    global_atomic_cmpswap v0, v2, v[0:1], s[0:1] glc
 ; GFX9-NEXT:    s_waitcnt vmcnt(0)
 ; GFX9-NEXT:    buffer_wbinvl1_vol
@@ -9741,6 +9749,8 @@ define amdgpu_kernel void @atomic_sub_i8_soffset__amdgpu_no_remote_memory(ptr ad
 ; GFX11-NEXT:    v_and_b32_e32 v0, s2, v0
 ; GFX11-NEXT:    s_delay_alu instid0(VALU_DEP_1)
 ; GFX11-NEXT:    v_and_or_b32 v0, v1, s3, v0
+; GFX11-NEXT:    s_waitcnt vmcnt(0) lgkmcnt(0)
+; GFX11-NEXT:    s_waitcnt_vscnt null, 0x0
 ; GFX11-NEXT:    global_atomic_cmpswap_b32 v0, v2, v[0:1], s[0:1] glc
 ; GFX11-NEXT:    s_waitcnt vmcnt(0)
 ; GFX11-NEXT:    buffer_gl1_inv
