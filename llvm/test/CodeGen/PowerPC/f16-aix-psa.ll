@@ -4,6 +4,14 @@
 ; RUN: llc -verify-machineinstrs -mtriple=powerpc-ibm-aix -mcpu=pwr9 \
 ; RUN:   -mattr=+float16,+vsx,+power9-vector < %s | FileCheck %s --check-prefix=P9-AIX-32
 
+; The following RUN lines omit -mattr=+float16: ABI routing through the
+; PSA must depend only on hardware capability, not this target feature, so
+; output must be byte-identical to the corresponding runs above.
+; RUN: llc -verify-machineinstrs -mtriple=powerpc64-ibm-aix -mcpu=pwr9 \
+; RUN:   -mattr=+vsx,+power9-vector < %s | FileCheck %s --check-prefix=P9-AIX-64
+; RUN: llc -verify-machineinstrs -mtriple=powerpc-ibm-aix -mcpu=pwr9 \
+; RUN:   -mattr=+vsx,+power9-vector < %s | FileCheck %s --check-prefix=P9-AIX-32
+
 ; 14th f16 argument goes to stack.
 ; The first 13 f16 args exhaust F1-F13. The 14th must come from the PSA.
 ; PSA starts at SP+48 on PPC64 AIX. With 8-byte slots, the 14th arg is at

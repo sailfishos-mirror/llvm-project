@@ -261,11 +261,12 @@ PPCTargetLowering::PPCTargetLowering(const PPCTargetMachine &TM,
     setTruncStoreAction(MVT::f32, MVT::f16, Expand);
   }
 
-  // Only active when -mfloat16 is passed and hard float is enabled.
+  // Make f16 a legal type whenever the hardware can back it (VSX half-
+  // precision registers on Power8+) and hard float is enabled.
   // This block intentionally overrides some actions set above
   // because when f16 is a first-class type we handle load/store
   // directly rather than through extending loads.
-  if (Subtarget.hasFloat16() && Subtarget.hasHardFloat()) {
+  if (Subtarget.hasP8Vector() && Subtarget.hasHardFloat()) {
     // Make f16 a legal type.
     addRegisterClass(MVT::f16, &PPC::VHFRCRegClass);
 
@@ -282,10 +283,21 @@ PPCTargetLowering::PPCTargetLowering(const PPCTargetMachine &TM,
         ISD::FCEIL,      ISD::FFLOOR,   ISD::FTRUNC,      ISD::FRINT,
         ISD::FNEARBYINT, ISD::FROUND,   ISD::FROUNDEVEN,  ISD::FCANONICALIZE,
         ISD::FSIN,       ISD::FCOS,     ISD::SETCC,       ISD::SELECT_CC,
-        ISD::SELECT};
+        ISD::SELECT,     ISD::FLDEXP,   ISD::FFREXP,      ISD::FMODF,
+        ISD::FATAN2,     ISD::FPOWI};
 
     // Promote all the arithmetic operations defined above to f32.
     setOperationAction(F16PromoteOps, MVT::f16, Promote);
+
+    // ISD::LRINT/LLRINT/LROUND/LLROUND have a result type that differs from
+    // their f16 operand (an integer, not f16), and SelectionDAGLegalize's
+    // PromoteNode computes the type to
+    // promote to from the *result* type, so a plain Promote action on the
+    // f16 operand is silently mismatched there and trips an assertion.
+    // Lower them manually instead: extend the f16 operand to f32 and
+    // re-emit the same node, which is already legal/handled for f32.
+    setOperationAction({ISD::LRINT, ISD::LLRINT, ISD::LROUND, ISD::LLROUND},
+                       MVT::f16, Custom);
 
     setOperationAction(ISD::LOAD, MVT::f16, Legal);
     setOperationAction(ISD::STORE, MVT::f16, Legal);
@@ -304,22 +316,34 @@ PPCTargetLowering::PPCTargetLowering(const PPCTargetMachine &TM,
       setTruncStoreAction(VT, MVT::f16, Expand);
     }
 
+    // FP_ROUND/STRICT_FP_ROUND to f16 is Custom on both P8 and P9: f32/f64
+    // sources are hardware-legal on P9 and need a libcall on P8, while an
+    // f128 source needs a libcall either way (no direct f128->f16
+    // instruction even on P9). The action table can't express this
+    // per-source distinction since it is keyed only on the f16 result
+    // type, so LowerFP_ROUND resolves it based on the actual operand type.
+    setOperationAction(ISD::FP_ROUND, MVT::f16, Custom);
+    setOperationAction(ISD::STRICT_FP_ROUND, MVT::f16, Custom);
+
     if (Subtarget.hasP9Vector()) {
       // P9+: Hardware support for conversions.
-      setOperationAction(ISD::FP_EXTEND, MVT::f32, Legal);
-      setOperationAction(ISD::FP_EXTEND, MVT::f64, Legal);
-      setOperationAction(ISD::STRICT_FP_EXTEND, MVT::f32, Legal);
-      setOperationAction(ISD::STRICT_FP_EXTEND, MVT::f64, Legal);
-      setOperationAction(ISD::FP_ROUND, MVT::f16, Legal);
-      setOperationAction(ISD::STRICT_FP_ROUND, MVT::f16, Legal);
     } else {
-      // P8: Conversions via libcalls
-      setOperationAction(ISD::FP_EXTEND, MVT::f32, Expand);
-      setOperationAction(ISD::FP_EXTEND, MVT::f64, Expand);
-      setOperationAction(ISD::STRICT_FP_EXTEND, MVT::f32, Expand);
-      setOperationAction(ISD::STRICT_FP_EXTEND, MVT::f64, Expand);
-      setOperationAction(ISD::FP_ROUND, MVT::f16, Expand);
-      setOperationAction(ISD::STRICT_FP_ROUND, MVT::f16, Expand);
+      // P8: Conversions via libcalls (__extendhfsf2/__extendhfdf2 etc).
+      // FP_EXTEND/STRICT_FP_EXTEND with an f32 result only ever have f16 as
+      // the source on this target, so it is safe to mark them Expand
+      // directly. An f64 result is ambiguous between f16->f64 (needs a
+      // libcall) and the common, always-legal f32->f64 widening, which the
+      // operation-action table cannot distinguish since it is keyed only on
+      // the result type. Use Custom for the f64 case so LowerFP_EXTEND can
+      // split f16->f64 into f16->f32->f64 while leaving f32->f64 untouched.
+      // FP_EXTEND with f16 as the source is the only case PowerPC needs to
+      // handle here (f32 has no other narrower legal source on this
+      // target; f64's other source, f32, is always legal and must be left
+      // alone). Use Custom rather than Expand:
+      // Custom only intercepts the f16-sourced case in LowerFP_EXTEND and
+      // otherwise defers to the existing (already-legal) default.
+      setOperationAction(ISD::FP_EXTEND, MVT::f32, Custom);
+      setOperationAction(ISD::FP_EXTEND, MVT::f64, Custom);
     }
   }
 
@@ -1340,7 +1364,11 @@ PPCTargetLowering::PPCTargetLowering(const PPCTargetMachine &TM,
       setOperationAction(ISD::FSUB, MVT::f128, Legal);
       setOperationAction(ISD::FDIV, MVT::f128, Legal);
       setOperationAction(ISD::FMUL, MVT::f128, Legal);
-      setOperationAction(ISD::FP_EXTEND, MVT::f128, Legal);
+      // Custom rather than Legal: f16 is also a legal source type (see the
+      // f16 setup above), and there is no direct f16->f128 hardware
+      // instruction, so LowerFP_EXTEND needs to route that case through a
+      // libcall while leaving the genuinely-legal f32/f64 sources alone.
+      setOperationAction(ISD::FP_EXTEND, MVT::f128, Custom);
 
       setOperationAction(ISD::FMA, MVT::f128, Legal);
       setCondCodeAction(ISD::SETULT, MVT::f128, Expand);
@@ -1368,6 +1396,9 @@ PPCTargetLowering::PPCTargetLowering(const PPCTargetMachine &TM,
       setOperationAction(ISD::STRICT_FDIV, MVT::f128, Legal);
       setOperationAction(ISD::STRICT_FMA, MVT::f128, Legal);
       setOperationAction(ISD::STRICT_FSQRT, MVT::f128, Legal);
+      // NOTE: STRICT_FP_EXTEND to f128 is left Legal (not Custom like the
+      // non-strict case above) since LowerOperation has no dispatch case
+      // for it; a strict half->fp128 extend is an unhandled known gap.
       setOperationAction(ISD::STRICT_FP_EXTEND, MVT::f128, Legal);
       setOperationAction(ISD::STRICT_FP_ROUND, MVT::f64, Legal);
       setOperationAction(ISD::STRICT_FP_ROUND, MVT::f32, Legal);
@@ -1402,8 +1433,13 @@ PPCTargetLowering::PPCTargetLowering(const PPCTargetMachine &TM,
       setOperationAction(ISD::FMA, MVT::f128, Expand);
       setOperationAction(ISD::FCOPYSIGN, MVT::f128, Expand);
 
-      // Expand the fp_extend if the target type is fp128.
-      setOperationAction(ISD::FP_EXTEND, MVT::f128, Expand);
+      // f16 is also a legal source type on this subtarget (see the f16
+      // setup above) and has no usable Expand lowering to f128 (no
+      // libcall handles f16->f128 directly), so this needs Custom rather
+      // than Expand to let LowerFP_EXTEND route it through f32. The
+      // existing f32/f64->f128 behavior is replicated there explicitly
+      // via the same libcalls Expand would have produced.
+      setOperationAction(ISD::FP_EXTEND, MVT::f128, Custom);
       setOperationAction(ISD::STRICT_FP_EXTEND, MVT::f128, Expand);
 
       // Expand the fp_round if the source type is fp128.
@@ -1758,10 +1794,12 @@ bool PPCTargetLowering::hasSPE() const {
   return Subtarget.hasSPE();
 }
 
-/// Tell the ABI lowering infrastructure to use FPRs for _Float16 parameters
-/// and return values rather than GPRs. Active only when -mfloat16 is enabled.
+/// Tell the ABI lowering infrastructure to use FPRs for f16 parameters
+/// and return values rather than GPRs whenever the hardware can hold them
+/// in VSX registers. This must not depend on -mfloat16: that flag only
+/// controls whether _Float16 is a spellable source-level type, not the ABI.
 bool PPCTargetLowering::useFPRegsForHalfType() const {
-  return Subtarget.hasFloat16() && Subtarget.hasHardFloat();
+  return Subtarget.hasP8Vector() && Subtarget.hasHardFloat();
 }
 
 bool PPCTargetLowering::preferIncOfAddToSubOfNot(EVT VT) const {
@@ -12659,8 +12697,40 @@ SDValue PPCTargetLowering::LowerMUL(SDValue Op, SelectionDAG &DAG) const {
 
 SDValue PPCTargetLowering::LowerFP_ROUND(SDValue Op, SelectionDAG &DAG) const {
   bool IsStrict = Op->isStrictFPOpcode();
-  if (Op.getOperand(IsStrict ? 1 : 0).getValueType() == MVT::f128 &&
-      !Subtarget.hasP9Vector())
+  SDValue Chain = IsStrict ? Op.getOperand(0) : SDValue();
+  SDValue Src = Op.getOperand(IsStrict ? 1 : 0);
+  EVT SrcVT = Src.getValueType();
+  EVT DstVT = Op.getValueType();
+  SDLoc dl(Op);
+
+  if (DstVT == MVT::f16) {
+    // No source type has a direct hardware rounding path to f16 except
+    // f32/f64 on P9; everything else (f128 on either subtarget, f32/f64
+    // on P8) goes through a libcall. FP_ROUND/f16 is registered Custom
+    // for all of these because the action table can't distinguish them
+    // by source type, being keyed only on the f16 result.
+    if (SrcVT == MVT::f32 || SrcVT == MVT::f64) {
+      if (Subtarget.hasP9Vector())
+        return Op;
+    }
+    RTLIB::Libcall LC;
+    if (SrcVT == MVT::f128)
+      LC = RTLIB::FPROUND_F128_F16;
+    else if (SrcVT == MVT::f64)
+      LC = RTLIB::FPROUND_F64_F16;
+    else {
+      assert(SrcVT == MVT::f32 && "Unexpected source type for fp_round");
+      LC = RTLIB::FPROUND_F32_F16;
+    }
+    MakeLibCallOptions CallOptions;
+    std::pair<SDValue, SDValue> Result =
+        makeLibCall(DAG, LC, MVT::f16, Src, CallOptions, dl, Chain);
+    if (!IsStrict)
+      return Result.first;
+    return DAG.getMergeValues({Result.first, Result.second}, dl);
+  }
+
+  if (SrcVT == MVT::f128 && !Subtarget.hasP9Vector())
     return SDValue();
 
   return Op;
@@ -12671,6 +12741,59 @@ SDValue PPCTargetLowering::LowerFP_EXTEND(SDValue Op, SelectionDAG &DAG) const {
 
   assert(Op.getOpcode() == ISD::FP_EXTEND &&
          "Should only be called for ISD::FP_EXTEND");
+
+  // On Power8 there is no hardware instruction extending f16 directly to
+  // f32 or f64; route those through the appropriate libcall. FP_EXTEND is
+  // marked Custom (rather than Expand) for f16-sourced cases so that the
+  // common, unrelated extends sharing the same result type (there is no
+  // other legal source for f32; f32->f64 for f64) are left untouched,
+  // since marking the whole opcode Expand would otherwise also divert
+  // those through the generic stack-conversion expansion.
+  if (Op.getOperand(0).getValueType() == MVT::f16) {
+    SDLoc dl(Op);
+    MakeLibCallOptions CallOptions;
+    SDValue Ext32 = makeLibCall(DAG, RTLIB::FPEXT_F16_F32, MVT::f32,
+                                Op.getOperand(0), CallOptions, dl)
+                        .first;
+    if (Op.getValueType() == MVT::f32)
+      return Ext32;
+    assert((Op.getValueType() == MVT::f64 || Op.getValueType() == MVT::f128) &&
+           "Unexpected f16 extend result");
+    // f32->f64 is always hardware-legal. f32->f128 is hardware-legal only
+    // with P9 IEEE-f128 support; on the older libcall-based f128
+    // emulation (VSX but no P9), it needs an explicit libcall too, since
+    // there is no instruction pattern to select it directly.
+    if (Op.getValueType() == MVT::f128 && !Subtarget.hasP9Vector())
+      return makeLibCall(DAG, RTLIB::FPEXT_F32_F128, MVT::f128, Ext32,
+                         CallOptions, dl)
+          .first;
+    return DAG.getNode(ISD::FP_EXTEND, dl, Op.getValueType(), Ext32);
+  }
+
+  // Reached only on the libcall-based f128 emulation path (VSX but no P9),
+  // where FP_EXTEND/f128 is Custom solely so the f16-sourced case above can
+  // be intercepted; every other source here previously relied on the
+  // generic Expand action, which doesn't have a usable lowering for f128,
+  // so replicate it explicitly via libcall instead.
+  if (Op.getValueType() == MVT::f128 && !Subtarget.hasP9Vector()) {
+    SDLoc dl(Op);
+    MakeLibCallOptions CallOptions;
+    RTLIB::Libcall LC = Op.getOperand(0).getValueType() == MVT::f64
+                            ? RTLIB::FPEXT_F64_F128
+                            : RTLIB::FPEXT_F32_F128;
+    return makeLibCall(DAG, LC, MVT::f128, Op.getOperand(0), CallOptions, dl)
+        .first;
+  }
+
+  // The common, scalar, always-legal widening cases (f32->f64, and
+  // f32/f64->f128 when P9 IEEE-f128 hardware is present) are already fine
+  // as constructed; hand the unchanged node back rather than falling into
+  // Expand. Deliberately scoped to scalar types only: returning the node
+  // unchanged for vector cases below (e.g. widening a <4 x half> extend)
+  // trips a "potential legalization loop" assertion, since the vector
+  // type legalizer expects Custom to actually transform the node.
+  if (!Op.getValueType().isVector())
+    return Op;
 
   // FIXME: handle extends from half precision float vectors on P9.
   // We only want to custom lower an extend from v2f32 to v2f64.
@@ -13047,6 +13170,19 @@ SDValue PPCTargetLowering::LowerOperation(SDValue Op, SelectionDAG &DAG) const {
   case ISD::STRICT_FP_ROUND:
   case ISD::FP_ROUND:
     return LowerFP_ROUND(Op, DAG);
+  case ISD::LRINT:
+  case ISD::LLRINT:
+  case ISD::LROUND:
+  case ISD::LLROUND: {
+    // Only reached for an f16 operand (the only case registered Custom);
+    // promote it to f32, which already has working support for these ops.
+    assert(Op.getOperand(0).getValueType() == MVT::f16 &&
+           "Unexpected operand type for custom-lowered LRINT/LLRINT/"
+           "LROUND/LLROUND");
+    SDLoc dl(Op);
+    SDValue Ext32 = DAG.getNode(ISD::FP_EXTEND, dl, MVT::f32, Op.getOperand(0));
+    return DAG.getNode(Op.getOpcode(), dl, Op.getValueType(), Ext32);
+  }
   case ISD::ROTL:               return LowerROTL(Op, DAG);
 
   // For counter-based loop handling.

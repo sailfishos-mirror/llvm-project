@@ -12,6 +12,23 @@
 ; RUN: llc -verify-machineinstrs -mtriple=powerpc64le-linux-gnu -mcpu=pwr9 \
 ; RUN:   -mattr=+float16,+vsx,+power9-vector < %s | FileCheck %s --check-prefixes=P9,P9-LINUX-64
 
+; The following RUN lines omit -mattr=+float16 entirely. f16 legalization and
+; ABI routing (FPR vs GPR) must depend only on hardware capability
+; (HasP8Vector/HasHardFloat), not on this target feature, so the codegen
+; below must be byte-identical to the corresponding runs above.
+; RUN: llc -verify-machineinstrs -mtriple=powerpc-ibm-aix -mcpu=pwr8 \
+; RUN:   < %s | FileCheck %s --check-prefix=P8-AIX-32
+; RUN: llc -verify-machineinstrs -mtriple=powerpc64-ibm-aix -mcpu=pwr8 \
+; RUN:   < %s | FileCheck %s --check-prefix=P8-AIX-64
+; RUN: llc -verify-machineinstrs -mtriple=powerpc-ibm-aix -mcpu=pwr9 \
+; RUN:   -mattr=+vsx,+power9-vector < %s | FileCheck %s --check-prefixes=P9,P9-AIX-32
+; RUN: llc -verify-machineinstrs -mtriple=powerpc64-ibm-aix -mcpu=pwr9 \
+; RUN:   -mattr=+vsx,+power9-vector < %s | FileCheck %s --check-prefixes=P9,P9-AIX-64
+; RUN: llc -verify-machineinstrs -mtriple=powerpc64le-linux-gnu -mcpu=pwr8 \
+; RUN:   < %s | FileCheck %s --check-prefix=P8-LINUX-64
+; RUN: llc -verify-machineinstrs -mtriple=powerpc64le-linux-gnu -mcpu=pwr9 \
+; RUN:   -mattr=+vsx,+power9-vector < %s | FileCheck %s --check-prefixes=P9,P9-LINUX-64
+
 ; ========================================================================================
 ; Load/Store Operations
 ; ISD::LOAD, ISD::STORE
@@ -446,15 +463,15 @@ define half @test_fma(half %a, half %b, half %c) nounwind {
 ; P8-AIX-32-NEXT:    fmr 30, 2
 ; P8-AIX-32-NEXT:    stfd 31, 72(1) # 8-byte Folded Spill
 ; P8-AIX-32-NEXT:    fmr 31, 3
-; P8-AIX-32-NEXT:    bl .__extendhfdf2[PR]
+; P8-AIX-32-NEXT:    bl .__extendhfsf2[PR]
 ; P8-AIX-32-NEXT:    nop
 ; P8-AIX-32-NEXT:    fmr 29, 1
 ; P8-AIX-32-NEXT:    fmr 1, 30
-; P8-AIX-32-NEXT:    bl .__extendhfdf2[PR]
+; P8-AIX-32-NEXT:    bl .__extendhfsf2[PR]
 ; P8-AIX-32-NEXT:    nop
 ; P8-AIX-32-NEXT:    fmr 30, 1
 ; P8-AIX-32-NEXT:    fmr 1, 31
-; P8-AIX-32-NEXT:    bl .__extendhfdf2[PR]
+; P8-AIX-32-NEXT:    bl .__extendhfsf2[PR]
 ; P8-AIX-32-NEXT:    nop
 ; P8-AIX-32-NEXT:    xsmaddadp 1, 29, 30
 ; P8-AIX-32-NEXT:    bl .__truncdfhf2[PR]
@@ -477,15 +494,15 @@ define half @test_fma(half %a, half %b, half %c) nounwind {
 ; P8-AIX-64-NEXT:    fmr 30, 2
 ; P8-AIX-64-NEXT:    stfd 31, 136(1) # 8-byte Folded Spill
 ; P8-AIX-64-NEXT:    fmr 31, 3
-; P8-AIX-64-NEXT:    bl .__extendhfdf2[PR]
+; P8-AIX-64-NEXT:    bl .__extendhfsf2[PR]
 ; P8-AIX-64-NEXT:    nop
 ; P8-AIX-64-NEXT:    fmr 29, 1
 ; P8-AIX-64-NEXT:    fmr 1, 30
-; P8-AIX-64-NEXT:    bl .__extendhfdf2[PR]
+; P8-AIX-64-NEXT:    bl .__extendhfsf2[PR]
 ; P8-AIX-64-NEXT:    nop
 ; P8-AIX-64-NEXT:    fmr 30, 1
 ; P8-AIX-64-NEXT:    fmr 1, 31
-; P8-AIX-64-NEXT:    bl .__extendhfdf2[PR]
+; P8-AIX-64-NEXT:    bl .__extendhfsf2[PR]
 ; P8-AIX-64-NEXT:    nop
 ; P8-AIX-64-NEXT:    xsmaddadp 1, 29, 30
 ; P8-AIX-64-NEXT:    bl .__truncdfhf2[PR]
@@ -517,15 +534,15 @@ define half @test_fma(half %a, half %b, half %c) nounwind {
 ; P8-LINUX-64-NEXT:    std 0, 80(1)
 ; P8-LINUX-64-NEXT:    fmr 31, 3
 ; P8-LINUX-64-NEXT:    fmr 30, 2
-; P8-LINUX-64-NEXT:    bl __extendhfdf2
+; P8-LINUX-64-NEXT:    bl __extendhfsf2
 ; P8-LINUX-64-NEXT:    nop
 ; P8-LINUX-64-NEXT:    fmr 29, 1
 ; P8-LINUX-64-NEXT:    fmr 1, 30
-; P8-LINUX-64-NEXT:    bl __extendhfdf2
+; P8-LINUX-64-NEXT:    bl __extendhfsf2
 ; P8-LINUX-64-NEXT:    nop
 ; P8-LINUX-64-NEXT:    fmr 30, 1
 ; P8-LINUX-64-NEXT:    fmr 1, 31
-; P8-LINUX-64-NEXT:    bl __extendhfdf2
+; P8-LINUX-64-NEXT:    bl __extendhfsf2
 ; P8-LINUX-64-NEXT:    nop
 ; P8-LINUX-64-NEXT:    xsmaddadp 1, 29, 30
 ; P8-LINUX-64-NEXT:    bl __truncdfhf2
@@ -3725,7 +3742,7 @@ define double @op_f16_to_f64(half %h) nounwind {
 ; P8-AIX-32-NEXT:    mflr 0
 ; P8-AIX-32-NEXT:    stwu 1, -64(1)
 ; P8-AIX-32-NEXT:    stw 0, 72(1)
-; P8-AIX-32-NEXT:    bl .__extendhfdf2[PR]
+; P8-AIX-32-NEXT:    bl .__extendhfsf2[PR]
 ; P8-AIX-32-NEXT:    nop
 ; P8-AIX-32-NEXT:    addi 1, 1, 64
 ; P8-AIX-32-NEXT:    lwz 0, 8(1)
@@ -3737,7 +3754,7 @@ define double @op_f16_to_f64(half %h) nounwind {
 ; P8-AIX-64-NEXT:    mflr 0
 ; P8-AIX-64-NEXT:    stdu 1, -112(1)
 ; P8-AIX-64-NEXT:    std 0, 128(1)
-; P8-AIX-64-NEXT:    bl .__extendhfdf2[PR]
+; P8-AIX-64-NEXT:    bl .__extendhfsf2[PR]
 ; P8-AIX-64-NEXT:    nop
 ; P8-AIX-64-NEXT:    addi 1, 1, 112
 ; P8-AIX-64-NEXT:    ld 0, 16(1)
@@ -3754,7 +3771,7 @@ define double @op_f16_to_f64(half %h) nounwind {
 ; P8-LINUX-64-NEXT:    mflr 0
 ; P8-LINUX-64-NEXT:    stdu 1, -32(1)
 ; P8-LINUX-64-NEXT:    std 0, 48(1)
-; P8-LINUX-64-NEXT:    bl __extendhfdf2
+; P8-LINUX-64-NEXT:    bl __extendhfsf2
 ; P8-LINUX-64-NEXT:    nop
 ; P8-LINUX-64-NEXT:    addi 1, 1, 32
 ; P8-LINUX-64-NEXT:    ld 0, 16(1)

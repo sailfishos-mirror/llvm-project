@@ -214,9 +214,6 @@ namespace llvm {
 
     bool hasSPE() const;
 
-    // Override to tell the ABI framework that _Float16 passes through FPRs
-    // when -mfloat16 is active. Without this, the generic lowering would
-    // try to pass f16 values in integer registers.
     bool useFPRegsForHalfType() const override;
 
     MVT getScalarShiftAmountTy(const DataLayout &, EVT) const override {
