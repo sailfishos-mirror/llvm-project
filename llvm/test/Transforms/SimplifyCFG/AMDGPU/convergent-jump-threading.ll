@@ -12,13 +12,15 @@ define void @preserve_loop_header_branch(i1 %cond, ptr %ptr) convergent {
 ; CHECK-NEXT:    br i1 [[COND]], label %[[OUTER_THEN:.*]], label %[[LOOP_BODY:.*]]
 ; CHECK:       [[OUTER_THEN]]:
 ; CHECK-NEXT:    store i32 1, ptr [[PTR]], align 4
-; CHECK-NEXT:    br label %[[LOOP_THEN:.*]]
-; CHECK:       [[LOOP_THEN]]:
-; CHECK-NEXT:    store i32 2, ptr [[PTR]], align 4
 ; CHECK-NEXT:    br label %[[LOOP_BODY]]
 ; CHECK:       [[LOOP_BODY]]:
+; CHECK-NEXT:    br i1 [[COND]], label %[[LOOP_THEN:.*]], label %[[LOOP_BODY1:.*]]
+; CHECK:       [[LOOP_THEN]]:
+; CHECK-NEXT:    store i32 2, ptr [[PTR]], align 4
+; CHECK-NEXT:    br label %[[LOOP_BODY1]]
+; CHECK:       [[LOOP_BODY1]]:
 ; CHECK-NEXT:    call void @barrier() #[[ATTR0]]
-; CHECK-NEXT:    br i1 [[COND]], label %[[LOOP_THEN]], label %[[EXIT:.*]]
+; CHECK-NEXT:    br i1 [[COND]], label %[[LOOP_BODY]], label %[[EXIT:.*]]
 ; CHECK:       [[EXIT]]:
 ; CHECK-NEXT:    ret void
 ;
@@ -90,5 +92,52 @@ loop.body:
   br i1 %cond, label %loop.header, label %exit
 
 exit:
+  ret void
+}
+
+define void @thread_convergent_only_on_exit_path(i1 %cond, ptr %ptr) convergent {
+; CHECK-LABEL: define void @thread_convergent_only_on_exit_path(
+; CHECK-SAME: i1 [[COND:%.*]], ptr [[PTR:%.*]]) #[[ATTR0]] {
+; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    call void @plain()
+; CHECK-NEXT:    br i1 [[COND]], label %[[OUTER_THEN:.*]], label %[[EXIT_CRITEDGE:.*]]
+; CHECK:       [[OUTER_THEN]]:
+; CHECK-NEXT:    store i32 1, ptr [[PTR]], align 4
+; CHECK-NEXT:    br label %[[LOOP_THEN:.*]]
+; CHECK:       [[LOOP_THEN]]:
+; CHECK-NEXT:    store i32 2, ptr [[PTR]], align 4
+; CHECK-NEXT:    call void @plain()
+; CHECK-NEXT:    br i1 [[COND]], label %[[LOOP_THEN]], label %[[EXIT:.*]]
+; CHECK:       [[EXIT_CRITEDGE]]:
+; CHECK-NEXT:    call void @plain()
+; CHECK-NEXT:    br label %[[EXIT]]
+; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    call void @barrier() #[[ATTR0]]
+; CHECK-NEXT:    ret void
+;
+entry:
+  br label %outer
+
+outer:
+  call void @plain()
+  br i1 %cond, label %outer.then, label %loop.header
+
+outer.then:
+  store i32 1, ptr %ptr, align 4
+  br label %loop.header
+
+loop.header:
+  br i1 %cond, label %loop.then, label %loop.body
+
+loop.then:
+  store i32 2, ptr %ptr, align 4
+  br label %loop.body
+
+loop.body:
+  call void @plain()
+  br i1 %cond, label %loop.header, label %exit
+
+exit:
+  call void @barrier() convergent
   ret void
 }
