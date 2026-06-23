@@ -81,7 +81,7 @@ enum class InstructionFlavor : uint8_t {
 
 This precondition simplifies reasoning about `tryCoexecSlot`: both candidates will land at the same effective slot (`Stage + StallCycles`), so the decision is purely about which instruction's flavor better matches that slot's preferences and avoidances.
 
-## The tryCoexecSlot Implementation
+## The tryCoexecSlot heuristic
 
 ```cpp
 bool CandidateHeuristics::tryCoexecSlot(
