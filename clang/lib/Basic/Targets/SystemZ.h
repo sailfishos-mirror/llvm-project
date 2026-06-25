@@ -186,7 +186,7 @@ public:
     fillValidCPUList(Values);
   }
 
-  bool setCPU(const std::string &Name) override {
+  bool setCPU(StringRef Name) override {
     ISARevision = getISARevision(Name);
     return ISARevision != -1;
   }

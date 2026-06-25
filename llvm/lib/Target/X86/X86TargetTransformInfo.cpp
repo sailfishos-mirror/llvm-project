@@ -51,6 +51,7 @@
 #include "X86TargetTransformInfo.h"
 #include "llvm/ADT/SmallBitVector.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
+#include "llvm/CodeGen/Analysis.h"
 #include "llvm/CodeGen/BasicTTIImpl.h"
 #include "llvm/CodeGen/CostTable.h"
 #include "llvm/CodeGen/TargetLowering.h"
@@ -1641,7 +1642,7 @@ InstructionCost X86TTIImpl::getShuffleCost(TTI::ShuffleKind Kind,
   }
 
   // Treat <X x bfloat> shuffles as <X x half>.
-  if (LT.second.isVector() && LT.second.getScalarType() == MVT::bf16)
+  if (LT.second.isVectorOf(MVT::bf16))
     LT.second = LT.second.changeVectorElementType(MVT::f16);
 
   // Subvector extractions are free if they start at the beginning of a
@@ -3191,7 +3192,7 @@ InstructionCost X86TTIImpl::getCastInstrCost(unsigned Opcode, Type *Dst,
   // BWI).
   if (!ST->hasAVX512() || (!ST->hasBWI() && DstTy.getScalarSizeInBits() < 32)) {
     if (I && Opcode == Instruction::CastOps::SExt &&
-        SrcTy.isFixedLengthVector() && SrcTy.getScalarType() == MVT::i1) {
+        SrcTy.isFixedLengthVectorOf(MVT::i1)) {
       if (auto *CmpI = dyn_cast<CmpInst>(I->getOperand(0))) {
         Type *CmpTy = CmpI->getOperand(0)->getType();
         if (CmpTy->getScalarSizeInBits() == DstTy.getScalarSizeInBits())
@@ -6399,7 +6400,7 @@ InstructionCost X86TTIImpl::getGSVectorCost(unsigned Opcode,
   // and that there's at most one variable index.
   auto getIndexSizeInBits = [](const Value *Ptr, const DataLayout &DL) {
     unsigned IndexSize = DL.getPointerSizeInBits();
-    const GetElementPtrInst *GEP = dyn_cast<GetElementPtrInst>(Ptr);
+    const GetElementPtrInst *GEP = dyn_cast_or_null<GetElementPtrInst>(Ptr);
     if (IndexSize < 64 || !GEP)
       return IndexSize;
 
@@ -6474,12 +6475,7 @@ X86TTIImpl::getGatherScatterOpCost(const MemIntrinsicCostAttributes &MICA,
     return BaseT::getMemIntrinsicInstrCost(MICA, CostKind);
 
   assert(SrcVTy->isVectorTy() && "Unexpected data type for Gather/Scatter");
-  PointerType *PtrTy = dyn_cast<PointerType>(Ptr->getType());
-  if (!PtrTy && Ptr->getType()->isVectorTy())
-    PtrTy = dyn_cast<PointerType>(
-        cast<VectorType>(Ptr->getType())->getElementType());
-  assert(PtrTy && "Unexpected type for Ptr argument");
-  unsigned AddressSpace = PtrTy->getAddressSpace();
+  unsigned AddressSpace = MICA.getAddressSpace();
   return getGSVectorCost(Opcode, CostKind, SrcVTy, Ptr, Alignment,
                          AddressSpace);
 }
@@ -6724,21 +6720,24 @@ bool X86TTIImpl::areInlineCompatible(const Function *Caller,
   const TargetMachine &TM = getTLI()->getTargetMachine();
 
   // Work this as a subsetting of subtarget features.
-  const FeatureBitset &CallerBits =
-      TM.getSubtargetImpl(*Caller)->getFeatureBits();
-  const FeatureBitset &CalleeBits =
-      TM.getSubtargetImpl(*Callee)->getFeatureBits();
+  const X86Subtarget &CallerSubtarget = TM.getSubtarget<X86Subtarget>(*Caller);
+  const X86Subtarget &CalleeSubtarget = TM.getSubtarget<X86Subtarget>(*Callee);
+  const FeatureBitset &CallerBits = CallerSubtarget.getFeatureBits();
+  const FeatureBitset &CalleeBits = CalleeSubtarget.getFeatureBits();
 
-  // Check whether features are the same (apart from the ignore list).
+  // Check whether callee features are a subset of caller features
+  // (apart from the ignore list).
   FeatureBitset RealCallerBits = CallerBits & ~InlineFeatureIgnoreList;
   FeatureBitset RealCalleeBits = CalleeBits & ~InlineFeatureIgnoreList;
-  if (RealCallerBits == RealCalleeBits)
-    return true;
-
-  // If the features are a subset, we need to additionally check for calls
-  // that may become ABI-incompatible as a result of inlining.
   if ((RealCallerBits & RealCalleeBits) != RealCalleeBits)
     return false;
+
+  // If the features are not exactly the same (or there is a difference in
+  // AVX512 register usage), we need to additionally check for calls
+  // that may become ABI-incompatible as a result of inlining.
+  if (RealCallerBits == RealCalleeBits &&
+      CallerSubtarget.useAVX512Regs() == CalleeSubtarget.useAVX512Regs())
+    return true;
 
   for (const Instruction &I : instructions(Callee)) {
     if (const auto *CB = dyn_cast<CallBase>(&I)) {
@@ -6770,23 +6769,23 @@ bool X86TTIImpl::areInlineCompatible(const Function *Caller,
 bool X86TTIImpl::areTypesABICompatible(const Function *Caller,
                                        const Function *Callee,
                                        ArrayRef<Type *> Types) const {
-  if (!BaseT::areTypesABICompatible(Caller, Callee, Types))
-    return false;
-
-  // If we get here, we know the target features match. If one function
-  // considers 512-bit vectors legal and the other does not, consider them
-  // incompatible.
   const TargetMachine &TM = getTLI()->getTargetMachine();
+  const TargetLowering *CallerTLI =
+      TM.getSubtargetImpl(*Caller)->getTargetLowering();
+  const TargetLowering *CalleeTLI =
+      TM.getSubtargetImpl(*Callee)->getTargetLowering();
 
-  if (TM.getSubtarget<X86Subtarget>(*Caller).useAVX512Regs() ==
-      TM.getSubtarget<X86Subtarget>(*Callee).useAVX512Regs())
-    return true;
-
-  // Consider the arguments compatible if they aren't vectors or aggregates.
-  // FIXME: Look at the size of vectors.
-  // FIXME: Look at the element types of aggregates to see if there are vectors.
-  return llvm::none_of(Types,
-      [](Type *T) { return T->isVectorTy() || T->isAggregateType(); });
+  LLVMContext &Ctx = Caller->getContext();
+  const DataLayout &DL = Caller->getDataLayout();
+  CallingConv::ID CC = Callee->getCallingConv();
+  return all_of(Types, [&](Type *Ty) {
+    SmallVector<EVT> VTs;
+    ComputeValueVTs(*CallerTLI, DL, Ty, VTs);
+    return all_of(VTs, [&](EVT VT) {
+      return CallerTLI->getRegisterTypeForCallingConv(Ctx, CC, VT) ==
+             CalleeTLI->getRegisterTypeForCallingConv(Ctx, CC, VT);
+    });
+  });
 }
 
 X86TTIImpl::TTI::MemCmpExpansionOptions
