@@ -98,7 +98,13 @@ enum ArchFeatureKind : uint32_t {
   FEATURE_XNACK_ON_OFF_MODES = 1 << 6,
 
   // VI SGPR initialization bug requiring a fixed SGPR allocation size.
-  FEATURE_SGPR_INIT_BUG = 1 << 7
+  FEATURE_SGPR_INIT_BUG = 1 << 7,
+
+  // Clusters are supported.
+  FEATURE_CLUSTERS = 1 << 8,
+
+  // AGPR allocation is supported.
+  FEATURE_AGPR_ALLOC = 1 << 9
 };
 
 enum FeatureError : uint32_t {
@@ -193,6 +199,14 @@ LLVM_ABI unsigned getAddressableNumSGPRs(Triple::SubArchType SubArch);
 
 LLVM_ABI unsigned getSGPRAllocGranule(GPUKind AK);
 LLVM_ABI unsigned getSGPRAllocGranule(Triple::SubArchType SubArch);
+
+/// \returns true if the target identified by \p SubArch has memory aperture
+/// base and size registers.
+LLVM_ABI bool hasApertureRegs(Triple::SubArchType SubArch);
+
+/// \returns true if the target identified by \p SubArch supports reading the
+/// doorbell ID through S_GETREG.
+LLVM_ABI bool supportsGetDoorbellID(Triple::SubArchType SubArch);
 
 /// Fills Features map with default values for given target GPU.
 /// \p Features contains overriding target features and this function returns

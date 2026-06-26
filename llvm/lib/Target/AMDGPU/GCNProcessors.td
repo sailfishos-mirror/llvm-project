@@ -170,7 +170,7 @@ def GFX909 : AMDGPUProcessorModel<"gfx909", SIQuarterSpeedModel,
 
 def GFX90A : AMDGPUProcessorModel<"gfx90a", SIDPFullSpeedModel,
   FeatureISAVersion9_0_A.Features, [9, 0, 0xa]> {
-  let ArchFeatures = ArchFeaturesW64XnackSramEcc;
+  let ArchFeatures = ArchFeaturesW64XnackSramEcc # [FEATURE_AGPR_ALLOC];
 }
 
 def GFX90C : AMDGPUProcessorModel<"gfx90c", SIQuarterSpeedModel,
@@ -180,12 +180,12 @@ def GFX90C : AMDGPUProcessorModel<"gfx90c", SIQuarterSpeedModel,
 
 def GFX942 : AMDGPUProcessorModel<"gfx942", SIDPGFX942FullSpeedModel,
   FeatureISAVersion9_4_2.Features, [9, 4, 2]> {
-  let ArchFeatures = ArchFeaturesW64XnackSramEcc;
+  let ArchFeatures = ArchFeaturesW64XnackSramEcc # [FEATURE_AGPR_ALLOC];
 }
 
 def GFX950 : AMDGPUProcessorModel<"gfx950", SIDPGFX950FullSpeedModel,
   FeatureISAVersion9_5_0.Features, [9, 5, 0]> {
-  let ArchFeatures = ArchFeaturesW64XnackSramEcc;
+  let ArchFeatures = ArchFeaturesW64XnackSramEcc # [FEATURE_AGPR_ALLOC];
 }
 
 def GFX9_GENERIC : AMDGPUProcessorModel<"gfx9-generic", SIQuarterSpeedModel,
@@ -196,7 +196,7 @@ def GFX9_GENERIC : AMDGPUProcessorModel<"gfx9-generic", SIQuarterSpeedModel,
 
 def GFX9_4_GENERIC : AMDGPUProcessorModel<"gfx9-4-generic", SIDPGFX942FullSpeedModel,
   FeatureISAVersion9_4_Generic.Features, [9, 4, 0]> {
-  let ArchFeatures = ArchFeaturesW64XnackSramEcc;
+  let ArchFeatures = ArchFeaturesW64XnackSramEcc # [FEATURE_AGPR_ALLOC];
   let CoveredGPUs = [GFX942, GFX950];
 }
 
@@ -370,17 +370,17 @@ def GFX12_GENERIC : AMDGPUProcessorModel<"gfx12-generic", GFX12SpeedModel,
 
 def GFX1250 : AMDGPUProcessorModel<"gfx1250", GFX1250SpeedModel,
   FeatureISAVersion12_50.Features, [12, 5, 0]> {
-  let ArchFeatures = [FEATURE_FAST_FMA_F32, FEATURE_FAST_DENORMAL_F32, FEATURE_WAVE32, FEATURE_XNACK, FEATURE_SRAMECC];
+  let ArchFeatures = [FEATURE_FAST_FMA_F32, FEATURE_FAST_DENORMAL_F32, FEATURE_WAVE32, FEATURE_XNACK, FEATURE_SRAMECC, FEATURE_CLUSTERS];
 }
 
 def GFX1251 : AMDGPUProcessorModel<"gfx1251", GFX1251SpeedModel,
   FeatureISAVersion12_51.Features, [12, 5, 1]> {
-  let ArchFeatures = [FEATURE_FAST_FMA_F32, FEATURE_FAST_DENORMAL_F32, FEATURE_WAVE32, FEATURE_XNACK, FEATURE_SRAMECC];
+  let ArchFeatures = [FEATURE_FAST_FMA_F32, FEATURE_FAST_DENORMAL_F32, FEATURE_WAVE32, FEATURE_XNACK, FEATURE_SRAMECC, FEATURE_CLUSTERS];
 }
 
 def GFX12_5_GENERIC : AMDGPUProcessorModel<"gfx12-5-generic", GFX125xGenericSpeedModel,
   FeatureISAVersion12_5_Generic.Features, [12, 5, 0]> {
-  let ArchFeatures = [FEATURE_FAST_FMA_F32, FEATURE_FAST_DENORMAL_F32, FEATURE_WAVE32, FEATURE_XNACK, FEATURE_SRAMECC];
+  let ArchFeatures = [FEATURE_FAST_FMA_F32, FEATURE_FAST_DENORMAL_F32, FEATURE_WAVE32, FEATURE_XNACK, FEATURE_SRAMECC, FEATURE_CLUSTERS];
   let CoveredGPUs = [GFX1250, GFX1251];
 }
 
@@ -390,12 +390,12 @@ def GFX12_5_GENERIC : AMDGPUProcessorModel<"gfx12-5-generic", GFX125xGenericSpee
 
 def GFX1310 : AMDGPUProcessorModel<"gfx1310", GFX12SpeedModel,
   FeatureISAVersion13.Features, [13, 1, 0]> {
-  let ArchFeatures = ArchFeaturesW32Wgp;
+  let ArchFeatures = ArchFeaturesW32Wgp # [FEATURE_CLUSTERS];
 }
 
 def GFX13_GENERIC : AMDGPUProcessorModel<"gfx13-generic", GFX12SpeedModel,
   FeatureISAVersion13_Generic.Features, [13, 1, 0]> {
-  let ArchFeatures = ArchFeaturesW32Wgp;
+  let ArchFeatures = ArchFeaturesW32Wgp # [FEATURE_CLUSTERS];
   let CoveredGPUs = [GFX1310];
 }
 
