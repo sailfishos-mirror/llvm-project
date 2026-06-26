@@ -414,6 +414,16 @@ unsigned AMDGPU::getSGPRAllocGranule(Triple::SubArchType SubArch) {
   return 8;
 }
 
+bool AMDGPU::hasApertureRegs(Triple::SubArchType SubArch) {
+  // Memory aperture registers were introduced on GFX9.
+  return getIsaVersion(SubArch).Major >= 9;
+}
+
+bool AMDGPU::supportsGetDoorbellID(Triple::SubArchType SubArch) {
+  // The S_GETREG DOORBELL_ID is supported by all GFX9 onward targets.
+  return getIsaVersion(SubArch).Major >= 9;
+}
+
 StringRef AMDGPU::getCanonicalArchName(const Triple &T, StringRef Arch) {
   assert(T.isAMDGPU());
   auto ProcKind = T.isAMDGCN() ? parseArchAMDGCN(Arch) : parseArchR600(Arch);

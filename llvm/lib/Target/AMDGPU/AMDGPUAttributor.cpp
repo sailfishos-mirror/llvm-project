@@ -153,7 +153,13 @@ public:
                          BumpPtrAllocator &Allocator,
                          SetVector<Function *> *CGSCC, TargetMachine &TM)
       : InformationCache(M, AG, Allocator, CGSCC), TM(TM),
-        CodeObjectVersion(AMDGPU::getAMDHSACodeObjectVersion(M)) {}
+        CodeObjectVersion(AMDGPU::getAMDHSACodeObjectVersion(M)),
+        HasApertureRegs(
+            AMDGPU::hasApertureRegs(M.getTargetTriple().getSubArch())),
+        SupportsGetDoorbellID(
+            AMDGPU::supportsGetDoorbellID(M.getTargetTriple().getSubArch())),
+        ArchAttr(AMDGPU::getArchAttrAMDGCN(
+            AMDGPU::getGPUKindFromSubArch(M.getTargetTriple().getSubArch()))) {}
 
   TargetMachine &TM;
 
@@ -167,17 +173,17 @@ public:
     CS_WORST = DS_GLOBAL | ADDR_SPACE_CAST_BOTH_TO_FLAT,
   };
 
-  /// Check if the subtarget has aperture regs.
-  bool hasApertureRegs(Function &F) {
-    const GCNSubtarget &ST = TM.getSubtarget<GCNSubtarget>(F);
-    return ST.hasApertureRegs();
-  }
+  /// Check if the module target has aperture regs.
+  bool hasApertureRegs() const { return HasApertureRegs; }
 
-  /// Check if the subtarget supports GetDoorbellID.
-  bool supportsGetDoorbellID(Function &F) {
-    const GCNSubtarget &ST = TM.getSubtarget<GCNSubtarget>(F);
-    return ST.supportsGetDoorbellID();
-  }
+  /// Check if the module target supports GetDoorbellID.
+  bool supportsGetDoorbellID() const { return SupportsGetDoorbellID; }
+
+  /// Check if the module target supports clusters.
+  bool hasClusters() const { return ArchAttr & AMDGPU::FEATURE_CLUSTERS; }
+
+  /// Check if the module target supports AGPR allocation.
+  bool hasAGPRAlloc() const { return ArchAttr & AMDGPU::FEATURE_AGPR_ALLOC; }
 
   std::optional<std::pair<unsigned, unsigned>>
   getFlatWorkGroupSizeAttr(const Function &F) const {
@@ -288,7 +294,7 @@ public:
   /// Returns true if \p Fn needs the queue pointer because of \p C.
   bool needsQueuePtr(const Constant *C, Function &Fn) {
     bool IsNonEntryFunc = !AMDGPU::isEntryFunctionCC(Fn.getCallingConv());
-    bool HasAperture = hasApertureRegs(Fn);
+    bool HasAperture = hasApertureRegs();
 
     // No need to explore the constants.
     if (!IsNonEntryFunc && HasAperture)
@@ -312,6 +318,9 @@ private:
   /// Used to determine if the Constant needs the queue pointer.
   DenseMap<const Constant *, std::optional<uint8_t>> ConstantStatus;
   const unsigned CodeObjectVersion;
+  const bool HasApertureRegs;
+  const bool SupportsGetDoorbellID;
+  const unsigned ArchAttr;
 };
 
 struct AAAMDAttributes
@@ -503,8 +512,8 @@ struct AAAMDAttributesFunction : public AAAMDAttributes {
 
     bool NeedsImplicit = false;
     auto &InfoCache = static_cast<AMDGPUInformationCache &>(A.getInfoCache());
-    bool HasApertureRegs = InfoCache.hasApertureRegs(*F);
-    bool SupportsGetDoorbellID = InfoCache.supportsGetDoorbellID(*F);
+    bool HasApertureRegs = InfoCache.hasApertureRegs();
+    bool SupportsGetDoorbellID = InfoCache.supportsGetDoorbellID();
     unsigned COV = InfoCache.getCodeObjectVersion();
 
     for (Function *Callee : AAEdges->getOptimisticEdges()) {
@@ -639,7 +648,7 @@ private:
       return true;
     };
 
-    bool HasApertureRegs = InfoCache.hasApertureRegs(*F);
+    bool HasApertureRegs = InfoCache.hasApertureRegs();
 
     // `checkForAllInstructions` is much more cheaper than going through all
     // instructions, try it first.
@@ -1638,11 +1647,10 @@ static bool runImpl(SetVector<Function *> &Functions, bool IsModulePass,
       A.getOrCreateAAFor<AAAMDWavesPerEU>(IRPosition::function(*F));
     }
 
-    const GCNSubtarget &ST = TM.getSubtarget<GCNSubtarget>(*F);
-    if (!F->isDeclaration() && ST.hasClusters())
+    if (!F->isDeclaration() && InfoCache.hasClusters())
       A.getOrCreateAAFor<AAAMDGPUClusterDims>(IRPosition::function(*F));
 
-    if (ST.hasGFX90AInsts())
+    if (InfoCache.hasAGPRAlloc())
       A.getOrCreateAAFor<AAAMDGPUMinAGPRAlloc>(IRPosition::function(*F));
 
     for (auto &I : instructions(F)) {
