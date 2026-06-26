@@ -1877,7 +1877,8 @@ define half @test_minimum(half %a, half %b) nounwind {
 ; P8-AIX-64-NEXT:    xsmindp 1, 1, 31
 ; P8-AIX-64-NEXT:    b L..BB19_3
 ; P8-AIX-64-NEXT:  L..BB19_2:
-; P8-AIX-64-NEXT:    ld 3, L..C0(2) # %const.0
+; P8-AIX-64-NEXT:    addis 3, L..C0@u(2)
+; P8-AIX-64-NEXT:    ld 3, L..C0@l(3)
 ; P8-AIX-64-NEXT:    lfs 1, 0(3)
 ; P8-AIX-64-NEXT:  L..BB19_3: # %entry
 ; P8-AIX-64-NEXT:    bl .__truncsfhf2[PR]
@@ -1916,7 +1917,8 @@ define half @test_minimum(half %a, half %b) nounwind {
 ; P9-AIX-64-NEXT:    xscvdphp 1, 0
 ; P9-AIX-64-NEXT:    blr
 ; P9-AIX-64-NEXT:  L..BB19_2:
-; P9-AIX-64-NEXT:    ld 3, L..C0(2) # %const.0
+; P9-AIX-64-NEXT:    addis 3, L..C0@u(2)
+; P9-AIX-64-NEXT:    ld 3, L..C0@l(3)
 ; P9-AIX-64-NEXT:    lfs 0, 0(3)
 ; P9-AIX-64-NEXT:    xscvdphp 1, 0
 ; P9-AIX-64-NEXT:    blr
@@ -2029,7 +2031,8 @@ define half @test_maximum(half %a, half %b) nounwind {
 ; P8-AIX-64-NEXT:    xsmaxdp 1, 1, 31
 ; P8-AIX-64-NEXT:    b L..BB20_3
 ; P8-AIX-64-NEXT:  L..BB20_2:
-; P8-AIX-64-NEXT:    ld 3, L..C1(2) # %const.0
+; P8-AIX-64-NEXT:    addis 3, L..C1@u(2)
+; P8-AIX-64-NEXT:    ld 3, L..C1@l(3)
 ; P8-AIX-64-NEXT:    lfs 1, 0(3)
 ; P8-AIX-64-NEXT:  L..BB20_3: # %entry
 ; P8-AIX-64-NEXT:    bl .__truncsfhf2[PR]
@@ -2068,7 +2071,8 @@ define half @test_maximum(half %a, half %b) nounwind {
 ; P9-AIX-64-NEXT:    xscvdphp 1, 0
 ; P9-AIX-64-NEXT:    blr
 ; P9-AIX-64-NEXT:  L..BB20_2:
-; P9-AIX-64-NEXT:    ld 3, L..C1(2) # %const.0
+; P9-AIX-64-NEXT:    addis 3, L..C1@u(2)
+; P9-AIX-64-NEXT:    ld 3, L..C1@l(3)
 ; P9-AIX-64-NEXT:    lfs 0, 0(3)
 ; P9-AIX-64-NEXT:    xscvdphp 1, 0
 ; P9-AIX-64-NEXT:    blr
@@ -4106,7 +4110,8 @@ define half @test_constant_fp() nounwind {
 ;
 ; P8-AIX-64-LABEL: test_constant_fp:
 ; P8-AIX-64:       # %bb.0: # %entry
-; P8-AIX-64-NEXT:    ld 3, L..C2(2) # %const.0
+; P8-AIX-64-NEXT:    addis 3, L..C2@u(2)
+; P8-AIX-64-NEXT:    ld 3, L..C2@l(3)
 ; P8-AIX-64-NEXT:    lhzx 3, 0, 3
 ; P8-AIX-64-NEXT:    mtfprwz 1, 3
 ; P8-AIX-64-NEXT:    blr
@@ -4119,7 +4124,8 @@ define half @test_constant_fp() nounwind {
 ;
 ; P9-AIX-64-LABEL: test_constant_fp:
 ; P9-AIX-64:       # %bb.0: # %entry
-; P9-AIX-64-NEXT:    ld 3, L..C2(2) # %const.0
+; P9-AIX-64-NEXT:    addis 3, L..C2@u(2)
+; P9-AIX-64-NEXT:    ld 3, L..C2@l(3)
 ; P9-AIX-64-NEXT:    lxsihzx 1, 0, 3
 ; P9-AIX-64-NEXT:    blr
 ;
@@ -4150,7 +4156,8 @@ define half @test_constant_zero() nounwind {
 ;
 ; P8-AIX-64-LABEL: test_constant_zero:
 ; P8-AIX-64:       # %bb.0: # %entry
-; P8-AIX-64-NEXT:    ld 3, L..C3(2) # %const.0
+; P8-AIX-64-NEXT:    addis 3, L..C3@u(2)
+; P8-AIX-64-NEXT:    ld 3, L..C3@l(3)
 ; P8-AIX-64-NEXT:    lhzx 3, 0, 3
 ; P8-AIX-64-NEXT:    mtfprwz 1, 3
 ; P8-AIX-64-NEXT:    blr
@@ -4163,7 +4170,8 @@ define half @test_constant_zero() nounwind {
 ;
 ; P9-AIX-64-LABEL: test_constant_zero:
 ; P9-AIX-64:       # %bb.0: # %entry
-; P9-AIX-64-NEXT:    ld 3, L..C3(2) # %const.0
+; P9-AIX-64-NEXT:    addis 3, L..C3@u(2)
+; P9-AIX-64-NEXT:    ld 3, L..C3@l(3)
 ; P9-AIX-64-NEXT:    lxsihzx 1, 0, 3
 ; P9-AIX-64-NEXT:    blr
 ;

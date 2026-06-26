@@ -284,7 +284,11 @@ PPCTargetLowering::PPCTargetLowering(const PPCTargetMachine &TM,
         ISD::FNEARBYINT, ISD::FROUND,   ISD::FROUNDEVEN,  ISD::FCANONICALIZE,
         ISD::FSIN,       ISD::FCOS,     ISD::SETCC,       ISD::SELECT_CC,
         ISD::SELECT,     ISD::FLDEXP,   ISD::FFREXP,      ISD::FMODF,
-        ISD::FATAN2,     ISD::FPOWI};
+        ISD::FATAN2,     ISD::FPOWI,
+        // BR_CC has f16 operands (the comparison inputs) but a chain result.
+        // Without explicit Promote, the f16 comparison reaches SelectCC in
+        // PPCISelDAGToDAG which only knows f32/f64/f128 and asserts.
+        ISD::BR_CC};
 
     // Promote all the arithmetic operations defined above to f32.
     setOperationAction(F16PromoteOps, MVT::f16, Promote);
