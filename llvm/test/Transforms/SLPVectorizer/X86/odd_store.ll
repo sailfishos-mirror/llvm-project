@@ -8,7 +8,7 @@
 ;  A[2] = (T * B[12] + 6.0);
 ;}
 
-define i32 @foo(ptr noalias nocapture %A, ptr noalias nocapture %B, float %T) {
+define void @foo(ptr noalias nocapture %A, ptr noalias nocapture %B, float %T) {
 ; NON-POW2-LABEL: @foo(
 ; NON-POW2-NEXT:    [[TMP1:%.*]] = getelementptr inbounds float, ptr [[B:%.*]], i64 10
 ; NON-POW2-NEXT:    [[TMP2:%.*]] = getelementptr inbounds i8, ptr [[A:%.*]], i64 1
@@ -26,7 +26,7 @@ define i32 @foo(ptr noalias nocapture %A, ptr noalias nocapture %B, float %T) {
 ; NON-POW2-NEXT:    [[TMP12:%.*]] = getelementptr inbounds i8, ptr [[A]], i64 2
 ; NON-POW2-NEXT:    [[TMP13:%.*]] = extractelement <3 x i8> [[TMP9]], i32 2
 ; NON-POW2-NEXT:    store i8 [[TMP13]], ptr [[TMP12]], align 1
-; NON-POW2-NEXT:    ret i32 undef
+; NON-POW2-NEXT:    ret void
 ;
 ; POW2-ONLY-LABEL: @foo(
 ; POW2-ONLY-NEXT:    [[TMP1:%.*]] = getelementptr inbounds float, ptr [[B:%.*]], i64 10
@@ -50,7 +50,7 @@ define i32 @foo(ptr noalias nocapture %A, ptr noalias nocapture %B, float %T) {
 ; POW2-ONLY-NEXT:    [[TMP17:%.*]] = getelementptr inbounds i8, ptr [[A]], i64 2
 ; POW2-ONLY-NEXT:    [[TMP18:%.*]] = extractelement <2 x i8> [[TMP15]], i32 1
 ; POW2-ONLY-NEXT:    store i8 [[TMP18]], ptr [[TMP17]], align 1
-; POW2-ONLY-NEXT:    ret i32 undef
+; POW2-ONLY-NEXT:    ret void
 ;
   %1 = getelementptr inbounds float, ptr %B, i64 10
   %2 = load float, ptr %1, align 4
@@ -75,7 +75,7 @@ define i32 @foo(ptr noalias nocapture %A, ptr noalias nocapture %B, float %T) {
   %19 = fptosi double %18 to i8
   %20 = getelementptr inbounds i8, ptr %A, i64 2
   store i8 %19, ptr %20, align 1
-  ret i32 undef
+  ret void
 }
 
 ; PR41892
