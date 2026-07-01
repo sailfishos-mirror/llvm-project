@@ -2129,8 +2129,16 @@ WaitcntGeneratorPreGFX12::getAllZeroWaitcnt(bool IncludeVSCnt) const {
 AMDGPU::Waitcnt
 WaitcntGeneratorGFX12Plus::getAllZeroWaitcnt(bool IncludeVSCnt) const {
   unsigned ExpertVal = IsExpertMode ? 0 : ~0u;
-  return AMDGPU::Waitcnt(0, 0, 0, IncludeVSCnt ? 0 : ~0u, 0, 0, 0,
-                         ~0u /* XCNT */, ~0u /* ASYNC_CNT */, ExpertVal,
+  // EXP_CNT, SAMPLE_CNT, and BVH_CNT are not available on all GFX12+ targets.
+  // gfx1250 does not have export or image instructions, so these counters
+  // should not be waited on.
+  unsigned ExpCntVal = ST.hasExportInsts() ? 0 : ~0u;
+  unsigned SampleBvhVal = ST.hasImageInsts() ? 0 : ~0u;
+  // X_CNT and ASYNC_CNT are only available on gfx1250+.
+  unsigned XCntVal = ST.hasWaitXcnt() ? 0 : ~0u;
+  unsigned AsyncCntVal = ST.hasGFX1250Insts() ? 0 : ~0u;
+  return AMDGPU::Waitcnt(0, ExpCntVal, 0, IncludeVSCnt ? 0 : ~0u, SampleBvhVal,
+                         SampleBvhVal, 0, XCntVal, AsyncCntVal, ExpertVal,
                          ExpertVal);
 }
 
@@ -2852,8 +2860,19 @@ bool SIInsertWaitcnts::generateWaitcntInstBefore(
   if (ForceEmitZeroLoadFlag && Wait.get(AMDGPU::LOAD_CNT) != ~0u)
     Wait.set(AMDGPU::LOAD_CNT, 0);
 
-  return generateWaitcnt(Wait, MI.getIterator(), *MI.getParent(), ScoreBrackets,
-                         OldWaitcntInstr);
+  bool Modified = generateWaitcnt(Wait, MI.getIterator(), *MI.getParent(),
+                                  ScoreBrackets, OldWaitcntInstr);
+
+  // Emit s_wait_tensorcnt 0 when forcing zero waits on gfx1250+.
+  // Tensorcnt is not tracked by the Waitcnt class, so we emit it separately.
+  if (ForceEmitZeroFlag && !MI.isTerminator() && ST.hasGFX1250Insts()) {
+    BuildMI(*MI.getParent(), MI.getIterator(), MI.getDebugLoc(),
+            TII.get(AMDGPU::S_WAIT_TENSORCNT))
+        .addImm(0);
+    Modified = true;
+  }
+
+  return Modified;
 }
 
 bool SIInsertWaitcnts::generateWaitcnt(AMDGPU::Waitcnt Wait,
