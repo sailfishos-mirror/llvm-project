@@ -72,6 +72,11 @@ static cl::opt<unsigned>
     NopPadding("amdgpu-snop-padding", cl::init(0), cl::Hidden,
                cl::desc("Insert a s_nop x before every instruction"));
 
+// This is intended for debugging purposes only.
+static cl::opt<unsigned>
+    VNopPadding("amdgpu-force-emit-vnops", cl::init(0), cl::Hidden,
+                cl::desc("Insert N v_nop instructions before every instruction"));
+
 static cl::opt<bool> EnableWMMAVnopHoisting(
     "amdgpu-wmma-vnop-hoisting", cl::init(true), cl::Hidden,
     cl::desc("Hoist WMMA hazard V_NOPs from loops to preheaders"));
@@ -1970,6 +1975,13 @@ void GCNHazardRecognizer::fixHazards(MachineInstr *MI) {
     fixScratchBaseForwardingHazard(MI);
   if (ST.setRegModeNeedsVNOPs())
     fixSetRegMode(MI);
+
+  // Insert forced v_nop instructions if requested (for debugging).
+  if (VNopPadding > 0) {
+    MachineBasicBlock *MBB = MI->getParent();
+    for (unsigned I = 0; I < VNopPadding; ++I)
+      BuildMI(*MBB, MI, MI->getDebugLoc(), TII.get(AMDGPU::V_NOP_e32));
+  }
 }
 
 static bool isVCmpXWritesExec(const SIInstrInfo &TII, const SIRegisterInfo &TRI,
