@@ -92,9 +92,9 @@ static bool dependsOnLocalPhi(const Loop *L, const Value *Cond,
   if (!I)
     return false;
 
+  if (!L->contains(I))
+    return false;
   for (const Value *V : I->operand_values()) {
-    if (!L->contains(I))
-      continue;
     if (const PHINode *PHI = dyn_cast<PHINode>(V)) {
       if (llvm::none_of(L->getSubLoops(), [PHI](const Loop* SubLoop) {
                   return SubLoop->contains(PHI); }))
@@ -128,8 +128,9 @@ void AMDGPUTTIImpl::getUnrollingPreferences(
   UP.UnrollVectorizedLoop = true;
 
   // Enable runtime unrolling for loops whose trip count is not known at
-  // compile time.
+  // compile time.  Use a reduced PartialThreshold to limit code-size growth.
   UP.Runtime = true;
+  UP.PartialThreshold = UP.Threshold / 4;
 
   // Maximum alloca size than can fit registers. Reserve 16 registers.
   const unsigned MaxAlloca = (256 - 16) * 4;
@@ -293,6 +294,7 @@ const FeatureBitset GCNTTIImpl::InlineFeatureIgnoreList = {
 
     // Property of the kernel/environment which can't actually differ.
     AMDGPU::FeatureSGPRInitBug, AMDGPU::FeatureXNACK,
+    AMDGPU::FeatureXNACKOnOffModes, AMDGPU::FeatureSupportsXNACK,
     AMDGPU::FeatureTrapHandler,
 
     // The default assumption needs to be ecc is enabled, but no directly
@@ -334,7 +336,10 @@ GCNTTIImpl::getRegisterBitWidth(TargetTransformInfo::RegisterKind K) const {
   case TargetTransformInfo::RGK_Scalar:
     return TypeSize::getFixed(32);
   case TargetTransformInfo::RGK_FixedWidthVector:
-    return TypeSize::getFixed(ST->hasPackedFP32Ops() ? 64 : 32);
+    return TypeSize::getFixed((ST->hasPackedFP64Ops() || ST->hasPackedU64Ops())
+                                  ? 128
+                              : ST->hasPackedFP32Ops() ? 64
+                                                       : 32);
   case TargetTransformInfo::RGK_ScalableVector:
     return TypeSize::getScalable(0);
   }
@@ -353,7 +358,10 @@ unsigned GCNTTIImpl::getMaximumVF(unsigned ElemWidth, unsigned Opcode) const {
   return (ElemWidth == 8 && ST->has16BitInsts())       ? 4
          : (ElemWidth == 16 && ST->has16BitInsts())    ? 2
          : (ElemWidth == 32 && ST->hasPackedFP32Ops()) ? 2
-                                                       : 1;
+         : (ElemWidth == 64 &&
+            (ST->hasPackedFP64Ops() || ST->hasPackedU64Ops()))
+             ? 2
+             : 1;
 }
 
 bool GCNTTIImpl::preferSLPInstCountCheck() const {
@@ -566,6 +574,9 @@ InstructionCost GCNTTIImpl::getArithmeticInstrCost(
     return getFullRateInstrCost() * LT.first * NElts;
   case ISD::ADD:
   case ISD::SUB:
+    if (SLT == MVT::i64 && ST->hasPackedU64Ops())
+      NElts = (NElts + 1) / 2;
+    [[fallthrough]];
   case ISD::AND:
   case ISD::OR:
   case ISD::XOR:
@@ -618,8 +629,11 @@ InstructionCost GCNTTIImpl::getArithmeticInstrCost(
       NElts = (NElts + 1) / 2;
     if (ST->hasBF16PackedInsts() && SLT == MVT::bf16)
       NElts = (NElts + 1) / 2;
-    if (SLT == MVT::f64)
+    if (SLT == MVT::f64) {
+      if (ST->hasPackedFP64Ops())
+        NElts = (NElts + 1) / 2;
       return LT.first * NElts * get64BitInstrCost(CostKind);
+    }
 
     if (ST->has16BitInsts() && SLT == MVT::f16)
       NElts = (NElts + 1) / 2;
@@ -882,8 +896,15 @@ GCNTTIImpl::getIntrinsicInstrCost(const IntrinsicCostAttributes &ICA,
   if ((ST->hasVOP3PInsts() &&
        (SLT == MVT::f16 || SLT == MVT::i16 ||
         (SLT == MVT::bf16 && ST->hasBF16PackedInsts()))) ||
-      (ST->hasPackedFP32Ops() && SLT == MVT::f32))
+      (ST->hasPackedFP64Ops() && SLT == MVT::f64) ||
+      (ST->hasPackedU64Ops() && SLT == MVT::i64)) {
     NElts = (NElts + 1) / 2;
+  } else if (SLT == MVT::f32) {
+    bool HasPk2FP32Op = ST->hasPackedFP32Ops() &&
+                        IID != Intrinsic::minimumnum &&
+                        IID != Intrinsic::maximumnum;
+    NElts = HasPk2FP32Op ? (NElts + 1) / 2 : NElts;
+  }
 
   // TODO: Get more refined intrinsic costs?
   unsigned InstRate = getQuarterRateInstrCost(CostKind);

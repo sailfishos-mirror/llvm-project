@@ -52,7 +52,7 @@ enum class AMDGPUSchedReason : uint8_t {
   NUM_REASONS
 };
 
-constexpr StringRef getReasonName(AMDGPUSchedReason R) {
+inline StringRef getReasonName(AMDGPUSchedReason R) {
   switch (R) {
   case AMDGPUSchedReason::None:
     return "None";

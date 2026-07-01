@@ -62,6 +62,8 @@ func.func @float32_unary_scalar(%arg0: f32) {
   %22 = math.acosh %arg0 : f32
   // CHECK: spirv.GL.Atanh %{{.*}}: f32
   %23 = math.atanh %arg0 : f32
+  // CHECK: spirv.GL.Trunc %{{.*}}: f32
+  %24 = math.trunc %arg0 : f32
   return
 }
 
@@ -117,6 +119,8 @@ func.func @float32_unary_vector(%arg0: vector<3xf32>) {
   %19 = math.acosh %arg0 : vector<3xf32>
   // CHECK: spirv.GL.Atanh %{{.*}}: vector<3xf32>
   %20 = math.atanh %arg0 : vector<3xf32>
+  // CHECK: spirv.GL.Trunc %{{.*}}: vector<3xf32>
+  %21 = math.trunc %arg0 : vector<3xf32>
   return
 }
 
@@ -473,6 +477,30 @@ func.func @tensor_1d(%arg0: tensor<2xf32>) {
   // CHECK-NEXT: math.powf {{.+}}, {{%.+}} : tensor<2xf32>
   %6 = math.powf %arg0, %arg0 : tensor<2xf32>
   // CHECK-NEXT: return
+  return
+}
+
+} // end module
+
+// -----
+
+module attributes {
+  spirv.target_env = #spirv.target_env<#spirv.vce<v1.0, [Shader], []>, #spirv.resource_limits<>>
+} {
+
+// CHECK-LABEL: @sincos_scalar
+func.func @sincos_scalar(%arg0: f32) {
+  // CHECK: %[[SIN:.+]] = spirv.GL.Sin %{{.*}}: f32
+  // CHECK: %[[COS:.+]] = spirv.GL.Cos %{{.*}}: f32
+  %sin, %cos = math.sincos %arg0 : f32
+  return
+}
+
+// CHECK-LABEL: @sincos_vector
+func.func @sincos_vector(%arg0: vector<3xf32>) {
+  // CHECK: %[[SIN:.+]] = spirv.GL.Sin %{{.*}}: vector<3xf32>
+  // CHECK: %[[COS:.+]] = spirv.GL.Cos %{{.*}}: vector<3xf32>
+  %sin, %cos = math.sincos %arg0 : vector<3xf32>
   return
 }
 

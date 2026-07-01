@@ -13,6 +13,7 @@
 
 #include "AMDGPUCoExecSchedStrategy.h"
 #include "AMDGPUBarrierLatency.h"
+#include "AMDGPUIGroupLP.h"
 #include "GCNHazardRecognizer.h"
 #include "GCNSubtarget.h"
 #include "SIRegisterInfo.h"
@@ -2793,6 +2794,7 @@ llvm::createGCNCoExecMachineScheduler(MachineSchedContext *C) {
   ScheduleDAGMILive *DAG = new GCNScheduleDAGMILive(
       C, std::make_unique<AMDGPUCoExecSchedStrategy>(C));
 
+  DAG->addMutation(createIGroupLPDAGMutation(AMDGPU::SchedulingPhase::Initial));
   DAG->addMutation(createAMDGPUBarrierLatencyDAGMutation(C->MF));
   return DAG;
 }

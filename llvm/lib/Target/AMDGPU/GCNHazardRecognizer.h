@@ -57,10 +57,18 @@ private:
   MachineInstr *CurrCycleInstr;
   std::list<MachineInstr*> EmittedInstrs;
 
-  // Track VALU/V_NOP separately which S_NOPs cannot resolve.
+  // WMMA co-execution hazards are only resolved by VALU-pipe activity (VALU
+  // ops or V_NOPs), never by S_NOPs, so track those instructions separately
+  // from EmittedInstrs.
   std::list<MachineInstr *> EmittedVALUInstrs;
-  static constexpr unsigned MaxVALULookAhead = 10;
-  // When true, stalls should be recorded in EmittedVALUInstrs.
+  // Lookahead bound for EmittedVALUInstrs. It must be at least as large as the
+  // largest WMMA co-execution wait-state requirement (the maximum value in
+  // WMMAWaitStates/VALUWaitStates in checkWMMACoexecutionHazards). Increase
+  // this if those wait-state limits grow.
+  static constexpr unsigned MaxVALULookAhead = 18;
+  // When true, an unresolved WMMA co-execution hazard is pending, so stall
+  // cycles are optimistically recorded in EmittedVALUInstrs (they will become
+  // V_NOPs unless a non-VALU instruction is scheduled into them).
   bool HasPendingWMMACoexecHazard = false;
 
   const MachineFunction &MF;
@@ -183,6 +191,8 @@ private:
   int checkVALUHazards(MachineInstr *VALU) const;
   int checkVALUHazardsHelper(const MachineOperand &Def,
                              const MachineRegisterInfo &MRI) const;
+  int checkUniformWindowVALUHazardsHelper(Register Reg) const;
+  int checkSOFFSETWindowVALUHazardsHelper(Register Reg) const;
   int checkRWLaneHazards(MachineInstr *RWLane) const;
   int checkRFEHazards(MachineInstr *RFE) const;
   int checkInlineAsmHazards(MachineInstr *IA) const;
