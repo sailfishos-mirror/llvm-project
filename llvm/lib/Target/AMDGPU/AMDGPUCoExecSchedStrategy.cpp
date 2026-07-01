@@ -769,9 +769,10 @@ unsigned CandidateHeuristics::getMaxBlockingCycles(const MCSchedClassDesc *SC,
   for (TargetSchedModel::ProcResIter PI = SchedModel->getWriteProcResBegin(SC),
                                      PE = SchedModel->getWriteProcResEnd(SC);
        PI != PE; ++PI) {
-    ReleaseAtCycle = std::max({ReleaseAtCycle, (unsigned)PI->ReleaseAtCycle,
-                               (unsigned)PI->RepeatRate});
+    ReleaseAtCycle = std::max(ReleaseAtCycle, (unsigned)PI->ReleaseAtCycle);
   }
+  // RepeatRate is AMDGPU-specific and not part of MCWriteProcResEntry
+  ReleaseAtCycle = std::max(ReleaseAtCycle, SII->getRepeatRate(*MI));
   return ReleaseAtCycle;
 }
 

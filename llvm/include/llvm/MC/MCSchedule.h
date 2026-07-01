@@ -81,15 +81,11 @@ struct MCWriteProcResEntry {
   /// relatively to the cycle in which the instruction is issued
   /// (assuming no stalls inbetween).
   uint16_t AcquireAtCycle;
-  /// Number of cycles until a new instruction can acquire this resource,
-  /// allowing the resource to be blocked without requiring it to be unbuffered.
-  uint16_t RepeatRate;
 
   bool operator==(const MCWriteProcResEntry &Other) const {
     return ProcResourceIdx == Other.ProcResourceIdx &&
            ReleaseAtCycle == Other.ReleaseAtCycle &&
-           AcquireAtCycle == Other.AcquireAtCycle &&
-           RepeatRate == Other.RepeatRate;
+           AcquireAtCycle == Other.AcquireAtCycle;
   }
 };
 

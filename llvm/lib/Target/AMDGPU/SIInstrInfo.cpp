@@ -11645,18 +11645,27 @@ std::optional<unsigned> SIInstrInfo::getDSLatencyMode() {
   llvm_unreachable("Unknown DS latency mode");
 }
 
+namespace llvm::AMDGPU {
+
+struct AMDGPURepeatRateInfo {
+  uint16_t Inst;
+  uint8_t RepeatRate;
+};
+
+#define GET_GFX1250RepeatRateTable_DECL
+#define GET_GFX1250RepeatRateTable_IMPL
+#include "AMDGPUGenSearchableTables.inc"
+
+} // namespace llvm::AMDGPU
+
 unsigned SIInstrInfo::getRepeatRate(const MachineInstr &MI) const {
-  if (!SchedModel.hasInstrSchedModel())
+  // Only GFX12.5+ has RepeatRate semantics
+  if (!ST.hasGFX1250Insts())
     return 0;
 
-  auto SchedClass = SchedModel.resolveSchedClass(&MI);
-  unsigned RepeatRate = 0;
-  for (TargetSchedModel::ProcResIter
-           PI = SchedModel.getWriteProcResBegin(SchedClass),
-           PE = SchedModel.getWriteProcResEnd(SchedClass);
-       PI != PE; ++PI) {
-    RepeatRate = std::max(RepeatRate, (unsigned)PI->RepeatRate);
-  }
+  // Use processor-specific lookup table
+  if (const auto *Entry = AMDGPU::getGFX1250RepeatRateInfo(MI.getOpcode()))
+    return Entry->RepeatRate;
 
-  return RepeatRate;
+  return 0;
 }
