@@ -205,6 +205,10 @@ void OmpStructureChecker::Enter(const parser::ModuleSubprogram &) {
 }
 
 void OmpStructureChecker::Enter(const parser::SpecificationPart &) {
+  // The pending metadirective requirement is reset once per program unit.
+  if (partStack_.empty()) {
+    metadirectiveLoopVariants_.clear();
+  }
   partStack_.push_back(PartKind::SpecificationPart);
 }
 
@@ -217,6 +221,11 @@ void OmpStructureChecker::Enter(const parser::ExecutionPart &) {
 }
 
 void OmpStructureChecker::Leave(const parser::ExecutionPart &) {
+  if (!metadirectiveLoopVariants_.empty()) {
+    // The metadirective is the last construct in the execution part, so its
+    // loop-associated variants never reached a loop nest.
+    CheckMetadirectiveVariantsWithoutLoop();
+  }
   partStack_.pop_back();
 }
 
