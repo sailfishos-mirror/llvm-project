@@ -49,6 +49,7 @@ class GetElementPtrInst;
 class ImplicitControlFlowTracking;
 class LoadInst;
 class LoopInfo;
+class ScalarEvolution;
 class MemDepResult;
 class MemoryAccess;
 class MemoryDependenceResults;
@@ -260,6 +261,8 @@ private:
   LoopInfo *LI = nullptr;
   AAResults *AA = nullptr;
   MemorySSAUpdater *MSSAU = nullptr;
+  // Prototype: SCEV handed to MemDep for affine select-address recovery.
+  ScalarEvolution *SE = nullptr;
 
   ValueTable VN;
 

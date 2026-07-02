@@ -41,6 +41,7 @@
 #include "llvm/Analysis/MemorySSAUpdater.h"
 #include "llvm/Analysis/OptimizationRemarkEmitter.h"
 #include "llvm/Analysis/PHITransAddr.h"
+#include "llvm/Analysis/ScalarEvolution.h"
 #include "llvm/Analysis/TargetLibraryInfo.h"
 #include "llvm/Analysis/ValueTracking.h"
 #include "llvm/IR/Attributes.h"
@@ -885,6 +886,11 @@ PreservedAnalyses GVNPass::run(Function &F, FunctionAnalysisManager &AM) {
     MSSA = &AM.getResult<MemorySSAAnalysis>(F);
   }
   auto &ORE = AM.getResult<OptimizationRemarkEmitterAnalysis>(F);
+  // Hand SCEV to MemDep so its select-address translation can recover
+  // affine-equal addresses (reuses the load-PRE-through-select path).
+  SE = &AM.getResult<ScalarEvolutionAnalysis>(F);
+  if (MemDep)
+    MemDep->setScalarEvolution(SE);
   bool Changed = runImpl(F, AC, DT, TLI, AA, MemDep, LI, &ORE,
                          MSSA ? &MSSA->getMSSA() : nullptr);
   if (!Changed)
