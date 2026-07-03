@@ -2400,14 +2400,14 @@ class PPCEmitTimePseudo<dag OOL, dag IOL, list<dag> pattern = [],
 // Instruction that require custom insertion support
 // a.k.a. ISelPseudos, however, these won't have isPseudo set
 class PPCCustomInserterPseudo<dag OOL, dag IOL, list<dag> pattern = []>
-    : PPCEmitTimePseudo<OOL, IOL, "", pattern> {
+    : PPCEmitTimePseudo<OOL, IOL, pattern, ""> {
   let usesCustomInserter = 1;
 }
 
 // PostRAPseudo will be expanded in expandPostRAPseudo, isPseudo flag in td
 // files is set only for PostRAPseudo
 class PPCPostRAExpPseudo<dag OOL, dag IOL, list<dag> pattern = []>
-    : PPCEmitTimePseudo<OOL, IOL, "", pattern> {
+    : PPCEmitTimePseudo<OOL, IOL, pattern, ""> {
   let isPseudo = 1;
 }
 
