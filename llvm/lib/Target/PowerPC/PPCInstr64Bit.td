@@ -516,16 +516,14 @@ def MFCR8 : XFXForm_3<31, 19, (outs g8rc:$RT), (ins),
 let hasSideEffects = 1 in {
   let Defs = [CTR8] in
   def EH_SjLj_SetJmp64  : PPCCustomInserterPseudo<(outs gprc:$dst), (ins memr:$buf),
-                            [(set i32:$dst, (PPCeh_sjlj_setjmp addr:$buf))],
-                            "#EH_SJLJ_SETJMP64">,
+                            [(set i32:$dst, (PPCeh_sjlj_setjmp addr:$buf))]>,
                           Requires<[IsPPC64]>;
 }
 
 let hasSideEffects = 1, isBarrier = 1 in {
   let isTerminator = 1 in
   def EH_SjLj_LongJmp64 : PPCCustomInserterPseudo<(outs), (ins memr:$buf),
-                            [(PPCeh_sjlj_longjmp addr:$buf)],
-                            "#EH_SJLJ_LONGJMP64">,
+                            [(PPCeh_sjlj_longjmp addr:$buf)]>,
                           Requires<[IsPPC64]>;
 }
 

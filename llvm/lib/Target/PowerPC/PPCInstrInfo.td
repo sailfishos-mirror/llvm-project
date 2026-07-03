@@ -1930,16 +1930,14 @@ def TAILBA   : IForm<18, 0, 0, (outs), (ins abscalltarget:$LI),
 let hasSideEffects = 1 in {
   let Defs = [CTR] in
   def EH_SjLj_SetJmp32  : PPCCustomInserterPseudo<(outs gprc:$dst), (ins memr:$buf),
-                            [(set i32:$dst, (PPCeh_sjlj_setjmp addr:$buf))],
-                            "#EH_SJLJ_SETJMP32">,
+                            [(set i32:$dst, (PPCeh_sjlj_setjmp addr:$buf))]>,
                           Requires<[IsPPC32]>;
 }
 
 let hasSideEffects = 1, isBarrier = 1 in {
   let isTerminator = 1 in
   def EH_SjLj_LongJmp32 : PPCCustomInserterPseudo<(outs), (ins memr:$buf),
-                            [(PPCeh_sjlj_longjmp addr:$buf)],
-                            "#EH_SJLJ_LONGJMP32">,
+                            [(PPCeh_sjlj_longjmp addr:$buf)]>,
                           Requires<[IsPPC32]>;
 }
 
@@ -3050,7 +3048,7 @@ let Predicates = [HasFPU] in {
 // Custom inserter instruction to perform FADD in round-to-zero mode.
 let Uses = [RM], mayRaiseFPException = 1 in {
   def FADDrtz: PPCCustomInserterPseudo<(outs f8rc:$FRT), (ins f8rc:$FRA, f8rc:$FRB),
-                      [(set f64:$FRT, (PPCany_faddrtz f64:$FRA, f64:$FRB))], "">;
+                      [(set f64:$FRT, (PPCany_faddrtz f64:$FRA, f64:$FRB))]>;
 }
 
 // The above pseudo gets expanded to make use of the following instructions
