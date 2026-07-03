@@ -181,9 +181,9 @@ add_entrypoint_object(
   DEPENDS
     .memory_utils.inline_memcpy
     .string_utils
-    .strnlen_s
     libc.src.__support.common
     libc.src.__support.constraint_handler
+    libc.src.__support.CPP.expected
     libc.src.__support.macros.config
     libc.hdr.types.constraint_handler_t
     libc.hdr.types.errno_t
