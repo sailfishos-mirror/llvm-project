@@ -292,6 +292,7 @@ private:
   SDValue PromoteIntRes_VECTOR_REVERSE(SDNode *N);
   SDValue PromoteIntRes_VECTOR_SHUFFLE(SDNode *N);
   SDValue PromoteIntRes_VECTOR_SPLICE(SDNode *N);
+  SDValue PromoteIntRes_VECTOR_BROADCAST(SDNode *N);
   SDValue PromoteIntRes_VECTOR_INTERLEAVE_DEINTERLEAVE(SDNode *N);
   SDValue PromoteIntRes_BUILD_VECTOR(SDNode *N);
   SDValue PromoteIntRes_ScalarOp(SDNode *N);
@@ -426,6 +427,7 @@ private:
   SDValue PromoteIntOp_UnaryBooleanVectorOp(SDNode *N, unsigned OpNo);
   SDValue PromoteIntOp_GET_ACTIVE_LANE_MASK(SDNode *N);
   SDValue PromoteIntOp_PARTIAL_REDUCE_MLA(SDNode *N);
+  SDValue PromoteIntOp_VECTOR_BROADCAST(SDNode *N);
   SDValue PromoteIntOp_LOOP_DEPENDENCE_MASK(SDNode *N);
   SDValue PromoteIntOp_MaskedBinOp(SDNode *N, unsigned OpNo);
 
