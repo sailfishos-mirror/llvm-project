@@ -4506,6 +4506,9 @@ if needed.
   * - 0x8
     - `FUNC_FULL_SIMD_MODE`
     - Function uses full SIMD execution mode
+  * - 0x10
+    - `FUNC_WAVE32`
+    - Function uses wave32; otherwise wave64
   :::
 
   Symbol references (`INFO_FUNC`, `INFO_USE`, `INFO_CALL`) generate
