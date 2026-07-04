@@ -4503,6 +4503,9 @@ if needed.
   * - 0x4
     - `FUNC_HAS_DYN_STACK`
     - Function has dynamic stack allocation
+  * - 0x8
+    - `FUNC_FULL_SIMD_MODE`
+    - Function uses full SIMD execution mode
   :::
 
   Symbol references (`INFO_FUNC`, `INFO_USE`, `INFO_CALL`) generate
