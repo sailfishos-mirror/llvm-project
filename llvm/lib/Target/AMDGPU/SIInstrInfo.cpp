@@ -47,6 +47,14 @@ namespace llvm::AMDGPU {
 #define GET_D16ImageDimIntrinsics_IMPL
 #define GET_ImageDimIntrinsicTable_IMPL
 #define GET_RsrcIntrinsics_IMPL
+#define GET_GFX1250RepeatRateTable_DECL
+#define GET_GFX1250RepeatRateTable_IMPL
+
+struct AMDGPURepeatRateInfo {
+  uint16_t Inst;
+  uint8_t RepeatRate;
+};
+
 #include "AMDGPUGenSearchableTables.inc"
 } // namespace llvm::AMDGPU
 
@@ -10866,6 +10874,17 @@ unsigned SIInstrInfo::getInstrLatency(const InstrItineraryData *ItinData,
   }
 
   return SchedModel.computeInstrLatency(&MI);
+}
+
+unsigned SIInstrInfo::getRepeatRate(const MachineInstr &MI) const {
+  if (!ST.hasGFX1250Insts())
+    return 0;
+
+  // Use processor-specific lookup table
+  if (const auto *Entry = AMDGPU::getGFX1250RepeatRateInfo(MI.getOpcode()))
+    return Entry->RepeatRate;
+
+  return 0;
 }
 
 const MachineOperand &
