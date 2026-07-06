@@ -7,15 +7,16 @@
 //===----------------------------------------------------------------------===//
 
 #include "SqrtTest.h"
-
+#include "src/__support/FPUtil/float128.h"
+#include "src/__support/integer_literals.h"
 #include "src/math/sqrtf128.h"
 
-#include "src/__support/integer_literals.h"
+using LIBC_NAMESPACE::fputil::Float128;
 
-LIST_SQRT_TESTS(float128, LIBC_NAMESPACE::sqrtf128)
+LIST_SQRT_TESTS(Float128, LIBC_NAMESPACE::sqrtf128)
 
 TEST_F(LlvmLibcSqrtTest, SpecialInputs) {
-  constexpr float128 INPUTS[] = {
+  constexpr Float128 INPUTS[] = {
       0x0.000000dee2f5b6a26c8f07f05442p-16382q,
       0x0.000000c86d174c5ad8ae54a548e7p-16382q,
       0x0.000020ab15cfe0b8e488e128f535p-16382q,

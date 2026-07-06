@@ -9,12 +9,15 @@
 #ifndef LLVM_LIBC_SRC_MATH_SQRTF128_H
 #define LLVM_LIBC_SRC_MATH_SQRTF128_H
 
+#include "src/__support/FPUtil/float128.h"
 #include "src/__support/macros/config.h"
 #include "src/__support/macros/properties/types.h"
 
+using LIBC_NAMESPACE::fputil::Float128;
+
 namespace LIBC_NAMESPACE_DECL {
 
-float128 sqrtf128(float128 x);
+Float128 sqrtf128(Float128 x);
 
 } // namespace LIBC_NAMESPACE_DECL
 

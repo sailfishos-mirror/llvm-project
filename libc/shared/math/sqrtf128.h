@@ -9,12 +9,11 @@
 #ifndef LLVM_LIBC_SHARED_MATH_SQRTF128_H
 #define LLVM_LIBC_SHARED_MATH_SQRTF128_H
 
-#include "include/llvm-libc-types/float128.h"
-
-#ifdef LIBC_TYPES_HAS_FLOAT128
-
 #include "shared/libc_common.h"
+#include "src/__support/FPUtil/float128.h"
 #include "src/__support/math/sqrtf128.h"
+
+using LIBC_NAMESPACE::fputil::Float128;
 
 namespace LIBC_NAMESPACE_DECL {
 namespace shared {
@@ -23,7 +22,5 @@ using math::sqrtf128;
 
 } // namespace shared
 } // namespace LIBC_NAMESPACE_DECL
-
-#endif // LIBC_TYPES_HAS_FLOAT128
 
 #endif // LLVM_LIBC_SHARED_MATH_SQRTF128_H

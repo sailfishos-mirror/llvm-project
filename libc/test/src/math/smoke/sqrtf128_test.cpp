@@ -8,14 +8,17 @@
 
 #include "SqrtTest.h"
 
+#include "src/__support/FPUtil/float128.h"
 #include "src/__support/uint128.h"
 #include "src/math/sqrtf128.h"
 
-LIST_SQRT_TESTS(float128, LIBC_NAMESPACE::sqrtf128);
+using LIBC_NAMESPACE::fputil::Float128;
+
+LIST_SQRT_TESTS(Float128, LIBC_NAMESPACE::sqrtf128);
 
 TEST_F(LlvmLibcSqrtTest, HardToRound) {
   using LIBC_NAMESPACE::fputil::testing::RoundingMode;
-  using FPBits = LIBC_NAMESPACE::fputil::FPBits<float128>;
+  using FPBits = LIBC_NAMESPACE::fputil::FPBits<Float128>;
 
   // Since there is no exact half cases for square root I encode the
   // round direction in the sign of the result. E.g. if the number is
@@ -23,7 +26,7 @@ TEST_F(LlvmLibcSqrtTest, HardToRound) {
   // (the absolute value). Thus I can test not only hard to round
   // cases for the round to nearest mode but also the directional
   // modes.
-  float128 HARD_TO_ROUND[][2] = {
+  Float128 HARD_TO_ROUND[][2] = {
       {0x0.000000dee2f5b6a26c8f07f05442p-16382q,
        -0x1.ddbd8763a617cff753e2a31083p-8204q},
       {0x0.000000c86d174c5ad8ae54a548e7p-16382q,
@@ -85,9 +88,9 @@ TEST_F(LlvmLibcSqrtTest, HardToRound) {
        0x1.ffffffffffffffffffffffffffffp+0q},
   };
 
-  auto rnd = [](float128 x, RoundingMode rm) -> float128 {
+  auto rnd = [](Float128 x, RoundingMode rm) -> Float128 {
     bool is_neg = x < 0;
-    float128 y = is_neg ? -x : x;
+    Float128 y = is_neg ? -x : x;
     FPBits ybits(y);
 
     if (is_neg &&
@@ -107,7 +110,7 @@ TEST_F(LlvmLibcSqrtTest, HardToRound) {
   }
 
   // Exact results for subnormal arguments
-  float128 EXACT_SUBNORMAL[][2] = {
+  Float128 EXACT_SUBNORMAL[][2] = {
       {0x0.0000000000000000000000000001p-16382q, 0x1p-8247q},
       {0x0.0000000000000000000000000004p-16382q, 0x1p-8246q},
       {0x0.0000000000001000000000000000p-16382q, 0x1p-8217q},
@@ -121,17 +124,17 @@ TEST_F(LlvmLibcSqrtTest, HardToRound) {
   // Check exact cases starting from small numbers
   for (unsigned k = 1; k < 100 * 100; ++k) {
     unsigned k2 = k * k;
-    float128 x = static_cast<float128>(k2);
-    float128 y = static_cast<float128>(k);
+    Float128 x = static_cast<Float128>(k2);
+    Float128 y = static_cast<Float128>(k);
     EXPECT_FP_EQ_ALL_ROUNDING(y, LIBC_NAMESPACE::sqrtf128(x));
   };
 
   // Then from the largest number.
   uint64_t k0 = 101904826760412362ULL;
   for (uint64_t k = k0; k > k0 - 10000; --k) {
-    float128 k_f128 = static_cast<float128>(k);
-    float128 x = k_f128 * k_f128;
-    float128 y = static_cast<float128>(k);
+    Float128 k_f128 = static_cast<Float128>(k);
+    Float128 x = k_f128 * k_f128;
+    Float128 y = static_cast<Float128>(k);
     EXPECT_FP_EQ_ALL_ROUNDING(y, LIBC_NAMESPACE::sqrtf128(x));
   }
 }
