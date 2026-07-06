@@ -4377,6 +4377,9 @@ LoopVectorizationCostModel::getInterleaveGroupCost(Instruction *I,
 
   Instruction *InsertPos = Group->getInsertPos();
   Type *ValTy = getLoadStoreType(InsertPos);
+  if (ValTy->isVectorTy())
+    return InstructionCost::getInvalid();
+
   auto *VectorTy = cast<VectorType>(toVectorTy(ValTy, VF));
   unsigned AS = getLoadStoreAddressSpace(InsertPos);
 
@@ -5133,6 +5136,7 @@ LoopVectorizationCostModel::getInstructionCost(Instruction *I,
     // fold away.  We can generalize this for all operations using the notion
     // of neutral elements.  (TODO)
     if (I->getOpcode() == Instruction::Mul &&
+        PSE.getSE()->isSCEVable(I->getOperand(0)->getType()) &&
         ((TheLoop->isLoopInvariant(I->getOperand(0)) &&
           PSE.getSCEV(I->getOperand(0))->isOne()) ||
          (TheLoop->isLoopInvariant(I->getOperand(1)) &&
@@ -5171,8 +5175,12 @@ LoopVectorizationCostModel::getInstructionCost(Instruction *I,
   }
   case Instruction::Select: {
     SelectInst *SI = cast<SelectInst>(I);
-    const SCEV *CondSCEV = SE->getSCEV(SI->getCondition());
-    bool ScalarCond = (SE->isLoopInvariant(CondSCEV, TheLoop));
+    Type *CondTy = SI->getCondition()->getType();
+    bool ScalarCond = false;
+    if (SE->isSCEVable(CondTy)) {
+      const SCEV *CondSCEV = SE->getSCEV(SI->getCondition());
+      ScalarCond = SE->isLoopInvariant(CondSCEV, TheLoop);
+    }
 
     const Value *Op0, *Op1;
     using namespace llvm::PatternMatch;
@@ -5191,9 +5199,8 @@ LoopVectorizationCostModel::getInstructionCost(Instruction *I,
           I);
     }
 
-    Type *CondTy = SI->getCondition()->getType();
     if (!ScalarCond)
-      CondTy = VectorType::get(CondTy, VF);
+      CondTy = toVectorTy(CondTy, VF);
 
     CmpInst::Predicate Pred = CmpInst::BAD_ICMP_PREDICATE;
     if (auto *Cmp = dyn_cast<CmpInst>(SI->getCondition()))
