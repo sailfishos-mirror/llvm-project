@@ -89,7 +89,7 @@ TEST_F(LlvmLibcSqrtTest, HardToRound) {
   };
 
   auto rnd = [](Float128 x, RoundingMode rm) -> Float128 {
-    bool is_neg = x < 0;
+    bool is_neg = x < Float128(0);
     Float128 y = is_neg ? -x : x;
     FPBits ybits(y);
 
