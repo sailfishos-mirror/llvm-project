@@ -52,8 +52,6 @@ private:
   std::string containsBuf_;
   // Tracks nested DEC structures and fields of that type
   UnorderedSymbolSet emittedDECStructures_, emittedDECFields_;
-  // Tracks enumerator PARAMETER symbols emitted within ENUMERATION TYPE blocks
-  UnorderedSymbolSet emittedEnumerators_;
   UnorderedSymbolSet usedNonIntrinsicModules_;
 
   llvm::raw_string_ostream needs_{needsBuf_};
