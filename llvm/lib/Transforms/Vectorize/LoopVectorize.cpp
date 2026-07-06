@@ -5544,7 +5544,7 @@ void LoopVectorizationPlanner::plan(
 
   // Invalidate interleave groups if all blocks of loop will be predicated.
   if (!useMaskedInterleavedAccesses(TTI)) {
-    for_each(EnabledCMs, [&](auto *CurrentCM) {
+    for (auto &CurrentCM : EnabledCMs) {
       if (CurrentCM->blockNeedsPredicationForAnyReason(OrigLoop->getHeader())) {
         LLVM_DEBUG(dbgs() << "LV: Invalidate all interleaved groups due to "
                           << "fold-tail by masking which requires "
@@ -5556,13 +5556,13 @@ void LoopVectorizationPlanner::plan(
           CurrentCM->invalidateCostModelingDecisions();
         }
       }
-    });
+    }
   }
 
-  for_each(EnabledCMs, [&](auto *CurrentCM) {
+  for (auto &CurrentCM : EnabledCMs) {
     if (CurrentCM->foldTailByMasking())
       Legal->prepareToFoldTailByMasking();
-  });
+  }
 
   ElementCount MaxUserVF =
       UserVF.isScalable() ? MaxFactors.ScalableVF : MaxFactors.FixedVF;
@@ -5576,17 +5576,13 @@ void LoopVectorizationPlanner::plan(
              "VF needs to be a power of two");
       // Collect the instructions (and their associated costs) that will be more
       // profitable to scalarize.
-      for_each(EnabledCMs, [&](auto *CurrentCM) {
-        CurrentCM->collectNonVectorizedAndSetWideningDecisions(UserVF);
-      });
+        EnabledCMs.front()->collectNonVectorizedAndSetWideningDecisions(UserVF);
       ElementCount EpilogueUserVF =
           ElementCount::getFixed(EpilogueVectorizationForceVF);
       if (EpilogueUserVF.isVector() &&
           ElementCount::isKnownLT(EpilogueUserVF, UserVF)) {
-        for_each(EnabledCMs, [&](auto *CurrentCM) {
-          CurrentCM->collectNonVectorizedAndSetWideningDecisions(
+          EnabledCMs.back()->collectNonVectorizedAndSetWideningDecisions(
               EpilogueUserVF);
-        });
         buildVPlans(*VPlan1, EpilogueUserVF, EpilogueUserVF, CM);
       }
       buildVPlans(*VPlan1, UserVF, UserVF, CM);
@@ -5617,9 +5613,9 @@ void LoopVectorizationPlanner::plan(
 
   for (const auto &VF : VFCandidates) {
     // Collect Uniform and Scalar instructions after vectorization with VF.
-    for_each(EnabledCMs, [&](auto *CurrentCM) {
+    for (auto &CurrentCM : EnabledCMs) {
       CurrentCM->collectNonVectorizedAndSetWideningDecisions(VF);
-    });
+    }
   }
 
   buildVPlans(*VPlan1, ElementCount::getFixed(1), MaxFactors.FixedVF, CM);
