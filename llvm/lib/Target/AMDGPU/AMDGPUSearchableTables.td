@@ -454,227 +454,98 @@ def GFX1250RepeatRateTable : GenericTable {
   let PrimaryKeyName = "getGFX1250RepeatRateInfo";
 }
 
-// RepeatRate = 32: F64 transcendentals
-foreach inst = !instances<Instruction>("^V_RCP_F64_e(32|64)$") in
+// RepeatRate = 32: F64 transcendentals and arithmetic
+foreach inst = !instances<Instruction>("V_(RCP|RSQ|SQRT)_F64_e(32|64)$") in
   def : GFX1250RepeatRateEntry<inst, 32>;
-foreach inst = !instances<Instruction>("^V_RSQ_F64_e(32|64)$") in
+foreach inst = !instances<Instruction>("V_(ADD|MUL|FMA)_F64_e64$") in
   def : GFX1250RepeatRateEntry<inst, 32>;
-foreach inst = !instances<Instruction>("^V_SQRT_F64_e(32|64)$") in
+foreach inst = !instances<Instruction>("V_DIV_(FIXUP|FMAS|SCALE)_F64_e64$") in
   def : GFX1250RepeatRateEntry<inst, 32>;
-
-// RepeatRate = 32: F64 arithmetic
-foreach inst = !instances<Instruction>("^V_ADD_F64_e64$") in
+foreach inst = !instances<Instruction>("V_LDEXP_F64_e64$") in
   def : GFX1250RepeatRateEntry<inst, 32>;
-foreach inst = !instances<Instruction>("^V_MUL_F64_e64$") in
+foreach inst = !instances<Instruction>("V_(MIN|MAX)_NUM_F64_e64$") in
   def : GFX1250RepeatRateEntry<inst, 32>;
-foreach inst = !instances<Instruction>("^V_FMA_F64_e64$") in
+foreach inst = !instances<Instruction>("V_(MIN|MAX)IMUM_F64_e64$") in
   def : GFX1250RepeatRateEntry<inst, 32>;
-foreach inst = !instances<Instruction>("^V_DIV_FIXUP_F64_e64$") in
+foreach inst = !instances<Instruction>("V_(FRACT|TRUNC|CEIL|RNDNE|FLOOR)_F64_e(32|64)$") in
   def : GFX1250RepeatRateEntry<inst, 32>;
-foreach inst = !instances<Instruction>("^V_DIV_FMAS_F64_e64$") in
+foreach inst = !instances<Instruction>("V_FREXP_(EXP_I32|MANT)_F64_e(32|64)$") in
   def : GFX1250RepeatRateEntry<inst, 32>;
-foreach inst = !instances<Instruction>("^V_DIV_SCALE_F64_e64$") in
-  def : GFX1250RepeatRateEntry<inst, 32>;
-foreach inst = !instances<Instruction>("^V_LDEXP_F64_e64$") in
-  def : GFX1250RepeatRateEntry<inst, 32>;
-foreach inst = !instances<Instruction>("^V_MIN_NUM_F64_e64$") in
-  def : GFX1250RepeatRateEntry<inst, 32>;
-foreach inst = !instances<Instruction>("^V_MAX_NUM_F64_e64$") in
-  def : GFX1250RepeatRateEntry<inst, 32>;
-foreach inst = !instances<Instruction>("^V_MINIMUM_F64_e64$") in
-  def : GFX1250RepeatRateEntry<inst, 32>;
-foreach inst = !instances<Instruction>("^V_MAXIMUM_F64_e64$") in
-  def : GFX1250RepeatRateEntry<inst, 32>;
-foreach inst = !instances<Instruction>("^V_FRACT_F64_e(32|64)$") in
-  def : GFX1250RepeatRateEntry<inst, 32>;
-foreach inst = !instances<Instruction>("^V_TRUNC_F64_e(32|64)$") in
-  def : GFX1250RepeatRateEntry<inst, 32>;
-foreach inst = !instances<Instruction>("^V_CEIL_F64_e(32|64)$") in
-  def : GFX1250RepeatRateEntry<inst, 32>;
-foreach inst = !instances<Instruction>("^V_RNDNE_F64_e(32|64)$") in
-  def : GFX1250RepeatRateEntry<inst, 32>;
-foreach inst = !instances<Instruction>("^V_FLOOR_F64_e(32|64)$") in
-  def : GFX1250RepeatRateEntry<inst, 32>;
-foreach inst = !instances<Instruction>("^V_FREXP_EXP_I32_F64_e(32|64)$") in
-  def : GFX1250RepeatRateEntry<inst, 32>;
-foreach inst = !instances<Instruction>("^V_FREXP_MANT_F64_e(32|64)$") in
-  def : GFX1250RepeatRateEntry<inst, 32>;
-foreach inst = !instances<Instruction>("^V_TRIG_PREOP_F64_e64$") in
+foreach inst = !instances<Instruction>("V_TRIG_PREOP_F64_e64$") in
   def : GFX1250RepeatRateEntry<inst, 32>;
 
 // RepeatRate = 32: F64 conversions
-foreach inst = !instances<Instruction>("^V_CVT_I32_F64_e(32|64)$") in
-  def : GFX1250RepeatRateEntry<inst, 32>;
-foreach inst = !instances<Instruction>("^V_CVT_F64_I32_e(32|64)$") in
-  def : GFX1250RepeatRateEntry<inst, 32>;
-foreach inst = !instances<Instruction>("^V_CVT_F32_F64_e(32|64)$") in
-  def : GFX1250RepeatRateEntry<inst, 32>;
-foreach inst = !instances<Instruction>("^V_CVT_F64_F32_e(32|64)$") in
-  def : GFX1250RepeatRateEntry<inst, 32>;
-foreach inst = !instances<Instruction>("^V_CVT_U32_F64_e(32|64)$") in
-  def : GFX1250RepeatRateEntry<inst, 32>;
-foreach inst = !instances<Instruction>("^V_CVT_F64_U32_e(32|64)$") in
+foreach inst = !instances<Instruction>("V_CVT_(I32_F64|F64_I32|F32_F64|F64_F32|U32_F64|F64_U32)_e(32|64)$") in
   def : GFX1250RepeatRateEntry<inst, 32>;
 
 // RepeatRate = 32: F64 comparisons
-foreach inst = !instances<Instruction>("^V_CMP_.*_F64_e(32|64)$") in
+foreach inst = !instances<Instruction>("V_CMP_.*_F64_e(32|64)$") in
   def : GFX1250RepeatRateEntry<inst, 32>;
 
 // RepeatRate = 32: 64-bit integer operations
-foreach inst = !instances<Instruction>("^V_MUL_U64_e32$") in
+foreach inst = !instances<Instruction>("V_MUL_U64_e32$") in
   def : GFX1250RepeatRateEntry<inst, 32>;
-foreach inst = !instances<Instruction>("^V_MAX_U64_e64$") in
-  def : GFX1250RepeatRateEntry<inst, 32>;
-foreach inst = !instances<Instruction>("^V_MAX_I64_e64$") in
-  def : GFX1250RepeatRateEntry<inst, 32>;
-foreach inst = !instances<Instruction>("^V_MIN_U64_e64$") in
-  def : GFX1250RepeatRateEntry<inst, 32>;
-foreach inst = !instances<Instruction>("^V_MIN_I64_e64$") in
+foreach inst = !instances<Instruction>("V_(MAX|MIN)_(U|I)64_e64$") in
   def : GFX1250RepeatRateEntry<inst, 32>;
 
-// RepeatRate = 2: F32 transcendentals
-foreach inst = !instances<Instruction>("^V_EXP_F32_e(32|64)$") in
+// RepeatRate = 2: F32/F16/BF16 transcendentals
+foreach inst = !instances<Instruction>("V_(EXP|LOG|RCP|RCP_IFLAG|RSQ|SQRT|SIN|COS|TANH)_F32_e(32|64)$") in
   def : GFX1250RepeatRateEntry<inst, 2>;
-foreach inst = !instances<Instruction>("^V_LOG_F32_e(32|64)$") in
+foreach inst = !instances<Instruction>("V_(EXP|LOG|RCP|RSQ|SQRT|SIN|COS|TANH)_F16_e(32|64)$") in
   def : GFX1250RepeatRateEntry<inst, 2>;
-foreach inst = !instances<Instruction>("^V_RCP_F32_e(32|64)$") in
-  def : GFX1250RepeatRateEntry<inst, 2>;
-foreach inst = !instances<Instruction>("^V_RCP_IFLAG_F32_e(32|64)$") in
-  def : GFX1250RepeatRateEntry<inst, 2>;
-foreach inst = !instances<Instruction>("^V_RSQ_F32_e(32|64)$") in
-  def : GFX1250RepeatRateEntry<inst, 2>;
-foreach inst = !instances<Instruction>("^V_SQRT_F32_e(32|64)$") in
-  def : GFX1250RepeatRateEntry<inst, 2>;
-foreach inst = !instances<Instruction>("^V_SIN_F32_e(32|64)$") in
-  def : GFX1250RepeatRateEntry<inst, 2>;
-foreach inst = !instances<Instruction>("^V_COS_F32_e(32|64)$") in
-  def : GFX1250RepeatRateEntry<inst, 2>;
-foreach inst = !instances<Instruction>("^V_TANH_F32_e(32|64)$") in
-  def : GFX1250RepeatRateEntry<inst, 2>;
-
-// RepeatRate = 2: F16 transcendentals
-foreach inst = !instances<Instruction>("^V_EXP_F16_e(32|64)$") in
-  def : GFX1250RepeatRateEntry<inst, 2>;
-foreach inst = !instances<Instruction>("^V_LOG_F16_e(32|64)$") in
-  def : GFX1250RepeatRateEntry<inst, 2>;
-foreach inst = !instances<Instruction>("^V_RCP_F16_e(32|64)$") in
-  def : GFX1250RepeatRateEntry<inst, 2>;
-foreach inst = !instances<Instruction>("^V_RSQ_F16_e(32|64)$") in
-  def : GFX1250RepeatRateEntry<inst, 2>;
-foreach inst = !instances<Instruction>("^V_SQRT_F16_e(32|64)$") in
-  def : GFX1250RepeatRateEntry<inst, 2>;
-foreach inst = !instances<Instruction>("^V_SIN_F16_e(32|64)$") in
-  def : GFX1250RepeatRateEntry<inst, 2>;
-foreach inst = !instances<Instruction>("^V_COS_F16_e(32|64)$") in
-  def : GFX1250RepeatRateEntry<inst, 2>;
-foreach inst = !instances<Instruction>("^V_TANH_F16_e(32|64)$") in
-  def : GFX1250RepeatRateEntry<inst, 2>;
-
-// RepeatRate = 2: BF16 transcendentals
-foreach inst = !instances<Instruction>("^V_EXP_BF16_e(32|64)$") in
-  def : GFX1250RepeatRateEntry<inst, 2>;
-foreach inst = !instances<Instruction>("^V_LOG_BF16_e(32|64)$") in
-  def : GFX1250RepeatRateEntry<inst, 2>;
-foreach inst = !instances<Instruction>("^V_RCP_BF16_e(32|64)$") in
-  def : GFX1250RepeatRateEntry<inst, 2>;
-foreach inst = !instances<Instruction>("^V_RSQ_BF16_e(32|64)$") in
-  def : GFX1250RepeatRateEntry<inst, 2>;
-foreach inst = !instances<Instruction>("^V_SQRT_BF16_e(32|64)$") in
-  def : GFX1250RepeatRateEntry<inst, 2>;
-foreach inst = !instances<Instruction>("^V_SIN_BF16_e(32|64)$") in
-  def : GFX1250RepeatRateEntry<inst, 2>;
-foreach inst = !instances<Instruction>("^V_COS_BF16_e(32|64)$") in
-  def : GFX1250RepeatRateEntry<inst, 2>;
-foreach inst = !instances<Instruction>("^V_TANH_BF16_e(32|64)$") in
+foreach inst = !instances<Instruction>("V_(EXP|LOG|RCP|RSQ|SQRT|SIN|COS|TANH)_BF16_e(32|64)$") in
   def : GFX1250RepeatRateEntry<inst, 2>;
 
 // RepeatRate = 2: 64-bit shifts, moves, comparisons
-foreach inst = !instances<Instruction>("^V_LSHLREV_B64_e64$") in
+foreach inst = !instances<Instruction>("V_(LSHLREV|LSHRREV)_B64_e64$") in
   def : GFX1250RepeatRateEntry<inst, 2>;
-foreach inst = !instances<Instruction>("^V_LSHRREV_B64_e64$") in
+foreach inst = !instances<Instruction>("V_ASHRREV_I64_e64$") in
   def : GFX1250RepeatRateEntry<inst, 2>;
-foreach inst = !instances<Instruction>("^V_ASHRREV_I64_e64$") in
+foreach inst = !instances<Instruction>("V_MOV_B64_e(32|64)$") in
   def : GFX1250RepeatRateEntry<inst, 2>;
-foreach inst = !instances<Instruction>("^V_MOV_B64_e(32|64)$") in
+foreach inst = !instances<Instruction>("V_LSHL_ADD_U64_e64$") in
   def : GFX1250RepeatRateEntry<inst, 2>;
-foreach inst = !instances<Instruction>("^V_LSHL_ADD_U64_e64$") in
+foreach inst = !instances<Instruction>("V_CMP_(EQ|LE|GE|NE)_(I|U)64_e(32|64)$") in
   def : GFX1250RepeatRateEntry<inst, 2>;
-foreach inst = !instances<Instruction>("^V_CMP_EQ_I64_e(32|64)$") in
-  def : GFX1250RepeatRateEntry<inst, 2>;
-foreach inst = !instances<Instruction>("^V_CMP_LE_I64_e(32|64)$") in
-  def : GFX1250RepeatRateEntry<inst, 2>;
-foreach inst = !instances<Instruction>("^V_CMP_GE_I64_e(32|64)$") in
-  def : GFX1250RepeatRateEntry<inst, 2>;
-foreach inst = !instances<Instruction>("^V_CMP_NE_I64_e(32|64)$") in
-  def : GFX1250RepeatRateEntry<inst, 2>;
-foreach inst = !instances<Instruction>("^V_CMP_EQ_U64_e(32|64)$") in
-  def : GFX1250RepeatRateEntry<inst, 2>;
-foreach inst = !instances<Instruction>("^V_CMP_LE_U64_e(32|64)$") in
-  def : GFX1250RepeatRateEntry<inst, 2>;
-foreach inst = !instances<Instruction>("^V_CMP_GE_U64_e(32|64)$") in
-  def : GFX1250RepeatRateEntry<inst, 2>;
-foreach inst = !instances<Instruction>("^V_CMP_NE_U64_e(32|64)$") in
-  def : GFX1250RepeatRateEntry<inst, 2>;
-foreach inst = !instances<Instruction>("^V_ADD_U64_e(32|64)$") in
+foreach inst = !instances<Instruction>("V_ADD_U64_e(32|64)$") in
   def : GFX1250RepeatRateEntry<inst, 2>;
 
 // RepeatRate = 2: SWAP and PERMLANE_SWAP instructions
-foreach inst = !instances<Instruction>("^V_SWAP_B32$") in
+foreach inst = !instances<Instruction>("V_SWAP_B(16|32)$") in
   def : GFX1250RepeatRateEntry<inst, 2>;
-foreach inst = !instances<Instruction>("^V_SWAP_B16$") in
+foreach inst = !instances<Instruction>("V_SWAPREL_B32$") in
   def : GFX1250RepeatRateEntry<inst, 2>;
-foreach inst = !instances<Instruction>("^V_SWAPREL_B32$") in
-  def : GFX1250RepeatRateEntry<inst, 2>;
-foreach inst = !instances<Instruction>("^V_PERMLANE32_SWAP_B32_e(32|64)$") in
-  def : GFX1250RepeatRateEntry<inst, 2>;
-foreach inst = !instances<Instruction>("^V_PERMLANE16_SWAP_B32_e(32|64)$") in
+foreach inst = !instances<Instruction>("V_PERMLANE(16|32)_SWAP_B32_e(32|64)$") in
   def : GFX1250RepeatRateEntry<inst, 2>;
 
 // RepeatRate = 4: Integer multiply
-foreach inst = !instances<Instruction>("^V_MUL_LO_U32_e64$") in
+foreach inst = !instances<Instruction>("V_MUL_(LO_U32|HI_U32|HI_I32)_e64$") in
   def : GFX1250RepeatRateEntry<inst, 4>;
-foreach inst = !instances<Instruction>("^V_MUL_HI_U32_e64$") in
+foreach inst = !instances<Instruction>("V_MAD_(U32|NC_U64_U32|NC_I64_I32)_e64$") in
   def : GFX1250RepeatRateEntry<inst, 4>;
-foreach inst = !instances<Instruction>("^V_MUL_HI_I32_e64$") in
+foreach inst = !instances<Instruction>("V_MAD_CO_(U64_U32|I64_I32)_e64_gfx12$") in
   def : GFX1250RepeatRateEntry<inst, 4>;
-foreach inst = !instances<Instruction>("^V_MAD_U32_e64$") in
+foreach inst = !instances<Instruction>("V_MQSAD_(PK_U16_U8|U32_U8)_e64$") in
   def : GFX1250RepeatRateEntry<inst, 4>;
-foreach inst = !instances<Instruction>("^V_MAD_NC_U64_U32_e64$") in
-  def : GFX1250RepeatRateEntry<inst, 4>;
-foreach inst = !instances<Instruction>("^V_MAD_NC_I64_I32_e64$") in
-  def : GFX1250RepeatRateEntry<inst, 4>;
-foreach inst = !instances<Instruction>("^V_MAD_CO_U64_U32_e64_gfx12$") in
-  def : GFX1250RepeatRateEntry<inst, 4>;
-foreach inst = !instances<Instruction>("^V_MAD_CO_I64_I32_e64_gfx12$") in
-  def : GFX1250RepeatRateEntry<inst, 4>;
-foreach inst = !instances<Instruction>("^V_QSAD_PK_U16_U8_e64$") in
-  def : GFX1250RepeatRateEntry<inst, 4>;
-foreach inst = !instances<Instruction>("^V_MQSAD_PK_U16_U8_e64$") in
-  def : GFX1250RepeatRateEntry<inst, 4>;
-foreach inst = !instances<Instruction>("^V_MQSAD_U32_U8_e64$") in
+foreach inst = !instances<Instruction>("V_QSAD_PK_U16_U8_e64$") in
   def : GFX1250RepeatRateEntry<inst, 4>;
 
 // RepeatRate = 4: CVT_SCALE_PK8 and PERM_PK16 instructions
-foreach inst = !instances<Instruction>("^V_CVT_SCALE_PK8_.*_e64$") in
+foreach inst = !instances<Instruction>("V_CVT_SCALE(F32)?_PK8_.*_e64$") in
   def : GFX1250RepeatRateEntry<inst, 4>;
-foreach inst = !instances<Instruction>("^V_CVT_SCALEF32_PK8_.*_e64$") in
+foreach inst = !instances<Instruction>("V_CVT_SCALEF32_SR_PK8_.*_e64$") in
   def : GFX1250RepeatRateEntry<inst, 4>;
-foreach inst = !instances<Instruction>("^V_CVT_SCALEF32_SR_PK8_.*_e64$") in
-  def : GFX1250RepeatRateEntry<inst, 4>;
-foreach inst = !instances<Instruction>("^V_PERM_PK16_.*_e64$") in
+foreach inst = !instances<Instruction>("V_PERM_PK16_.*_e64$") in
   def : GFX1250RepeatRateEntry<inst, 4>;
 
 // RepeatRate = 8: CVT_SCALE(F32)_PK16 instructions
-foreach inst = !instances<Instruction>("^V_CVT_SCALEF32_2XPK16_.*_e64$") in
+foreach inst = !instances<Instruction>("V_CVT_SCALEF32_(2X)?PK16_.*_e64$") in
   def : GFX1250RepeatRateEntry<inst, 8>;
-foreach inst = !instances<Instruction>("^V_CVT_SCALEF32_PK16_.*_e64$") in
+foreach inst = !instances<Instruction>("V_CVT_SCALEF32_SR_PK16_.*_e64$") in
   def : GFX1250RepeatRateEntry<inst, 8>;
-foreach inst = !instances<Instruction>("^V_CVT_SCALEF32_SR_PK16_.*_e64$") in
-  def : GFX1250RepeatRateEntry<inst, 8>;
-foreach inst = !instances<Instruction>("^V_CVT_SCALE_PK16_.*_e64$") in
+foreach inst = !instances<Instruction>("V_CVT_SCALE_PK16_.*_e64$") in
   def : GFX1250RepeatRateEntry<inst, 8>;
 
 // RepeatRate = 16: CVT_SCALEF32_PK32 instructions
-foreach inst = !instances<Instruction>("^V_CVT_SCALEF32_PK32_.*_e64$") in
+foreach inst = !instances<Instruction>("V_CVT_SCALEF32_PK32_.*_e64$") in
   def : GFX1250RepeatRateEntry<inst, 16>;
-  
