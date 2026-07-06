@@ -3918,6 +3918,30 @@ public:
     AnalyzedReductionVals.clear();
     AnalyzedMinBWVals.clear();
   }
+  /// Returns the subset of \p VL currently flagged as analyzed for minimal
+  /// bitwidth (see AnalyzedMinBWVals), see restrictAnalyzedMinBWVals().
+  SmallVector<Value *> getAnalyzedMinBWVals(ArrayRef<Value *> VL) const {
+    SmallVector<Value *> Res;
+    for (Value *V : VL)
+      if (AnalyzedMinBWVals.contains(V))
+        Res.push_back(V);
+    return Res;
+  }
+  /// Clears the minimal-bitwidth-analyzed flag (see AnalyzedMinBWVals) for
+  /// every value in \p VL except those listed in \p Keep. Used to undo the
+  /// bookkeeping a speculative, later-rejected buildTree/
+  /// computeMinimumValueSizes attempt performed for its own top-level
+  /// candidates \p VL (e.g. probing a non-power-of-2 reduction width), so a
+  /// subsequent, differently-shaped attempt within the same reduction
+  /// search is not blocked from analyzing them. Values in \p VL that were
+  /// already flagged before the speculative attempt (passed in \p Keep)
+  /// are left untouched, since that flag was not set by this attempt.
+  void restrictAnalyzedMinBWVals(ArrayRef<Value *> VL, ArrayRef<Value *> Keep) {
+    SmallPtrSet<Value *, 8> KeepSet(llvm::from_range, Keep);
+    for (Value *V : VL)
+      if (!KeepSet.contains(V))
+        AnalyzedMinBWVals.erase(V);
+  }
   /// Checks if the given value is gathered in one of the nodes.
   bool isAnyGathered(const SmallDenseSet<Value *> &Vals) const {
     return any_of(MustGather, [&](Value *V) { return Vals.contains(V); });
@@ -7478,6 +7502,47 @@ isMaskedLoadCompress(ArrayRef<Value *> VL, ArrayRef<Value *> PointerOps,
                               CompressMask, LoadVecTy);
 }
 
+/// Checks if a consecutive run of \p NumElts stores of \p ScalarTy can be
+/// lowered as a single masked store into the next full/legal vector width,
+/// with the padding lanes masked off; this can be cheaper than a direct
+/// odd-width vector store. On success \p StoreVecTy is the padded vector type
+/// and \p ReuseShuffleIndices places each stored value at its lane, poison in
+/// the padding.
+static bool isMaskedStoreExpand(unsigned NumElts, Type *ScalarTy,
+                                ArrayRef<unsigned> Order, unsigned AS,
+                                const TargetTransformInfo &TTI,
+                                Align CommonAlignment,
+                                SmallVectorImpl<int> &ReuseShuffleIndices,
+                                FixedVectorType *&StoreVecTy) {
+  if (has_single_bit(NumElts) ||
+      (!ScalarTy->isIntOrPtrTy() && !ScalarTy->isFloatingPointTy()))
+    return false;
+  const unsigned PaddedElts =
+      getFullVectorNumberOfElements(TTI, ScalarTy, NumElts);
+  if (PaddedElts <= NumElts)
+    return false;
+  auto *PaddedVecTy =
+      cast<FixedVectorType>(getWidenedType(ScalarTy, PaddedElts));
+  if (!TTI.isLegalMaskedStore(PaddedVecTy, CommonAlignment, AS,
+                              TTI::ConstantMask))
+    return false;
+  constexpr TTI::TargetCostKind CostKind = TTI::TCK_RecipThroughput;
+  InstructionCost DirectCost =
+      TTI.getMemoryOpCost(Instruction::Store, getWidenedType(ScalarTy, NumElts),
+                          CommonAlignment, AS, CostKind);
+  InstructionCost ExpandCost = TTI.getMemIntrinsicInstrCost(
+      MemIntrinsicCostAttributes(Intrinsic::masked_store, PaddedVecTy,
+                                 CommonAlignment, AS),
+      CostKind);
+  if (ExpandCost > DirectCost)
+    return false;
+  StoreVecTy = PaddedVecTy;
+  ReuseShuffleIndices.assign(PaddedElts, PoisonMaskElem);
+  for (unsigned I : seq<unsigned>(NumElts))
+    ReuseShuffleIndices[I] = static_cast<int>(Order.empty() ? I : Order[I]);
+  return true;
+}
+
 /// Checks if the stores \p VL with pointers \p PointerOps can be lowered as a
 /// single masked store. On success \p StoreVecTy is the widened store type and
 /// \p ReuseShuffleIndices is the expand mask that places each stored value at
@@ -10231,10 +10296,8 @@ void BoUpSLP::tryToVectorizeGatheredLoads(
          NumElts > 1; NumElts = getFloorFullVectorNumberOfElements(
                           *TTI, Loads.front()->getType(), NumElts - 1)) {
       CandidateVFs.push_back(NumElts);
-      // Gate the NumElts - 1 non-power-of-2 candidate through the unified
-      // isAllowedNonPowerOf2VF policy: otherwise widths such as 9 (when
-      // NumElts == 10) would be probed even though every other path rejects
-      // them, wasting compile time without ever producing a profitable tree.
+      // Filter NumElts - 1 through isAllowedNonPowerOf2VF too, otherwise
+      // widths like 9 (from NumElts == 10) get probed for nothing.
       if (NumElts > 2 && isAllowedNonPowerOf2VF(NumElts - 1, IsVectorElement))
         CandidateVFs.push_back(NumElts - 1);
     }
@@ -11278,40 +11341,18 @@ BoUpSLP::TreeEntry::EntryState BoUpSLP::getScalarsVectorizationState(
           getPointersDiff(ScalarTy, Ptr0, ScalarTy, PtrN, *DL, *SE);
       // Check that the sorted pointer operands are consecutive.
       if (static_cast<uint64_t>(*Dist) == VL.size() - 1) {
-        const unsigned NumElts = VL.size();
         // A non-power-of-2 run is sometimes cheaper to store as a masked
         // store into the next full/legal vector width (padding lanes are
-        // simply masked off) than as a direct odd-width vector store. Try
-        // that alternative and use it only if the target's cost model
-        // actually prefers it over the plain vector store.
-        if (EnableMaskedStores && !has_single_bit(NumElts) &&
-            (ScalarTy->isIntOrPtrTy() || ScalarTy->isFloatingPointTy())) {
-          const unsigned PaddedElts =
-              getFullVectorNumberOfElements(*TTI, ScalarTy, NumElts);
-          if (PaddedElts > NumElts) {
-            const unsigned AS = cast<StoreInst>(VL0)->getPointerAddressSpace();
-            auto *PaddedVecTy =
-                cast<FixedVectorType>(getWidenedType(ScalarTy, PaddedElts));
-            if (TTI->isLegalMaskedStore(PaddedVecTy, CommonAlignment, AS,
-                                        TTI::ConstantMask)) {
-              constexpr TTI::TargetCostKind CostKind = TTI::TCK_RecipThroughput;
-              InstructionCost DirectCost = TTI->getMemoryOpCost(
-                  Instruction::Store, getWidenedType(ScalarTy, NumElts),
-                  CommonAlignment, AS, CostKind);
-              InstructionCost ExpandCost = TTI->getMemIntrinsicInstrCost(
-                  MemIntrinsicCostAttributes(Intrinsic::masked_store,
-                                             PaddedVecTy, CommonAlignment, AS),
-                  CostKind);
-              if (ExpandCost <= DirectCost) {
-                ReuseShuffleIndices.assign(PaddedElts, PoisonMaskElem);
-                for (unsigned I : seq<unsigned>(NumElts))
-                  ReuseShuffleIndices[I] = static_cast<int>(
-                      CurrentOrder.empty() ? I : CurrentOrder[I]);
-                SPtrInfo.Ty = PaddedVecTy;
-                return TreeEntry::ExpandVectorize;
-              }
-            }
-          }
+        // simply masked off) than as a direct odd-width vector store; see
+        // isMaskedStoreExpand.
+        FixedVectorType *PaddedVecTy = nullptr;
+        if (EnableMaskedStores &&
+            isMaskedStoreExpand(VL.size(), ScalarTy, CurrentOrder,
+                                cast<StoreInst>(VL0)->getPointerAddressSpace(),
+                                *TTI, CommonAlignment, ReuseShuffleIndices,
+                                PaddedVecTy)) {
+          SPtrInfo.Ty = PaddedVecTy;
+          return TreeEntry::ExpandVectorize;
         }
         return TreeEntry::Vectorize;
       }
@@ -11954,12 +11995,12 @@ class InstructionsCompatibilityAnalysis {
   /// elements.
   static bool isSupportedOpcode(const unsigned Opcode) {
     return Opcode == Instruction::Add || Opcode == Instruction::Sub ||
-           Opcode == Instruction::LShr || Opcode == Instruction::Shl ||
-           Opcode == Instruction::SDiv || Opcode == Instruction::UDiv ||
-           Opcode == Instruction::And || Opcode == Instruction::Or ||
-           Opcode == Instruction::Xor || Opcode == Instruction::FAdd ||
-           Opcode == Instruction::FSub || Opcode == Instruction::FMul ||
-           Opcode == Instruction::FDiv;
+           Opcode == Instruction::Mul || Opcode == Instruction::LShr ||
+           Opcode == Instruction::Shl || Opcode == Instruction::SDiv ||
+           Opcode == Instruction::UDiv || Opcode == Instruction::And ||
+           Opcode == Instruction::Or || Opcode == Instruction::Xor ||
+           Opcode == Instruction::FAdd || Opcode == Instruction::FSub ||
+           Opcode == Instruction::FMul || Opcode == Instruction::FDiv;
   }
 
   /// Identifies the best candidate value, which represents main opcode
@@ -12581,6 +12622,7 @@ public:
       switch (MainOpcode) {
       case Instruction::Add:
       case Instruction::Sub:
+      case Instruction::Mul:
       case Instruction::LShr:
       case Instruction::Shl:
       case Instruction::SDiv:
@@ -27882,10 +27924,8 @@ SLPVectorizerPass::vectorizeStoreChain(ArrayRef<Value *> Chain, BoUpSLP &R,
           VF) ||
       VF < 2 || VF < MinVF) {
     // Check if vectorizing with a non-power-of-2 VF should be considered; see
-    // isAllowedNonPowerOf2VF for supported widths. Preserve the original
-    // VF + 1 == MinVF exception (chain length is one less than the
-    // power-of-two MinVF) so that near-power-of-two non-power-of-2 chains
-    // remain reachable, matching main behavior.
+    // isAllowedNonPowerOf2VF. Keep the legacy VF + 1 == MinVF exception so
+    // chains one short of a power-of-two MinVF stay reachable.
     if (!VectorizeNonPowerOf2 || (VF < MinVF && VF + 1 != MinVF))
       return false;
   }
@@ -30114,14 +30154,11 @@ public:
       if (isAllowedNonPowerOf2VF(
               ReduxWidth,
               isa<FixedVectorType>(Candidates.front()->getType()))) {
-        // For a 5-wide reduction merged from two groups (4 elements plus a
-        // single trailing value) via copyable analysis, refuse the non-power
-        // of-2 width when the lone trailing value does not fit the main-op
-        // operand pattern. Such a mismatch makes a 5-wide vector wasteful
-        // compared to a 4-wide + scalar tail.
-        // Check across all candidates in the full-register portion, not only
-        // getMainOp(), to handle copyable groups whose members may have
-        // structurally different operands.
+        // Refuse a 5-wide copyable-merged reduction (4 elements plus a
+        // trailing value) when the trailing value's operands do not match
+        // any candidate in the full-register portion: a 4-wide vector plus
+        // scalar tail is cheaper then. Check all candidates, not just
+        // getMainOp(), since copyable members can differ structurally.
         auto LoneValueMismatchesMainOpOperands = [&]() {
           Value *LastVal = ReducedVals.back().back();
           auto CandSlice = ArrayRef(Candidates).take_front(FullRegReduxWidth);
@@ -30264,6 +30301,12 @@ public:
           }
         }
         V.transformNodes();
+        // This width/position is speculative: it may be rejected below on
+        // cost, in which case computeMinimumValueSizes() must not leave
+        // behind bookkeeping for VL that would suppress minimal-bitwidth
+        // analysis for a later, differently-shaped attempt over
+        // overlapping values (see restrictAnalyzedMinBWVals()).
+        SmallVector<Value *> AnalyzedMinBWValsInVL = V.getAnalyzedMinBWVals(VL);
         V.computeMinimumValueSizes();
         InstructionCost TreeCost = V.calculateTreeCostAndTrimNonProfitable(VL);
 
@@ -30317,9 +30360,12 @@ public:
             V.getTreeCost(TreeCost, VL, ReductionCost, InsertPt);
         LLVM_DEBUG(dbgs() << "SLP: Found cost = " << Cost
                           << " for reduction\n");
-        if (!Cost.isValid())
+        if (!Cost.isValid()) {
+          V.restrictAnalyzedMinBWVals(VL, AnalyzedMinBWValsInVL);
           break;
+        }
         if (Cost >= -SLPCostThreshold) {
+          V.restrictAnalyzedMinBWVals(VL, AnalyzedMinBWValsInVL);
           V.getORE()->emit([&]() {
             return OptimizationRemarkMissed(SV_NAME, "HorSLPNotBeneficial",
                                             ReducedValsToOps.at(VL[0]).front())
@@ -30724,6 +30770,12 @@ public:
       }
 
       V.transformNodes();
+      // This window is speculative: it may be rejected below on cost, in
+      // which case computeMinimumValueSizes() must not leave behind
+      // bookkeeping for VL that would suppress minimal-bitwidth analysis
+      // for a later, differently-sized window over overlapping values
+      // (see restrictAnalyzedMinBWVals()).
+      SmallVector<Value *> AnalyzedMinBWValsInVL = V.getAnalyzedMinBWVals(VL);
       V.computeMinimumValueSizes();
       InstructionCost TreeCost =
           V.calculateTreeCostAndTrimNonProfitable(VL, RdxRootInst);
@@ -30738,6 +30790,7 @@ public:
                         << " for ordered reduction\n");
       if (Cost > -SLPCostThreshold/* ||
           (Cost == -SLPCostThreshold && V.getTreeSize() > 1)*/) {
+        V.restrictAnalyzedMinBWVals(VL, AnalyzedMinBWValsInVL);
         if (Cost.isValid())
           V.getORE()->emit([&]() {
             return OptimizationRemarkMissed(SV_NAME, "HorSLPNotBeneficial",
@@ -30773,9 +30826,8 @@ public:
     // try front-anchored [0, W) then back-anchored [N-W, N).
     unsigned N = Candidates.size();
     ReduxWidth = N;
-    // Mirror the associative reduction width policy: keep the original width
-    // when it is a supported non-power-of-2 VF (3, 5, 6, 7, 10..14, ...) so
-    // that ordered reductions do not floor widths the associative path keeps.
+    // Mirror the associative-reduction width policy (isAllowedNonPowerOf2VF)
+    // so ordered reductions do not floor widths the associative path keeps.
     if (!isAllowedNonPowerOf2VF(
             ReduxWidth, isa<FixedVectorType>(Candidates.front()->getType())))
       ReduxWidth = GetVectorFactor(ReduxWidth);
@@ -31884,6 +31936,9 @@ bool SLPVectorizerPass::tryToVectorize(
   // Vectorize in current basic block only.
   auto *Op0 = dyn_cast<Instruction>(I->getOperand(0));
   auto *Op1 = dyn_cast<Instruction>(I->getOperand(1));
+  // A duplicate or load/extractvalue operand rarely makes a profitable pair;
+  // skip it unless a negative cost threshold forces non-profitable
+  // vectorization.
   if (!Op0 || !Op1 || Op0->getParent() != P || Op1->getParent() != P ||
       R.isDeleted(Op0) || R.isDeleted(Op1) ||
       ((Op0 == Op1 || isa<LoadInst, ExtractValueInst>(Op0) ||
