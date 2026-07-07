@@ -24,7 +24,6 @@
 #include "llvm/Support/WithColor.h"
 #include "llvm/Support/raw_ostream.h"
 #include <cmath>
-#include <map>
 using namespace llvm;
 
 static cl::extrahelp FileCheckOptsEnv(
@@ -426,16 +425,17 @@ static std::string GetCheckTypeAbbreviation(Check::FileCheckType Ty) {
   llvm_unreachable("unknown FileCheckType");
 }
 
+template <> struct DenseMapInfo<SMLoc> {
+  static unsigned getHashValue(const SMLoc &Loc) {
+    return DenseMapInfo<const char *>::getHashValue(Loc.getPointer());
+  }
+  static bool isEqual(const SMLoc &LHS, SMLoc &RHS) { return LHS == RHS; }
+};
+
 namespace {
 /// Stores all information needed to generate \c InputAnnotation labels.
 class InputAnnotationLabeler {
 private:
-  struct CompareSMLoc {
-    bool operator()(SMLoc LHS, SMLoc RHS) const {
-      return LHS.getPointer() < RHS.getPointer();
-    }
-  };
-
   const SourceMgr &SM;
   const unsigned CheckFileBufferID;
   const std::pair<unsigned, unsigned> ImpPatBufferIDRange;
@@ -445,11 +445,11 @@ private:
   /// by a series of zero or more \c MatchNoteDiag's.  Each such
   /// \c MatchResultDiag and its \c MatchNoteDiag series can require multiple
   /// labels.
-  std::map<SMLoc, unsigned, CompareSMLoc> LabelCountPerPattern;
+  DenseMap<SMLoc, unsigned> LabelCountPerPattern;
   /// For each check pattern, how many labels have we generated so far?
-  std::map<SMLoc, unsigned, CompareSMLoc> LabelIndexPerPattern;
+  DenseMap<SMLoc, unsigned> LabelIndexPerPattern;
   /// For each check pattern, what is the common prefix for all its labels?
-  std::map<SMLoc, std::string, CompareSMLoc> LabelPrefixPerPattern;
+  DenseMap<SMLoc, std::string> LabelPrefixPerPattern;
   /// How many total labels have we generated so far over all check patterns?
   unsigned LabelIndexGlobal;
   /// The widest label generated so far over all check patterns.
