@@ -2024,15 +2024,12 @@ bool GVNPass::performLoopLoadPRE(LoadInst *Load,
   // the reload only runs on the path that feeds the header.
   BasicBlock *InsertBlock = LoopBlock;
   if (LoopBlock->getTerminator()->getNumSuccessors() != 1) {
-    if (isa<IndirectBrInst>(LoopBlock->getTerminator()))
-      return false;
-
     BasicBlock *InLoopSucc = nullptr;
     for (BasicBlock *Succ : successors(LoopBlock)) {
       if (!L->contains(Succ))
         continue;
-      // Bail if there is more than one in-loop successor: it is unclear which
-      // edge feeds the header.
+      // Bail if there is more than one in-loop successor: it is then unclear
+      // which edge carries the value back to the header.
       if (InLoopSucc)
         return false;
       InLoopSucc = Succ;
@@ -2040,12 +2037,11 @@ bool GVNPass::performLoopLoadPRE(LoadInst *Load,
     if (!InLoopSucc)
       return false;
 
-    // Do not split a backedge unless explicitly enabled; it would break
-    // canonical loop form.
-    if (!isLoadPRESplitBackedgeEnabled() &&
-        DT->dominates(InLoopSucc, LoopBlock))
-      return false;
-
+    // splitCriticalEdges() returns nullptr for edges it cannot split, e.g. an
+    // indirectbr terminator or an EH-pad successor; bail out in that case. The
+    // in-loop successor cannot be a backedge target here: LoopBlock does not
+    // dominate the latch, and a single-latch loop only has the latch->header
+    // backedge, so no critical loop backedge is split.
     InsertBlock = splitCriticalEdges(LoopBlock, InLoopSucc);
     if (!InsertBlock)
       return false;

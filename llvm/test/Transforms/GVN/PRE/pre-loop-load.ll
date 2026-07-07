@@ -582,6 +582,65 @@ cold_exit:
   ret i32 -1
 }
 
+; Not PRE'd: the cold path has more than one in-loop successor, so it is unclear
+; which edge carries the reloaded value back to the header. The pointer cannot
+; be freed (nofree function), so freeability is not the blocker here.
+define i32 @test_load_on_cold_path_multi_inloop_succ(ptr %p) nofree {
+; CHECK-LABEL: @test_load_on_cold_path_multi_inloop_succ(
+; CHECK-NEXT:  entry:
+; CHECK-NEXT:    br label [[LOOP:%.*]]
+; CHECK:       loop:
+; CHECK-NEXT:    [[IV:%.*]] = phi i32 [ 0, [[ENTRY:%.*]] ], [ [[IV_NEXT:%.*]], [[BACKEDGE:%.*]] ]
+; CHECK-NEXT:    [[X:%.*]] = load i32, ptr [[P:%.*]], align 4
+; CHECK-NEXT:    [[COND:%.*]] = icmp ne i32 [[X]], 0
+; CHECK-NEXT:    br i1 [[COND]], label [[HOT_PATH:%.*]], label [[COLD_PATH:%.*]]
+; CHECK:       hot_path:
+; CHECK-NEXT:    br label [[BACKEDGE]]
+; CHECK:       cold_path:
+; CHECK-NEXT:    [[SIDE_COND:%.*]] = call i1 @side_effect_cond() #[[ATTR0]]
+; CHECK-NEXT:    br i1 [[SIDE_COND]], label [[COLD_SUCC_A:%.*]], label [[COLD_SUCC_B:%.*]]
+; CHECK:       cold_succ_a:
+; CHECK-NEXT:    br label [[BACKEDGE]]
+; CHECK:       cold_succ_b:
+; CHECK-NEXT:    br label [[BACKEDGE]]
+; CHECK:       backedge:
+; CHECK-NEXT:    [[IV_NEXT]] = add i32 [[IV]], [[X]]
+; CHECK-NEXT:    [[LOOP_COND:%.*]] = icmp ult i32 [[IV_NEXT]], 1000
+; CHECK-NEXT:    br i1 [[LOOP_COND]], label [[LOOP]], label [[EXIT:%.*]]
+; CHECK:       exit:
+; CHECK-NEXT:    ret i32 [[X]]
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i32 [ 0, %entry], [%iv.next, %backedge]
+  %x = load i32, ptr %p
+  %cond = icmp ne i32 %x, 0
+  br i1 %cond, label %hot_path, label %cold_path
+
+hot_path:
+  br label %backedge
+
+cold_path:
+  %side_cond = call i1 @side_effect_cond() nofree
+  br i1 %side_cond, label %cold_succ_a, label %cold_succ_b
+
+cold_succ_a:
+  br label %backedge
+
+cold_succ_b:
+  br label %backedge
+
+backedge:
+  %iv.next = add i32 %iv, %x
+  %loop.cond = icmp ult i32 %iv.next, 1000
+  br i1 %loop.cond, label %loop, label %exit
+
+exit:
+  ret i32 %x
+}
+
 ; Make sure we do not insert load into both cold path & backedge.
 define i32 @test_load_on_cold_path_and_backedge(ptr %p) {
 ; CHECK-LABEL: @test_load_on_cold_path_and_backedge(
