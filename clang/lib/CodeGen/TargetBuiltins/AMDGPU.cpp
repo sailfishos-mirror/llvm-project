@@ -1905,6 +1905,7 @@ Value *CodeGenFunction::EmitAMDGPUBuiltinExpr(unsigned BuiltinID,
     FenceInst *Fence = Builder.CreateFence(AO, SSID);
     if (E->getNumArgs() > 2)
       AddAMDGPUFenceAddressSpaceMMRA(Fence, E);
+    getTargetHooks().setTargetAtomicMetadata(*this, *Fence);
     return Fence;
   }
   case AMDGPU::BI__builtin_amdgcn_atomic_inc32:
@@ -2017,6 +2018,9 @@ Value *CodeGenFunction::EmitAMDGPUBuiltinExpr(unsigned BuiltinID,
         Builder.CreateAtomicRMW(BinOp, Ptr, Val, AO, SSID);
     if (Volatile)
       RMW->setVolatile(true);
+    if (!AMDGCNAVMode.empty()) {
+      llvm::MMRAMetadata::appendTags(*RMW, {{"amdgcn-av", AMDGCNAVMode}});
+    }
 
     unsigned AddrSpace = Ptr.getType()->getAddressSpace();
     if (AddrSpace != llvm::AMDGPUAS::LOCAL_ADDRESS) {
