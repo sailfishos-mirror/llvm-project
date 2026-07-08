@@ -493,7 +493,7 @@ static unsigned computeSlotsMissed(const RegionMixInfo &MixInfo, SUnit *RepSU,
     for (unsigned F = 0;
          F < static_cast<unsigned>(InstructionFlavor::NUM_FLAVORS) && !Filled;
          ++F) {
-      if ((Mask & flavorBit(static_cast<InstructionFlavor>(F))) &&
+      if ((Mask & flavorToCoExecMask(static_cast<InstructionFlavor>(F))) &&
           TryConsume(static_cast<InstructionFlavor>(F))) {
         Filled = true;
         break;
