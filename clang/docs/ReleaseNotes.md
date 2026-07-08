@@ -1211,6 +1211,8 @@ latest release, please see the [Clang Web Site](https://clang.llvm.org) or the
   (e.g. `std::complex`). The private copy is now initialized to the
   multiplicative identity instead of being value-initialized, which previously
   produced a wrong result (the product collapsed to the additive identity).
+- Added parsing and semantic support for `dims` modifier in `num_teams` and
+  `thread_limit` clauses when OpenMP >= 61.
 
 ### SYCL Support
 
