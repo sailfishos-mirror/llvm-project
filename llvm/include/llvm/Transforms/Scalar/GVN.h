@@ -322,6 +322,24 @@ private:
   // List of critical edges to be split between iterations.
   SmallVector<std::pair<Instruction *, unsigned>, 4> ToSplit;
 
+  // A pair of instructions with the same value number to be hoisted and merged,
+  // together with their respective hoist barriers. A pair of insructions can be
+  // hoisted iff both their barriers (if not null) are hoisted as well. The
+  // `WeakVH` is used to track when the barrier instruction itself is hoisted.
+  struct HoistPair {
+    Instruction *ThenI = nullptr;
+    Instruction *ThenB = nullptr;
+    Instruction *ElseI = nullptr;
+    WeakVH ElseB = nullptr;
+  };
+  
+  /// A mapping from value numbers to a pair of instructions. This map
+  /// stores pairs of instructions with the same value number, from two blocks
+  /// having a single common predecessor, for the duration of a single top level
+  /// iteration in `performHoist`.
+  using HoistMap = DenseMap<uint32_t,  HoistPair>;
+  HoistMap HoistPairs;
+
 public:
   GVNPass(GVNOptions Options = {}) : Options(Options) {}
 
@@ -506,6 +524,13 @@ private:
                                  BasicBlock *Curr, unsigned int ValNo);
   bool performScalarPRE(Instruction *I);
   bool performPRE(Function &F);
+
+  void collectHoistCandidates(BasicBlock *ThenBB);
+  void matchHoistCandidates(BasicBlock *ElseBB);
+  void replaceInstruction(Instruction *I, Instruction *Repl);
+  std::pair<bool, bool> hoistPair(BasicBlock *DestBB, BasicBlock *ThenBB,
+                                  BasicBlock *ElseBB, Instruction *ThenI);
+  bool performHoist(Function &F);
 
   /// Main entry point for the GVN pass. Also used by the GVNLegacyPass.
   bool runImpl(Function &F, AssumptionCache &RunAC, DominatorTree &RunDT,
