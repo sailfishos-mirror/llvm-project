@@ -2379,6 +2379,13 @@ bool SIInsertWaitcnts::generateWaitcntInstBefore(
     if (TII.isAlwaysGDS(Opc) && ScoreBrackets.hasPendingGDS())
       Wait.add(AMDGPU::DS_CNT, ScoreBrackets.getPendingGDSWait());
 
+    // LDS-to-global DMA instructions read from LDS through a non-DS engine.
+    // If they immediately follow DS writes, the tensor/global async engine can
+    // otherwise consume LDS before the producer stores have completed.
+    if (SIInstrInfo::mayReadLDSThroughDMA(MI) &&
+        ScoreBrackets.hasPendingEvent(AMDGPU::DS_CNT))
+      Wait.set(AMDGPU::DS_CNT, 0);
+
     if (MI.isCall()) {
       // The function is going to insert a wait on everything in its prolog.
       // This still needs to be careful if the call target is a load (e.g. a GOT

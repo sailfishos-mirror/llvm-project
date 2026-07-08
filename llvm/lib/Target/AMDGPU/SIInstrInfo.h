@@ -878,6 +878,13 @@ public:
            Opc != AMDGPU::TENSOR_STORE_FROM_LDS_d4;
   }
 
+  static bool mayReadLDSThroughDMA(const MachineInstr &MI) {
+    unsigned Opc = MI.getOpcode();
+    return Opc == AMDGPU::BUFFER_STORE_LDS_DWORD ||
+           Opc == AMDGPU::TENSOR_STORE_FROM_LDS_d2 ||
+           Opc == AMDGPU::TENSOR_STORE_FROM_LDS_d4;
+  }
+
   static bool isSBarrierSCCWrite(unsigned Opcode) {
     return Opcode == AMDGPU::S_BARRIER_LEAVE ||
            Opcode == AMDGPU::S_BARRIER_SIGNAL_ISFIRST_IMM ||
