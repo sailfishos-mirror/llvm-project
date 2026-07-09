@@ -2362,10 +2362,11 @@ static unsigned EstimateFunctionSizeInBytes(const MachineFunction &MF,
   // update sp for variadic functions (2 bytes)
   // + push registers (maybe high ones by copying them down, up to 14 bytes)
   // + frame pointer (might use r11, requiring pushing it first, 6 bytes)
-  // + stack update (up to 6 bytes)
+  // + stack update (up to 12 bytes if a constant load is needed and a branch
+  //   required later to skip the constant)
   // + stack realignment (8)
   // + make base pointer (2).
-  FnSize += 0x38;
+  FnSize += 0x2c;
 
   for (auto &MBB : MF) {
     bool seenBranch = false, seenConstantLoad = false;
