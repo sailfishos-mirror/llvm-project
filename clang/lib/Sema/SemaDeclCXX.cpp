@@ -18141,7 +18141,7 @@ DeclResult Sema::ActOnTemplatedFriendTag(
       return CheckClassTemplate(S, TagSpec, TagUseKind::Friend, TagLoc, SS,
                                 Name, NameLoc, Attr, TemplateParams, AS_public,
                                 /*ModulePrivateLoc=*/SourceLocation(),
-                                FriendLoc, TempParamLists.size() - 1,
+                                FriendLoc, TempParamLists.size(),
                                 TempParamLists.data(), IsMemberSpecialization)
           .get();
     } else {

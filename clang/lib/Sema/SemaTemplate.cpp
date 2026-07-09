@@ -3221,7 +3221,7 @@ TemplateParameterList *Sema::MatchTemplateParametersToScopeSpecifier(
 
   // Return the last template parameter list, which corresponds to the
   // entity being declared.
-  return ParamLists.back();
+  return ParamLists.consume_back();
 }
 
 void Sema::NoteAllFoundTemplates(TemplateName Name) {
@@ -4382,8 +4382,8 @@ void Sema::CheckDeductionGuideTemplate(FunctionTemplateDecl *TD) {
 
 DeclResult Sema::ActOnVarTemplateSpecialization(
     Scope *S, Declarator &D, TypeSourceInfo *TSI, LookupResult &Previous,
-    SourceLocation TemplateKWLoc, TemplateParameterList *TemplateParams,
-    StorageClass SC, bool IsPartialSpecialization) {
+    TemplateParameterList *TemplateParams, StorageClass SC,
+    bool IsPartialSpecialization) {
   // D must be variable template id.
   assert(D.getName().getKind() == UnqualifiedIdKind::IK_TemplateId &&
          "Variable template specialization is declared with a template id.");
@@ -4506,8 +4506,9 @@ DeclResult Sema::ActOnVarTemplateSpecialization(
         cast_or_null<VarTemplatePartialSpecializationDecl>(PrevDecl);
     VarTemplatePartialSpecializationDecl *Partial =
         VarTemplatePartialSpecializationDecl::Create(
-            Context, VarTemplate->getDeclContext(), TemplateKWLoc,
-            TemplateNameLoc, TemplateParams,
+            Context, VarTemplate->getDeclContext(),
+            /*StartLoc=*/TemplateParams->getTemplateLoc(), TemplateNameLoc,
+            TemplateParams,
             ASTTemplateArgumentListInfo::Create(Context, TemplateArgs),
             VarTemplate, TSI->getType(), TSI, SC, CTAI.CanonicalConverted);
 
@@ -4520,7 +4521,8 @@ DeclResult Sema::ActOnVarTemplateSpecialization(
     // Create a new class template specialization declaration node for
     // this explicit specialization or friend declaration.
     Specialization = VarTemplateSpecializationDecl::Create(
-        Context, VarTemplate->getDeclContext(), TemplateKWLoc, TemplateNameLoc,
+        Context, VarTemplate->getDeclContext(),
+        /*StartLoc=*/TemplateParams->getTemplateLoc(), TemplateNameLoc,
         VarTemplate, TSI->getType(), TSI, SC, CTAI.CanonicalConverted);
     Specialization->setExplicitSpecializationInfo(
         TemplateParams,
@@ -9010,7 +9012,7 @@ DeclResult Sema::ActOnClassTemplateSpecialization(
           S, TagSpec, TUK, KWLoc, SS, ClassTemplate->getIdentifier(),
           TemplateNameLoc, Attr, TemplateParams, AS_none,
           /*ModulePrivateLoc=*/SourceLocation(),
-          /*FriendLoc*/ SourceLocation(), TemplateParameterLists.size() - 1,
+          /*FriendLoc=*/SourceLocation(), TemplateParameterLists.size(),
           TemplateParameterLists.data(), isMemberSpecialization);
     }
 
@@ -9034,10 +9036,9 @@ DeclResult Sema::ActOnClassTemplateSpecialization(
   }
 
   SetNestedNameSpecifier(*this, Specialization, SS);
-  if (TemplateParameterLists.size() > 1 && SS.isSet()) {
-    Specialization->setTemplateParameterListsInfo(
-        Context, TemplateParameterLists.drop_back(1));
-  }
+  if (!TemplateParameterLists.empty())
+    Specialization->setTemplateParameterListsInfo(Context,
+                                                  TemplateParameterLists);
 
   if (isPartialSpecialization)
     CheckTemplatePartialSpecialization(

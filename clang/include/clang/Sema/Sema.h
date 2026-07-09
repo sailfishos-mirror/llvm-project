@@ -11857,10 +11857,11 @@ public:
       SourceLocation TemplateLoc, SourceLocation LAngleLoc,
       ASTTemplateArgsPtr TemplateArgsIn, SourceLocation RAngleLoc);
 
-  DeclResult ActOnVarTemplateSpecialization(
-      Scope *S, Declarator &D, TypeSourceInfo *TSI, LookupResult &Previous,
-      SourceLocation TemplateKWLoc, TemplateParameterList *TemplateParams,
-      StorageClass SC, bool IsPartialSpecialization);
+  DeclResult
+  ActOnVarTemplateSpecialization(Scope *S, Declarator &D, TypeSourceInfo *TSI,
+                                 LookupResult &Previous,
+                                 TemplateParameterList *TemplateParams,
+                                 StorageClass SC, bool IsPartialSpecialization);
 
   /// Get the specialization of the given variable template corresponding to
   /// the specified argument list, or a null-but-valid result if the arguments

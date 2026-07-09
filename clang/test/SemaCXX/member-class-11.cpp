@@ -97,3 +97,11 @@ namespace GH202109 {
     // expected-error@-2 {{class member cannot be redeclared}}
   };
 } // namespace GH202109
+
+namespace GH207911 {
+  template <class> struct A {
+    template <> static int foo;
+    // expected-error@-1 {{extraneous 'template<>' in declaration of variable 'foo'}}
+  };
+  int bar = A<int>::foo;
+} // namespace GH207911

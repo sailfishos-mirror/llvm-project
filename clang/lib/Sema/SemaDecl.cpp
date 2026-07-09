@@ -8021,15 +8021,8 @@ NamedDecl *Sema::ActOnVariableDeclarator(
     }
 
     if (IsVariableTemplateSpecialization) {
-      // FIXME: This should be the template keyword location for the last
-      // template parameter list.
-      SourceLocation TemplateKWLoc =
-          TemplateParamLists.size() > 0
-              ? TemplateParamLists[0]->getTemplateLoc()
-              : SourceLocation();
       DeclResult Res = ActOnVarTemplateSpecialization(
-          S, D, TInfo, Previous, TemplateKWLoc, TemplateParams, SC,
-          IsPartialSpecialization);
+          S, D, TInfo, Previous, TemplateParams, SC, IsPartialSpecialization);
       if (Res.isInvalid())
         return nullptr;
       NewVD = cast<VarDecl>(Res.get());
@@ -8065,11 +8058,8 @@ NamedDecl *Sema::ActOnVariableDeclarator(
 
     // If we have any template parameter lists that don't directly belong to
     // the variable (matching the scope specifier), store them.
-    unsigned VDTemplateParamLists =
-        IsVariableTemplate || IsVariableTemplateSpecialization ? 1 : 0;
-    if (TemplateParamLists.size() > VDTemplateParamLists)
-      NewVD->setTemplateParameterListsInfo(
-          Context, TemplateParamLists.drop_back(VDTemplateParamLists));
+    if (!TemplateParamLists.empty())
+      NewVD->setTemplateParameterListsInfo(Context, TemplateParamLists);
   }
 
   if (D.getDeclSpec().isInlineSpecified()) {
@@ -10293,10 +10283,8 @@ Sema::ActOnFunctionDeclarator(Scope *S, Declarator &D, DeclContext *DC,
         }
       }
       // For source fidelity, store the other template param lists.
-      if (TemplateParamLists.size() > 1) {
-        NewFD->setTemplateParameterListsInfo(
-            Context,
-            ArrayRef<TemplateParameterList *>(TemplateParamLists).drop_back(1));
+      if (!TemplateParamLists.empty()) {
+        NewFD->setTemplateParameterListsInfo(Context, TemplateParamLists);
       }
     } else {
       // Check that we can declare a template here.
@@ -14360,6 +14348,9 @@ void Sema::AddInitializerToDecl(Decl *RealDecl, Expr *Init, bool DirectInit) {
         Diag(VDecl->getLocation(),
              diag::ext_in_class_initializer_float_type_cxx11)
             << DclT << Init->getSourceRange();
+        // FIXME: This should use `getInnerLocStart()` instead of
+        // `getBeginLoc()`, because otherwise this will insert `constexpr`
+        // before the `template` keyword for template declarations.
         Diag(VDecl->getBeginLoc(),
              diag::note_in_class_initializer_float_type_cxx11)
             << FixItHint::CreateInsertion(VDecl->getBeginLoc(), "constexpr ");
@@ -18067,7 +18058,7 @@ Sema::ActOnTag(Scope *S, unsigned TagSpec, TagUseKind TUK, SourceLocation KWLoc,
         DeclResult Result = CheckClassTemplate(
             S, TagSpec, TUK, KWLoc, SS, Name, NameLoc, Attrs, TemplateParams,
             AS, ModulePrivateLoc,
-            /*FriendLoc*/ SourceLocation(), TemplateParameterLists.size() - 1,
+            /*FriendLoc*/ SourceLocation(), TemplateParameterLists.size(),
             TemplateParameterLists.data(), isMemberSpecialization, SkipBody);
         return Result.get();
       } else {
