@@ -2348,6 +2348,8 @@ bool ARMFrameLowering::restoreCalleeSavedRegisters(
 static unsigned EstimateFunctionSizeInBytes(const MachineFunction &MF,
                                             const ARMBaseInstrInfo &TII,
                                             const ARMSubtarget &STI,
+                                            const ARMBaseRegisterInfo *RegInfo,
+                                            BitVector &SavedRegs,
                                             bool BigFrameOffsets) {
   unsigned FnSize = 0;
 
@@ -2362,55 +2364,77 @@ static unsigned EstimateFunctionSizeInBytes(const MachineFunction &MF,
     FnSize += 0x24;
   }
 
+  // Count the number of saved high registers, which take more effort
+  // to push and pop in the prologue and epilogue.
+  unsigned SavedHighRegs = 0;
+  for (auto Reg : {ARM::R8, ARM::R9, ARM::R10, ARM::R11, ARM::R12})
+    if (SavedRegs.test(Reg))
+      ++SavedHighRegs;
+
   // Size of a particularly large Thumb1 stack setup prologue:
   // update sp for variadic functions (2 bytes)
-  // + push registers (maybe high ones by copying them down, up to 14 bytes)
+  // + push registers (2 bytes for PUSH {low regs} + 4 bytes per high register
+  //   that needs to be copied into a low reg and then pushed)
   // + frame pointer (might use r11, requiring pushing it first, 6 bytes)
-  // + stack update (up to 6 bytes)
-  // + stack realignment (8)
+  // + stack update (up to 12 bytes if a constant load is needed and a branch
+  //   required later to skip the constant)
+  // + stack realignment (8, if needed)
   // + make base pointer (2).
-  LLVM_DEBUG(dbgs() << "  +0x38 bytes for prologue\n");
-  FnSize += 0x38;
+  unsigned PrologueSize = 2 + 4 * SavedHighRegs + 6 + 12 + 2;
+  LLVM_DEBUG(dbgs() << "  +" << Twine::utohexstr(PrologueSize)
+                    << " bytes for prologue\n");
+  if (RegInfo->hasStackRealignment(MF))
+    PrologueSize += 8;
+  FnSize += PrologueSize;
 
   // Size of a large epilogue:
   // restore sp from frame pointer (6 bytes if it's in r11)
-  // + pop registers (up to 14 bytes, as above)
+  // + pop registers (2 bytes + 4 per high register, as above)
   // + pop r11 if it was saved to make frame pointer (4 bytes)
   // + pop return address into a low reg (2 bytes)
   // + update sp to undo variadic function setup (2 bytes)
   // + BX to where you popped the return address (2 bytes)
-  LLVM_DEBUG(dbgs() << "  +0x1e bytes for epilogue\n");
-  FnSize += 0x1e;
+  unsigned EpilogueSize = 6 + 2 + 4 * SavedHighRegs + 4 + 2 + 2;
 
+  bool FirstBlock = true;
   for (auto &MBB : MF) {
+    if (!FirstBlock) {
+      // We might have to insert padding to align the start of this basic
+      // block.
+      unsigned Alignment = MBB.getMaxBytesForAlignment();
+      LLVM_DEBUG(dbgs() << "    0x" << Twine::utohexstr(FnSize) << " +"
+                        << Alignment << " realignment\n");
+      FnSize += Alignment;
+    }
+
+    unsigned SizeBeforeThisBB = FnSize;
+
     LLVM_DEBUG(dbgs() << "  " << printMBBReference(MBB) << ":\n");
     bool seenBranch = false, seenConstantLoad = false;
     for (auto &MI : MBB) {
       unsigned InstSize;
       switch (MI.getOpcode()) {
       case ARM::tADDframe:
-        if (BigFrameOffsets) {
+        if (BigFrameOffsets)
           // We might need two ADD instructions, or even a constant
           // load. In the latter case we must count the constant as
           // well as the load instruction and the addition, for 8
           // bytes total.
           InstSize = 8;
-        } else {
+        else
           InstSize = 2;
-        }
         break;
       case ARM::tLDRspi:
       case ARM::tSTRspi:
-        if (BigFrameOffsets) {
+        if (BigFrameOffsets)
           // In a really nasty case, accessing a stack slot might
           // require saving and restoring a scratch register (4 bytes)
           // to make space to load (2 bytes) a constant (4 bytes) to
           // add to SP or FP (2 bytes) and then do the load/store to
           // the resulting register (2 bytes).
           InstSize = 14;
-        } else {
+        else
           InstSize = 2;
-        }
         break;
       case TargetOpcode::COPY:
         // In some situations, COPY has to go via a high register, to
@@ -2438,19 +2462,18 @@ static unsigned EstimateFunctionSizeInBytes(const MachineFunction &MF,
         break;
 
       case TargetOpcode::LOAD_STACK_GUARD:
-        if (STI.genExecuteOnly()) {
+        if (STI.genExecuteOnly())
           // In execute-only code generation, it costs seven 2-byte
           // instructions (MOV + 3 ADD + 3 LSL) to load an arbitrary
           // 32-bit constant, plus two 4-byte MSRs to save/restore the
           // flags those instructions clobber. Then we load from the
           // resulting address with one more 2-byte instruction.
           InstSize = 7 * 2 + 2 * 4 + 8;
-        } else {
+        else
           // If we're not generating execute-only code, the constant
           // just costs an LDR and a literal, and then another LDR is
           // needed to load from that address.
           InstSize = 2 * 2 + 4;
-        }
         break;
 
       default:
@@ -2462,7 +2485,7 @@ static unsigned EstimateFunctionSizeInBytes(const MachineFunction &MF,
 
       FnSize += InstSize;
 
-      // If the instruction loads a constant, score the value of the
+      // If the instruction loads a constant, score the size of the
       // constant, in case it can't be shared with other basic blocks.
       for (MachineMemOperand *MO : MI.memoperands()) {
         const PseudoSourceValue *PSV =
@@ -2477,18 +2500,44 @@ static unsigned EstimateFunctionSizeInBytes(const MachineFunction &MF,
         }
       }
 
-      if (MI.isBranch())
+      // If the instruction is a return or a tailcall, count the size
+      // of an epilogue. (We do this for each return, in case the
+      // epilogue must be duplicated.)
+      if (MI.isReturn() || TII.isTailCall(MI)) {
+        LLVM_DEBUG(dbgs() << "    0x" << Twine::utohexstr(FnSize) << " +"
+                          << EpilogueSize << ": epilogue\n");
+        FnSize += EpilogueSize;
+      }
+
+      if (MI.isUnconditionalBranch())
         seenBranch = true;
     }
 
-    // If there's no branch instruction in the block and we saw a
-    // constant, count a branch + alignment in case we have to branch
-    // round it.
-    if (seenConstantLoad && !seenBranch)
+    // If there's no branch instruction in the block and we saw a constant,
+    // count a branch + realignment to 4 bytes, in case we have to branch round
+    // it.
+    if (seenConstantLoad && !seenBranch) {
+      LLVM_DEBUG(dbgs() << "    0x" << Twine::utohexstr(FnSize)
+                        << " +4: in case of branching round a constant\n");
       FnSize += 4;
+    }
 
-    // We might have to realign at the end of a basic block.
-    FnSize += 2;
+    // Also, if the block is really, really big, then count an extra 4 bytes
+    // (again branch + realignment) for potentially splitting it in order to
+    // put constants in the middle, avoiding the problem of an LDR not being
+    // able to reach all the way to the end. The LDR offset limit is 1024
+    // bytes; the splitting itself adds some cost, but since any function this
+    // large is likely to have already gone over the "must stack LR" limit, we
+    // can keep things simple by assuming we split at half that rate.
+    unsigned BBSize = FnSize - SizeBeforeThisBB;
+    unsigned SplitBranches = 4 * BBSize / 512;
+    if (SplitBranches) {
+      LLVM_DEBUG(
+          dbgs()
+          << "    0x" << Twine::utohexstr(FnSize) << " +" << SplitBranches
+          << ": in case of splitting the block to branch round constants\n");
+      FnSize += SplitBranches;
+    }
   }
   LLVM_DEBUG(dbgs() << "  trailers:\n");
   if (MF.getJumpTableInfo()) {
@@ -2947,8 +2996,8 @@ void ARMFrameLowering::determineCalleeSaves(MachineFunction &MF,
                     << "; BigFrameOffsets: " << BigFrameOffsets << "\n");
 
   if (AFI->isThumb1OnlyFunction()) {
-    unsigned FnSize =
-        EstimateFunctionSizeInBytes(MF, TII, STI, BigFrameOffsets);
+    unsigned FnSize = EstimateFunctionSizeInBytes(MF, TII, STI, RegInfo,
+                                                  SavedRegs, BigFrameOffsets);
     AFI->setEstimatedFunctionSizeInBytes(FnSize);
 
     if (!LRSpilled && FnSize >= (1 << 11)) {
