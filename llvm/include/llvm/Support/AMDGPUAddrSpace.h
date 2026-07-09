@@ -47,6 +47,11 @@ enum : unsigned {
   BUFFER_STRIDED_POINTER = 9, ///< Address space for 192-bit fat buffer
                               ///< pointers with an additional index.
 
+  VGPR = 13, ///< Address space for VGPRs. The 32-bit address is a byte offset
+             ///< into the wave's view of its vector registers. Note this shares
+             ///< its numeric value with CONSTANT_BUFFER_5, which is only used
+             ///< by the (graphics) R600 path.
+
   RESERVED_ADDRESS_SPACE_16 = 16, ///< Reserved for downstream use.
 
   /// Internal address spaces. Can be freely renumbered.
