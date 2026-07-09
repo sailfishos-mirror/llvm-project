@@ -2398,6 +2398,9 @@ static unsigned EstimateFunctionSizeInBytes(const MachineFunction &MF,
       unsigned Alignment = MBB.getMaxBytesForAlignment();
       FnSize += Alignment;
     }
+
+    unsigned SizeBeforeThisBB = FnSize;
+
     bool seenBranch = false, seenConstantLoad = false;
     for (auto &MI : MBB) {
       unsigned InstSize;
@@ -2498,8 +2501,19 @@ static unsigned EstimateFunctionSizeInBytes(const MachineFunction &MF,
     // If there's no branch instruction in the block and we saw a constant,
     // count a branch + realignment to 4 bytes, in case we have to branch round
     // it.
-    if (seenConstantLoad && !seenBranch)
+    if (seenConstantLoad && !seenBranch) {
       FnSize += 4;
+    }
+
+    // Also, if the block is really, really big, then count an extra 4 bytes
+    // (again branch + realignment) for potentially splitting it in order to
+    // put constants in the middle, avoiding the problem of an LDR not being
+    // able to reach all the way to the end. The LDR offset limit is 1024
+    // bytes; the splitting itself adds some cost, but since any function this
+    // large is likely to have already gone over the "must stack LR" limit, we
+    // can keep things simple by assuming we split at half that rate.
+    unsigned BBSize = FnSize - SizeBeforeThisBB;
+    FnSize += 4 * BBSize / 512;
   }
   if (MF.getJumpTableInfo()) {
     for (auto &Table : MF.getJumpTableInfo()->getJumpTables()) {
