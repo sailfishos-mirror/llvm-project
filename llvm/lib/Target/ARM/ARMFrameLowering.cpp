@@ -2348,6 +2348,7 @@ bool ARMFrameLowering::restoreCalleeSavedRegisters(
 static unsigned EstimateFunctionSizeInBytes(const MachineFunction &MF,
                                             const ARMBaseInstrInfo &TII,
                                             const ARMSubtarget &STI,
+                                            BitVector &SavedRegs,
                                             bool BigFrameOffsets) {
   unsigned FnSize = 0;
 
@@ -2358,15 +2359,32 @@ static unsigned EstimateFunctionSizeInBytes(const MachineFunction &MF,
     FnSize += 0x24;
   }
 
+  // Count the number of saved high registers, which take more effort
+  // to push and pop in the prologue and epilogue.
+  unsigned SavedHighRegs = 0;
+  for (auto Reg : {ARM::R8, ARM::R9, ARM::R10, ARM::R11, ARM::R12})
+    if (SavedRegs.test(Reg))
+      ++SavedHighRegs;
+
   // Size of a particularly large Thumb1 stack setup prologue:
   // update sp for variadic functions (2 bytes)
-  // + push registers (maybe high ones by copying them down, up to 14 bytes)
+  // + push registers (2 bytes for PUSH {low regs} + 4 bytes per high register
+  //   that needs to be copied into a low reg and then pushed)
   // + frame pointer (might use r11, requiring pushing it first, 6 bytes)
   // + stack update (up to 12 bytes if a constant load is needed and a branch
   //   required later to skip the constant)
   // + stack realignment (8)
   // + make base pointer (2).
-  FnSize += 0x2c;
+  FnSize += 2 + 4 * SavedHighRegs + 6 + 12 + 8 + 2;
+
+  // Size of a large epilogue:
+  // restore sp from frame pointer (6 bytes if it's in r11)
+  // + pop registers (2 bytes + 4 per high register, as above)
+  // + pop r11 if it was saved to make frame pointer (4 bytes)
+  // + pop return address into a low reg (2 bytes)
+  // + update sp to undo variadic function setup (2 bytes)
+  // + BX to where you popped the return address (2 bytes)
+  unsigned EpilogueSize = 6 + 2 + 4 * SavedHighRegs + 4 + 2 + 2;
 
   for (auto &MBB : MF) {
     bool seenBranch = false, seenConstantLoad = false;
@@ -2459,14 +2477,7 @@ static unsigned EstimateFunctionSizeInBytes(const MachineFunction &MF,
       // of an epilogue. (We do this for each return, in case the
       // epilogue must be duplicated.)
       if (MI.isReturn() || TII.isTailCall(MI)) {
-        // Size of a large epilogue:
-        // restore sp from frame pointer (6 bytes if it's in r11)
-        // + pop registers (up to 14 bytes, as above)
-        // + pop r11 if it was saved to make frame pointer (4 bytes)
-        // + pop return address into a low reg (2 bytes)
-        // + update sp to undo variadic function setup (2 bytes)
-        // + BX to where you popped the return address (2 bytes)
-        FnSize += 0x1e;
+        FnSize += EpilogueSize;
       }
 
       if (MI.isUnconditionalBranch())
@@ -2937,7 +2948,7 @@ void ARMFrameLowering::determineCalleeSaves(MachineFunction &MF,
 
   if (!LRSpilled && AFI->isThumb1OnlyFunction()) {
     unsigned FnSize =
-        EstimateFunctionSizeInBytes(MF, TII, STI, BigFrameOffsets);
+        EstimateFunctionSizeInBytes(MF, TII, STI, SavedRegs, BigFrameOffsets);
 
     if (FnSize >= (1 << 11)) {
       // Force LR to be spilled if the Thumb function size is > 2048. This
