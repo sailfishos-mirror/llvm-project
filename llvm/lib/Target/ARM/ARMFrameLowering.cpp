@@ -2390,7 +2390,14 @@ static unsigned EstimateFunctionSizeInBytes(const MachineFunction &MF,
   // + BX to where you popped the return address (2 bytes)
   unsigned EpilogueSize = 6 + 2 + 4 * SavedHighRegs + 4 + 2 + 2;
 
+  bool FirstBlock = true;
   for (auto &MBB : MF) {
+    if (!FirstBlock) {
+      // We might have to insert padding to align the start of this basic
+      // block.
+      unsigned Alignment = MBB.getMaxBytesForAlignment();
+      FnSize += Alignment;
+    }
     bool seenBranch = false, seenConstantLoad = false;
     for (auto &MI : MBB) {
       unsigned InstSize;
@@ -2488,14 +2495,11 @@ static unsigned EstimateFunctionSizeInBytes(const MachineFunction &MF,
         seenBranch = true;
     }
 
-    // If there's no branch instruction in the block and we saw a
-    // constant, count a branch + alignment in case we have to branch
-    // round it.
+    // If there's no branch instruction in the block and we saw a constant,
+    // count a branch + realignment to 4 bytes, in case we have to branch round
+    // it.
     if (seenConstantLoad && !seenBranch)
       FnSize += 4;
-
-    // We might have to realign at the end of a basic block.
-    FnSize += 2;
   }
   if (MF.getJumpTableInfo()) {
     for (auto &Table : MF.getJumpTableInfo()->getJumpTables()) {
