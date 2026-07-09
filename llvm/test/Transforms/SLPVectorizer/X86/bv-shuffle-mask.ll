@@ -5,21 +5,21 @@ define i16 @test(i16 %v1, i16 %v2) {
 ; CHECK-LABEL: define i16 @test(
 ; CHECK-SAME: i16 [[V1:%.*]], i16 [[V2:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
-; CHECK-NEXT:    [[TMP4:%.*]] = insertelement <4 x i16> poison, i16 [[V1]], i32 0
-; CHECK-NEXT:    [[TMP5:%.*]] = insertelement <4 x i16> [[TMP4]], i16 [[V2]], i32 1
-; CHECK-NEXT:    [[TMP2:%.*]] = shufflevector <4 x i16> [[TMP5]], <4 x i16> poison, <4 x i32> <i32 0, i32 0, i32 0, i32 1>
+; CHECK-NEXT:    [[TMP0:%.*]] = insertelement <4 x i16> poison, i16 [[V1]], i32 0
+; CHECK-NEXT:    [[TMP1:%.*]] = insertelement <4 x i16> [[TMP0]], i16 [[V2]], i32 1
+; CHECK-NEXT:    [[TMP2:%.*]] = shufflevector <4 x i16> [[TMP1]], <4 x i16> poison, <4 x i32> <i32 0, i32 0, i32 0, i32 1>
 ; CHECK-NEXT:    [[TMP8:%.*]] = or <4 x i16> [[TMP2]], zeroinitializer
-; CHECK-NEXT:    [[TMP0:%.*]] = shufflevector <4 x i16> [[TMP2]], <4 x i16> <i16 -1, i16 -1, i16 -1, i16 poison>, <4 x i32> <i32 4, i32 5, i32 6, i32 3>
-; CHECK-NEXT:    [[TMP1:%.*]] = insertelement <4 x i16> <i16 0, i16 0, i16 0, i16 poison>, i16 [[V1]], i32 3
-; CHECK-NEXT:    [[TMP3:%.*]] = and <4 x i16> [[TMP0]], [[TMP1]]
-; CHECK-NEXT:    [[TMP7:%.*]] = or <4 x i16> [[TMP3]], zeroinitializer
-; CHECK-NEXT:    [[TMP9:%.*]] = and <4 x i16> [[TMP7]], zeroinitializer
-; CHECK-NEXT:    [[TMP10:%.*]] = and <4 x i16> [[TMP9]], zeroinitializer
-; CHECK-NEXT:    [[TMP11:%.*]] = icmp ne <4 x i16> [[TMP10]], zeroinitializer
+; CHECK-NEXT:    [[TMP4:%.*]] = shufflevector <4 x i16> [[TMP2]], <4 x i16> <i16 0, i16 0, i16 0, i16 poison>, <4 x i32> <i32 4, i32 5, i32 6, i32 3>
+; CHECK-NEXT:    [[TMP5:%.*]] = or <4 x i16> [[TMP4]], zeroinitializer
+; CHECK-NEXT:    [[TMP6:%.*]] = insertelement <4 x i16> <i16 0, i16 0, i16 0, i16 poison>, i16 [[V1]], i32 3
+; CHECK-NEXT:    [[TMP7:%.*]] = and <4 x i16> <i16 -1, i16 -1, i16 -1, i16 0>, [[TMP5]]
+; CHECK-NEXT:    [[TMP13:%.*]] = and <4 x i16> [[TMP7]], [[TMP6]]
+; CHECK-NEXT:    [[TMP9:%.*]] = and <4 x i16> [[TMP13]], zeroinitializer
+; CHECK-NEXT:    [[TMP11:%.*]] = icmp ne <4 x i16> [[TMP9]], zeroinitializer
 ; CHECK-NEXT:    [[TMP12:%.*]] = or <4 x i1> [[TMP11]], zeroinitializer
-; CHECK-NEXT:    [[TMP13:%.*]] = or <4 x i16> [[TMP8]], zeroinitializer
-; CHECK-NEXT:    [[TMP14:%.*]] = or <4 x i16> [[TMP13]], zeroinitializer
-; CHECK-NEXT:    [[TMP15:%.*]] = or <4 x i16> [[TMP14]], zeroinitializer
+; CHECK-NEXT:    [[TMP10:%.*]] = or <4 x i16> [[TMP8]], zeroinitializer
+; CHECK-NEXT:    [[TMP28:%.*]] = or <4 x i16> [[TMP10]], zeroinitializer
+; CHECK-NEXT:    [[TMP15:%.*]] = or <4 x i16> [[TMP28]], zeroinitializer
 ; CHECK-NEXT:    [[TMP16:%.*]] = icmp ne <4 x i16> [[TMP15]], zeroinitializer
 ; CHECK-NEXT:    [[TMP17:%.*]] = or <4 x i1> zeroinitializer, [[TMP16]]
 ; CHECK-NEXT:    [[TMP18:%.*]] = or <4 x i1> [[TMP12]], [[TMP17]]
