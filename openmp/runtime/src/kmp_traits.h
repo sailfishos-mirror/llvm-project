@@ -16,6 +16,73 @@
 #include "kmp.h"
 #include "kmp_adt.h"
 
+// Lexer for the OpenMP trait grammar (the grammar is documented in
+// kmp_traits.cpp).
+namespace lexer {
+
+enum class token_kind {
+  END, // end of the input
+  COMMA, // ,
+  STAR, // *
+  NOT, // !
+  L_PAREN, // (
+  R_PAREN, // )
+  L_BRACKET, // [
+  R_BRACKET, // ]
+  COLON, // :
+  AND, // &&
+  OR, // ||
+  WORD, // word characters
+  UNKNOWN, // an unrecognized character (e.g. a lone '&' or '|')
+};
+
+// A single token produced by the lexer. `text` is a non-owning reference into
+// the source string the token was lexed from.
+struct token {
+  token_kind kind = token_kind::UNKNOWN;
+  kmp_str_ref text = kmp_str_ref("");
+};
+
+class kmp_lexer final {
+  kmp_str_ref scan;
+  token lookahead{token_kind::END, kmp_str_ref("")};
+  bool has_lookahead = false;
+
+  // Lex the next token directly from the input, advancing past it.
+  token lex();
+
+public:
+  explicit kmp_lexer(kmp_str_ref source) : scan(source) {}
+
+  // Return the next token and advance past it.
+  token next() {
+    if (has_lookahead) {
+      has_lookahead = false;
+      return lookahead;
+    }
+    return lex();
+  }
+
+  // Return the next token without advancing.
+  token peek() {
+    if (!has_lookahead) {
+      lookahead = lex();
+      has_lookahead = true;
+    }
+    return lookahead;
+  }
+
+  // Return the yet-unconsumed portion of the source, with any whitespace before
+  // the next token skipped.
+  kmp_str_ref remaining() {
+    token t = peek();
+    return kmp_str_ref(t.text.begin(),
+                       static_cast<size_t>(scan.end() - t.text.begin()));
+  }
+};
+
+} // namespace lexer
+
 namespace kmp_traits {
 
 extern "C" int omp_get_num_devices();

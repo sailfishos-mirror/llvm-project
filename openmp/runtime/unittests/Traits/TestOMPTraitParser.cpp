@@ -870,6 +870,30 @@ TEST_F(ParserTest, NestedMixedWithSpaces) {
   check_result<false, 3>(context, result);
 }
 
+TEST_F(ParserTest, DeepNestingWithinLimit) {
+  // A moderate nesting depth (well under the recursion limit) parses fine and
+  // is transparent to matching.
+  constexpr int depth = 20;
+  const char *inner = "uid(device-0)";
+  char spec[64];
+  char *p = spec;
+  for (int i = 0; i < depth; ++i)
+    *p++ = '(';
+  for (const char *s = inner; *s; ++s)
+    *p++ = *s;
+  for (int i = 0; i < depth; ++i)
+    *p++ = ')';
+  *p = '\0';
+  parse(spec, "deep_nesting_within_limit");
+
+  ASSERT_NE(context, nullptr);
+  kmp_vector<int> result = context->evaluate();
+
+  EXPECT_EQ(result.size(), 1u);
+  check_result<true, 0>(context, result);
+  check_result<false, 1, 2, 3>(context, result);
+}
+
 //===----------------------------------------------------------------------===//
 // Empty Input
 //===----------------------------------------------------------------------===//
@@ -931,17 +955,34 @@ TEST_F(ParserTest, MixedOrAndSameLevel) {
 }
 
 TEST_F(ParserTest, InvalidUID) {
-  // Empty UID is not allowed
+  // Empty UID is not allowed; the offending token (the closing ')') is reported
+  // as the invalid trait value.
   ASSERT_DEATH(parse("uid()", "invalid_uid"),
                "OMP: Error #[0-9]+: trait parser while parsing invalid_uid: "
-               "invalid uid \\(\\)");
+               "invalid value for trait 'uid' \\(\\)\\)");
+}
+
+TEST_F(ParserTest, MissingOpenParenAfterTrait) {
+  // A trait name must be followed by "(".
+  ASSERT_DEATH(parse("uid", "missing_open_paren"),
+               "OMP: Error #[0-9]+: trait parser while parsing "
+               "missing_open_paren: error: expected '\\(' after trait name");
+}
+
+TEST_F(ParserTest, MissingCloseParenAfterTraitValue) {
+  // A trait value must be followed by ")".
+  ASSERT_DEATH(parse("uid(a", "missing_close_paren"),
+               "OMP: Error #[0-9]+: trait parser while parsing "
+               "missing_close_paren: error: expected '\\)' after trait value");
 }
 
 TEST_F(ParserTest, UnclosedParenthesis) {
+  // Once "(" is consumed we are committed to a group, so a missing ")" is a
+  // hard error rather than a recoverable parse failure.
   ASSERT_DEATH(
       parse("(uid(a)", "unclosed_parenthesis"),
       "OMP: Error #[0-9]+: trait parser while parsing unclosed_parenthesis: "
-      "failed to parse trait specification \\(\\(uid\\(a\\)\\)");
+      "error: expected '\\)' after trait expression group");
 }
 
 TEST_F(ParserTest, UnmatchedClosingParenthesis) {
@@ -952,17 +993,46 @@ TEST_F(ParserTest, UnmatchedClosingParenthesis) {
 }
 
 TEST_F(ParserTest, EmptyParentheses) {
+  // "(" commits to a group, so an empty group is a hard error.
   ASSERT_DEATH(
       parse("()", "empty_parentheses"),
       "OMP: Error #[0-9]+: trait parser while parsing empty_parentheses: "
-      "failed to parse trait specification \\(\\(\\)\\)");
+      "error: expected trait expression after '\\('");
 }
 
 TEST_F(ParserTest, TrailingOperator) {
+  // A consumed "&&"/"||" commits to another operand, so its absence is a hard
+  // error.
   ASSERT_DEATH(
       parse("uid(a) &&", "trailing_operator"),
       "OMP: Error #[0-9]+: trait parser while parsing trailing_operator: "
-      "failed to parse trait specification \\(uid\\(a\\) &&\\)");
+      "error: expected trait expression after operator");
+}
+
+TEST_F(ParserTest, NegationWithoutTrait) {
+  // A consumed "!" commits to a trait expression, so its absence is a hard
+  // error rather than a recoverable parse failure.
+  ASSERT_DEATH(
+      parse("!", "negation_without_trait"),
+      "OMP: Error #[0-9]+: trait parser while parsing negation_without_trait: "
+      "error: expected trait expression after '!'");
+}
+
+TEST_F(ParserTest, DeviceNumberOutOfRange) {
+  // A word shaped like a device number is treated as a device number, so one
+  // that does not fit an int is a hard error.
+  ASSERT_DEATH(parse("99999999999", "device_number_out_of_range"),
+               "OMP: Error #[0-9]+: trait parser while parsing "
+               "device_number_out_of_range: error: device number out of range");
+}
+
+TEST_F(ParserTest, NegativeDeviceNumber) {
+  // "-5" is lexed as a single WORD; the parser recognizes its numeric shape and
+  // rejects it as an out-of-range device number rather than treating it as a
+  // name/uid_value.
+  ASSERT_DEATH(parse("-5", "negative_device_number"),
+               "OMP: Error #[0-9]+: trait parser while parsing "
+               "negative_device_number: error: device number out of range");
 }
 
 TEST_F(ParserTest, LeadingOperator) {
@@ -976,6 +1046,27 @@ TEST_F(ParserTest, DoubleComma) {
   ASSERT_DEATH(parse("uid(a),,uid(b)", "double_comma"),
                "OMP: Error #[0-9]+: trait parser while parsing double_comma: "
                "failed to parse trait specification \\(,,uid\\(b\\)\\)");
+}
+
+TEST_F(ParserTest, UnrecognizedTrait) {
+  // "uid" is currently the only trait name; any other word is not a trait, so
+  // the clause cannot be parsed.
+  ASSERT_DEATH(
+      parse("foo", "unrecognized_trait"),
+      "OMP: Error #[0-9]+: trait parser while parsing unrecognized_trait: "
+      "failed to parse trait specification \\(foo\\)");
+}
+
+TEST_F(ParserTest, MaxRecursionExceeded) {
+  // Nesting parentheses deeper than the recursion limit is a hard error. The
+  // guard trips before the input is exhausted, so unbalanced "(" are enough.
+  char spec[101];
+  for (int i = 0; i < 100; ++i)
+    spec[i] = '(';
+  spec[100] = '\0';
+  ASSERT_DEATH(parse(spec, "max_recursion"),
+               "OMP: Error #[0-9]+: trait parser while parsing max_recursion: "
+               "max recursion depth \\(64\\) exceeded");
 }
 
 } // namespace
