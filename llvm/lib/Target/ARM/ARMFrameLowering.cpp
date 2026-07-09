@@ -2367,15 +2367,6 @@ static unsigned EstimateFunctionSizeInBytes(const MachineFunction &MF,
   // + make base pointer (2).
   FnSize += 0x38;
 
-  // Size of a large epilogue:
-  // restore sp from frame pointer (6 bytes if it's in r11)
-  // + pop registers (up to 14 bytes, as above)
-  // + pop r11 if it was saved to make frame pointer (4 bytes)
-  // + pop return address into a low reg (2 bytes)
-  // + update sp to undo variadic function setup (2 bytes)
-  // + BX to where you popped the return address (2 bytes)
-  FnSize += 0x1e;
-
   for (auto &MBB : MF) {
     bool seenBranch = false, seenConstantLoad = false;
     for (auto &MI : MBB) {
@@ -2450,7 +2441,7 @@ static unsigned EstimateFunctionSizeInBytes(const MachineFunction &MF,
 
       FnSize += InstSize;
 
-      // If the instruction loads a constant, score the value of the
+      // If the instruction loads a constant, score the size of the
       // constant, in case it can't be shared with other basic blocks.
       for (MachineMemOperand *MO : MI.memoperands()) {
         const PseudoSourceValue *PSV =
@@ -2461,6 +2452,20 @@ static unsigned EstimateFunctionSizeInBytes(const MachineFunction &MF,
           FnSize += ConstSize;
           seenConstantLoad = true;
         }
+      }
+
+      // If the instruction is a return or a tailcall, count the size
+      // of an epilogue. (We do this for each return, in case the
+      // epilogue must be duplicated.)
+      if (MI.isReturn() || TII.isTailCall(MI)) {
+        // Size of a large epilogue:
+        // restore sp from frame pointer (6 bytes if it's in r11)
+        // + pop registers (up to 14 bytes, as above)
+        // + pop r11 if it was saved to make frame pointer (4 bytes)
+        // + pop return address into a low reg (2 bytes)
+        // + update sp to undo variadic function setup (2 bytes)
+        // + BX to where you popped the return address (2 bytes)
+        FnSize += 0x1e;
       }
 
       if (MI.isBranch())
