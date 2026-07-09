@@ -2348,6 +2348,7 @@ bool ARMFrameLowering::restoreCalleeSavedRegisters(
 static unsigned EstimateFunctionSizeInBytes(const MachineFunction &MF,
                                             const ARMBaseInstrInfo &TII,
                                             const ARMSubtarget &STI,
+                                            const ARMBaseRegisterInfo *RegInfo,
                                             BitVector &SavedRegs,
                                             bool BigFrameOffsets) {
   unsigned FnSize = 0;
@@ -2373,9 +2374,12 @@ static unsigned EstimateFunctionSizeInBytes(const MachineFunction &MF,
   // + frame pointer (might use r11, requiring pushing it first, 6 bytes)
   // + stack update (up to 12 bytes if a constant load is needed and a branch
   //   required later to skip the constant)
-  // + stack realignment (8)
+  // + stack realignment (8, if needed)
   // + make base pointer (2).
-  FnSize += 2 + 4 * SavedHighRegs + 6 + 12 + 8 + 2;
+  unsigned PrologueSize = 2 + 4 * SavedHighRegs + 6 + 12 + 2;
+  if (RegInfo->hasStackRealignment(MF))
+    PrologueSize += 8;
+  FnSize += PrologueSize;
 
   // Size of a large epilogue:
   // restore sp from frame pointer (6 bytes if it's in r11)
@@ -2947,8 +2951,8 @@ void ARMFrameLowering::determineCalleeSaves(MachineFunction &MF,
                     << "; BigFrameOffsets: " << BigFrameOffsets << "\n");
 
   if (!LRSpilled && AFI->isThumb1OnlyFunction()) {
-    unsigned FnSize =
-        EstimateFunctionSizeInBytes(MF, TII, STI, SavedRegs, BigFrameOffsets);
+    unsigned FnSize = EstimateFunctionSizeInBytes(MF, TII, STI, RegInfo,
+                                                  SavedRegs, BigFrameOffsets);
 
     if (FnSize >= (1 << 11)) {
       // Force LR to be spilled if the Thumb function size is > 2048. This
