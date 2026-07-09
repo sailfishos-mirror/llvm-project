@@ -47,12 +47,12 @@ namespace llvm::AMDGPU {
 #define GET_D16ImageDimIntrinsics_IMPL
 #define GET_ImageDimIntrinsicTable_IMPL
 #define GET_RsrcIntrinsics_IMPL
-#define GET_GFX1250RepeatRateTable_DECL
-#define GET_GFX1250RepeatRateTable_IMPL
+#define GET_GFX1250BlockingCyclesTable_DECL
+#define GET_GFX1250BlockingCyclesTable_IMPL
 
-struct AMDGPURepeatRateInfo {
-  uint16_t Inst;
-  uint8_t RepeatRate;
+struct AMDGPUBlockingCyclesInfo {
+  uint16_t Opcode;
+  uint8_t GFX1250BlockingCycles;
 };
 
 #include "AMDGPUGenSearchableTables.inc"
@@ -10876,13 +10876,13 @@ unsigned SIInstrInfo::getInstrLatency(const InstrItineraryData *ItinData,
   return SchedModel.computeInstrLatency(&MI);
 }
 
-unsigned SIInstrInfo::getRepeatRate(const MachineInstr &MI) const {
+unsigned SIInstrInfo::getBlockingCycles(const MachineInstr &MI) const {
   if (!ST.hasGFX1250Insts())
     return 0;
 
   // Use processor-specific lookup table
-  if (const auto *Entry = AMDGPU::getGFX1250RepeatRateInfo(MI.getOpcode()))
-    return Entry->RepeatRate;
+  if (const auto *Entry = AMDGPU::getGFX1250BlockingCyclesInfo(MI.getOpcode()))
+    return Entry->GFX1250BlockingCycles;
 
   return 0;
 }

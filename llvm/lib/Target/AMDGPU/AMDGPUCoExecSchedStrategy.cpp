@@ -66,7 +66,7 @@ InstructionFlavor llvm::AMDGPU::classifyFlavor(const MachineInstr &MI,
     return InstructionFlavor::TRANS;
 
   if (SII.isVALU(MI, /*AllowLDSDMA=*/false)) {
-    if (SII.getRepeatRate(MI) > 1)
+    if (SII.getBlockingCycles(MI) > 1)
       return InstructionFlavor::MultiCycleVALU;
 
     return InstructionFlavor::SingleCycleVALU;
@@ -193,7 +193,7 @@ unsigned CandidateHeuristics::getHWUICyclesForInst(SUnit *SU) {
   }
 
   ReleaseAtCycle =
-      std::max(ReleaseAtCycle, SII->getRepeatRate(*SU->getInstr()));
+      std::max(ReleaseAtCycle, SII->getBlockingCycles(*SU->getInstr()));
   return ReleaseAtCycle;
 }
 
