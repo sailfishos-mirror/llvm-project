@@ -143,7 +143,7 @@ ASTNodeUP DILParser::ParseExpression() { return ParseAssignmentExpression(); }
 //    "-="
 //
 ASTNodeUP DILParser::ParseAssignmentExpression() {
-  auto lhs = ParseShiftExpression();
+  auto lhs = ParseEqualityExpression();
   assert(lhs && "ASTNodeUP must not contain a nullptr");
 
   // Check if it's an assignment expression.
@@ -157,6 +157,55 @@ ASTNodeUP DILParser::ParseAssignmentExpression() {
         token.GetLocation(), GetBinaryOpKindFromToken(token.GetKind()),
         std::move(lhs), std::move(rhs));
   }
+  return lhs;
+}
+
+// Parse an equality_expression.
+//
+//  equality_expression:
+//    relational_expression {"==" relational_expression}
+//    relational_expression {"!=" relational_expression}
+//
+ASTNodeUP DILParser::ParseEqualityExpression() {
+  auto lhs = ParseRelationalExpression();
+  assert(lhs && "ASTNodeUP must not contain a nullptr");
+
+  while (CurToken().IsOneOf({Token::equalequal, Token::exclaimequal})) {
+    Token token = CurToken();
+    m_dil_lexer.Advance();
+    auto rhs = ParseRelationalExpression();
+    assert(lhs && "ASTNodeUP must not contain a nullptr");
+    lhs = std::make_unique<BinaryOpNode>(
+        token.GetLocation(), GetBinaryOpKindFromToken(token.GetKind()),
+        std::move(lhs), std::move(rhs));
+  }
+
+  return lhs;
+}
+
+// Parse a relational_expression.
+//
+//  relational_expression:
+//    shift_expression {"<" shift_expression}
+//    shift_expression {">" shift_expression}
+//    shift_expression {"<=" shift_expression}
+//    shift_expression {">=" shift_expression}
+//
+ASTNodeUP DILParser::ParseRelationalExpression() {
+  auto lhs = ParseShiftExpression();
+  assert(lhs && "ASTNodeUP must not contain a nullptr");
+
+  while (CurToken().IsOneOf(
+      {Token::less, Token::greater, Token::lessequal, Token::greaterequal})) {
+    Token token = CurToken();
+    m_dil_lexer.Advance();
+    auto rhs = ParseShiftExpression();
+    assert(lhs && "ASTNodeUP must not contain a nullptr");
+    lhs = std::make_unique<BinaryOpNode>(
+        token.GetLocation(), GetBinaryOpKindFromToken(token.GetKind()),
+        std::move(lhs), std::move(rhs));
+  }
+
   return lhs;
 }
 

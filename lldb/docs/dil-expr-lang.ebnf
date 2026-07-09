@@ -5,12 +5,20 @@
 
 expression = assignment_expression ;
 
-assignment_expression = shift_expression
-                      | shift_expression assignment_operator assignment_expression ;
+assignment_expression = equality_expression
+                      | equality_expression assignment_operator assignment_expression ;
 
 assignment_operator = "="
                     | "+="
                     | "-=" ;
+
+equality_expression = relational_expression {"==" relational_expression}
+                    | relational_expression {"!=" relational_expression} ;
+
+relational_expression = shift_expression {"<" shift_expression}
+                      | shift_expression {">" shift_expression}
+                      | shift_expression {"<=" shift_expression}
+                      | shift_expression {">=" shift_expression} ;
 
 shift_expression = additive_expression {"<<" additive_expression}
                  | additive_expression {">>" additive_expression} ;

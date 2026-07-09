@@ -84,6 +84,8 @@ private:
   ASTNodeUP ParseExpression();
 
   ASTNodeUP ParseAssignmentExpression();
+  ASTNodeUP ParseEqualityExpression();
+  ASTNodeUP ParseRelationalExpression();
   ASTNodeUP ParseShiftExpression();
   ASTNodeUP ParseAdditiveExpression();
   ASTNodeUP ParseMultiplicativeExpression();
