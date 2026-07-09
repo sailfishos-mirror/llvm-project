@@ -2468,7 +2468,7 @@ static unsigned EstimateFunctionSizeInBytes(const MachineFunction &MF,
         FnSize += 0x1e;
       }
 
-      if (MI.isBranch())
+      if (MI.isUnconditionalBranch())
         seenBranch = true;
     }
 
