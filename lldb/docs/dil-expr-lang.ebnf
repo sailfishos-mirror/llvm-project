@@ -10,7 +10,12 @@ assignment_expression = shift_expression
 
 assignment_operator = "="
                     | "+="
-                    | "-=" ;
+                    | "-="
+                    | "*="
+                    | "/="
+                    | "%="
+                    | "<<="
+                    | ">>=" ;
 
 shift_expression = additive_expression {"<<" additive_expression}
                  | additive_expression {">>" additive_expression} ;

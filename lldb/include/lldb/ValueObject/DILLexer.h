@@ -33,6 +33,7 @@ public:
     equal,
     float_constant,
     greatergreater,
+    greatergreaterequal,
     identifier,
     integer_constant,
     kw_false,
@@ -40,16 +41,20 @@ public:
     l_paren,
     l_square,
     lessless,
+    lesslessequal,
     minus,
     minusequal,
     percent,
+    percentequal,
     period,
     plus,
     plusequal,
     r_paren,
     r_square,
     slash,
+    slashequal,
     star,
+    starequal,
   };
 
   Token(Kind kind, std::string spelling, uint32_t start)
