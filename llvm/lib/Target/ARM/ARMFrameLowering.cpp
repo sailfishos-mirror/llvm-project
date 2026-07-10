@@ -139,6 +139,7 @@
 #include "llvm/IR/CallingConv.h"
 #include "llvm/IR/DebugLoc.h"
 #include "llvm/IR/Function.h"
+#include "llvm/IR/Module.h"
 #include "llvm/MC/MCAsmInfo.h"
 #include "llvm/MC/MCInstrDesc.h"
 #include "llvm/Support/CodeGen.h"
@@ -2353,6 +2354,8 @@ static unsigned EstimateFunctionSizeInBytes(const MachineFunction &MF,
                                             bool BigFrameOffsets) {
   unsigned FnSize = 0;
 
+  bool KCFI = MF.getFunction().getParent()->getModuleFlag("kcfi");
+
   LLVM_DEBUG(dbgs() << "EstimateFunctionSizeInBytes(" << MF.getName()
                     << "):\n");
 
@@ -2461,6 +2464,36 @@ static unsigned EstimateFunctionSizeInBytes(const MachineFunction &MF,
         InstSize = 2;
         break;
 
+      case ARM::tBLXNS_CALL:
+        // A call across a CMSE trust boundary involves a lot of work. We must
+        // clear all the registers that might contain our own secrets, which
+        // means pushing them first. So first push low registers, then move
+        // four high regs into them and push those too.
+        InstSize = 2 + 2 * 4 + 2;
+        // Then we must clear the low bit of the target register, because
+        // instead of indicating Arm/Thumb it indicates the CMSE security
+        // status. That takes two instructions.
+        InstSize += 4;
+        // Now actually clear all the registers, via a MOV for each one. This
+        // includes argument registers as well as saved regs, so it can be
+        // r1-r12 inclusive.
+        InstSize += 2 * 12;
+        // Clear the PSR flags (a wide instruction even in Armv8-M Baseline).
+        InstSize += 4;
+        // Perform the BLXNS call itself.
+        InstSize += 2;
+        // Now pop all the saved registers, which takes the same amount of
+        // effort as pushing them did.
+        InstSize += 2 + 2 * 4 + 2;
+        break;
+
+      case ARM::tBXNS_RET:
+        // When returning across a CMSE boundary, we must potentially clear all
+        // the registers that we haven't restored to the caller's value: r0-r3
+        // and r12. We also clear the PSR flags, and finally return via BXNS.
+        InstSize = 5 * 2 + 4 + 2;
+        break;
+
       case TargetOpcode::LOAD_STACK_GUARD:
         if (STI.genExecuteOnly())
           // In execute-only code generation, it costs seven 2-byte
@@ -2507,6 +2540,17 @@ static unsigned EstimateFunctionSizeInBytes(const MachineFunction &MF,
         LLVM_DEBUG(dbgs() << "    0x" << Twine::utohexstr(FnSize) << " +"
                           << EpilogueSize << ": epilogue\n");
         FnSize += EpilogueSize;
+      }
+
+      // If the instruction is a call, and KCFI is enabled, then count the
+      // cost of a KCFI_CHECK_Thumb1 pseudo.
+      if (KCFI && MI.isCall() && MI.getCFIType()) {
+        const MCInstrDesc &MCID = TII.get(ARM::KCFI_CHECK_Thumb1);
+        LLVM_DEBUG(
+            dbgs() << "    0x" << Twine::utohexstr(FnSize) << " +"
+                   << MCID.getSize()
+                   << ": KCFI_CHECK_Thumb1 before the previous branch\n");
+        FnSize += MCID.getSize();
       }
 
       if (MI.isUnconditionalBranch())
