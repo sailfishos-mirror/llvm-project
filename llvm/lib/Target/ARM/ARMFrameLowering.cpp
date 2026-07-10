@@ -139,6 +139,7 @@
 #include "llvm/IR/CallingConv.h"
 #include "llvm/IR/DebugLoc.h"
 #include "llvm/IR/Function.h"
+#include "llvm/IR/Module.h"
 #include "llvm/MC/MCAsmInfo.h"
 #include "llvm/MC/MCInstrDesc.h"
 #include "llvm/Support/CodeGen.h"
@@ -2353,6 +2354,8 @@ static unsigned EstimateFunctionSizeInBytes(const MachineFunction &MF,
                                             bool BigFrameOffsets) {
   unsigned FnSize = 0;
 
+  bool KCFI = MF.getFunction().getParent()->getModuleFlag("kcfi");
+
   if (MF.shouldSplitStack()) {
     // Split stack prologue saves r4,r5; makes a copy of sp and loads
     // a literal; compares the two, and if sp < literal, pushes
@@ -2522,6 +2525,13 @@ static unsigned EstimateFunctionSizeInBytes(const MachineFunction &MF,
       // epilogue must be duplicated.)
       if (MI.isReturn() || TII.isTailCall(MI)) {
         FnSize += EpilogueSize;
+      }
+
+      // If the instruction is a call, and KCFI is enabled, then count the
+      // cost of a KCFI_CHECK_Thumb1 pseudo.
+      if (KCFI && MI.isCall() && MI.getCFIType()) {
+        const MCInstrDesc &MCID = TII.get(ARM::KCFI_CHECK_Thumb1);
+        FnSize += MCID.getSize();
       }
 
       if (MI.isUnconditionalBranch())
