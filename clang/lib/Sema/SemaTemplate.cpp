@@ -3999,8 +3999,9 @@ QualType Sema::CheckTemplateIdType(ElaboratedTypeKeyword Keyword,
           ClassTemplate->getLocation(), ClassTemplate, CTAI.CanonicalConverted,
           CTAI.StrictPackMatch, nullptr);
       ClassTemplate->AddSpecialization(Decl, InsertPos);
-      if (ClassTemplate->isOutOfLine())
-        Decl->setLexicalDeclContext(ClassTemplate->getLexicalDeclContext());
+      // Don't set a lexical context here. A definition might later be
+      // instantiated for this specialization from a pattern with a different
+      // lexical context.
     }
 
     if (Decl->getSpecializationKind() == TSK_Undeclared &&

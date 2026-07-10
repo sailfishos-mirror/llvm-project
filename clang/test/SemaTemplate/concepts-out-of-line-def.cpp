@@ -985,3 +985,19 @@ namespace GH193558 {
     requires (T())
     void A<T*>::f() {}
 } // namespace GH193558
+
+namespace FriendClassTemplate1 {
+  template <class> struct A {
+    template <class> friend class B;
+  };
+  template struct A<int>;
+  template <class T> struct B {
+    template <class U>
+      requires (__is_same(T, int) && __is_same(U, char))
+    void f();
+  };
+  template <template <class> class TT> void t() {
+    TT<int>().template f<char>();
+  }
+  template void t<B>();
+} // namespace FriendClassTemplate1
