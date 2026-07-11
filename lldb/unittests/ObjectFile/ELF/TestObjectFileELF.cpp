@@ -16,6 +16,7 @@
 #include "lldb/Core/Section.h"
 #include "lldb/Host/FileSystem.h"
 #include "lldb/Host/HostInfo.h"
+#include "lldb/Symbol/Symtab.h"
 #include "lldb/Utility/DataBufferHeap.h"
 #include "llvm/BinaryFormat/ELF.h"
 #include "llvm/Support/Compression.h"
@@ -555,4 +556,124 @@ TEST_F(ObjectFileELFTest, SkipsLocalMappingAndDotLSymbols) {
   const Symbol *global_obj = module_sp->FindFirstSymbolWithNameAndType(
       ConstString("global_obj"), eSymbolTypeAny);
   ASSERT_NE(nullptr, global_obj);
+}
+
+// An ELF filter library (DT_FILTER / DT_AUXILIARY) delegates symbol
+// resolution to its filtees.  Its zero-sized exported function definitions
+// are placeholders whose addresses are meaningless (e.g. FreeBSD >= 15's
+// libc.so.7 exports a zero-sized "mmap" whose address points into an
+// unrelated function; the real definition lives in the libsys.so.7 filtee).
+// Check that the filtees are reported in dynamic-section order and that
+// placeholders are turned into re-exported symbols.
+TEST_F(ObjectFileELFTest, FilterLibraryPlaceholderSymbols) {
+  auto ExpectedFile = TestFile::fromYaml(R"(
+--- !ELF
+FileHeader:
+  Class:           ELFCLASS64
+  Data:            ELFDATA2LSB
+  Type:            ET_DYN
+  Machine:         EM_X86_64
+Sections:
+  - Name:            .text
+    Type:            SHT_PROGBITS
+    Flags:           [ SHF_ALLOC, SHF_EXECINSTR ]
+    Address:         0x1000
+    AddressAlign:    0x10
+    Content:         C3C3C3C3
+# .dynstr content: "\0libaux1.so\0libaux2.so\0"
+#   offset 0x1: "libaux1.so"
+#   offset 0xC: "libaux2.so"
+  - Name:            .dynstr
+    Type:            SHT_STRTAB
+    Flags:           [ SHF_ALLOC ]
+    Address:         0x2000
+    AddressAlign:    0x1
+    Content:         "006C6962617578312E736F006C6962617578322E736F00"
+  - Name:            .dynamic
+    Type:            SHT_DYNAMIC
+    Flags:           [ SHF_ALLOC ]
+    Address:         0x3000
+    AddressAlign:    0x8
+    Link:            .dynstr
+    Entries:
+      - Tag:             DT_AUXILIARY
+        Value:           0x1
+      - Tag:             DT_AUXILIARY
+        Value:           0xC
+      - Tag:             DT_NULL
+        Value:           0x0
+Symbols:
+  - Name:            local_helper
+    Type:            STT_FUNC
+    Section:         .text
+    Value:           0x1002
+    Binding:         STB_LOCAL
+  - Name:            mmap
+    Type:            STT_FUNC
+    Section:         .text
+    Value:           0x1000
+    Binding:         STB_GLOBAL
+  - Name:            "open@@FBSD_1.0"
+    Type:            STT_FUNC
+    Section:         .text
+    Value:           0x1001
+    Binding:         STB_WEAK
+  - Name:            printf
+    Type:            STT_FUNC
+    Section:         .text
+    Value:           0x1000
+    Size:            0x4
+    Binding:         STB_GLOBAL
+...
+  )");
+  ASSERT_THAT_EXPECTED(ExpectedFile, llvm::Succeeded());
+  auto module_sp = std::make_shared<Module>(ExpectedFile->moduleSpec());
+  ObjectFile *object_file = module_sp->GetObjectFile();
+  ASSERT_NE(nullptr, object_file);
+
+  // The filtees must come back in dynamic-section order.
+  FileSpecList filtees = object_file->GetReExportedLibraries();
+  ASSERT_EQ(2u, filtees.GetSize());
+  EXPECT_EQ(ConstString("libaux1.so"),
+            filtees.GetFileSpecAtIndex(0).GetFilename());
+  EXPECT_EQ(ConstString("libaux2.so"),
+            filtees.GetFileSpecAtIndex(1).GetFilename());
+
+  // A zero-sized exported function becomes a re-export recording the first
+  // filtee.
+  const Symbol *placeholder = module_sp->FindFirstSymbolWithNameAndType(
+      ConstString("mmap"), eSymbolTypeReExported);
+  ASSERT_NE(nullptr, placeholder);
+  EXPECT_EQ(ConstString("mmap"), placeholder->GetReExportedSymbolName());
+  EXPECT_EQ(ConstString("libaux1.so"),
+            ConstString(
+                placeholder->GetReExportedSymbolSharedLibrary().GetFilename()));
+
+  // The re-exported name must not carry the @VERSION suffix.  Find the
+  // symbol by iterating rather than by name: whether a versioned symbol can
+  // be looked up by its stripped base name is a property of the symtab name
+  // indexes, not of the re-export marking under test here.
+  Symtab *symtab = module_sp->GetSymtab();
+  ASSERT_NE(nullptr, symtab);
+  const Symbol *versioned = nullptr;
+  for (size_t i = 0, e = symtab->GetNumSymbols(); i != e; ++i) {
+    Symbol *candidate = symtab->SymbolAtIndex(i);
+    if (candidate->GetType() == eSymbolTypeReExported &&
+        candidate->GetName().GetStringRef().starts_with("open"))
+      versioned = candidate;
+  }
+  ASSERT_NE(nullptr, versioned);
+  EXPECT_EQ(ConstString("open"), versioned->GetReExportedSymbolName());
+
+  // A function the filter genuinely defines (nonzero size) keeps its
+  // definition, matching the dynamic linker's DT_AUXILIARY fallback.
+  const Symbol *real = module_sp->FindFirstSymbolWithNameAndType(
+      ConstString("printf"), eSymbolTypeCode);
+  ASSERT_NE(nullptr, real);
+
+  // Local zero-sized functions are not exported and must not be marked.
+  const Symbol *local = module_sp->FindFirstSymbolWithNameAndType(
+      ConstString("local_helper"), eSymbolTypeAny);
+  ASSERT_NE(nullptr, local);
+  EXPECT_NE(eSymbolTypeReExported, local->GetType());
 }
