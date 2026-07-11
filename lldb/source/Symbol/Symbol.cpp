@@ -456,8 +456,15 @@ Symbol *Symbol::ResolveReExportedSymbolInModuleSpec(
     module_sp->FindSymbolsWithNameAndType(reexport_name, eSymbolTypeAny,
                                           sc_list);
     for (const SymbolContext &sc : sc_list) {
-      if (sc.symbol->IsExternal())
-        return sc.symbol;
+      if (!sc.symbol->IsExternal())
+        continue;
+      // Don't return a symbol that itself only re-exports the definition
+      // (e.g. an ELF filter library's placeholder): the real definition is
+      // found by following the module-level re-exports below, which also
+      // guards against cycles.
+      if (sc.symbol->GetType() == eSymbolTypeReExported)
+        continue;
+      return sc.symbol;
     }
     // If we didn't find the symbol in this module, it may be because this
     // module re-exports some whole other library.  We have to search those as
@@ -480,17 +487,43 @@ Symbol *Symbol::ResolveReExportedSymbolInModuleSpec(
   return nullptr;
 }
 
-Symbol *Symbol::ResolveReExportedSymbol(Target &target) const {
+Symbol *Symbol::ResolveReExportedSymbol(
+    Target &target, const lldb::ModuleSP &containing_module_sp) const {
   ConstString reexport_name(GetReExportedSymbolName());
-  if (reexport_name) {
-    ModuleSpec module_spec;
-    ModuleList seen_modules;
-    module_spec.GetFileSpec() = GetReExportedSymbolSharedLibrary();
-    if (module_spec.GetFileSpec()) {
-      return ResolveReExportedSymbolInModuleSpec(target, reexport_name,
-                                                 module_spec, seen_modules);
+  if (!reexport_name)
+    return nullptr;
+
+  ModuleList seen_modules;
+
+  // Search the library recorded on the symbol itself first.
+  ModuleSpec module_spec;
+  module_spec.GetFileSpec() = GetReExportedSymbolSharedLibrary();
+  if (module_spec.GetFileSpec()) {
+    if (Symbol *result = ResolveReExportedSymbolInModuleSpec(
+            target, reexport_name, module_spec, seen_modules))
+      return result;
+  }
+
+  // The recorded library is only the first candidate: the module defining
+  // this symbol may re-export several libraries which must be searched in
+  // the order they are declared (e.g. an ELF filter library with multiple
+  // DT_FILTER / DT_AUXILIARY entries).  seen_modules is shared with the
+  // search above so no library is searched twice.
+  if (containing_module_sp) {
+    if (ObjectFile *object_file = containing_module_sp->GetObjectFile()) {
+      FileSpecList reexported_libraries = object_file->GetReExportedLibraries();
+      const size_t count = reexported_libraries.GetSize();
+      for (size_t idx = 0; idx < count; ++idx) {
+        ModuleSpec reexported_module_spec;
+        reexported_module_spec.GetFileSpec() =
+            reexported_libraries.GetFileSpecAtIndex(idx);
+        if (Symbol *result = ResolveReExportedSymbolInModuleSpec(
+                target, reexport_name, reexported_module_spec, seen_modules))
+          return result;
+      }
     }
   }
+
   return nullptr;
 }
 
