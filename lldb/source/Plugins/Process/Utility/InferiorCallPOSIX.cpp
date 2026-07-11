@@ -33,6 +33,30 @@
 using namespace lldb;
 using namespace lldb_private;
 
+/// Pick a call target from \p sc_list.  Re-exported symbols have no code of
+/// their own and are resolved through the library that actually defines
+/// them, mirroring what the dynamic linker does.
+static Address GetCallableAddress(Target &target,
+                                  const SymbolContextList &sc_list) {
+  const uint32_t count = sc_list.GetSize();
+  for (uint32_t i = 0; i < count; ++i) {
+    SymbolContext sc;
+    if (!sc_list.GetContextAtIndex(i, sc))
+      continue;
+    if (sc.symbol && sc.symbol->GetType() == eSymbolTypeReExported) {
+      // Pass the containing module so all of its re-exported libraries
+      // (e.g. an ELF filter library's filtees) are searched in order.
+      if (Symbol *actual =
+              sc.symbol->ResolveReExportedSymbol(target, sc.module_sp))
+        return actual->GetAddress();
+      // Unresolvable re-export: not callable.
+      continue;
+    }
+    return sc.GetFunctionOrSymbolAddress();
+  }
+  return Address();
+}
+
 bool lldb_private::InferiorCallMmap(Process *process, addr_t &allocated_addr,
                                     addr_t addr, addr_t length, unsigned prot,
                                     unsigned flags, addr_t fd, addr_t offset) {
@@ -50,8 +74,7 @@ bool lldb_private::InferiorCallMmap(Process *process, addr_t &allocated_addr,
       ConstString("mmap"), eFunctionNameTypeFull, function_options, sc_list);
   const uint32_t count = sc_list.GetSize();
   if (count > 0) {
-    SymbolContext sc;
-    if (sc_list.GetContextAtIndex(0, sc)) {
+    {
       EvaluateExpressionOptions options;
       options.SetStopOthers(true);
       options.SetUnwindOnError(true);
@@ -74,7 +97,7 @@ bool lldb_private::InferiorCallMmap(Process *process, addr_t &allocated_addr,
           prot_arg |= PROT_WRITE;
       }
 
-      Address mmap_addr = sc.GetFunctionOrSymbolAddress();
+      Address mmap_addr = GetCallableAddress(process->GetTarget(), sc_list);
       if (mmap_addr.IsValid()) {
         auto type_system_or_err =
             process->GetTarget().GetScratchTypeSystemForLanguage(
@@ -142,8 +165,7 @@ bool lldb_private::InferiorCallMunmap(Process *process, addr_t addr,
       ConstString("munmap"), eFunctionNameTypeFull, function_options, sc_list);
   const uint32_t count = sc_list.GetSize();
   if (count > 0) {
-    SymbolContext sc;
-    if (sc_list.GetContextAtIndex(0, sc)) {
+    {
       EvaluateExpressionOptions options;
       options.SetStopOthers(true);
       options.SetUnwindOnError(true);
@@ -153,7 +175,7 @@ bool lldb_private::InferiorCallMunmap(Process *process, addr_t addr,
       options.SetTimeout(process->GetUtilityExpressionTimeout());
       options.SetTrapExceptions(false);
 
-      Address munmap_addr = sc.GetFunctionOrSymbolAddress();
+      Address munmap_addr = GetCallableAddress(process->GetTarget(), sc_list);
       if (munmap_addr.IsValid()) {
         lldb::addr_t args[] = {addr, length};
         lldb::ThreadPlanSP call_plan_sp(new ThreadPlanCallFunction(
