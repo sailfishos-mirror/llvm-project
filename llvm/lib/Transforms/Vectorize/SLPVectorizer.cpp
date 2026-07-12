@@ -22145,7 +22145,7 @@ Value *BoUpSLP::gather(
         return Vec;
       InsElt = II;
     } else {
-      Vec = Builder.CreateInsertElement(Vec, Scalar, Builder.getInt32(Pos));
+      Vec = Builder.CreateInsertElement(Vec, Scalar, Pos);
       InsElt = dyn_cast<InsertElementInst>(Vec);
       if (!InsElt)
         return Vec;
@@ -25037,7 +25037,6 @@ Value *BoUpSLP::vectorizeTree(
     Value *Vec = E->VectorizedValue;
     assert(Vec && "Can't find vectorizable value");
 
-    Value *Lane = Builder.getInt32(ExternalUse.Lane);
     auto ExtractAndExtendIfNeeded = [&](Value *Vec) {
       if (isa<InsertValueInst>(Scalar))
         return Vec;
@@ -25122,7 +25121,7 @@ Value *BoUpSLP::vectorizeTree(
                 IV->comesBefore(IVec))
               Ex = Builder.CreateExtractElement(V, ES->getIndexOperand());
             else
-              Ex = Builder.CreateExtractElement(Vec, Lane);
+              Ex = Builder.CreateExtractElement(Vec, ExternalUse.Lane);
           } else if (auto *VecTy =
                          dyn_cast<FixedVectorType>(Scalar->getType())) {
             assert(SLPReVec && "FixedVectorType is not expected.");
@@ -25166,7 +25165,7 @@ Value *BoUpSLP::vectorizeTree(
               Ex = createExtractVector(Builder, Vec, VecTyNumElements,
                                        ExternalUse.Lane * VecTyNumElements);
             } else {
-              Ex = Builder.CreateExtractElement(Vec, Lane);
+              Ex = Builder.CreateExtractElement(Vec, ExternalUse.Lane);
             }
           }
           // If necessary, sign-extend or zero-extend ScalarRoot
