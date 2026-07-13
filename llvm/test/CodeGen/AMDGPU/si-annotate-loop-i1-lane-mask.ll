@@ -12,15 +12,15 @@ define amdgpu_kernel void @divergent_loop(ptr addrspace(1) %p) {
 ; OPT-NEXT:    [[TID:%.*]] = call i32 @llvm.amdgcn.workitem.id.x()
 ; OPT-NEXT:    br label [[LOOP:%.*]]
 ; OPT:       loop:
-; OPT-NEXT:    [[PHI_BROKEN:%.*]] = phi i64 [ [[TMP0:%.*]], [[LOOP]] ], [ 0, [[ENTRY:%.*]] ]
+; OPT-NEXT:    [[PHI_BROKEN:%.*]] = phi i1 [ [[TMP0:%.*]], [[LOOP]] ], [ false, [[ENTRY:%.*]] ]
 ; OPT-NEXT:    [[I:%.*]] = phi i32 [ 0, [[ENTRY]] ], [ [[I_NEXT:%.*]], [[LOOP]] ]
 ; OPT-NEXT:    [[I_NEXT]] = add i32 [[I]], 1
 ; OPT-NEXT:    [[COND:%.*]] = icmp sge i32 [[I]], [[TID]]
-; OPT-NEXT:    [[TMP0]] = call i64 @llvm.amdgcn.if.break.i64(i1 [[COND]], i64 [[PHI_BROKEN]])
-; OPT-NEXT:    [[TMP1:%.*]] = call i1 @llvm.amdgcn.loop.i64(i64 [[TMP0]])
+; OPT-NEXT:    [[TMP0]] = call i1 @llvm.amdgcn.if.break(i1 [[COND]], i1 [[PHI_BROKEN]])
+; OPT-NEXT:    [[TMP1:%.*]] = call i1 @llvm.amdgcn.loop(i1 [[TMP0]])
 ; OPT-NEXT:    br i1 [[TMP1]], label [[EXIT:%.*]], label [[LOOP]]
 ; OPT:       exit:
-; OPT-NEXT:    call void @llvm.amdgcn.end.cf.i64(i64 [[TMP0]])
+; OPT-NEXT:    call void @llvm.amdgcn.end.cf(i1 [[TMP0]])
 ; OPT-NEXT:    store i32 [[I]], ptr addrspace(1) [[P:%.*]], align 4
 ; OPT-NEXT:    ret void
 ;

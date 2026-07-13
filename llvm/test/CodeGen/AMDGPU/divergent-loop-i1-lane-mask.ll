@@ -34,18 +34,22 @@ define amdgpu_kernel void @divergent_loop(ptr addrspace(1) %p) {
 ;
 ; GFX9-GISEL-LABEL: divergent_loop:
 ; GFX9-GISEL:       ; %bb.0: ; %entry
-; GFX9-GISEL-NEXT:    s_mov_b32 s2, -1
+; GFX9-GISEL-NEXT:    s_mov_b32 s6, -1
 ; GFX9-GISEL-NEXT:    s_mov_b64 s[0:1], 0
+; GFX9-GISEL-NEXT:    ; implicit-def: $sgpr2_sgpr3
 ; GFX9-GISEL-NEXT:  .LBB0_1: ; %loop
 ; GFX9-GISEL-NEXT:    ; =>This Inner Loop Header: Depth=1
-; GFX9-GISEL-NEXT:    s_add_i32 s2, s2, 1
-; GFX9-GISEL-NEXT:    v_cmp_ge_i32_e32 vcc, s2, v0
+; GFX9-GISEL-NEXT:    s_add_i32 s6, s6, 1
+; GFX9-GISEL-NEXT:    v_cmp_ge_i32_e32 vcc, s6, v0
 ; GFX9-GISEL-NEXT:    s_or_b64 s[0:1], vcc, s[0:1]
-; GFX9-GISEL-NEXT:    v_mov_b32_e32 v1, s2
+; GFX9-GISEL-NEXT:    s_andn2_b64 s[2:3], s[2:3], exec
+; GFX9-GISEL-NEXT:    s_and_b64 s[8:9], exec, s[0:1]
+; GFX9-GISEL-NEXT:    v_mov_b32_e32 v1, s6
+; GFX9-GISEL-NEXT:    s_or_b64 s[2:3], s[2:3], s[8:9]
 ; GFX9-GISEL-NEXT:    s_andn2_b64 exec, exec, s[0:1]
 ; GFX9-GISEL-NEXT:    s_cbranch_execnz .LBB0_1
 ; GFX9-GISEL-NEXT:  ; %bb.2: ; %exit
-; GFX9-GISEL-NEXT:    s_or_b64 exec, exec, s[0:1]
+; GFX9-GISEL-NEXT:    s_or_b64 exec, exec, s[2:3]
 ; GFX9-GISEL-NEXT:    s_load_dwordx2 s[0:1], s[4:5], 0x24
 ; GFX9-GISEL-NEXT:    v_mov_b32_e32 v0, 0
 ; GFX9-GISEL-NEXT:    s_waitcnt lgkmcnt(0)
@@ -74,18 +78,22 @@ define amdgpu_kernel void @divergent_loop(ptr addrspace(1) %p) {
 ;
 ; GFX10-GISEL-LABEL: divergent_loop:
 ; GFX10-GISEL:       ; %bb.0: ; %entry
-; GFX10-GISEL-NEXT:    s_mov_b32 s1, -1
-; GFX10-GISEL-NEXT:    s_mov_b32 s0, 0
+; GFX10-GISEL-NEXT:    s_mov_b32 s0, -1
+; GFX10-GISEL-NEXT:    s_mov_b32 s1, 0
+; GFX10-GISEL-NEXT:    ; implicit-def: $sgpr2
 ; GFX10-GISEL-NEXT:  .LBB0_1: ; %loop
 ; GFX10-GISEL-NEXT:    ; =>This Inner Loop Header: Depth=1
-; GFX10-GISEL-NEXT:    s_add_i32 s1, s1, 1
-; GFX10-GISEL-NEXT:    v_cmp_ge_i32_e32 vcc_lo, s1, v0
-; GFX10-GISEL-NEXT:    v_mov_b32_e32 v1, s1
-; GFX10-GISEL-NEXT:    s_or_b32 s0, vcc_lo, s0
-; GFX10-GISEL-NEXT:    s_andn2_b32 exec_lo, exec_lo, s0
+; GFX10-GISEL-NEXT:    s_add_i32 s0, s0, 1
+; GFX10-GISEL-NEXT:    v_cmp_ge_i32_e32 vcc_lo, s0, v0
+; GFX10-GISEL-NEXT:    v_mov_b32_e32 v1, s0
+; GFX10-GISEL-NEXT:    s_or_b32 s1, vcc_lo, s1
+; GFX10-GISEL-NEXT:    s_andn2_b32 s2, s2, exec_lo
+; GFX10-GISEL-NEXT:    s_and_b32 s3, exec_lo, s1
+; GFX10-GISEL-NEXT:    s_or_b32 s2, s2, s3
+; GFX10-GISEL-NEXT:    s_andn2_b32 exec_lo, exec_lo, s1
 ; GFX10-GISEL-NEXT:    s_cbranch_execnz .LBB0_1
 ; GFX10-GISEL-NEXT:  ; %bb.2: ; %exit
-; GFX10-GISEL-NEXT:    s_or_b32 exec_lo, exec_lo, s0
+; GFX10-GISEL-NEXT:    s_or_b32 exec_lo, exec_lo, s2
 ; GFX10-GISEL-NEXT:    s_load_dwordx2 s[0:1], s[4:5], 0x24
 ; GFX10-GISEL-NEXT:    v_mov_b32_e32 v0, 0
 ; GFX10-GISEL-NEXT:    s_waitcnt lgkmcnt(0)
