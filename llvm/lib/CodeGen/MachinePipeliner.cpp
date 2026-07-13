@@ -1904,9 +1904,11 @@ public:
   }
 
   // Calculate the maximum register pressures of the loop and check if they
-  // exceed the limit
+  // exceed the limit, or defer to the target's verdict via
+  // PipelinerLoopInfo::isScheduleRegPressureTooHigh.
   bool detect(const SwingSchedulerDAG *SSD, SMSchedule &Schedule,
-              const unsigned MaxStage) const {
+              const unsigned MaxStage,
+              const TargetInstrInfo::PipelinerLoopInfo *PLI) const {
     assert(0 <= RegPressureMargin && RegPressureMargin <= 100 &&
            "the percentage of the margin must be between 0 to 100");
 
@@ -1923,6 +1925,18 @@ public:
       }
       dbgs() << '\n';
     });
+
+    if (PLI) {
+      if (std::optional<bool> TooHigh =
+              PLI->isScheduleRegPressureTooHigh(MaxSetPressure)) {
+        LLVM_DEBUG(dbgs() << (*TooHigh
+                                  ? "Rejected the schedule because of too high "
+                                    "register pressure (per target verdict)\n"
+                                  : "Accepted the schedule (per target "
+                                    "verdict)\n"));
+        return *TooHigh;
+      }
+    }
 
     for (unsigned PSet = 0; PSet < PSetNum; PSet++) {
       unsigned Limit = PressureSetLimit[PSet];
@@ -2802,7 +2816,8 @@ bool SwingSchedulerDAG::schedulePipeline(SMSchedule &Schedule) {
 
   bool scheduleFound = false;
   std::unique_ptr<HighRegisterPressureDetector> HRPDetector;
-  if (LimitRegPressure) {
+  if (LimitRegPressure ||
+      (LoopPipelinerInfo && LoopPipelinerInfo->shouldLimitRegPressure())) {
     HRPDetector =
         std::make_unique<HighRegisterPressureDetector>(Loop.getHeader(), MF);
     HRPDetector->init(RegClassInfo);
@@ -2886,11 +2901,11 @@ bool SwingSchedulerDAG::schedulePipeline(SMSchedule &Schedule) {
     if (scheduleFound)
       scheduleFound = Schedule.isValidSchedule(this);
 
-    // If a schedule was found and the option is enabled, check if the schedule
-    // might generate additional register spills/fills.
-    if (scheduleFound && LimitRegPressure)
-      scheduleFound =
-          !HRPDetector->detect(this, Schedule, Schedule.getMaxStageCount());
+    // If a schedule was found and the detector is enabled, check if the
+    // schedule might generate additional register spills/fills.
+    if (scheduleFound && HRPDetector)
+      scheduleFound = !HRPDetector->detect(
+          this, Schedule, Schedule.getMaxStageCount(), LoopPipelinerInfo);
   }
 
   LLVM_DEBUG(dbgs() << "Schedule Found? " << scheduleFound
