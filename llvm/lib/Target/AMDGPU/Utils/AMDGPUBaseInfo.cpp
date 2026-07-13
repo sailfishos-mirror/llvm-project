@@ -1081,7 +1081,7 @@ VOPD::InstInfo getVOPDInstInfo(unsigned VOPDOpcode,
 TargetID createAMDGPUTargetID(const MCSubtargetInfo &STI,
                               StringRef FeatureString) {
   TargetID TargetID(parseArchAMDGCN(STI.getCPU()), STI.getTargetTriple(),
-                    STI.getFeatureBits().test(FeatureSupportsXNACK)
+                    STI.getFeatureBits().test(FeatureXNACKOnOffModes)
                         ? TargetIDSetting::Any
                         : TargetIDSetting::Unsupported,
                     STI.getFeatureBits().test(FeatureSupportsSRAMECC)
