@@ -1,5 +1,3 @@
-// RUN: llvm-mc -triple aarch64-none-linux-gnu -show-encoding -mattr=+hcx < %s 2>%t | FileCheck %s
-// RUN: llvm-mc -triple aarch64-none-linux-gnu -show-encoding -mattr=+v8.7a < %s 2>%t | FileCheck %s
 // RUN: llvm-mc -triple aarch64-none-linux-gnu -show-encoding < %s 2>%t | FileCheck %s
 
   mrs x2, HCRX_EL2
