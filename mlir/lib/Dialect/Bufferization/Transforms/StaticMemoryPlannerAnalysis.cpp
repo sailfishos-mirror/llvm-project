@@ -18,6 +18,7 @@
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
+#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/Support/Debug.h"
 #include <numeric>
 
@@ -34,10 +35,12 @@ using namespace mlir;
 
 namespace {
 
-/// A candidate allocation with its matching deallocation and assigned offset.
+/// A candidate allocation with its matching deallocation(s) and assigned
+/// offset. An alloc may be freed indirectly through arith.select chains,
+/// yielding multiple potential deallocs — all must be in the same block.
 struct AllocationCandidate {
   memref::AllocOp alloc;
-  memref::DeallocOp dealloc;
+  SmallVector<memref::DeallocOp> deallocs;
   int64_t offset = 0; // Offset in bytes from arena start (assigned by planner)
   int64_t sizeInBytes = 0; // Size in bytes
   int64_t alignment = 1;   // Required alignment in bytes
@@ -47,18 +50,25 @@ struct AllocationCandidate {
 // Helper utilities
 //===----------------------------------------------------------------------===//
 
-/// Finds the unique dealloc operation for a given alloc value.
-/// Returns nullptr if there are zero or multiple deallocs.
-static memref::DeallocOp findUniqueDealloc(Value allocValue) {
-  memref::DeallocOp deallocOp = nullptr;
-  for (Operation *user : allocValue.getUsers()) {
+/// Collect all dealloc ops that might free the given value, following
+/// arith.select chains. For example:
+///   %0 = memref.alloc()
+///   %2 = arith.select %c, %0, %1
+///   memref.dealloc %2    <- this covers %0 conditionally
+/// `visited` prevents cycles in the use-def graph.
+static void findPotentialDeallocs(Value value,
+                                  SmallVectorImpl<memref::DeallocOp> &deallocs,
+                                  SmallPtrSetImpl<Value> &visited) {
+  if (!visited.insert(value).second)
+    return;
+  for (Operation *user : value.getUsers()) {
     if (auto dealloc = dyn_cast<memref::DeallocOp>(user)) {
-      if (deallocOp)
-        return nullptr; // Multiple deallocs found
-      deallocOp = dealloc;
+      deallocs.push_back(dealloc);
+    } else if (auto select = dyn_cast<arith::SelectOp>(user)) {
+      if (isa<MemRefType>(select.getType()))
+        findPotentialDeallocs(select.getResult(), deallocs, visited);
     }
   }
-  return deallocOp;
 }
 
 /// Compute the size in bytes for a memref type.
@@ -70,25 +80,31 @@ static int64_t computeSizeInBytes(MemRefType memrefType) {
 
 /// Build lifetime-annotated allocation descriptors from candidates.
 /// Returns the arena alignment (LCM of all individual alignments).
+/// Uses a single block scan (O(n+m)) instead of one scan per candidate.
 static int64_t buildAllocInfos(
     MutableArrayRef<AllocationCandidate> candidates,
     SmallVectorImpl<bufferization::MemoryPlannerAlloc> &allocInfos) {
+  // Build an op-index map with a single pass over the block.
+  DenseMap<Operation *, int64_t> opIndex;
+  if (!candidates.empty()) {
+    Block *block = candidates.front().alloc->getBlock();
+    int64_t idx = 0;
+    for (Operation &op : *block)
+      opIndex[&op] = idx++;
+  }
+
   int64_t arenaAlignment = 1;
   for (auto &candidate : candidates) {
     bufferization::MemoryPlannerAlloc info;
     info.sizeInBytes = candidate.sizeInBytes;
     info.alignment = candidate.alignment;
-
-    Block *block = candidate.alloc->getBlock();
-    int64_t opIdx = 0;
-    for (Operation &op : *block) {
-      if (&op == candidate.alloc.getOperation())
-        info.timeStart = opIdx;
-      if (&op == candidate.dealloc.getOperation())
-        info.timeEnd = opIdx;
-      ++opIdx;
-    }
-
+    info.timeStart = opIndex.lookup(candidate.alloc.getOperation());
+    // Conservative: timeEnd = latest dealloc index among all potential
+    // deallocs.
+    int64_t timeEnd = 0;
+    for (memref::DeallocOp d : candidate.deallocs)
+      timeEnd = std::max(timeEnd, opIndex.lookup(d.getOperation()));
+    info.timeEnd = timeEnd;
     allocInfos.push_back(info);
     arenaAlignment = std::lcm(arenaAlignment, candidate.alignment);
   }
@@ -96,45 +112,59 @@ static int64_t buildAllocInfos(
 }
 
 /// Collect alloc/dealloc pairs eligible for arena placement.
-/// An allocation is eligible if it has a static shape and a unique dealloc
-/// in the same block.
+/// An allocation is eligible if it has a static shape and all of its
+/// potential deallocs (including those reached via arith.select chains)
+/// are in the same block. A group constraint ensures that all allocs
+/// sharing a select-based dealloc are either all eligible or all skipped.
 static SmallVector<AllocationCandidate>
 collectCandidates(FunctionOpInterface funcOp, llvm::Statistic &numSkipDynamic,
                   llvm::Statistic &numSkipNoDealloc,
                   llvm::Statistic &numEligible) {
-  SmallVector<AllocationCandidate> candidates;
+  // Walk allocs, find all potential deallocs via select chains.
+  SmallVector<AllocationCandidate> potentialCandidates;
 
   funcOp->walk([&](memref::AllocOp allocOp) {
     MemRefType memrefType = allocOp.getType();
-
-    // Skip dynamic shapes
     if (!memrefType.hasStaticShape()) {
       ++numSkipDynamic;
       return;
     }
 
-    // Find unique dealloc in the same block
-    memref::DeallocOp deallocOp = findUniqueDealloc(allocOp.getResult());
-    if (!deallocOp) {
+    SmallVector<memref::DeallocOp> deallocs;
+    SmallPtrSet<Value, 8> visited;
+    findPotentialDeallocs(allocOp.getResult(), deallocs, visited);
+
+    if (deallocs.empty()) {
       ++numSkipNoDealloc;
       return;
     }
 
-    if (deallocOp->getBlock() != allocOp->getBlock()) {
+    // All deallocs must be in the same block as the alloc.
+    bool allSameBlock = llvm::all_of(deallocs, [&](memref::DeallocOp d) {
+      return d->getBlock() == allocOp->getBlock();
+    });
+    if (!allSameBlock) {
       ++numSkipNoDealloc;
       return;
     }
 
-    // This allocation is eligible
-    ++numEligible;
     AllocationCandidate candidate;
     candidate.alloc = allocOp;
-    candidate.dealloc = deallocOp;
+    candidate.deallocs = deallocs;
     candidate.sizeInBytes = computeSizeInBytes(memrefType);
     candidate.alignment = allocOp.getAlignment().value_or(1);
-    candidates.push_back(candidate);
+    potentialCandidates.push_back(candidate);
   });
 
+  // Note: arith.select requires both operands to have the same type, so if
+  // one alloc in a select group has a static shape, all others must too.
+  // A mixed-eligibility group (some eligible, some not) is therefore
+  // impossible and no group-constraint fixpoint is needed.
+  SmallVector<AllocationCandidate> candidates;
+  for (auto &c : potentialCandidates) {
+    ++numEligible;
+    candidates.push_back(c);
+  }
   return candidates;
 }
 
@@ -180,8 +210,14 @@ static FailureOr<Value> createArena(OpBuilder &builder,
 }
 
 /// Replace each alloc/dealloc pair with a memref.view into the arena.
+/// Handles select-chained deallocs: a single dealloc may cover multiple allocs,
+/// so we track erased deallocs to avoid double-erase.
 static void rewriteAllocations(MutableArrayRef<AllocationCandidate> candidates,
                                Value arenaValue) {
+  SmallPtrSet<Operation *, 8> erasedDeallocs;
+  SmallVector<Operation *> allocsToErase;
+
+  // First replace all alloc results (rewires selects too), collect for erase.
   for (auto &candidate : candidates) {
     OpBuilder builder(candidate.alloc);
     Location loc = candidate.alloc.getLoc();
@@ -191,11 +227,19 @@ static void rewriteAllocations(MutableArrayRef<AllocationCandidate> candidates,
         arith::ConstantIndexOp::create(builder, loc, candidate.offset);
     auto view = memref::ViewOp::create(builder, loc, originalType, arenaValue,
                                        offsetIndex, SmallVector<Value>{});
-
     candidate.alloc.getResult().replaceAllUsesWith(view.getResult());
-    candidate.alloc.erase();
-    candidate.dealloc.erase();
+    allocsToErase.push_back(candidate.alloc.getOperation());
   }
+
+  // Erase deallocs first (they may reference alloc results via selects).
+  for (auto &candidate : candidates)
+    for (memref::DeallocOp d : candidate.deallocs)
+      if (erasedDeallocs.insert(d.getOperation()).second)
+        d.erase();
+
+  // Erase allocs last (no users remain after replaceAllUsesWith).
+  for (Operation *allocOp : allocsToErase)
+    allocOp->erase();
 }
 
 //===----------------------------------------------------------------------===//

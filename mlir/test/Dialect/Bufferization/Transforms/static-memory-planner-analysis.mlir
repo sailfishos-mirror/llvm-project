@@ -190,3 +190,64 @@ func.func @lcm_alignment() {
   memref.dealloc %alloc1 : memref<3xi32>
   return
 }
+
+// -----
+
+// Test 10: Single alloc freed via arith.select-based dealloc.
+// CHECK-LABEL: func @select_single_alloc
+func.func @select_single_alloc() {
+  %c = arith.constant true
+  // CHECK: %[[ARENA:.*]] = memref.alloc() {alignment = 1 : i64} : memref<4096xi8>
+  // CHECK-NEXT: %[[C0:.*]] = arith.constant 0 : index
+  // CHECK-NEXT: %[[V:.*]] = memref.view %[[ARENA]][%[[C0]]][] : memref<4096xi8> to memref<1024xf32>
+  // CHECK-NOT: memref.alloc
+  // CHECK-NOT: memref.dealloc
+  %alloc = memref.alloc() : memref<1024xf32>
+  %sel = arith.select %c, %alloc, %alloc : memref<1024xf32>
+  memref.dealloc %sel : memref<1024xf32>
+  return
+}
+
+// -----
+
+// Test 11: Two allocs freed via a shared select-based dealloc.
+// Group constraint: both must be eligible together or neither is.
+// CHECK-LABEL: func @select_shared_dealloc
+func.func @select_shared_dealloc() {
+  %c = arith.constant true
+  // CHECK: %[[ARENA:.*]] = memref.alloc() {alignment = 1 : i64} : memref<8192xi8>
+  // CHECK-NEXT: %[[C0:.*]] = arith.constant 0 : index
+  // CHECK-NEXT: %[[V0:.*]] = memref.view %[[ARENA]][%[[C0]]][] : memref<8192xi8> to memref<1024xf32>
+  // CHECK-NEXT: %[[C4096:.*]] = arith.constant 4096 : index
+  // CHECK-NEXT: %[[V1:.*]] = memref.view %[[ARENA]][%[[C4096]]][] : memref<8192xi8> to memref<1024xf32>
+  // CHECK-NOT: memref.alloc
+  // CHECK-NOT: memref.dealloc
+  %a = memref.alloc() : memref<1024xf32>
+  %b = memref.alloc() : memref<1024xf32>
+  %sel = arith.select %c, %a, %b : memref<1024xf32>
+  memref.dealloc %sel : memref<1024xf32>
+  return
+}
+
+// -----
+
+// Test 12: Two allocs, two select-based deallocs (mentor's canonical example).
+// %a freed via dealloc(%sel1) or dealloc(%sel2), %b likewise.
+// CHECK-LABEL: func @select_two_deallocs
+func.func @select_two_deallocs() {
+  %c = arith.constant true
+  // CHECK: %[[ARENA:.*]] = memref.alloc() {alignment = 1 : i64} : memref<8192xi8>
+  // CHECK-NEXT: %[[C0:.*]] = arith.constant 0 : index
+  // CHECK-NEXT: %{{.*}} = memref.view %[[ARENA]][%[[C0]]][] : memref<8192xi8> to memref<1024xf32>
+  // CHECK-NEXT: %[[C4096:.*]] = arith.constant 4096 : index
+  // CHECK-NEXT: %{{.*}} = memref.view %[[ARENA]][%[[C4096]]][] : memref<8192xi8> to memref<1024xf32>
+  // CHECK-NOT: memref.alloc
+  // CHECK-NOT: memref.dealloc
+  %a = memref.alloc() : memref<1024xf32>
+  %b = memref.alloc() : memref<1024xf32>
+  %sel1 = arith.select %c, %a, %b : memref<1024xf32>
+  memref.dealloc %sel1 : memref<1024xf32>
+  %sel2 = arith.select %c, %b, %a : memref<1024xf32>
+  memref.dealloc %sel2 : memref<1024xf32>
+  return
+}
