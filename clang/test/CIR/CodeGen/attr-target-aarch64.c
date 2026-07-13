@@ -239,6 +239,6 @@ void applem4(void) {}
 
 // CIR:      cir.func{{.*}} @applem4()
 // CIR-SAME: "cir.target-cpu" = "apple-m4"
-// CIR-SAME: "cir.target-features" = "+aes,+bf16,+bti,+ccidx,+complxnum,+crc,+dit,+dotprod,+flagm,+fp-armv8,+fp16fml,+fpac,+fullfp16,+hcx,+i8mm,+jsconv,+lse,+neon,+pauth,+perfmon,+predres,+ras,+rcpc,+rdm,+sb,+sha2,+sha3,+sme,+sme-f64f64,+sme-i16i64,+sme2,+spe-eef,+ssbs,+v8.1a,+v8.2a,+v8.3a,+v8.4a,+v8.5a,+v8.6a,+v8.7a,+v8a,+wfxt"
+// CIR-SAME: "cir.target-features" = "+aes,+bf16,+bti,+ccidx,+complxnum,+crc,+dit,+dotprod,+flagm,+fp-armv8,+fp16fml,+fpac,+fullfp16,+i8mm,+jsconv,+lse,+neon,+pauth,+perfmon,+predres,+ras,+rcpc,+rdm,+sb,+sha2,+sha3,+sme,+sme-f64f64,+sme-i16i64,+sme2,+spe-eef,+ssbs,+v8.1a,+v8.2a,+v8.3a,+v8.4a,+v8.5a,+v8.6a,+v8.7a,+v8a,+wfxt"
 // LLVM-DAG: define{{.*}} void @applem4(){{.*}} #[[ATTR_APPLEM4:[0-9]+]]
-// LLVM-DAG: attributes #[[ATTR_APPLEM4]] = {{.*}}"target-cpu"="apple-m4"{{.*}}"target-features"="+aes,+bf16,+bti,+ccidx,+complxnum,+crc,+dit,+dotprod,+flagm,+fp-armv8,+fp16fml,+fpac,+fullfp16,+hcx,+i8mm,+jsconv,+lse,+neon,+pauth,+perfmon,+predres,+ras,+rcpc,+rdm,+sb,+sha2,+sha3,+sme,+sme-f64f64,+sme-i16i64,+sme2,+spe-eef,+ssbs,+v8.1a,+v8.2a,+v8.3a,+v8.4a,+v8.5a,+v8.6a,+v8.7a,+v8a,+wfxt"
+// LLVM-DAG: attributes #[[ATTR_APPLEM4]] = {{.*}}"target-cpu"="apple-m4"{{.*}}"target-features"="+aes,+bf16,+bti,+ccidx,+complxnum,+crc,+dit,+dotprod,+flagm,+fp-armv8,+fp16fml,+fpac,+fullfp16,+i8mm,+jsconv,+lse,+neon,+pauth,+perfmon,+predres,+ras,+rcpc,+rdm,+sb,+sha2,+sha3,+sme,+sme-f64f64,+sme-i16i64,+sme2,+spe-eef,+ssbs,+v8.1a,+v8.2a,+v8.3a,+v8.4a,+v8.5a,+v8.6a,+v8.7a,+v8a,+wfxt"
