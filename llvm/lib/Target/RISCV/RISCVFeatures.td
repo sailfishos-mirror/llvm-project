@@ -204,6 +204,13 @@ def FeatureZilsdWordAlign
     : SubtargetFeature<"zilsd-word-align", "AllowZilsdWordAlign", "true",
                        "Allow 4-byte alignment for Zilsd LD/SD instructions">;
 
+def FeatureStdExtZilx
+    : RISCVExperimentalExtension<0, 1, "Index Load for Integer">;
+def HasStdExtZilx
+    : Predicate<"Subtarget->hasStdExtZilx()">,
+      AssemblerPredicate<(all_of FeatureStdExtZilx),
+                          "'Zilx' (Index Load for Integer)">;
+
 // Multiply Extensions
 
 def FeatureStdExtZmmul
