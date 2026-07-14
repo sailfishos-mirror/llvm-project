@@ -33,9 +33,10 @@
 using namespace lldb;
 using namespace lldb_private;
 
-/// Pick a call target from \p sc_list.  Re-exported symbols have no code of
-/// their own and are resolved through the library that actually defines
-/// them, mirroring what the dynamic linker does.
+/// Pick a call target from \p sc_list.  A symbol from an ELF filter/auxiliary
+/// library is resolved through its filtee(s) first, falling back to its own
+/// definition only if none of them provide it, mirroring what the dynamic
+/// linker does.
 static Address GetCallableAddress(Target &target,
                                   const SymbolContextList &sc_list) {
   const uint32_t count = sc_list.GetSize();
@@ -43,14 +44,16 @@ static Address GetCallableAddress(Target &target,
     SymbolContext sc;
     if (!sc_list.GetContextAtIndex(i, sc))
       continue;
-    if (sc.symbol && sc.symbol->GetType() == eSymbolTypeReExported) {
+    if (sc.symbol) {
       // Pass the containing module so all of its re-exported libraries
       // (e.g. an ELF filter library's filtees) are searched in order.
       if (Symbol *actual =
               sc.symbol->ResolveReExportedSymbol(target, sc.module_sp))
         return actual->GetAddress();
-      // Unresolvable re-export: not callable.
-      continue;
+      // A pure re-export placeholder with no filtee providing a definition
+      // has no code of its own and isn't callable.
+      if (sc.symbol->GetType() == eSymbolTypeReExported)
+        continue;
     }
     return sc.GetFunctionOrSymbolAddress();
   }
