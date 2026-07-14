@@ -1,5 +1,5 @@
-#include <cstdint>
 #include <cstddef>
+#include <cstdint>
 
 enum class ScopedEnum { kZeroS, kOneS };
 enum class ScopedEnumInt8 : int8_t { kZeroS8, kOneS8 };
