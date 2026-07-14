@@ -34,15 +34,15 @@ using namespace coro;
 
 // Returns true if \p Root is available in the resume function without
 // introducing a new spill. This holds when a value is:
-// 1. A constant: Genuinely free, as it is materialized as an immediate in the
-//    resume function.
-// 2. An argument: Treated as free heuristically. An argument crossing the
-//    suspend is actually spilled, but treating it as free preserves beneficial
-//    shared-operand rematerialization
+// 1. A constant: genuinely available at no cost, materialized as an immediate
+//    in the resume function.
+// 2. An argument: treated as available heuristically. An argument crossing the
+//    suspend is actually spilled, but treating it as available preserves
+//    beneficial shared-operand rematerialization.
 // 3. A value that already crosses a suspend point for an independent use, i.e.,
-//    it is spilled regardless
-// 4. A materializable value all of whose operands are themselves free.
-static bool isFreeAfterSuspend(
+//    it is spilled regardless.
+// 4. A materializable value all of whose operands are themselves available.
+static bool isAvailableAfterSuspend(
     Value *Root, const std::function<bool(Instruction &)> &Materializable,
     const SuspendCrossingInfo &Checker, SmallDenseMap<Value *, bool> &Memo) {
   SmallVector<Value *> Stack;
@@ -59,8 +59,9 @@ static bool isFreeAfterSuspend(
     }
 
     // Leaves that resolve without inspecting operands. Non-instructions
-    // (constants, arguments) are free; a value that already crosses a suspend
-    // independently is spilled regardless, so referencing its slot is free.
+    // (constants, arguments) are available; a value that already crosses a
+    // suspend independently is spilled regardless, so referencing its slot is
+    // available at no new cost.
     auto *I = dyn_cast<Instruction>(V);
     if (!I || Checker.isDefinitionAcrossSuspend(*I)) {
       Memo[V] = true;
@@ -73,9 +74,9 @@ static bool isFreeAfterSuspend(
       continue;
     }
 
-    // Materializable: free iff all operands are free. On the first visit,
-    // schedule the unresolved operands above V and revisit V once they are
-    // folded.
+    // Materializable: available iff all operands are available. On the first
+    // visit, schedule the unresolved operands above V and revisit V once they
+    // are folded.
     if (Opened.insert(V).second) {
       for (Use &U : I->operands())
         if (!Memo.contains(U.get()))
@@ -85,7 +86,7 @@ static bool isFreeAfterSuspend(
 
     // Second visit: operands are resolved, except any reached through a cycle
     // (only possible via non-materializable PHIs, which never open). An
-    // unresolved operand is treated as not free, conservatively.
+    // unresolved operand is treated as not available, conservatively.
     Stack.pop_back();
     Memo[V] = all_of(I->operands(), [&](Use &U) {
       auto It = Memo.find(U.get());
@@ -95,16 +96,16 @@ static bool isFreeAfterSuspend(
   return Memo.lookup(Root);
 }
 
-// Returns true if every operand of \p I is free after the suspend. This is the
-// profitability condition for rematerializing \p I: recomputing it then forces
-// no new value into the coroutine frame. Note this deliberately does NOT
+// Returns true if every operand of \p I is available after the suspend. This is
+// the profitability condition for rematerializing \p I: recomputing it then
+// forces no new value into the coroutine frame. Note this deliberately does NOT
 // consult isDefinitionAcrossSuspend(I) on I itself -- every remat candidate
 // crosses a suspend by definition, so that would make the check a no-op.
-static bool allOperandsFreeAfterSuspend(
+static bool allOperandsAvailableAfterSuspend(
     Instruction &I, const std::function<bool(Instruction &)> &Materializable,
     const SuspendCrossingInfo &Checker, SmallDenseMap<Value *, bool> &Memo) {
   return all_of(I.operands(), [&](Use &U) {
-    return isFreeAfterSuspend(U.get(), Materializable, Checker, Memo);
+    return isAvailableAfterSuspend(U.get(), Materializable, Checker, Memo);
   });
 }
 
@@ -133,15 +134,15 @@ struct RematGraph {
   const std::function<bool(Instruction &)> &MaterializableCallback;
   SuspendCrossingInfo &Checker;
   // Shared across all RematGraphs and the candidate scan in
-  // doRematerializations: isFreeAfterSuspend is context-free and the IR is not
-  // mutated until rematerialization, so results can be cached across uses.
-  SmallDenseMap<Value *, bool> &FreeMemo;
+  // doRematerializations: isAvailableAfterSuspend is context-free and the IR is
+  // not mutated until rematerialization, so results can be cached across uses.
+  SmallDenseMap<Value *, bool> &AvailMemo;
 
   RematGraph(const std::function<bool(Instruction &)> &MaterializableCallback,
              Instruction *I, SuspendCrossingInfo &Checker,
-             SmallDenseMap<Value *, bool> &FreeMemo)
+             SmallDenseMap<Value *, bool> &AvailMemo)
       : MaterializableCallback(MaterializableCallback), Checker(Checker),
-        FreeMemo(FreeMemo) {
+        AvailMemo(AvailMemo) {
     std::unique_ptr<RematNode> FirstNode = std::make_unique<RematNode>(I);
     EntryNode = FirstNode.get();
     std::deque<std::unique_ptr<RematNode>> WorkList;
@@ -167,8 +168,8 @@ struct RematGraph {
       Instruction *D = dyn_cast<Instruction>(Def.get());
       if (!D || !MaterializableCallback(*D) ||
           !Checker.isDefinitionAcrossSuspend(*D, FirstUse) ||
-          !allOperandsFreeAfterSuspend(*D, MaterializableCallback, Checker,
-                                       FreeMemo))
+          !allOperandsAvailableAfterSuspend(*D, MaterializableCallback, Checker,
+                                            AvailMemo))
         continue;
 
       if (auto It = Remats.find(D); It != Remats.end()) {
@@ -404,11 +405,12 @@ void coro::doRematerializations(
   // See if there are materializable instructions across suspend points
   // We record these as the starting point to also identify materializable
   // defs of uses in these operations
-  SmallDenseMap<Value *, bool> FreeMemo;
+  SmallDenseMap<Value *, bool> AvailMemo;
   for (Instruction &I : instructions(F)) {
     if (!IsMaterializable(I))
       continue;
-    if (!allOperandsFreeAfterSuspend(I, IsMaterializable, Checker, FreeMemo))
+    if (!allOperandsAvailableAfterSuspend(I, IsMaterializable, Checker,
+                                          AvailMemo))
       continue;
     for (User *U : I.users())
       if (Checker.isDefinitionAcrossSuspend(I, U))
@@ -441,7 +443,7 @@ void coro::doRematerializations(
 
       // Constructor creates the whole RematGraph for the given Use
       auto RematUPtr =
-          std::make_unique<RematGraph>(IsMaterializable, U, Checker, FreeMemo);
+          std::make_unique<RematGraph>(IsMaterializable, U, Checker, AvailMemo);
 
       LLVM_DEBUG(dbgs() << "***** Next remat group *****\n";
                  ReversePostOrderTraversal<RematGraph *> RPOT(RematUPtr.get());
