@@ -3736,8 +3736,8 @@ static bool isRegRegScaleLoadOrStore(SDNode *User, SDValue Add,
     return false;
   EVT VT = cast<MemSDNode>(User)->getMemoryVT();
   if (!(VT.isScalarInteger() &&
-        (Subtarget.hasStdExtZilx() ||
-         Subtarget.hasVendorXTHeadMemIdx() || Subtarget.hasVendorXqcisls())) &&
+        (Subtarget.hasStdExtZilx() || Subtarget.hasVendorXTHeadMemIdx() ||
+         Subtarget.hasVendorXqcisls())) &&
       !((VT == MVT::f32 || VT == MVT::f64) &&
         Subtarget.hasVendorXTHeadFMemIdx()))
     return false;
