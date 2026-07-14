@@ -70,4 +70,4 @@ def LXWU_S    : ScaledIndexLoad<0b100, 0b10, 1, "lxwu.s">, Sched<[WriteLDW, Read
 def LXWU_S_UW : ScaledIndexLoad<0b101, 0b10, 1, "lxwu.s.uw">, Sched<[WriteLDW, ReadMemBase, ReadMemBase]>;
 def LXD_S     : ScaledIndexLoad<0b100, 0b11, 0, "lxd.s">, Sched<[WriteLDD, ReadMemBase, ReadMemBase]>;
 def LXD_S_UW  : ScaledIndexLoad<0b101, 0b11, 0, "lxd.s.uw">, Sched<[WriteLDD, ReadMemBase, ReadMemBase]>;
-} // Predicates = [HasStdExtZilsx, IsRV64]
+} // Predicates = [HasStdExtZilx, IsRV64]
