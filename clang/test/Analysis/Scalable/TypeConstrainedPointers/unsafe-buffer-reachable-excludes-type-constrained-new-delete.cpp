@@ -46,13 +46,13 @@ void foo(int *p) {
 
 
 // CHECK: "id_table"
-// CHECK-DAG: "id": [[NEW_RET:[0-9]+]],{{([^]]|[[:space:]])+\],[[:space:]]+"suffix": "0",[[:space:]]+"usr": }}"c:@F@operator new#l#*v#"
-// CHECK-DAG: "id": [[NEW_PLACE:[0-9]+]],{{([^]]|[[:space:]])+\],[[:space:]]+"suffix": "2",[[:space:]]+"usr": }}"c:@F@operator new#l#*v#"
+// CHECK-DAG: "id": [[NEW_RET:[0-9]+]],{{([^]]|[[:space:]])+\],[[:space:]]+"suffix": "0",[[:space:]]+"usr": }}"c:@F@operator new#{{[^#]+}}#*v#"
+// CHECK-DAG: "id": [[NEW_PLACE:[0-9]+]],{{([^]]|[[:space:]])+\],[[:space:]]+"suffix": "2",[[:space:]]+"usr": }}"c:@F@operator new#{{[^#]+}}#*v#"
 // CHECK-DAG: "id": [[DEL_PTR:[0-9]+]],{{([^]]|[[:space:]])+\],[[:space:]]+"suffix": "1",[[:space:]]+"usr": }}"c:@F@operator delete#*v#"
 
 // CHECK-DAG: "id": [[FOO_Q:[0-9]+]],{{([^]]|[[:space:]])+\],[[:space:]]+"suffix": "",[[:space:]]+"usr": "[^"]+}}foo#*I#@q"
 // CHECK-DAG: "id": [[FOO_R:[0-9]+]],{{([^]]|[[:space:]])+\],[[:space:]]+"suffix": "",[[:space:]]+"usr": "[^"]+}}foo#*I#@r"
-// CHECK-DAG: "id": [[NEW_LOCAL:[0-9]+]],{{([^]]|[[:space:]])+\],[[:space:]]+"suffix": "",[[:space:]]+"usr": "[^"]+}}operator new#l#*v#@new_local"
+// CHECK-DAG: "id": [[NEW_LOCAL:[0-9]+]],{{([^]]|[[:space:]])+\],[[:space:]]+"suffix": "",[[:space:]]+"usr": "[^"]+}}operator new#{{[^#]+}}#*v#@new_local"
 // CHECK-DAG: "id": [[DELETE_LOCAL:[0-9]+]],{{([^]]|[[:space:]])+\],[[:space:]]+"suffix": "",[[:space:]]+"usr": "[^"]+}}operator delete#*v#@delete_local"
 
 // The return and every new/delete parameter are reported as type-constrained.
