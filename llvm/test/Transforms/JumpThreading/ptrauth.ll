@@ -468,3 +468,27 @@ join:
   %auth = call i64 @llvm.ptrauth.auth(i64 %phi, i32 2, i64 %disc)
   ret i64 %auth
 }
+
+define i64 @test_same_bb(i64 %p1, i1 %cond) {
+; CHECK-LABEL: define i64 @test_same_bb(
+; CHECK-SAME: i64 [[P1:%.*]], i1 [[COND:%.*]]) {
+; CHECK-NEXT:  [[BB1:.*:]]
+; CHECK-NEXT:    br i1 [[COND]], label %[[ENTRY_JOIN_CRIT_EDGE:.*]], label %[[JOIN:.*]]
+; CHECK:       [[JOIN]]:
+; CHECK-NEXT:    [[TMP0:%.*]] = call i64 @llvm.ptrauth.auth(i64 [[P1]], i32 2, i64 1234)
+; CHECK-NEXT:    br label %[[JOIN1:.*]]
+; CHECK:       [[ENTRY_JOIN_CRIT_EDGE]]:
+; CHECK-NEXT:    [[TMP1:%.*]] = call i64 @llvm.ptrauth.auth(i64 [[P1]], i32 2, i64 1234)
+; CHECK-NEXT:    br label %[[JOIN1]]
+; CHECK:       [[JOIN1]]:
+; CHECK-NEXT:    [[PHI:%.*]] = phi i64 [ [[TMP1]], %[[ENTRY_JOIN_CRIT_EDGE]] ], [ [[TMP0]], %[[JOIN]] ]
+; CHECK-NEXT:    ret i64 [[PHI]]
+;
+entry:
+  br i1 %cond, label %join, label %join
+
+join:
+  %phi = phi i64 [ %p1, %entry ], [ %p1, %entry ]
+  %auth = call i64 @llvm.ptrauth.auth(i64 %phi, i32 2, i64 1234)
+  ret i64 %auth
+}

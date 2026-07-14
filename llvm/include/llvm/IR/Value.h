@@ -457,7 +457,7 @@ public:
   LLVM_ABI bool hasOneUser() const;
 
   LLVM_ABI User *getUniqueUser();
-  LLVM_ABI const User *getUniqueUser() const {
+  const User *getUniqueUser() const {
     return const_cast<Value *>(this)->getUniqueUser();
   }
 

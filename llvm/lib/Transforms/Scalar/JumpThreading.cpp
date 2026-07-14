@@ -949,7 +949,8 @@ static BasicBlock *splitEdge(BasicBlock *BB, BasicBlock *Succ,
   BasicBlock *NewBB = SplitEdge(BB, Succ);
   Updates.push_back({DominatorTree::Insert, BB, NewBB});
   Updates.push_back({DominatorTree::Insert, NewBB, Succ});
-  Updates.push_back({DominatorTree::Delete, BB, Succ});
+  if (!llvm::is_contained(successors(BB), Succ))
+    Updates.push_back({DominatorTree::Delete, BB, Succ});
   return NewBB;
 }
 
@@ -968,12 +969,6 @@ static bool hoistPtrAuth(PHINode *PN, DomTreeUpdater *DTU) {
   Instruction *P2I = dyn_cast_or_null<PtrToIntInst>(PN->getUniqueUser());
   auto *II = dyn_cast_or_null<IntrinsicInst>((P2I ? P2I : PN)->getUniqueUser());
   if (!II || II->getIntrinsicID() != Intrinsic::ptrauth_auth)
-    return false;
-
-  // The discriminator value must dominate PN in order for it to be valid to
-  // reference it from the predecessors.
-  if (auto *Disc = dyn_cast<Instruction>(II->getArgOperand(2));
-      Disc && !DTU->getDomTree().dominates(Disc, PN->getParent()))
     return false;
 
   if (P2I) {
@@ -1003,6 +998,12 @@ static bool hoistPtrAuth(PHINode *PN, DomTreeUpdater *DTU) {
     return true;
   }
 
+  // The discriminator value must dominate PN in order for it to be valid to
+  // reference it from the predecessors. Since we can't easily query the domtree
+  // from here, just check whether it is an instruction.
+  if (isa<Instruction>(II->getArgOperand(2)))
+    return false;
+
   if (II->getParent() != PN->getParent())
     return false;
 
@@ -1010,7 +1011,7 @@ static bool hoistPtrAuth(PHINode *PN, DomTreeUpdater *DTU) {
   // before the auth may terminate the program), we cannot move it to the
   // predecessor.
   if (!isGuaranteedToTransferExecutionToSuccessor(II->getParent()->begin(),
-                                                  BasicBlock::iterator(II)))
+                                                  II->getIterator()))
     return false;
 
   std::vector<DominatorTree::UpdateType> Updates;
@@ -1023,7 +1024,7 @@ static bool hoistPtrAuth(PHINode *PN, DomTreeUpdater *DTU) {
     UniqueSuccForEachPred = true;
     for (int i = 0, e = PN->getNumIncomingValues(); i != e; ++i) {
       BasicBlock *Pred = PN->getIncomingBlock(i);
-      if (!Pred->getUniqueSuccessor()) {
+      if (!Pred->getSingleSuccessor()) {
         splitEdge(Pred, PN->getParent(), Updates);
         UniqueSuccForEachPred = false;
         break;
