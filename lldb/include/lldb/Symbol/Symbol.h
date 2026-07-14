@@ -126,7 +126,9 @@ public:
     }
   }
 
-  lldb::addr_t ResolveCallableAddress(Target &target) const;
+  lldb::addr_t
+  ResolveCallableAddress(Target &target,
+                         const lldb::ModuleSP &containing_module_sp) const;
 
   ConstString GetName() const;
 
