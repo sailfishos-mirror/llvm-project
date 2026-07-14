@@ -490,18 +490,38 @@ Symbol *Symbol::ResolveReExportedSymbolInModuleSpec(
 Symbol *Symbol::ResolveReExportedSymbol(
     Target &target, const lldb::ModuleSP &containing_module_sp) const {
   ConstString reexport_name(GetReExportedSymbolName());
-  if (!reexport_name)
-    return nullptr;
-
   ModuleList seen_modules;
 
-  // Search the library recorded on the symbol itself first.
-  ModuleSpec module_spec;
-  module_spec.GetFileSpec() = GetReExportedSymbolSharedLibrary();
-  if (module_spec.GetFileSpec()) {
-    if (Symbol *result = ResolveReExportedSymbolInModuleSpec(
-            target, reexport_name, module_spec, seen_modules))
-      return result;
+  if (reexport_name) {
+    // Search the library recorded on the symbol itself first.
+    ModuleSpec module_spec;
+    module_spec.GetFileSpec() = GetReExportedSymbolSharedLibrary();
+    if (module_spec.GetFileSpec()) {
+      if (Symbol *result = ResolveReExportedSymbolInModuleSpec(
+              target, reexport_name, module_spec, seen_modules))
+        return result;
+    }
+  } else {
+    // This symbol isn't itself marked as a re-export. Some formats (ELF's
+    // DT_FILTER / DT_AUXILIARY) have no per-symbol tagging: the dynamic
+    // linker always resolves through the filtee(s) first and only falls
+    // back to the filter object's own definition if none of them provide
+    // it, even when the filter also provides a genuine implementation of
+    // the same symbol.
+    ObjectFile *object_file =
+        containing_module_sp ? containing_module_sp->GetObjectFile() : nullptr;
+    if (!object_file ||
+        !object_file->ReExportedLibrariesShadowLocalDefinitions())
+      return nullptr;
+
+    // Use this symbol's own (version-suffix-stripped) name so the filtees
+    // below are searched for it.
+    reexport_name = GetName();
+    if (!reexport_name)
+      return nullptr;
+    if (ContainsLinkerAnnotations())
+      reexport_name = ConstString(object_file->StripLinkerSymbolAnnotations(
+          reexport_name.GetStringRef()));
   }
 
   // The recorded library is only the first candidate: the module defining
@@ -547,20 +567,22 @@ ConstString Symbol::GetNameNoArguments() const {
   return GetMangled().GetName(Mangled::ePreferDemangledWithoutArguments);
 }
 
-lldb::addr_t Symbol::ResolveCallableAddress(Target &target) const {
+lldb::addr_t Symbol::ResolveCallableAddress(
+    Target &target, const lldb::ModuleSP &containing_module_sp) const {
   if (GetType() == lldb::eSymbolTypeUndefined)
     return LLDB_INVALID_ADDRESS;
 
   Address func_so_addr;
 
   bool is_indirect = IsIndirect();
-  if (GetType() == eSymbolTypeReExported) {
-    Symbol *reexported_symbol = ResolveReExportedSymbol(target);
-    if (reexported_symbol) {
-      func_so_addr = reexported_symbol->GetAddress();
-      is_indirect = reexported_symbol->IsIndirect();
-    }
-  } else {
+  // A symbol from an ELF filter/auxiliary library is resolved through its
+  // filtee(s) first, falling back to its own definition only if none of them
+  // provide it, mirroring what the dynamic linker does.
+  if (Symbol *reexported_symbol =
+          ResolveReExportedSymbol(target, containing_module_sp)) {
+    func_so_addr = reexported_symbol->GetAddress();
+    is_indirect = reexported_symbol->IsIndirect();
+  } else if (GetType() != eSymbolTypeReExported) {
     func_so_addr = GetAddress();
     is_indirect = IsIndirect();
   }
