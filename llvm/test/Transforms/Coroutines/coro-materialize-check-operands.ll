@@ -1,9 +1,7 @@
 ; RUN: opt %s -passes='cgscc(coro-split)' -S | FileCheck %s
 
-; Verify -coro-remat-check-operands only rematerializes a value across a suspend
-; when doing so introduces no new spill.
-
-target datalayout = "e-m:e-p:64:64-i64:64-f80:128-n8:16:32:64-S128"
+; Verify that values are only rematerializes across a suspend when doing so
+; introduces no new spill.
 
 ; %v's operands are two call results that are otherwise dead across the suspend.
 ; Rematerializing %v would force both calls' results into the frame, so spill %v.
