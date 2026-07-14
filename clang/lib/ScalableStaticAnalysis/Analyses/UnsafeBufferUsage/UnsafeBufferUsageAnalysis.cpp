@@ -16,7 +16,9 @@
 #include "clang/ScalableStaticAnalysis/Analyses/EntityPointerLevel/EntityPointerLevel.h"
 #include "clang/ScalableStaticAnalysis/Analyses/EntityPointerLevel/EntityPointerLevelFormat.h"
 #include "clang/ScalableStaticAnalysis/Analyses/PointerFlow/PointerFlowAnalysis.h"
+#include "clang/ScalableStaticAnalysis/Analyses/TypeConstrainedPointers/TypeConstrainedPointers.h"
 #include "clang/ScalableStaticAnalysis/Analyses/UnsafeBufferUsage/UnsafeBufferUsage.h"
+#include "clang/ScalableStaticAnalysis/Core/Model/EntityId.h"
 #include "clang/ScalableStaticAnalysis/Core/Serialization/JSONFormat.h"
 #include "clang/ScalableStaticAnalysis/Core/WholeProgramAnalysis/AnalysisRegistry.h"
 #include "clang/ScalableStaticAnalysis/Core/WholeProgramAnalysis/SummaryAnalysis.h"
@@ -124,12 +126,21 @@ JSONFormat::AnalysisResultRegistry::Add<UnsafeBufferReachableAnalysisResult>
         serializeUnsafeBufferReachableAnalysisResult,
         deserializeUnsafeBufferReachableAnalysisResult);
 
-/// Computes all the reachable "nodes" (pointers) in a pointer flow graph from a
-/// provided starter node set.  Specifically, the starter set is the unsafe
-/// pointers found by `UnsafeBufferUsageAnalysis`.
+/// \brief Computes pointers (EPLs) that satisfy a specific set of constraints.
+///
+/// The pointers must satisfy all of the following constraints:
+///
+/// 1. **C1 (Unsafe):** Any pointer in `UnsafeBufferUsageAnalysisResult`
+///    is considered unsafe.
+/// 2. **C2 (Reachable):** If a pointer is reachable from an unsafe pointer in
+///    the pointer flow graph (provided by `PointerFlowAnalysisResult`), it is
+///    also unsafe.
+/// 3. **C3 (Transformable):** Any pointer associated with type-constrained
+///    entities is NOT transformable.
 class UnsafeBufferReachableAnalysis
     : public DerivedAnalysis<UnsafeBufferReachableAnalysisResult,
                              PointerFlowAnalysisResult,
+                             TypeConstrainedPointersAnalysisResult,
                              UnsafeBufferUsageAnalysisResult> {
 
   /// BoundsPropagationGraph adds bounds propagation semantics to the
@@ -186,6 +197,7 @@ class UnsafeBufferReachableAnalysis
   };
 
   std::map<EntityId, BoundsPropagationGraph> BPG;
+  const std::set<EntityId> *TypeConstrainedEntities = nullptr;
 
   // Use pointers for efficiency. EPLs are in tree-based containers that only
   // grow. So pointers to them are stable.
@@ -207,18 +219,9 @@ class UnsafeBufferReachableAnalysis
     }
   }
 
-public:
-  llvm::Error
-  initialize(const PointerFlowAnalysisResult &PtrFlowGraph,
-             const UnsafeBufferUsageAnalysisResult &Starter) override {
-    for (auto &[Id, SubGraph] : PtrFlowGraph.Edges)
-      BPG.try_emplace(Id, BoundsPropagationGraph(SubGraph));
-    assert(getResult().Reachables.empty());
-    getResult().Reachables.insert(Starter.begin(), Starter.end());
-    return llvm::Error::success();
-  }
-
-  llvm::Expected<bool> step() override {
+  // Expand the initial set of C1 pointers in `getResult().Reachables` by
+  // computing and appending all reachable pointers, satisfying both C1 and C2.
+  void computeReachableUnsafePointers() {
     auto &Reachables = getResult().Reachables;
     // Simple DFS:
     std::vector<EPLPtr> Worklist;
@@ -233,6 +236,47 @@ public:
 
       updateReachablesWithOutgoings(Node, Worklist);
     }
+  }
+
+  // Filter out non-transformable pointers from `getResult().Result`, leaving
+  // only those that satisfy C3.
+  void filterTransformablePointers() {
+    assert(TypeConstrainedEntities &&
+           "The initialize(...) method should initialize "
+           "TypeConstrainedEntities to non-null");
+    auto &Result = getResult().Reachables;
+
+    for (auto &[Key, EPLs] : Result) {
+      for (auto ConstrainedEntityId : *TypeConstrainedEntities) {
+        // FIXME: optimization chance here.  Since both sets are sorted, the
+        // next 'equal_range' search can ignore everything before
+        // `NonTransEPLs.second`.
+        auto NonTransEPLs = EPLs.equal_range(ConstrainedEntityId);
+
+        EPLs.erase(NonTransEPLs.first, NonTransEPLs.second);
+      }
+    }
+  }
+
+public:
+  llvm::Error
+  initialize(const PointerFlowAnalysisResult &PtrFlowGraph,
+             const TypeConstrainedPointersAnalysisResult &TypeConstraints,
+             const UnsafeBufferUsageAnalysisResult &UnsafePtrs) override {
+    for (auto &[Id, SubGraph] : PtrFlowGraph.Edges)
+      BPG.try_emplace(Id, BoundsPropagationGraph(SubGraph));
+    TypeConstrainedEntities = &TypeConstraints.Entities;
+    assert(getResult().Reachables.empty());
+    // C1: all pointers in UnsafeBufferUsageAnalysisResult are unsafe
+    getResult().Reachables.insert(UnsafePtrs.begin(), UnsafePtrs.end());
+    return llvm::Error::success();
+  }
+
+  llvm::Expected<bool> step() override {
+    // result meets C1 & C2:
+    computeReachableUnsafePointers();
+    // result meets C1 & C2 & C3:
+    filterTransformablePointers();
     // This is not an iterative algorithm so stop iteration by retruning false:
     return false;
   }
