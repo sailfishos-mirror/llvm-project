@@ -968,3 +968,282 @@ define i64 @lxd_s_uw(ptr %a, i32 %b) {
   %3 = load i64, ptr %2, align 8
   ret i64 %3
 }
+
+;------------------------------------------------------------------------------
+; Load with a shift amount that doesn't match the access size
+;
+; The scaled forms require the index shift amount to match log2 of the access
+; size. When the shift is smaller or larger than the access size the scaled
+; forms can't be used: the shift is materialized separately, but the base+index
+; add can still fold into the unscaled index load.
+;------------------------------------------------------------------------------
+
+; i8 access with the index scaled by 2 (larger than the access size).
+define zeroext i8 @lxbu_shl_too_large(ptr %a, iXLen %b) {
+; RV32-LABEL: lxbu_shl_too_large:
+; RV32:       # %bb.0:
+; RV32-NEXT:    slli a1, a1, 2
+; RV32-NEXT:    add a0, a0, a1
+; RV32-NEXT:    lbu a0, 0(a0)
+; RV32-NEXT:    ret
+;
+; RV32-ZILX-LABEL: lxbu_shl_too_large:
+; RV32-ZILX:       # %bb.0:
+; RV32-ZILX-NEXT:    slli a1, a1, 2
+; RV32-ZILX-NEXT:    lxbu a0, (a0), a1
+; RV32-ZILX-NEXT:    ret
+;
+; RV64-LABEL: lxbu_shl_too_large:
+; RV64:       # %bb.0:
+; RV64-NEXT:    slli a1, a1, 2
+; RV64-NEXT:    add a0, a0, a1
+; RV64-NEXT:    lbu a0, 0(a0)
+; RV64-NEXT:    ret
+;
+; RV64-ZILX-LABEL: lxbu_shl_too_large:
+; RV64-ZILX:       # %bb.0:
+; RV64-ZILX-NEXT:    slli a1, a1, 2
+; RV64-ZILX-NEXT:    lxbu a0, (a0), a1
+; RV64-ZILX-NEXT:    ret
+  %1 = getelementptr i32, ptr %a, iXLen %b
+  %2 = load i8, ptr %1, align 1
+  ret i8 %2
+}
+
+; i16 access with the index scaled by 2 (larger than the access size).
+define signext i16 @lxh_s_shl_too_large(ptr %a, iXLen %b) {
+; RV32-LABEL: lxh_s_shl_too_large:
+; RV32:       # %bb.0:
+; RV32-NEXT:    slli a1, a1, 2
+; RV32-NEXT:    add a0, a0, a1
+; RV32-NEXT:    lh a0, 0(a0)
+; RV32-NEXT:    ret
+;
+; RV32-ZILX-LABEL: lxh_s_shl_too_large:
+; RV32-ZILX:       # %bb.0:
+; RV32-ZILX-NEXT:    slli a1, a1, 2
+; RV32-ZILX-NEXT:    lxh a0, (a0), a1
+; RV32-ZILX-NEXT:    ret
+;
+; RV64-LABEL: lxh_s_shl_too_large:
+; RV64:       # %bb.0:
+; RV64-NEXT:    slli a1, a1, 2
+; RV64-NEXT:    add a0, a0, a1
+; RV64-NEXT:    lh a0, 0(a0)
+; RV64-NEXT:    ret
+;
+; RV64-ZILX-LABEL: lxh_s_shl_too_large:
+; RV64-ZILX:       # %bb.0:
+; RV64-ZILX-NEXT:    slli a1, a1, 2
+; RV64-ZILX-NEXT:    lxh a0, (a0), a1
+; RV64-ZILX-NEXT:    ret
+  %1 = getelementptr i32, ptr %a, iXLen %b
+  %2 = load i16, ptr %1, align 2
+  ret i16 %2
+}
+
+; i32 access with the index scaled by 1 (smaller than the access size).
+define i32 @lxw_s_shl_too_small(ptr %a, iXLen %b) {
+; RV32-LABEL: lxw_s_shl_too_small:
+; RV32:       # %bb.0:
+; RV32-NEXT:    slli a1, a1, 1
+; RV32-NEXT:    add a0, a0, a1
+; RV32-NEXT:    lw a0, 0(a0)
+; RV32-NEXT:    ret
+;
+; RV32-ZILX-LABEL: lxw_s_shl_too_small:
+; RV32-ZILX:       # %bb.0:
+; RV32-ZILX-NEXT:    slli a1, a1, 1
+; RV32-ZILX-NEXT:    lxw a0, (a0), a1
+; RV32-ZILX-NEXT:    ret
+;
+; RV64-LABEL: lxw_s_shl_too_small:
+; RV64:       # %bb.0:
+; RV64-NEXT:    slli a1, a1, 1
+; RV64-NEXT:    add a0, a0, a1
+; RV64-NEXT:    lw a0, 0(a0)
+; RV64-NEXT:    ret
+;
+; RV64-ZILX-LABEL: lxw_s_shl_too_small:
+; RV64-ZILX:       # %bb.0:
+; RV64-ZILX-NEXT:    slli a1, a1, 1
+; RV64-ZILX-NEXT:    lxw a0, (a0), a1
+; RV64-ZILX-NEXT:    ret
+  %1 = getelementptr i16, ptr %a, iXLen %b
+  %2 = load i32, ptr %1, align 4
+  ret i32 %2
+}
+
+; i32 access with the index scaled by 3 (larger than the access size).
+define i32 @lxw_s_shl_too_large(ptr %a, iXLen %b) {
+; RV32-LABEL: lxw_s_shl_too_large:
+; RV32:       # %bb.0:
+; RV32-NEXT:    slli a1, a1, 3
+; RV32-NEXT:    add a0, a0, a1
+; RV32-NEXT:    lw a0, 0(a0)
+; RV32-NEXT:    ret
+;
+; RV32-ZILX-LABEL: lxw_s_shl_too_large:
+; RV32-ZILX:       # %bb.0:
+; RV32-ZILX-NEXT:    slli a1, a1, 3
+; RV32-ZILX-NEXT:    lxw a0, (a0), a1
+; RV32-ZILX-NEXT:    ret
+;
+; RV64-LABEL: lxw_s_shl_too_large:
+; RV64:       # %bb.0:
+; RV64-NEXT:    slli a1, a1, 3
+; RV64-NEXT:    add a0, a0, a1
+; RV64-NEXT:    lw a0, 0(a0)
+; RV64-NEXT:    ret
+;
+; RV64-ZILX-LABEL: lxw_s_shl_too_large:
+; RV64-ZILX:       # %bb.0:
+; RV64-ZILX-NEXT:    slli a1, a1, 3
+; RV64-ZILX-NEXT:    lxw a0, (a0), a1
+; RV64-ZILX-NEXT:    ret
+  %1 = getelementptr i64, ptr %a, iXLen %b
+  %2 = load i32, ptr %1, align 4
+  ret i32 %2
+}
+
+; i64 access with the index scaled by 2 (smaller than the access size).
+define i64 @lxd_s_shl_too_small(ptr %a, iXLen %b) {
+; RV32-LABEL: lxd_s_shl_too_small:
+; RV32:       # %bb.0:
+; RV32-NEXT:    slli a1, a1, 2
+; RV32-NEXT:    add a1, a0, a1
+; RV32-NEXT:    lw a0, 0(a1)
+; RV32-NEXT:    lw a1, 4(a1)
+; RV32-NEXT:    ret
+;
+; RV32-ZILX-LABEL: lxd_s_shl_too_small:
+; RV32-ZILX:       # %bb.0:
+; RV32-ZILX-NEXT:    addi a2, a0, 4
+; RV32-ZILX-NEXT:    lxw.s a0, (a0), a1
+; RV32-ZILX-NEXT:    lxw.s a1, (a2), a1
+; RV32-ZILX-NEXT:    ret
+;
+; RV64-LABEL: lxd_s_shl_too_small:
+; RV64:       # %bb.0:
+; RV64-NEXT:    slli a1, a1, 2
+; RV64-NEXT:    add a0, a0, a1
+; RV64-NEXT:    ld a0, 0(a0)
+; RV64-NEXT:    ret
+;
+; RV64-ZILX-LABEL: lxd_s_shl_too_small:
+; RV64-ZILX:       # %bb.0:
+; RV64-ZILX-NEXT:    slli a1, a1, 2
+; RV64-ZILX-NEXT:    lxd a0, (a0), a1
+; RV64-ZILX-NEXT:    ret
+  %1 = getelementptr i32, ptr %a, iXLen %b
+  %2 = load i64, ptr %1, align 8
+  ret i64 %2
+}
+
+; i16 access with the zero-extended index scaled by 2 (larger than the access
+; size).
+define signext i16 @lxh_s_uw_shl_too_large(ptr %a, i32 %b) {
+; RV32-LABEL: lxh_s_uw_shl_too_large:
+; RV32:       # %bb.0:
+; RV32-NEXT:    slli a1, a1, 2
+; RV32-NEXT:    add a0, a0, a1
+; RV32-NEXT:    lh a0, 0(a0)
+; RV32-NEXT:    ret
+;
+; RV32-ZILX-LABEL: lxh_s_uw_shl_too_large:
+; RV32-ZILX:       # %bb.0:
+; RV32-ZILX-NEXT:    slli a1, a1, 2
+; RV32-ZILX-NEXT:    lxh a0, (a0), a1
+; RV32-ZILX-NEXT:    ret
+;
+; RV64-LABEL: lxh_s_uw_shl_too_large:
+; RV64:       # %bb.0:
+; RV64-NEXT:    slli a1, a1, 32
+; RV64-NEXT:    srli a1, a1, 30
+; RV64-NEXT:    add a0, a0, a1
+; RV64-NEXT:    lh a0, 0(a0)
+; RV64-NEXT:    ret
+;
+; RV64-ZILX-LABEL: lxh_s_uw_shl_too_large:
+; RV64-ZILX:       # %bb.0:
+; RV64-ZILX-NEXT:    slli a1, a1, 32
+; RV64-ZILX-NEXT:    srli a1, a1, 30
+; RV64-ZILX-NEXT:    lxh a0, (a0), a1
+; RV64-ZILX-NEXT:    ret
+  %1 = zext i32 %b to i64
+  %2 = getelementptr i32, ptr %a, i64 %1
+  %3 = load i16, ptr %2, align 2
+  ret i16 %3
+}
+
+; i32 access with the zero-extended index scaled by 1 (smaller than the access
+; size).
+define i32 @lxw_s_uw_shl_too_small(ptr %a, i32 %b) {
+; RV32-LABEL: lxw_s_uw_shl_too_small:
+; RV32:       # %bb.0:
+; RV32-NEXT:    slli a1, a1, 1
+; RV32-NEXT:    add a0, a0, a1
+; RV32-NEXT:    lw a0, 0(a0)
+; RV32-NEXT:    ret
+;
+; RV32-ZILX-LABEL: lxw_s_uw_shl_too_small:
+; RV32-ZILX:       # %bb.0:
+; RV32-ZILX-NEXT:    slli a1, a1, 1
+; RV32-ZILX-NEXT:    lxw a0, (a0), a1
+; RV32-ZILX-NEXT:    ret
+;
+; RV64-LABEL: lxw_s_uw_shl_too_small:
+; RV64:       # %bb.0:
+; RV64-NEXT:    slli a1, a1, 32
+; RV64-NEXT:    srli a1, a1, 31
+; RV64-NEXT:    add a0, a0, a1
+; RV64-NEXT:    lw a0, 0(a0)
+; RV64-NEXT:    ret
+;
+; RV64-ZILX-LABEL: lxw_s_uw_shl_too_small:
+; RV64-ZILX:       # %bb.0:
+; RV64-ZILX-NEXT:    slli a1, a1, 32
+; RV64-ZILX-NEXT:    srli a1, a1, 31
+; RV64-ZILX-NEXT:    lxw a0, (a0), a1
+; RV64-ZILX-NEXT:    ret
+  %1 = zext i32 %b to i64
+  %2 = getelementptr i16, ptr %a, i64 %1
+  %3 = load i32, ptr %2, align 4
+  ret i32 %3
+}
+
+; i32 access with the zero-extended index scaled by 3 (larger than the access
+; size).
+define i32 @lxw_s_uw_shl_too_large(ptr %a, i32 %b) {
+; RV32-LABEL: lxw_s_uw_shl_too_large:
+; RV32:       # %bb.0:
+; RV32-NEXT:    slli a1, a1, 3
+; RV32-NEXT:    add a0, a0, a1
+; RV32-NEXT:    lw a0, 0(a0)
+; RV32-NEXT:    ret
+;
+; RV32-ZILX-LABEL: lxw_s_uw_shl_too_large:
+; RV32-ZILX:       # %bb.0:
+; RV32-ZILX-NEXT:    slli a1, a1, 3
+; RV32-ZILX-NEXT:    lxw a0, (a0), a1
+; RV32-ZILX-NEXT:    ret
+;
+; RV64-LABEL: lxw_s_uw_shl_too_large:
+; RV64:       # %bb.0:
+; RV64-NEXT:    slli a1, a1, 32
+; RV64-NEXT:    srli a1, a1, 29
+; RV64-NEXT:    add a0, a0, a1
+; RV64-NEXT:    lw a0, 0(a0)
+; RV64-NEXT:    ret
+;
+; RV64-ZILX-LABEL: lxw_s_uw_shl_too_large:
+; RV64-ZILX:       # %bb.0:
+; RV64-ZILX-NEXT:    slli a1, a1, 32
+; RV64-ZILX-NEXT:    srli a1, a1, 29
+; RV64-ZILX-NEXT:    lxw a0, (a0), a1
+; RV64-ZILX-NEXT:    ret
+  %1 = zext i32 %b to i64
+  %2 = getelementptr i64, ptr %a, i64 %1
+  %3 = load i32, ptr %2, align 4
+  ret i32 %3
+}
