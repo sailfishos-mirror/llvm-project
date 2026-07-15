@@ -179,7 +179,7 @@ define <4 x float> @simple_select_eph(<4 x float> %a, <4 x float> %b, <4 x i32> 
 ; X86TM-NEXT:    [[Q3:%.*]] = extractelement <4 x float> [[RD]], i32 3
 ; X86TM-NEXT:    [[Q5:%.*]] = fadd float [[Q2]], [[Q3]]
 ; X86TM-NEXT:    [[TMP1:%.*]] = shufflevector <4 x float> [[RD]], <4 x float> poison, <3 x i32> <i32 0, i32 1, i32 poison>
-; X86TM-NEXT:    [[TMP2:%.*]] = insertelement <3 x float> [[TMP1]], float [[Q5]], i32 2
+; X86TM-NEXT:    [[TMP2:%.*]] = insertelement <3 x float> [[TMP1]], float [[Q5]], i64 2
 ; X86TM-NEXT:    [[TMP3:%.*]] = call float @llvm.vector.reduce.fadd.v3f32(float -0.000000e+00, <3 x float> [[TMP2]])
 ; X86TM-NEXT:    [[QI:%.*]] = fcmp olt float [[TMP3]], [[Q5]]
 ; X86TM-NEXT:    call void @llvm.assume(i1 [[QI]])
@@ -286,7 +286,7 @@ define <4 x float> @simple_select_eph(<4 x float> %a, <4 x float> %b, <4 x i32> 
 ; AARCH64TM-NEXT:    [[Q3:%.*]] = extractelement <4 x float> [[RD]], i32 3
 ; AARCH64TM-NEXT:    [[Q5:%.*]] = fadd float [[Q2]], [[Q3]]
 ; AARCH64TM-NEXT:    [[TMP1:%.*]] = shufflevector <4 x float> [[RD]], <4 x float> poison, <3 x i32> <i32 0, i32 1, i32 poison>
-; AARCH64TM-NEXT:    [[TMP2:%.*]] = insertelement <3 x float> [[TMP1]], float [[Q5]], i32 2
+; AARCH64TM-NEXT:    [[TMP2:%.*]] = insertelement <3 x float> [[TMP1]], float [[Q5]], i64 2
 ; AARCH64TM-NEXT:    [[TMP3:%.*]] = call float @llvm.vector.reduce.fadd.v3f32(float -0.000000e+00, <3 x float> [[TMP2]])
 ; AARCH64TM-NEXT:    [[QI:%.*]] = fcmp olt float [[TMP3]], [[Q5]]
 ; AARCH64TM-NEXT:    call void @llvm.assume(i1 [[QI]])
@@ -596,10 +596,10 @@ define <4 x float> @take_credit(<4 x float> %a, <4 x float> %b) {
 ; Make sure we handle multiple trees that feed one build vector correctly.
 define <4 x double> @multi_tree(double %w, double %x, double %y, double %z) {
 ; CHECK-LABEL: @multi_tree(
-; CHECK-NEXT:    [[TMP1:%.*]] = insertelement <4 x double> poison, double [[Z:%.*]], i32 0
-; CHECK-NEXT:    [[TMP2:%.*]] = insertelement <4 x double> [[TMP1]], double [[Y:%.*]], i32 1
-; CHECK-NEXT:    [[TMP3:%.*]] = insertelement <4 x double> [[TMP2]], double [[X:%.*]], i32 2
-; CHECK-NEXT:    [[TMP4:%.*]] = insertelement <4 x double> [[TMP3]], double [[W:%.*]], i32 3
+; CHECK-NEXT:    [[TMP1:%.*]] = insertelement <4 x double> poison, double [[Z:%.*]], i64 0
+; CHECK-NEXT:    [[TMP2:%.*]] = insertelement <4 x double> [[TMP1]], double [[Y:%.*]], i64 1
+; CHECK-NEXT:    [[TMP3:%.*]] = insertelement <4 x double> [[TMP2]], double [[X:%.*]], i64 2
+; CHECK-NEXT:    [[TMP4:%.*]] = insertelement <4 x double> [[TMP3]], double [[W:%.*]], i64 3
 ; CHECK-NEXT:    [[TMP5:%.*]] = fadd <4 x double> [[TMP4]], <double 3.000000e+00, double 2.000000e+00, double 1.000000e+00, double 0.000000e+00>
 ; CHECK-NEXT:    [[TMP6:%.*]] = fmul <4 x double> [[TMP5]], splat (double 1.000000e+00)
 ; CHECK-NEXT:    ret <4 x double> [[TMP6]]

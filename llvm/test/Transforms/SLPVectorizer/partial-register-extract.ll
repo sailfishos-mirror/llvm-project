@@ -8,8 +8,8 @@ define i32 @test(i32 %v, ptr %p) {
 ; CHECK-NEXT:    [[LD:%.*]] = load i32, ptr [[P]], align 4
 ; CHECK-NEXT:    br i1 false, label %[[INC:.*]], label %[[PH:.*]]
 ; CHECK:       [[PH]]:
-; CHECK-NEXT:    [[TMP0:%.*]] = insertelement <20 x i32> <i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 poison, i32 0, i32 0, i32 poison, i32 poison, i32 poison, i32 poison>, i32 [[V]], i32 13
-; CHECK-NEXT:    [[TMP1:%.*]] = insertelement <20 x i32> [[TMP0]], i32 [[LD]], i32 16
+; CHECK-NEXT:    [[TMP0:%.*]] = insertelement <20 x i32> <i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 poison, i32 0, i32 0, i32 poison, i32 poison, i32 poison, i32 poison>, i32 [[V]], i64 13
+; CHECK-NEXT:    [[TMP1:%.*]] = insertelement <20 x i32> [[TMP0]], i32 [[LD]], i64 16
 ; CHECK-NEXT:    [[TMP2:%.*]] = shufflevector <20 x i32> [[TMP1]], <20 x i32> poison, <20 x i32> <i32 0, i32 1, i32 2, i32 3, i32 4, i32 5, i32 6, i32 7, i32 8, i32 9, i32 10, i32 11, i32 12, i32 13, i32 14, i32 15, i32 16, i32 16, i32 16, i32 16>
 ; CHECK-NEXT:    [[TMP3:%.*]] = icmp eq <20 x i32> [[TMP2]], zeroinitializer
 ; CHECK-NEXT:    [[TMP4:%.*]] = shufflevector <20 x i1> [[TMP3]], <20 x i1> poison, <6 x i32> <i32 16, i32 15, i32 poison, i32 poison, i32 poison, i32 poison>

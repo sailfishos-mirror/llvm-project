@@ -6,8 +6,8 @@ define void @test() {
 ; CHECK-SAME: ) #[[ATTR0:[0-9]+]] {
 ; CHECK-NEXT:    [[TMP1:%.*]] = zext i8 0 to i32
 ; CHECK-NEXT:    [[TMP2:%.*]] = zext i8 0 to i32
-; CHECK-NEXT:    [[TMP3:%.*]] = insertelement <7 x i32> <i32 poison, i32 0, i32 0, i32 0, i32 0, i32 poison, i32 poison>, i32 [[TMP2]], i32 0
-; CHECK-NEXT:    [[TMP4:%.*]] = insertelement <7 x i32> [[TMP3]], i32 [[TMP1]], i32 5
+; CHECK-NEXT:    [[TMP3:%.*]] = insertelement <7 x i32> <i32 poison, i32 0, i32 0, i32 0, i32 0, i32 poison, i32 poison>, i32 [[TMP2]], i64 0
+; CHECK-NEXT:    [[TMP4:%.*]] = insertelement <7 x i32> [[TMP3]], i32 [[TMP1]], i64 5
 ; CHECK-NEXT:    [[TMP5:%.*]] = shufflevector <7 x i32> [[TMP4]], <7 x i32> poison, <7 x i32> <i32 0, i32 1, i32 2, i32 3, i32 4, i32 5, i32 0>
 ; CHECK-NEXT:    [[TMP6:%.*]] = select <7 x i1> zeroinitializer, <7 x i32> zeroinitializer, <7 x i32> [[TMP5]]
 ; CHECK-NEXT:    [[OP_RDX2:%.*]] = call i32 @llvm.vector.reduce.xor.v7i32(<7 x i32> [[TMP6]])

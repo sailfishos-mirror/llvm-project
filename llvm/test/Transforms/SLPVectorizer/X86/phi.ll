@@ -150,7 +150,7 @@ define float @foo3(ptr nocapture readonly %A) #0 {
 ; CHECK-NEXT:    [[ARRAYIDX19:%.*]] = getelementptr inbounds float, ptr [[ARRAYIDX1]], i64 [[INDVARS_IV_NEXT]]
 ; CHECK-NEXT:    [[TMP24]] = load <2 x float>, ptr [[ARRAYIDX19]], align 4
 ; CHECK-NEXT:    [[TMP7:%.*]] = shufflevector <2 x float> [[TMP24]], <2 x float> poison, <5 x i32> <i32 poison, i32 poison, i32 poison, i32 0, i32 1>
-; CHECK-NEXT:    [[TMP13:%.*]] = insertelement <5 x float> [[TMP7]], float [[TMP9]], i32 2
+; CHECK-NEXT:    [[TMP13:%.*]] = insertelement <5 x float> [[TMP7]], float [[TMP9]], i64 2
 ; CHECK-NEXT:    [[TMP14:%.*]] = shufflevector <2 x float> [[TMP8]], <2 x float> poison, <5 x i32> <i32 0, i32 1, i32 poison, i32 poison, i32 poison>
 ; CHECK-NEXT:    [[TMP10:%.*]] = shufflevector <5 x float> [[TMP13]], <5 x float> [[TMP14]], <5 x i32> <i32 5, i32 6, i32 2, i32 3, i32 4>
 ; CHECK-NEXT:    [[TMP11:%.*]] = fmul <5 x float> [[TMP10]], <float 7.000000e+00, float 8.000000e+00, float 9.000000e+00, float 1.000000e+01, float 1.100000e+01>

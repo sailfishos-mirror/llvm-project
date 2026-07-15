@@ -4,7 +4,7 @@
 define i1 @src(i1 %cmp4.118.i) {
 ; CHECK-LABEL: define i1 @src(
 ; CHECK-SAME: i1 [[CMP4_118_I:%.*]]) {
-; CHECK-NEXT:    [[TMP1:%.*]] = insertelement <6 x i1> <i1 poison, i1 true, i1 true, i1 true, i1 true, i1 poison>, i1 [[CMP4_118_I]], i32 0
+; CHECK-NEXT:    [[TMP1:%.*]] = insertelement <6 x i1> <i1 poison, i1 true, i1 true, i1 true, i1 true, i1 poison>, i1 [[CMP4_118_I]], i64 0
 ; CHECK-NEXT:    [[TMP2:%.*]] = xor <6 x i1> [[TMP1]], <i1 true, i1 poison, i1 poison, i1 poison, i1 poison, i1 poison>
 ; CHECK-NEXT:    [[TMP3:%.*]] = freeze <6 x i1> [[TMP2]]
 ; CHECK-NEXT:    [[OP_RDX1:%.*]] = call i1 @llvm.vector.reduce.or.v6i1(<6 x i1> [[TMP3]])

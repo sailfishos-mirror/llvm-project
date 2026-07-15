@@ -15,7 +15,7 @@ target triple = "x86_64-apple-macosx10.7.0"
 define i32 @foo(ptr nocapture %A, i32 %n) {
 ; CHECK-LABEL: @foo(
 ; CHECK-NEXT:    [[TMP1:%.*]] = mul nsw i32 [[N:%.*]], 5
-; CHECK-NEXT:    [[TMP2:%.*]] = insertelement <5 x i32> poison, i32 [[TMP1]], i32 0
+; CHECK-NEXT:    [[TMP2:%.*]] = insertelement <5 x i32> poison, i32 [[TMP1]], i64 0
 ; CHECK-NEXT:    [[TMP3:%.*]] = shufflevector <5 x i32> [[TMP2]], <5 x i32> poison, <5 x i32> zeroinitializer
 ; CHECK-NEXT:    [[TMP4:%.*]] = add nsw <5 x i32> [[TMP3]], <i32 7, i32 8, i32 9, i32 10, i32 11>
 ; CHECK-NEXT:    [[TMP5:%.*]] = load <5 x i32>, ptr [[A:%.*]], align 4

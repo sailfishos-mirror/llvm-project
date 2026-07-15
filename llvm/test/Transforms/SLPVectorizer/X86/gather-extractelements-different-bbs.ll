@@ -4,14 +4,14 @@
 define i32 @foo(i32 %a) {
 ; CHECK-LABEL: @foo(
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[TMP4:%.*]] = insertelement <3 x i32> <i32 0, i32 poison, i32 0>, i32 [[A:%.*]], i32 1
+; CHECK-NEXT:    [[TMP4:%.*]] = insertelement <3 x i32> <i32 0, i32 poison, i32 0>, i32 [[A:%.*]], i64 1
 ; CHECK-NEXT:    [[TMP5:%.*]] = sub nsw <3 x i32> zeroinitializer, [[TMP4]]
 ; CHECK-NEXT:    br i1 false, label [[BB5:%.*]], label [[BB1:%.*]]
 ; CHECK:       bb1:
 ; CHECK-NEXT:    [[TMP2:%.*]] = shufflevector <3 x i32> [[TMP5]], <3 x i32> poison, <2 x i32> <i32 0, i32 1>
 ; CHECK-NEXT:    [[TMP3:%.*]] = mul <2 x i32> <i32 3, i32 1>, [[TMP2]]
-; CHECK-NEXT:    [[TMP0:%.*]] = extractelement <2 x i32> [[TMP3]], i32 0
-; CHECK-NEXT:    [[TMP1:%.*]] = extractelement <2 x i32> [[TMP3]], i32 1
+; CHECK-NEXT:    [[TMP0:%.*]] = extractelement <2 x i32> [[TMP3]], i64 0
+; CHECK-NEXT:    [[TMP1:%.*]] = extractelement <2 x i32> [[TMP3]], i64 1
 ; CHECK-NEXT:    [[OP_RDX2:%.*]] = add i32 [[TMP1]], [[TMP0]]
 ; CHECK-NEXT:    br label [[BB3:%.*]]
 ; CHECK:       bb2:

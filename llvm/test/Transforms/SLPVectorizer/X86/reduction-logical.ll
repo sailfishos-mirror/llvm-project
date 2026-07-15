@@ -155,12 +155,12 @@ define i1 @logical_and_icmp_diff_const(<4 x i32> %x) {
 define i1 @mixed_logical_icmp(<4 x i32> %x) {
 ; CHECK-LABEL: @mixed_logical_icmp(
 ; CHECK-NEXT:    [[TMP1:%.*]] = icmp sgt <4 x i32> [[X:%.*]], zeroinitializer
-; CHECK-NEXT:    [[TMP2:%.*]] = extractelement <4 x i1> [[TMP1]], i32 0
-; CHECK-NEXT:    [[TMP3:%.*]] = extractelement <4 x i1> [[TMP1]], i32 1
+; CHECK-NEXT:    [[TMP2:%.*]] = extractelement <4 x i1> [[TMP1]], i64 0
+; CHECK-NEXT:    [[TMP3:%.*]] = extractelement <4 x i1> [[TMP1]], i64 1
 ; CHECK-NEXT:    [[S1:%.*]] = select i1 [[TMP2]], i1 [[TMP3]], i1 false
-; CHECK-NEXT:    [[TMP4:%.*]] = extractelement <4 x i1> [[TMP1]], i32 2
+; CHECK-NEXT:    [[TMP4:%.*]] = extractelement <4 x i1> [[TMP1]], i64 2
 ; CHECK-NEXT:    [[S2:%.*]] = select i1 [[S1]], i1 true, i1 [[TMP4]]
-; CHECK-NEXT:    [[TMP5:%.*]] = extractelement <4 x i1> [[TMP1]], i32 3
+; CHECK-NEXT:    [[TMP5:%.*]] = extractelement <4 x i1> [[TMP1]], i64 3
 ; CHECK-NEXT:    [[S3:%.*]] = select i1 [[S2]], i1 [[TMP5]], i1 false
 ; CHECK-NEXT:    ret i1 [[S3]]
 ;
@@ -237,7 +237,7 @@ define i1 @logical_and_icmp_clamp(<4 x i32> %x) {
 define i1 @logical_and_icmp_clamp_extra_use_cmp(<4 x i32> %x) {
 ; CHECK-LABEL: @logical_and_icmp_clamp_extra_use_cmp(
 ; CHECK-NEXT:    [[TMP1:%.*]] = icmp slt <4 x i32> [[X:%.*]], splat (i32 42)
-; CHECK-NEXT:    [[TMP5:%.*]] = extractelement <4 x i1> [[TMP1]], i32 2
+; CHECK-NEXT:    [[TMP5:%.*]] = extractelement <4 x i1> [[TMP1]], i64 2
 ; CHECK-NEXT:    call void @use1(i1 [[TMP5]])
 ; CHECK-NEXT:    [[TMP3:%.*]] = icmp sgt <4 x i32> [[X]], splat (i32 17)
 ; CHECK-NEXT:    [[TMP8:%.*]] = shufflevector <4 x i1> [[TMP3]], <4 x i1> poison, <8 x i32> <i32 0, i32 1, i32 2, i32 3, i32 poison, i32 poison, i32 poison, i32 poison>
@@ -289,15 +289,15 @@ define i1 @logical_and_icmp_clamp_extra_use_select(<4 x i32> %x) {
 ; AVX-LABEL: @logical_and_icmp_clamp_extra_use_select(
 ; AVX-NEXT:    [[TMP1:%.*]] = icmp slt <4 x i32> [[X:%.*]], splat (i32 42)
 ; AVX-NEXT:    [[TMP2:%.*]] = icmp sgt <4 x i32> [[X]], splat (i32 17)
-; AVX-NEXT:    [[TMP3:%.*]] = extractelement <4 x i1> [[TMP1]], i32 0
-; AVX-NEXT:    [[TMP4:%.*]] = extractelement <4 x i1> [[TMP1]], i32 1
+; AVX-NEXT:    [[TMP3:%.*]] = extractelement <4 x i1> [[TMP1]], i64 0
+; AVX-NEXT:    [[TMP4:%.*]] = extractelement <4 x i1> [[TMP1]], i64 1
 ; AVX-NEXT:    [[S1:%.*]] = select i1 [[TMP3]], i1 [[TMP4]], i1 false
-; AVX-NEXT:    [[TMP5:%.*]] = extractelement <4 x i1> [[TMP1]], i32 2
+; AVX-NEXT:    [[TMP5:%.*]] = extractelement <4 x i1> [[TMP1]], i64 2
 ; AVX-NEXT:    [[S2:%.*]] = select i1 [[S1]], i1 [[TMP5]], i1 false
 ; AVX-NEXT:    call void @use1(i1 [[S2]])
 ; AVX-NEXT:    [[TMP6:%.*]] = freeze <4 x i1> [[TMP2]]
 ; AVX-NEXT:    [[TMP7:%.*]] = call i1 @llvm.vector.reduce.and.v4i1(<4 x i1> [[TMP6]])
-; AVX-NEXT:    [[TMP8:%.*]] = extractelement <4 x i1> [[TMP1]], i32 3
+; AVX-NEXT:    [[TMP8:%.*]] = extractelement <4 x i1> [[TMP1]], i64 3
 ; AVX-NEXT:    [[OP_RDX:%.*]] = select i1 [[TMP7]], i1 [[TMP8]], i1 false
 ; AVX-NEXT:    [[OP_RDX1:%.*]] = select i1 [[S2]], i1 [[OP_RDX]], i1 false
 ; AVX-NEXT:    ret i1 [[OP_RDX1]]
@@ -364,16 +364,16 @@ define i1 @logical_and_icmp_clamp_v8i32(<8 x i32> %x, <8 x i32> %y) {
 
 define i1 @logical_and_icmp_clamp_partial(<4 x i32> %x) {
 ; CHECK-LABEL: @logical_and_icmp_clamp_partial(
-; CHECK-NEXT:    [[TMP1:%.*]] = extractelement <4 x i32> [[X:%.*]], i32 2
+; CHECK-NEXT:    [[TMP1:%.*]] = extractelement <4 x i32> [[X:%.*]], i64 2
 ; CHECK-NEXT:    [[TMP2:%.*]] = shufflevector <4 x i32> [[X]], <4 x i32> poison, <2 x i32> <i32 0, i32 1>
 ; CHECK-NEXT:    [[TMP3:%.*]] = icmp slt <2 x i32> [[TMP2]], splat (i32 42)
 ; CHECK-NEXT:    [[C2:%.*]] = icmp slt i32 [[TMP1]], 42
 ; CHECK-NEXT:    [[TMP4:%.*]] = icmp sgt <4 x i32> [[X]], splat (i32 17)
 ; CHECK-NEXT:    [[TMP5:%.*]] = freeze <4 x i1> [[TMP4]]
 ; CHECK-NEXT:    [[TMP6:%.*]] = call i1 @llvm.vector.reduce.and.v4i1(<4 x i1> [[TMP5]])
-; CHECK-NEXT:    [[TMP7:%.*]] = extractelement <2 x i1> [[TMP3]], i32 0
+; CHECK-NEXT:    [[TMP7:%.*]] = extractelement <2 x i1> [[TMP3]], i64 0
 ; CHECK-NEXT:    [[OP_RDX:%.*]] = select i1 [[TMP6]], i1 [[TMP7]], i1 false
-; CHECK-NEXT:    [[TMP8:%.*]] = extractelement <2 x i1> [[TMP3]], i32 1
+; CHECK-NEXT:    [[TMP8:%.*]] = extractelement <2 x i1> [[TMP3]], i64 1
 ; CHECK-NEXT:    [[TMP9:%.*]] = freeze i1 [[TMP8]]
 ; CHECK-NEXT:    [[OP_RDX1:%.*]] = select i1 [[TMP9]], i1 [[C2]], i1 false
 ; CHECK-NEXT:    [[TMP10:%.*]] = freeze i1 [[OP_RDX]]

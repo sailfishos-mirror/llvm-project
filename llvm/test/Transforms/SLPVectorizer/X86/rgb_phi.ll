@@ -34,7 +34,7 @@ define float @foo(ptr nocapture readonly %A) {
 ; CHECK-NEXT:    [[ARRAYIDX7:%.*]] = getelementptr inbounds float, ptr [[ARRAYIDX2]], i64 [[TMP6]]
 ; CHECK-NEXT:    [[TMP5:%.*]] = load <2 x float>, ptr [[ARRAYIDX7]], align 4
 ; CHECK-NEXT:    [[TMP11:%.*]] = shufflevector <2 x float> [[TMP5]], <2 x float> poison, <3 x i32> <i32 poison, i32 0, i32 1>
-; CHECK-NEXT:    [[TMP7:%.*]] = insertelement <3 x float> poison, float [[TMP4]], i32 0
+; CHECK-NEXT:    [[TMP7:%.*]] = insertelement <3 x float> poison, float [[TMP4]], i64 0
 ; CHECK-NEXT:    [[TMP8:%.*]] = shufflevector <3 x float> [[TMP11]], <3 x float> [[TMP7]], <3 x i32> <i32 3, i32 1, i32 2>
 ; CHECK-NEXT:    [[TMP9:%.*]] = fmul <3 x float> [[TMP8]], <float 7.000000e+00, float 8.000000e+00, float 9.000000e+00>
 ; CHECK-NEXT:    [[TMP10]] = fadd <3 x float> [[TMP3]], [[TMP9]]
@@ -47,10 +47,10 @@ define float @foo(ptr nocapture readonly %A) {
 ; CHECK-NEXT:    [[DOTPRE]] = load float, ptr [[ARRAYIDX3_PHI_TRANS_INSERT]], align 4
 ; CHECK-NEXT:    br label [[FOR_BODY]]
 ; CHECK:       for.end:
-; CHECK-NEXT:    [[TMP15:%.*]] = extractelement <3 x float> [[TMP10]], i32 0
-; CHECK-NEXT:    [[TMP16:%.*]] = extractelement <3 x float> [[TMP10]], i32 1
+; CHECK-NEXT:    [[TMP15:%.*]] = extractelement <3 x float> [[TMP10]], i64 0
+; CHECK-NEXT:    [[TMP16:%.*]] = extractelement <3 x float> [[TMP10]], i64 1
 ; CHECK-NEXT:    [[ADD16:%.*]] = fadd float [[TMP15]], [[TMP16]]
-; CHECK-NEXT:    [[ADD14:%.*]] = extractelement <3 x float> [[TMP10]], i32 2
+; CHECK-NEXT:    [[ADD14:%.*]] = extractelement <3 x float> [[TMP10]], i64 2
 ; CHECK-NEXT:    [[ADD17:%.*]] = fadd float [[ADD16]], [[ADD14]]
 ; CHECK-NEXT:    ret float [[ADD17]]
 ;

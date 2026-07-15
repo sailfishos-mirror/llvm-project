@@ -8,7 +8,7 @@ define i1 @test(i32 %0, i32 %1, i32 %p) {
 ; X86-SAME: i32 [[TMP0:%.*]], i32 [[TMP1:%.*]], i32 [[P:%.*]]) {
 ; X86-NEXT:  entry:
 ; X86-NEXT:    [[CMP1:%.*]] = icmp sgt i32 [[TMP0]], 0
-; X86-NEXT:    [[TMP2:%.*]] = insertelement <4 x i32> poison, i32 [[TMP1]], i32 0
+; X86-NEXT:    [[TMP2:%.*]] = insertelement <4 x i32> poison, i32 [[TMP1]], i64 0
 ; X86-NEXT:    [[TMP3:%.*]] = shufflevector <4 x i32> [[TMP2]], <4 x i32> poison, <4 x i32> zeroinitializer
 ; X86-NEXT:    [[TMP4:%.*]] = shl <4 x i32> zeroinitializer, [[TMP3]]
 ; X86-NEXT:    [[TMP5:%.*]] = icmp slt <4 x i32> [[TMP4]], zeroinitializer
@@ -23,11 +23,11 @@ define i1 @test(i32 %0, i32 %1, i32 %p) {
 ; AARCH64-LABEL: define i1 @test(
 ; AARCH64-SAME: i32 [[TMP0:%.*]], i32 [[TMP1:%.*]], i32 [[P:%.*]]) {
 ; AARCH64-NEXT:  entry:
-; AARCH64-NEXT:    [[TMP2:%.*]] = insertelement <6 x i32> <i32 0, i32 poison, i32 0, i32 poison, i32 poison, i32 poison>, i32 [[TMP1]], i32 1
+; AARCH64-NEXT:    [[TMP2:%.*]] = insertelement <6 x i32> <i32 0, i32 poison, i32 0, i32 poison, i32 poison, i32 poison>, i32 [[TMP1]], i64 1
 ; AARCH64-NEXT:    [[TMP3:%.*]] = shufflevector <6 x i32> [[TMP2]], <6 x i32> poison, <6 x i32> <i32 0, i32 1, i32 1, i32 1, i32 1, i32 2>
 ; AARCH64-NEXT:    [[TMP4:%.*]] = shl <6 x i32> zeroinitializer, [[TMP3]]
-; AARCH64-NEXT:    [[TMP5:%.*]] = insertelement <6 x i32> <i32 poison, i32 0, i32 0, i32 0, i32 0, i32 poison>, i32 [[P]], i32 0
-; AARCH64-NEXT:    [[TMP6:%.*]] = insertelement <6 x i32> [[TMP5]], i32 [[TMP0]], i32 5
+; AARCH64-NEXT:    [[TMP5:%.*]] = insertelement <6 x i32> <i32 poison, i32 0, i32 0, i32 0, i32 0, i32 poison>, i32 [[P]], i64 0
+; AARCH64-NEXT:    [[TMP6:%.*]] = insertelement <6 x i32> [[TMP5]], i32 [[TMP0]], i64 5
 ; AARCH64-NEXT:    [[TMP7:%.*]] = icmp slt <6 x i32> [[TMP4]], [[TMP6]]
 ; AARCH64-NEXT:    [[TMP8:%.*]] = freeze <6 x i1> [[TMP7]]
 ; AARCH64-NEXT:    [[OP_RDX2:%.*]] = call i1 @llvm.vector.reduce.or.v6i1(<6 x i1> [[TMP8]])

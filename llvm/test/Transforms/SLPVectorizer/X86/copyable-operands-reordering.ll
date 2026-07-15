@@ -12,14 +12,14 @@ define i64 @test(ptr %buf) {
 ; CHECK-NEXT:    [[TMP10:%.*]] = load i8, ptr [[ARRAYIDX22]], align 1
 ; CHECK-NEXT:    [[ARRAYIDX8:%.*]] = getelementptr inbounds nuw i8, ptr [[BUF]], i64 3
 ; CHECK-NEXT:    [[TMP3:%.*]] = zext i8 [[TMP0]] to i32
-; CHECK-NEXT:    [[TMP4:%.*]] = insertelement <5 x i32> <i32 poison, i32 1, i32 1, i32 1, i32 1>, i32 [[TMP3]], i32 0
+; CHECK-NEXT:    [[TMP4:%.*]] = insertelement <5 x i32> <i32 poison, i32 1, i32 1, i32 1, i32 1>, i32 [[TMP3]], i64 0
 ; CHECK-NEXT:    [[TMP5:%.*]] = mul <5 x i32> <i32 24, i32 0, i32 0, i32 0, i32 0>, [[TMP4]]
 ; CHECK-NEXT:    [[TMP17:%.*]] = zext i8 [[TMP8]] to i32
-; CHECK-NEXT:    [[TMP7:%.*]] = insertelement <5 x i32> <i32 poison, i32 1, i32 1, i32 1, i32 1>, i32 [[TMP17]], i32 0
+; CHECK-NEXT:    [[TMP7:%.*]] = insertelement <5 x i32> <i32 poison, i32 1, i32 1, i32 1, i32 1>, i32 [[TMP17]], i64 0
 ; CHECK-NEXT:    [[TMP19:%.*]] = mul <5 x i32> <i32 16, i32 0, i32 0, i32 0, i32 0>, [[TMP7]]
 ; CHECK-NEXT:    [[TMP9:%.*]] = or disjoint <5 x i32> [[TMP19]], [[TMP5]]
 ; CHECK-NEXT:    [[TMP21:%.*]] = zext i8 [[TMP10]] to i32
-; CHECK-NEXT:    [[TMP11:%.*]] = insertelement <5 x i32> <i32 poison, i32 1, i32 1, i32 1, i32 1>, i32 [[TMP21]], i32 0
+; CHECK-NEXT:    [[TMP11:%.*]] = insertelement <5 x i32> <i32 poison, i32 1, i32 1, i32 1, i32 1>, i32 [[TMP21]], i64 0
 ; CHECK-NEXT:    [[TMP12:%.*]] = mul <5 x i32> <i32 8, i32 0, i32 0, i32 0, i32 0>, [[TMP11]]
 ; CHECK-NEXT:    [[TMP13:%.*]] = or disjoint <5 x i32> [[TMP9]], [[TMP12]]
 ; CHECK-NEXT:    [[TMP14:%.*]] = load <5 x i8>, ptr [[ARRAYIDX8]], align 1
