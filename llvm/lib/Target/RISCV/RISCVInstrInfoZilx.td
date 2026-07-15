@@ -86,10 +86,11 @@ def LXD_S_UW  : IndexedLoad<0b101, 0b11, 0, "lxd.s.uw">,
 } // Predicates = [HasStdExtZilx, IsRV64]
 
 class AddrRegReg<int N>
-    : ComplexPattern<iPTR, 2, "SelectAddrRegRegFixedScale<"#N#">">;
+    : ComplexPattern<iPTR, 2, "SelectAddrRegRegFixedScale<"#N#">",
+                     [], [], !add(10, N)>;
 class AddrRegZextReg<int N>
     : ComplexPattern<i64, 2, "SelectAddrRegZextRegFixedScale<"#N#", 32>",
-                     [], [], 10>;
+                     [], [], !add(20, N)>;
 
 def AddrRegReg0 : AddrRegReg<0>;
 def AddrRegReg1 : AddrRegReg<1>;
