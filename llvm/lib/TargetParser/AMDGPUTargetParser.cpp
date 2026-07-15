@@ -1094,11 +1094,15 @@ std::string TargetID::toString() const {
   return Str;
 }
 
+void TargetID::printCanonicalTargetIDString(raw_ostream &OS) const {
+  OS << getArchNameAMDGCN(Arch);
+  printFeatureModifiers(OS, getSramEccSetting(), getXnackSetting());
+}
+
 std::string TargetID::getCanonicalFeatureString() const {
   std::string Str;
   raw_string_ostream OS(Str);
-  OS << getArchNameAMDGCN(Arch);
-  printFeatureModifiers(OS, getSramEccSetting(), getXnackSetting());
+  printCanonicalTargetIDString(OS);
   return Str;
 }
 

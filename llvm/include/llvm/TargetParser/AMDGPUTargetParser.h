@@ -260,6 +260,11 @@ public:
 
   std::string toString() const;
 
+  /// Print the canonical processor name followed by any explicit xnack and
+  /// sramecc feature modifiers (e.g. "gfx908:sramecc-:xnack+"), without the
+  /// triple prefix.
+  void printCanonicalTargetIDString(raw_ostream &OS) const;
+
   /// \returns the canonical processor name followed by any explicit xnack and
   /// sramecc feature modifiers order (e.g.  "gfx908:sramecc-:xnack+"), without
   /// the triple prefix.
