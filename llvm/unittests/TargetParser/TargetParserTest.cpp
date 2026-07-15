@@ -2937,46 +2937,6 @@ TEST(TargetParserTest, testAMDGPUParseTargetIDString) {
       TargetID::parse(Triple("r600-unknown-unknown"), "cypress").has_value());
 }
 
-TEST(TargetParserTest, testAMDGPUSplitTargetID) {
-  using AMDGPU::TargetIDSetting;
-  auto Split = [](StringRef ID) {
-    TargetIDSetting Xnack, SramEcc;
-    StringRef Proc = AMDGPU::splitTargetID(ID, Xnack, SramEcc);
-    return std::make_tuple(Proc, Xnack, SramEcc);
-  };
-
-  // Bare processor, no modifiers.
-  EXPECT_EQ(Split("gfx90a"),
-            std::make_tuple(StringRef("gfx90a"), TargetIDSetting::Any,
-                            TargetIDSetting::Any));
-
-  // Explicit modifiers, either order.
-  EXPECT_EQ(Split("gfx90a:xnack+:sramecc-"),
-            std::make_tuple(StringRef("gfx90a"), TargetIDSetting::On,
-                            TargetIDSetting::Off));
-  EXPECT_EQ(Split("gfx90a:sramecc+:xnack-"),
-            std::make_tuple(StringRef("gfx90a"), TargetIDSetting::Off,
-                            TargetIDSetting::On));
-
-  // The processor may be a multi-component prefix (e.g. a full bundle-entry
-  // id); splitTargetID is purely syntactic and does not validate it.
-  EXPECT_EQ(Split("hip-amdgcn-amd-amdhsa-gfx906:xnack+"),
-            std::make_tuple(StringRef("hip-amdgcn-amd-amdhsa-gfx906"),
-                            TargetIDSetting::On, TargetIDSetting::Any));
-
-  EXPECT_EQ(Split(""), std::make_tuple(StringRef(""), TargetIDSetting::Any,
-                                       TargetIDSetting::Any));
-  EXPECT_EQ(Split(":"), std::make_tuple(StringRef(""), TargetIDSetting::Any,
-                                        TargetIDSetting::Any));
-  EXPECT_EQ(Split("::"), std::make_tuple(StringRef(""), TargetIDSetting::Any,
-                                         TargetIDSetting::Any));
-  // An absent modifier defaults to "Any", but a present but malformed modifier
-  // (no +/- sign, or unknown name) yields "Unsupported".
-  EXPECT_EQ(Split("gfx90a:xnack"),
-            std::make_tuple(StringRef("gfx90a"), TargetIDSetting::Unsupported,
-                            TargetIDSetting::Any));
-}
-
 TEST(TargetParserTest, testAMDGPUTargetIDProvidesFor) {
   using AMDGPU::TargetID;
   Triple AMDHSA("amdgcn-amd-amdhsa");

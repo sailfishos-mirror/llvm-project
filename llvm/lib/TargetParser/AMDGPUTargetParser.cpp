@@ -964,26 +964,6 @@ static TargetIDSetting getTargetIDSettingFromFeatureString(StringRef Sign) {
   return TargetIDSetting::Unsupported;
 }
 
-StringRef AMDGPU::splitTargetID(StringRef TargetID,
-                                TargetIDSetting &XnackSetting,
-                                TargetIDSetting &SramEccSetting) {
-  XnackSetting = TargetIDSetting::Any;
-  SramEccSetting = TargetIDSetting::Any;
-
-  SmallVector<StringRef, 3> Split;
-  TargetID.split(Split, ':');
-
-  // The substring before the first ':' is the processor
-  for (StringRef FeatureString : ArrayRef<StringRef>(Split).drop_front()) {
-    if (FeatureString.consume_front("xnack"))
-      XnackSetting = getTargetIDSettingFromFeatureString(FeatureString);
-    else if (FeatureString.consume_front("sramecc"))
-      SramEccSetting = getTargetIDSettingFromFeatureString(FeatureString);
-  }
-
-  return Split.front();
-}
-
 // Derive the architecture from the processor name in \p TargetIDStr. "generic"
 // and the empty processor name act as a wildcard.
 static GPUKind getGPUKindFromTargetID(const Triple &TT, StringRef TargetIDStr) {

@@ -155,12 +155,6 @@ fillAMDGPUFeatureMap(StringRef GPU, const Triple &T, StringMap<bool> &Features);
 
 enum class TargetIDSetting { Unsupported, Any, Off, On };
 
-/// Split a target-id string \p TargetID into its processor and the
-/// xnack/sramecc feature modifiers present. This is purely syntactic.
-LLVM_ABI StringRef splitTargetID(StringRef TargetID,
-                                 TargetIDSetting &XnackSetting,
-                                 TargetIDSetting &SramEccSetting);
-
 class LLVM_ABI TargetID {
 private:
   GPUKind Arch;
