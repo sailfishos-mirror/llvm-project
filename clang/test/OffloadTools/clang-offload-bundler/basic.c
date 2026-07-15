@@ -478,11 +478,16 @@
 // RUN: clang-offload-bundler -type=bc -targets=hip-amdgcn-amd-amdhsa--gfx906:xnack- \
 // RUN:   -targets=hip-amdgcn-amd-amdhsa--gfx906:xnack+ \
 // RUN:   -input=%t.tgt1 -input=%t.tgt2 -output=%t.hip.bundle.bc
-// RUN: not clang-offload-bundler -type=bc -targets=hip-amdgcn-amd-amdhsa--gfx906 \
+//
+// A processor with a feature specified in one target and unspecified in another
+// is not treated as a conflict; the inputs are simply bundled together.
+// RUN: clang-offload-bundler -type=bc -targets=hip-amdgcn-amd-amdhsa--gfx906 \
 // RUN:   -targets=hip-amdgcn-amd-amdhsa--gfx906:xnack+ \
-// RUN:   -input=%t.tgt1 -input=%t.tgt2 -output=%t.hip.bundle.bc 2>&1 \
-// RUN:   | FileCheck %s -check-prefix=CONFLICT-TID
-// CONFLICT-TID: error: Cannot bundle inputs with conflicting targets: 'hip-amdgcn-amd-amdhsa--gfx906' and 'hip-amdgcn-amd-amdhsa--gfx906:xnack+'
+// RUN:   -input=%t.tgt1 -input=%t.tgt2 -output=%t.hip.mixed.bundle.bc
+// RUN: clang-offload-bundler -type=bc -input=%t.hip.mixed.bundle.bc -list \
+// RUN:   | FileCheck %s -check-prefix=MIXED-TID
+// MIXED-TID-DAG: hip-amdgcn-amd-amdhsa--gfx906{{$}}
+// MIXED-TID-DAG: hip-amdgcn-amd-amdhsa--gfx906:xnack+
 
 //
 // Check extracting bundle entry with compatible target ID for HIP.
@@ -532,8 +537,12 @@
 // GFX906: simple-openmp-amdgcn-amd-amdhsa--gfx906
 // RUN: llvm-ar t %t-archive-gfx908-simple.a | FileCheck %s -check-prefix=GFX908
 // GFX908-NOT: {{gfx906}}
-// RUN: not clang-offload-bundler -type=o -targets=host-x86_64-unknown-linux-gnu,openmp-amdgcn-amd-amdhsa--gfx906,openmp-amdgcn-amd-amdhsa--gfx906:sramecc+ -input=%t.o -input=%t.tgt1 -input=%t.tgt2 -output=%t.bad.bundle 2>&1 | FileCheck %s -check-prefix=BADTARGETS
-// BADTARGETS: error: Cannot bundle inputs with conflicting targets: 'openmp-amdgcn-amd-amdhsa--gfx906' and 'openmp-amdgcn-amd-amdhsa--gfx906:sramecc+'
+// A processor with a feature specified in one target and unspecified in another
+// is not a conflict; the inputs are bundled together.
+// RUN: clang-offload-bundler -type=o -targets=host-x86_64-unknown-linux-gnu,openmp-amdgcn-amd-amdhsa--gfx906,openmp-amdgcn-amd-amdhsa--gfx906:sramecc+ -input=%t.o -input=%t.tgt1 -input=%t.tgt2 -output=%t.mixed.bundle
+// RUN: clang-offload-bundler -type=o -input=%t.mixed.bundle -list | FileCheck %s -check-prefix=MIXED-SRAMECC
+// MIXED-SRAMECC-DAG: openmp-amdgcn-amd-amdhsa--gfx906{{$}}
+// MIXED-SRAMECC-DAG: openmp-amdgcn-amd-amdhsa--gfx906:sramecc+
 
 // Check for error if no compatible code object is found in the heterogeneous archive library
 // RUN: not clang-offload-bundler -unbundle -type=a -targets=openmp-amdgcn-amd-amdhsa--gfx803 -input=%t.input-archive.a -output=%t-archive-gfx803-incompatible.a 2>&1 | FileCheck %s -check-prefix=INCOMPATIBLEARCHIVE

@@ -32,7 +32,6 @@ public:
 
   bool AllowNoHost = false;
   bool AllowMissingBundles = false;
-  bool CheckInputArchive = false;
   bool PrintExternalCommands = false;
   bool HipOpenmpCompatible = false;
   bool Compress = false;

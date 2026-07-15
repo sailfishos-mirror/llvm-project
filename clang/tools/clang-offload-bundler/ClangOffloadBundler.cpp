@@ -13,7 +13,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "clang/Basic/Cuda.h"
-#include "clang/Basic/TargetID.h"
 #include "clang/Basic/Version.h"
 #include "clang/Driver/OffloadBundler.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -126,15 +125,9 @@ int main(int argc, const char **argv) {
                         cl::desc("Create empty files if bundles are missing "
                                  "when unbundling.\n"),
                         cl::init(false), cl::cat(ClangOffloadBundlerCategory));
-  cl::opt<unsigned>
-    BundleAlignment("bundle-align",
-                    cl::desc("Alignment of bundle for binary files"),
-                    cl::init(1), cl::cat(ClangOffloadBundlerCategory));
-  cl::opt<bool> CheckInputArchive(
-      "check-input-archive",
-      cl::desc("Check if input heterogeneous archive is "
-               "valid in terms of TargetID rules.\n"),
-      cl::init(false), cl::cat(ClangOffloadBundlerCategory));
+  cl::opt<unsigned> BundleAlignment(
+      "bundle-align", cl::desc("Alignment of bundle for binary files"),
+      cl::init(1), cl::cat(ClangOffloadBundlerCategory));
   cl::opt<bool> HipOpenmpCompatible(
     "hip-openmp-compatible",
     cl::desc("Treat hip and hipv4 offload kinds as "
@@ -170,7 +163,6 @@ int main(int argc, const char **argv) {
   // Avoid using cl::opt variables after these assignments when possible
   OffloadBundlerConfig BundlerConfig;
   BundlerConfig.AllowMissingBundles = AllowMissingBundles;
-  BundlerConfig.CheckInputArchive = CheckInputArchive;
   BundlerConfig.PrintExternalCommands = PrintExternalCommands;
   BundlerConfig.HipOpenmpCompatible = HipOpenmpCompatible;
   BundlerConfig.BundleAlignment = BundleAlignment;
@@ -290,19 +282,6 @@ int main(int argc, const char **argv) {
     });
   }
 
-  if (BundlerConfig.CheckInputArchive) {
-    if (!Unbundle) {
-      return reportError(createStringError(
-          errc::invalid_argument, "-check-input-archive cannot be used while "
-                                  "bundling"));
-    }
-    if (Unbundle && BundlerConfig.FilesType != "a") {
-      return reportError(createStringError(
-          errc::invalid_argument, "-check-input-archive can only be used for "
-                                  "unbundling archives (-type=a)"));
-    }
-  }
-
   if (OutputFileNames.size() == 0) {
     return reportError(
         createStringError(errc::invalid_argument, "no output file specified!"));
@@ -349,8 +328,6 @@ int main(int argc, const char **argv) {
   unsigned HostTargetNum = 0u;
   bool HIPOnly = true;
   llvm::DenseSet<StringRef> ParsedTargets;
-  // Map {offload-kind}-{triple} to target IDs.
-  std::map<std::string, std::set<StringRef>> TargetIDs;
   // Standardize target names to include env field
   std::vector<std::string> StandardizedTargetNames;
   for (StringRef Target : TargetNames) {
@@ -385,8 +362,6 @@ int main(int argc, const char **argv) {
       return reportError(createStringError(errc::invalid_argument, Msg.str()));
     }
 
-    TargetIDs[OffloadInfo.OffloadKind.str() + "-" + OffloadInfo.Triple.str()]
-        .insert(OffloadInfo.TargetID);
     if (KindIsValid && OffloadInfo.hasHostKind()) {
       ++HostTargetNum;
       // Save the index of the input that refers to the host.
@@ -401,18 +376,6 @@ int main(int argc, const char **argv) {
 
   BundlerConfig.TargetNames.assign(StandardizedTargetNames.begin(),
                                    StandardizedTargetNames.end());
-
-  for (const auto &TargetID : TargetIDs) {
-    if (auto ConflictingTID =
-            clang::getConflictTargetIDCombination(TargetID.second)) {
-      SmallVector<char, 128u> Buf;
-      raw_svector_ostream Msg(Buf);
-      Msg << "Cannot bundle inputs with conflicting targets: '"
-          << TargetID.first + "-" + ConflictingTID->first << "' and '"
-          << TargetID.first + "-" + ConflictingTID->second << "'";
-      return reportError(createStringError(errc::invalid_argument, Msg.str()));
-    }
-  }
 
   // HIP uses clang-offload-bundler to bundle device-only compilation results
   // for multiple GPU archs, therefore allow no host target if all entries

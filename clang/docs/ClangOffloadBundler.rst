@@ -56,7 +56,6 @@ objects appropriate for the devices present when the host program is executed.
     --###                   - Print any external commands that are to be executed instead of actually executing them - for testing purposes.
     --allow-missing-bundles - Create empty files if bundles are missing when unbundling.
     --bundle-align=<uint>   - Alignment of bundle for binary files
-    --check-input-archive   - Check if input heterogeneous archive is valid in terms of TargetID rules.
     --inputs=<string>       - [<input file>,...]
     --list                  - List bundle IDs in the bundled file.
     --outputs=<string>      - [<output file>,...]
@@ -501,11 +500,6 @@ Additional Options while Archive Unbundling
 
 **-allow-missing-bundles**
   Create an empty archive file if no compatible device binary is found.
-
-**-check-input-archive**
-  Check if input heterogeneous device archive follows rules for composition
-  as defined in :ref:`code-object-composition` before creating device-specific
-  archive(s).
 
 **-debug-only=CodeObjectCompatibility**
   Verbose printing of matched/unmatched comparisons between bundle entry id of
