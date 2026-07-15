@@ -69,9 +69,8 @@ public:
   template <unsigned MaxShift>
   bool SelectAddrRegRegScale(SDValue Addr, SDValue &Base, SDValue &Index,
                              SDValue &Scale) {
-    SmallVector<unsigned, MaxShift> Amounts;
-    for (unsigned I = 0; I <= MaxShift; I++)
-      Amounts.push_back(I);
+    SmallVector<unsigned> Amounts(MaxShift + 1);
+    std::iota(Amounts.begin(), Amounts.end(), 0);
     return SelectAddrRegRegScale(Addr, Amounts, Base, Index, Scale);
   }
 
@@ -93,9 +92,8 @@ public:
   template <unsigned MaxShift, unsigned Bits>
   bool SelectAddrRegZextRegScale(SDValue Addr, SDValue &Base, SDValue &Index,
                                  SDValue &Scale) {
-    SmallVector<unsigned, MaxShift> Amounts;
-    for (unsigned I = 0; I <= MaxShift; I++)
-      Amounts.push_back(I);
+    SmallVector<unsigned> Amounts(MaxShift + 1);
+    std::iota(Amounts.begin(), Amounts.end(), 0);
     return SelectAddrRegZextRegScale(Addr, Amounts, Bits, Base, Index, Scale);
   }
 

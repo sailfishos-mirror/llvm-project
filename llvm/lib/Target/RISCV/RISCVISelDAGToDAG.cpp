@@ -3862,7 +3862,7 @@ bool RISCVDAGToDAGISel::SelectAddrRegRegScale(SDValue Addr,
   if (!isWorthFoldingIntoRegRegScale(*Subtarget, Addr))
     return false;
 
-  // Bail out if 0 is not in candicate shift amounts.
+  // Bail out if 0 is not in candidate shift amounts.
   if (!llvm::is_contained(Amounts, 0))
     return false;
 
