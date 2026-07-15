@@ -645,6 +645,7 @@ X86TargetLowering::X86TargetLowering(const X86TargetMachine &TM,
     setOperationAction(ISD::FROUNDEVEN, VT, Action);
     setOperationAction(ISD::FTRUNC, VT, Action);
     setOperationAction(ISD::FLDEXP, VT, Action);
+    setOperationAction(ISD::FFREXP, VT, Action);
     setOperationAction(ISD::FSINCOSPI, VT, Action);
   };
 
@@ -2374,6 +2375,11 @@ X86TargetLowering::X86TargetLowering(const X86TargetMachine &TM,
     }
 
     if (Subtarget.hasBMM()) {
+      setOperationAction(ISD::BITREVERSE, MVT::i8, Custom);
+      setOperationAction(ISD::BITREVERSE, MVT::i16, Custom);
+      setOperationAction(ISD::BITREVERSE, MVT::i32, Custom);
+      setOperationAction(ISD::BITREVERSE, MVT::i64, Custom);
+
       for (auto VT : {MVT::v16i8, MVT::v32i8, MVT::v64i8})
         setOperationAction(ISD::BITREVERSE, VT, Legal);
     }
@@ -3831,7 +3837,8 @@ unsigned X86TargetLowering::preferedOpcodeForCmpEqPiecesOfOperand(
 TargetLoweringBase::CondMergingParams
 X86TargetLowering::getJumpConditionMergingParams(Instruction::BinaryOps Opc,
                                                  const Value *Lhs,
-                                                 const Value *Rhs) const {
+                                                 const Value *Rhs,
+                                                 const Function *) const {
   using namespace llvm::PatternMatch;
   int BaseCost = BrMergingBaseCostThresh.getValue();
   // With CCMP, branches can be merged in a more efficient way.
@@ -11915,6 +11922,7 @@ static SDValue lowerShuffleAsDecomposedShuffleMerge(
   int NumElts = Mask.size();
   int NumLanes = VT.getSizeInBits() / 128;
   int NumEltsPerLane = NumElts / NumLanes;
+  int EltSizeInBits = VT.getScalarSizeInBits();
 
   // Shuffle the input elements into the desired positions in V1 and V2 and
   // unpack/blend them together.
@@ -11975,7 +11983,9 @@ static SDValue lowerShuffleAsDecomposedShuffleMerge(
   // the shuffle may be able to fold with a load or other benefit. However, when
   // we'll have to do 2x as many shuffles in order to achieve this, a 2-input
   // pre-shuffle first is a better strategy.
-  if (!isNoopShuffleMask(V1Mask) && !isNoopShuffleMask(V2Mask)) {
+  bool V1Noop = isNoopShuffleMask(V1Mask);
+  bool V2Noop = isNoopShuffleMask(V2Mask);
+  if (!V1Noop && !V2Noop) {
     // If we don't have blends, see if we can create a cheap unpack.
     if (!Subtarget.hasSSE41() && VT.is128BitVector() &&
         (is128BitUnpackShuffleMask(V1Mask, DAG) ||
@@ -12010,17 +12020,20 @@ static SDValue lowerShuffleAsDecomposedShuffleMerge(
                                                           DAG))
       return BlendPerm;
 
-    if (VT.getScalarSizeInBits() >= 32)
+    if (EltSizeInBits >= 32)
       if (SDValue PermUnpack = lowerShuffleAsPermuteAndUnpack(
               DL, VT, V1, V2, Mask, Subtarget, DAG))
         return PermUnpack;
   }
 
   // If the final mask is an alternating blend of vXi8/vXi16, convert to an
-  // UNPCKL(SHUFFLE, SHUFFLE) pattern.
+  // UNPCKL(SHUFFLE, SHUFFLE) pattern unless BLENDI is cheap.
   // TODO: It doesn't have to be alternating - but each lane mustn't have more
   // than half the elements coming from each source.
-  if (IsAlternating && VT.getScalarSizeInBits() < 32) {
+  bool PreferBlend = EltSizeInBits == 16 && (V1Noop || V2Noop) &&
+                     Subtarget.hasSSE41() &&
+                     is128BitLaneRepeatedShuffleMask(VT, FinalMask);
+  if (!PreferBlend && IsAlternating && EltSizeInBits < 32) {
     V1Mask.assign(NumElts, -1);
     V2Mask.assign(NumElts, -1);
     FinalMask.assign(NumElts, -1);
@@ -33492,8 +33505,8 @@ static SDValue LowerBITREVERSE(SDValue Op, const X86Subtarget &Subtarget,
   if (Subtarget.hasXOP() && !VT.is512BitVector())
     return LowerBITREVERSE_XOP(Op, DAG);
 
-  assert((Subtarget.hasSSSE3() || Subtarget.hasGFNI()) &&
-         "SSSE3 or GFNI required for BITREVERSE");
+  assert((Subtarget.hasSSSE3() || Subtarget.hasGFNI() || Subtarget.hasBMM()) &&
+         "SSSE3, GFNI, or BMM required for BITREVERSE");
 
   SDValue In = Op.getOperand(0);
   SDLoc DL(Op);
@@ -61514,6 +61527,13 @@ static SDValue combineINSERT_SUBVECTOR(SDNode *N, SelectionDAG &DAG,
     }
   }
 
+  auto peekThroughBitcastsAndExtracts = [](SDValue V) {
+    while (V.getOpcode() == ISD::BITCAST ||
+           V.getOpcode() == ISD::EXTRACT_SUBVECTOR)
+      V = V.getOperand(0);
+    return V;
+  };
+
   // Match concat_vector style patterns.
   SmallVector<SDValue, 2> SubVectorOps;
   if (collectConcatOps(N, SubVectorOps, DAG)) {
@@ -61533,8 +61553,9 @@ static SDValue combineINSERT_SUBVECTOR(SDNode *N, SelectionDAG &DAG,
                          SubVectorOps[0], DAG.getVectorIdxConstant(0, dl));
 
     // Attempt to recursively combine to a shuffle.
-    if (all_of(SubVectorOps, [](SDValue SubOp) {
-          return isTargetShuffle(peekThroughBitcasts(SubOp).getOpcode());
+    if (all_of(SubVectorOps, [&](SDValue SubOp) {
+          SubOp = peekThroughBitcastsAndExtracts(SubOp);
+          return isTargetShuffle(SubOp.getOpcode());
         })) {
       SDValue Op(N, 0);
       if (SDValue Res = combineX86ShufflesRecursively(Op, DAG, Subtarget))
@@ -61587,13 +61608,6 @@ static SDValue combineINSERT_SUBVECTOR(SDNode *N, SelectionDAG &DAG,
       return getConstVector(VecEltBits, VecUndefElts, OpVT, DAG, dl);
     }
   }
-
-  auto peekThroughBitcastsAndExtracts = [](SDValue V) {
-    while (V.getOpcode() == ISD::BITCAST ||
-           V.getOpcode() == ISD::EXTRACT_SUBVECTOR)
-      V = V.getOperand(0);
-    return V;
-  };
 
   // Attempt to recursively combine to a shuffle.
   if (isTargetShuffle(peekThroughBitcasts(Vec).getOpcode()) &&

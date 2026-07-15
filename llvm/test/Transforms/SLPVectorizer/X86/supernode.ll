@@ -161,8 +161,8 @@ define void @supernode_scheduling(ptr %Aarray, ptr %Barray, ptr %Carray, ptr %Da
 ; ENABLED-NEXT:    [[D:%.*]] = load double, ptr [[DARRAY:%.*]], align 8
 ; ENABLED-NEXT:    [[TMP0:%.*]] = load <2 x double>, ptr [[AARRAY:%.*]], align 8
 ; ENABLED-NEXT:    [[TMP1:%.*]] = load <2 x double>, ptr [[BARRAY:%.*]], align 8
-; ENABLED-NEXT:    [[TMP2:%.*]] = insertelement <2 x double> poison, double [[C]], i32 0
-; ENABLED-NEXT:    [[TMP3:%.*]] = insertelement <2 x double> [[TMP2]], double [[D]], i32 1
+; ENABLED-NEXT:    [[TMP2:%.*]] = insertelement <2 x double> poison, double [[C]], i64 0
+; ENABLED-NEXT:    [[TMP3:%.*]] = insertelement <2 x double> [[TMP2]], double [[D]], i64 1
 ; ENABLED-NEXT:    [[TMP4:%.*]] = fadd reassoc nsz arcp contract afn <2 x double> [[TMP0]], [[TMP3]]
 ; ENABLED-NEXT:    [[TMP5:%.*]] = fadd reassoc nsz arcp contract afn <2 x double> [[TMP4]], [[TMP1]]
 ; ENABLED-NEXT:    store <2 x double> [[TMP5]], ptr [[SARRAY:%.*]], align 8
