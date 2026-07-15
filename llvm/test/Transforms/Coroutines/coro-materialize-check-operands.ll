@@ -101,6 +101,38 @@ suspend:
   ret ptr %hdl
 }
 
+; %res is not rematerialized, as it would force both %c1 and %c2 into the
+; coroutine frame instead of %res.
+
+; CHECK-LABEL: @f_two_args(
+; CHECK: %[[C1:.*]] = call i32 @opaque
+; CHECK: %[[C2:.*]] = call i32 @opaque
+; CHECK: %[[RES:.*]] = mul i32 %[[C1]], %[[C2]]
+; CHECK: store i32 %[[RES]]
+define ptr @f_two_args() presplitcoroutine {
+entry:
+  %id = call token @llvm.coro.id(i32 0, ptr null, ptr @f_two_args, ptr null)
+  %size = call i32 @llvm.coro.size.i32()
+  %alloc = call ptr @malloc(i32 %size)
+  %hdl = call ptr @llvm.coro.begin(token %id, ptr %alloc)
+  %c1 = call i32 @opaque()
+  %c2 = call i32 @opaque()
+  %res = mul i32 %c1, %c2
+  %sp1 = call i8 @llvm.coro.suspend(token none, i1 false)
+  switch i8 %sp1, label %suspend [i8 0, label %resume
+                                  i8 1, label %cleanup]
+resume:
+  call void @print(i32 %res)
+  br label %cleanup
+cleanup:
+  %mem = call ptr @llvm.coro.free(token %id, ptr %hdl)
+  call void @free(ptr %mem)
+  br label %suspend
+suspend:
+  call void @llvm.coro.end(ptr %hdl, i1 0, token none)
+  ret ptr %hdl
+}
+
 ; coro-split emits all ramp functions before any of the resume/destroy/cleanup
 ; thunks, so these checks (which must scan forward) come after all defines above.
 
@@ -118,6 +150,11 @@ suspend:
 ; CHECK-NOT: add i32 %{{.*}}, 1
 ; CHECK: add i32 %[[M_RELOAD]], 2
 ; CHECK-NOT: add i32 %{{.*}}, 1
+
+; CHECK-LABEL: @f_two_args.resume(
+; CHECK: %[[RES_RELOAD:.*]] = load i32
+; CHECK-NOT: mul i32
+; CHECK: call void @print(i32 %[[RES_RELOAD]])
 
 declare ptr @llvm.coro.free(token, ptr)
 declare i32 @llvm.coro.size.i32()
