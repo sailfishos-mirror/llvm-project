@@ -302,6 +302,8 @@ public:
 
   bool isIgnorableUse(const MachineOperand &MO) const override;
 
+  bool isConvergentInstrHoistable(const MachineInstr &MI) const override;
+
   bool isSafeToSink(MachineInstr &MI, MachineBasicBlock *SuccToSinkTo,
                     MachineCycleInfo *CI) const override;
 

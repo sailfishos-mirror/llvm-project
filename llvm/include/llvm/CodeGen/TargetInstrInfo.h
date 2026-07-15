@@ -481,6 +481,18 @@ public:
     return true;
   }
 
+  /// Some convergent instructions (e.g. a cross-lane reduction of a
+  /// wave-uniform value) produce a result that does not actually depend on the
+  /// enclosing control flow, and are therefore safe for MachineLICM to hoist
+  /// even though they are marked convergent -- provided their operands
+  /// (including any implicit control-flow register such as EXEC) are proven
+  /// loop-invariant by the usual analysis. This hook lets a target opt such
+  /// instructions back into hoisting. Defaults to false (preserve the
+  /// conservative "never hoist convergent" behavior).
+  virtual bool isConvergentInstrHoistable(const MachineInstr &MI) const {
+    return false;
+  }
+
   /// Re-issue the specified 'original' instruction at the
   /// specific location targeting a new destination register.
   /// The register in Orig->getOperand(0).getReg() will be substituted by
