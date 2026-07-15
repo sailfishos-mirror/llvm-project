@@ -1099,8 +1099,11 @@ bool MachineLICMImpl::IsLICMCandidate(MachineInstr &I, MachineLoop *CurLoop) {
   // Convergent attribute has been used on operations that involve inter-thread
   // communication which results are implicitly affected by the enclosing
   // control flows. It is not safe to hoist or sink such operations across
-  // control flow.
-  if (I.isConvergent())
+  // control flow. A target may opt specific convergent instructions back into
+  // hoisting when their result is control-flow-invariant; IsLoopInvariantInst
+  // still requires every operand (including any implicit control-flow register)
+  // to be loop-invariant, so such a hoist only fires when it is safe.
+  if (I.isConvergent() && !TII->isConvergentInstrHoistable(I))
     return false;
 
   if (!TII->shouldHoist(I, CurLoop))
@@ -1364,9 +1367,13 @@ bool MachineLICMImpl::IsProfitableToHoist(MachineInstr &MI,
   }
 
   // High register pressure situation, only hoist if the instruction is going
-  // to be remat'ed.
+  // to be remat'ed, or the target has explicitly opted this convergent
+  // instruction into hoisting (e.g. a wave-uniform readfirstlane, where keeping
+  // the scalar result live out of the loop is preferable to re-broadcasting it
+  // every iteration).
   if (!TII->isTriviallyReMaterializable(MI) &&
-      !MI.isDereferenceableInvariantLoad()) {
+      !MI.isDereferenceableInvariantLoad() &&
+      !TII->isConvergentInstrHoistable(MI)) {
     LLVM_DEBUG(dbgs() << "Can't remat / high reg-pressure: " << MI);
     return false;
   }

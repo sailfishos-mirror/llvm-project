@@ -786,6 +786,15 @@ bool SIRegisterInfo::requiresRegisterScavenging(const MachineFunction &Fn) const
   return true;
 }
 
+bool SIRegisterInfo::shouldAnalyzePhysregInMachineLoopInfo(MCRegister R) const {
+  // Ask MachineLoopInfo to track EXEC so that instructions whose result depends
+  // on EXEC (e.g. v_readfirstlane_b32) are treated as loop-invariant only when
+  // EXEC itself is loop-invariant -- i.e. in uniform loops, where EXEC is not
+  // redefined. This is what makes hoisting such instructions out of uniform
+  // loops safe (see SIInstrInfo::isConvergentInstrHoistable).
+  return R == AMDGPU::EXEC || R == AMDGPU::EXEC_LO || R == AMDGPU::EXEC_HI;
+}
+
 bool SIRegisterInfo::requiresFrameIndexScavenging(
   const MachineFunction &MF) const {
   // Do not use frame virtual registers. They used to be used for SGPRs, but

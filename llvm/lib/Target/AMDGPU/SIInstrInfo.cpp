@@ -64,6 +64,12 @@ static cl::opt<bool> Fix16BitCopies(
   cl::init(true),
   cl::ReallyHidden);
 
+static cl::opt<bool> HoistUniformReadfirstlane(
+    "amdgpu-hoist-uniform-readfirstlane", cl::init(true), cl::Hidden,
+    cl::desc("Let MachineLICM hoist loop-invariant v_readfirstlane_b32 out of "
+             "uniform loops (its EXEC use keeps this to loops where EXEC is "
+             "loop-invariant, so the result is unchanged)."));
+
 SIInstrInfo::SIInstrInfo(const GCNSubtarget &ST)
     : AMDGPUGenInstrInfo(ST, RI, AMDGPU::ADJCALLSTACKUP,
                          AMDGPU::ADJCALLSTACKDOWN),
@@ -211,6 +217,19 @@ bool SIInstrInfo::isIgnorableUse(const MachineOperand &MO) const {
   return MO.getReg() == AMDGPU::EXEC && MO.isImplicit() &&
          isVALU(*MO.getParent(), /*AllowLDSDMA=*/true) &&
          !resultDependsOnExec(*MO.getParent());
+}
+
+bool SIInstrInfo::isConvergentInstrHoistable(const MachineInstr &MI) const {
+  if (!HoistUniformReadfirstlane)
+    return false;
+  // v_readfirstlane_b32 of a loop-invariant value is loop-invariant when EXEC
+  // is loop-invariant (i.e. the loop is uniform): the "first active lane" is the
+  // same on every iteration, so the broadcast result does not change. EXEC is
+  // an implicit operand of the instruction, and SIRegisterInfo asks
+  // MachineLoopInfo to analyze it, so IsLoopInvariantInst already rejects the
+  // divergent-loop case (EXEC redefined in the loop). Here we only whitelist the
+  // opcode so MachineLICM does not bail purely on the convergent bit.
+  return MI.getOpcode() == AMDGPU::V_READFIRSTLANE_B32;
 }
 
 bool SIInstrInfo::isSafeToSink(MachineInstr &MI,
