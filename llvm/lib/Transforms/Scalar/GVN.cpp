@@ -341,6 +341,12 @@ uint32_t GVNValueTable::lookupOrAddCall(CallInst *C) {
     return NextValueNumber++;
   }
 
+  // Conservatively assign unique value numbers to calls with operand bundles.
+  if (C->hasOperandBundles()) {
+    ValueNumbering[C] = NextValueNumber;
+    return NextValueNumber++;
+  }
+
   if (AA->doesNotAccessMemory(C)) {
     Expression Exp = createExpr(C);
     uint32_t E = assignExpNewValueNum(Exp).first;
