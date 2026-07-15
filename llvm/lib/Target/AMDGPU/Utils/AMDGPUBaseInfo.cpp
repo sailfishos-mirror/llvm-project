@@ -1107,7 +1107,8 @@ TargetID createAMDGPUTargetID(const MCSubtargetInfo &STI,
   }
 
   // Only allow changing xnack setting if the target supports on/off modes.
-  // Targets without on/off mode support keep their initial setting (Any).
+  // Targets without on/off mode support keep their initial setting
+  // (Unsupported).
 
   bool XnackSupported = STI.getFeatureBits().test(FeatureXNACKOnOffModes);
   bool SramEccSupported = TargetID.isSramEccSupported();
