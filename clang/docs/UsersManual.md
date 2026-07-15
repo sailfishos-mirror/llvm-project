@@ -1654,6 +1654,7 @@ describes the various floating point semantic modes and the corresponding option
 | fallow-approximate-fns  | {on, off}                                          |        |
 | fassociative-math       | {on, off}                                          |        |
 | fcomplex-arithmetic     | {basic, improved, full, promoted}                  |        |
+| fsignaling-nans         | {on, off}                                          |        |
 
 This table describes the option settings that correspond to the three
 floating point semantic models: precise (the default), strict, and fast.
@@ -1672,6 +1673,7 @@ floating point semantic models: precise (the default), strict, and fast.
 | allow_approximate_fns | off       | off     | on        | on         |
 | allow_reassociation   | off       | off     | on        | on         |
 | complex_arithmetic    | full      | full    | promoted  | basic      |
+| signaling_nans        | off       | on      | off       | off        |
 
 The `-ffp-model` option does not modify the `fdenormal-fp-math`
 setting, but it does have an impact on whether `crtfastmath.o` is
@@ -1988,6 +1990,7 @@ for more details.
    - The option ``-frounding-math`` forces the compiler to honor the dynamically-set rounding mode.  This prevents optimizations which might affect results if the rounding mode changes or is different from the default; for example, it prevents floating-point operations from being reordered across most calls and prevents constant-folding when the result is not exactly representable.
 ```
 
+```{eval-rst}
 .. option:: -f[no-]signaling-nans
 
    Informs the compiler whether signaling NaNs behave according to IEEE 754.
@@ -2016,7 +2019,9 @@ for more details.
    supporting architectures, it can enable additional optimization opportunities.
 
    If more than one option is specified, the last one takes effect.
+```
 
+```{eval-rst}
 .. option:: -ffp-model=<value>
 
    Specify floating point behavior. ``-ffp-model`` is an umbrella
