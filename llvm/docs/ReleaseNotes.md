@@ -282,7 +282,8 @@ Makes programs 10x faster by doing Special New Thing.
 * Adds experimental assembler support for dot-product extensions(Zvqwdota8i, Zvqwdota16i, Zvfwdota16bf and Zvfqwdota8f).
 * `-mtune=generic` now uses the scheduling model from SpacemiT X60 instead of an empty scheduling model.
 * The Xqcilo pseudos now emit sequences that can be relaxed.
-* Adds experimental assembler support for the 'Zilx` (Index Load For Integer) extension.
+* Adds experimental assembler support for the `Zilx` (Indexed Integer Load) extension.
+* Adds experimental CodeGen support for the `Zilx` (Indexed Integer Load) extension.
 
 ### Changes to the WebAssembly Backend
 
