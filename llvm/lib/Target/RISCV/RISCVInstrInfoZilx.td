@@ -6,8 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 ///
-/// This file describes the RISC-V instructions for 'Zilx' (Index Load for 
-/// Integer).
+/// This file describes the RISC-V instructions for 'Zilx' (Indexed Integer
+/// Load).
 ///
 //===----------------------------------------------------------------------===//
 

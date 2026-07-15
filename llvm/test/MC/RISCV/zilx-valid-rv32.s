@@ -9,39 +9,39 @@
 lxb a0, (a1), a2
 # CHECK-INST: lxb a0, (a1), a2
 # CHECK-ENCODING: [0x03,0xf5,0xc5,0x04]
-# CHECK-ERROR: instruction requires the following: 'Zilx' (Index Load for Integer){{$}}
+# CHECK-ERROR: instruction requires the following: 'Zilx' (Indexed Integer Load Instructions){{$}}
 
 lxbu a0, (a1), a2
 # CHECK-INST: lxbu a0, (a1), a2
 # CHECK-ENCODING: [0x03,0xf5,0xc5,0x24]
-# CHECK-ERROR: instruction requires the following: 'Zilx' (Index Load for Integer){{$}}
+# CHECK-ERROR: instruction requires the following: 'Zilx' (Indexed Integer Load Instructions){{$}}
 
 lxh a0, (a1), a2
 # CHECK-INST: lxh a0, (a1), a2
 # CHECK-ENCODING: [0x03,0xf5,0xc5,0x44]
-# CHECK-ERROR: instruction requires the following: 'Zilx' (Index Load for Integer){{$}}
+# CHECK-ERROR: instruction requires the following: 'Zilx' (Indexed Integer Load Instructions){{$}}
 
 lxhu a0, (a1), a2
 # CHECK-INST: lxhu a0, (a1), a2
 # CHECK-ENCODING: [0x03,0xf5,0xc5,0x64]
-# CHECK-ERROR: instruction requires the following: 'Zilx' (Index Load for Integer){{$}}
+# CHECK-ERROR: instruction requires the following: 'Zilx' (Indexed Integer Load Instructions){{$}}
 
 lxw a0, (a1), a2
 # CHECK-INST: lxw a0, (a1), a2
 # CHECK-ENCODING: [0x03,0xf5,0xc5,0x84]
-# CHECK-ERROR: instruction requires the following: 'Zilx' (Index Load for Integer){{$}}
+# CHECK-ERROR: instruction requires the following: 'Zilx' (Indexed Integer Load Instructions){{$}}
 
 lxh.s a0, (a1), a2
 # CHECK-INST: lxh.s a0, (a1), a2
 # CHECK-ENCODING: [0x03,0xf5,0xc5,0x48]
-# CHECK-ERROR: instruction requires the following: 'Zilx' (Index Load for Integer){{$}}
+# CHECK-ERROR: instruction requires the following: 'Zilx' (Indexed Integer Load Instructions){{$}}
 
 lxhu.s a0, (a1), a2
 # CHECK-INST: lxhu.s a0, (a1), a2
 # CHECK-ENCODING: [0x03,0xf5,0xc5,0x68]
-# CHECK-ERROR: instruction requires the following: 'Zilx' (Index Load for Integer){{$}}
+# CHECK-ERROR: instruction requires the following: 'Zilx' (Indexed Integer Load Instructions){{$}}
 
 lxw.s a0, (a1), a2
 # CHECK-INST: lxw.s a0, (a1), a2
 # CHECK-ENCODING: [0x03,0xf5,0xc5,0x88]
-# CHECK-ERROR: instruction requires the following: 'Zilx' (Index Load for Integer){{$}}
+# CHECK-ERROR: instruction requires the following: 'Zilx' (Indexed Integer Load Instructions){{$}}
