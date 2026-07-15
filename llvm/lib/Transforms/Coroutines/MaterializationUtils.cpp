@@ -32,7 +32,7 @@ using namespace coro;
 // "coro-frame", which results in leaner debug spew.
 #define DEBUG_TYPE "coro-suspend-crossing"
 
-// Returns true if \p Root is available in the resume function without
+// Returns true if \p Root can be rematerialized in the resume function without
 // introducing a new spill. This holds when a value is:
 // 1. A constant: genuinely available at no cost, materialized as an immediate
 //    in the resume function.
