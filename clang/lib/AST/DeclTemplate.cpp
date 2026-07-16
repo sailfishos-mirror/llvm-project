@@ -407,30 +407,34 @@ void RedeclarableTemplateDecl::addSpecializationImpl(
     void *InsertPos) {
   using SETraits = SpecEntryTraits<EntryType>;
 
-  if (InsertPos) {
+  const auto *D = SETraits::getDecl(Entry);
+
+  // 'Specializations' only tracks the canonical specializations.
+  if (D->isCanonicalDecl()) {
+    if (InsertPos) {
 #ifndef NDEBUG
-    auto Args = SETraits::getTemplateArgs(Entry);
-    // Due to hash collisions, it can happen that we load another template
-    // specialization with the same hash. This is fine, as long as the next
-    // call to findSpecializationImpl does not find a matching Decl for the
-    // template arguments.
-    loadLazySpecializationsImpl(Args);
-    void *CorrectInsertPos;
-    assert(!findSpecializationImpl(Specializations, CorrectInsertPos, Args) &&
-           InsertPos == CorrectInsertPos &&
-           "given incorrect InsertPos for specialization");
+      auto Args = SETraits::getTemplateArgs(Entry);
+      // Due to hash collisions, it can happen that we load another template
+      // specialization with the same hash. This is fine, as long as the next
+      // call to findSpecializationImpl does not find a matching Decl for the
+      // template arguments.
+      loadLazySpecializationsImpl(Args);
+      void *CorrectInsertPos;
+      assert(!findSpecializationImpl(Specializations, CorrectInsertPos, Args) &&
+             InsertPos == CorrectInsertPos &&
+             "given incorrect InsertPos for specialization");
 #endif
-    Specializations.InsertNode(Entry, InsertPos);
-  } else {
-    EntryType *Existing = Specializations.GetOrInsertNode(Entry);
-    (void)Existing;
-    assert(SETraits::getDecl(Existing)->isCanonicalDecl() &&
-           "non-canonical specialization?");
+      Specializations.InsertNode(Entry, InsertPos);
+    } else {
+      EntryType *Existing = Specializations.GetOrInsertNode(Entry);
+      (void)Existing;
+      assert(SETraits::getDecl(Existing)->isCanonicalDecl() &&
+             "non-canonical specialization?");
+    }
   }
 
   if (ASTMutationListener *L = getASTMutationListener())
-    L->AddedCXXTemplateSpecialization(cast<Derived>(this),
-                                      SETraits::getDecl(Entry));
+    L->AddedCXXTemplateSpecialization(cast<Derived>(this), D);
 }
 
 //===----------------------------------------------------------------------===//

@@ -3094,16 +3094,13 @@ public:
   /// \param PointOfInstantiation point at which the function template
   /// specialization was first instantiated.
   ///
-  /// \param AddSpecialization whether to add this specialization to the
-  /// template's specialization set.
-  ///
   void setFunctionTemplateSpecialization(
       ASTContext &C, FunctionTemplateDecl *Template,
       TemplateArgumentList *TemplateArgs, void *InsertPos,
       TemplateSpecializationKind TSK,
       const TemplateParameterList *TemplateParams,
       const TemplateArgumentListInfo *TemplateArgsAsWritten,
-      SourceLocation PointOfInstantiation, bool AddSpecialization);
+      SourceLocation PointOfInstantiation);
 
   /// Specifies that this function declaration is actually a
   /// dependent function template specialization.

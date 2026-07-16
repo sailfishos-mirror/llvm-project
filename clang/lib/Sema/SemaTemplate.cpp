@@ -9862,7 +9862,7 @@ bool Sema::CheckFunctionTemplateSpecialization(
       /*InsertPos=*/nullptr, SpecInfo->getTemplateSpecializationKind(),
       TemplateParams,
       ExplicitTemplateArgs ? &ConvertedTemplateArgs[Specialization] : nullptr,
-      /*PointOfInstantiation=*/SourceLocation(), /*AddSpecialization=*/true);
+      /*PointOfInstantiation=*/SourceLocation());
 
   // A function template specialization inherits the target attributes
   // of its template.  (We require the attributes explicitly in the

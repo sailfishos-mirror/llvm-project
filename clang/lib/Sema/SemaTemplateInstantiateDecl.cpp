@@ -3003,8 +3003,7 @@ Decl *TemplateDeclInstantiator::VisitFunctionDecl(
         /*InsertPos=*/nullptr, /*TSK=*/TSK_ImplicitInstantiation,
         /*TemplateParams=*/nullptr,
         /*TemplateArgsAsWritten=*/nullptr,
-        /*PointOfInstantiation=*/SourceLocation(),
-        /*AddSpecialization=*/PrevDecl == nullptr);
+        /*PointOfInstantiation=*/SourceLocation());
   } else if (FunctionRewriteKind == RewriteKind::None) {
     if (isFriend && D->isThisDeclarationADefinition()) {
       // Do not connect the friend to the template unless it's actually a
@@ -3405,8 +3404,7 @@ Decl *TemplateDeclInstantiator::VisitCXXMethodDecl(
         /*InsertPos=*/nullptr, /*TSK=*/TSK_ImplicitInstantiation,
         /*TemplateParams=*/nullptr,
         /*TemplateArgsAsWritten=*/nullptr,
-        /*PointOfInstantiation=*/SourceLocation(),
-        /*AddSpecialization=*/PrevDecl == nullptr);
+        /*PointOfInstantiation=*/SourceLocation());
   } else if (!isFriend && FunctionRewriteKind == RewriteKind::None) {
     // Record that this is an instantiation of a member function.
     Method->setInstantiationOfMemberFunction(D, TSK_ImplicitInstantiation);

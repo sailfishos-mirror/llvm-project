@@ -3727,8 +3727,7 @@ Error ASTNodeImporter::ImportTemplateInformation(
     ToFD->setFunctionTemplateSpecialization(
         Importer.getToContext(), std::get<0>(*FunctionAndArgsOrErr), ToTAList,
         /*InsertPos=*/nullptr, TSK, *TemplateParamsOrErr,
-        FromTAArgsAsWritten ? &ToTAInfo : nullptr, *POIOrErr,
-        /*AddSpecialization=*/true);
+        FromTAArgsAsWritten ? &ToTAInfo : nullptr, *POIOrErr);
     return Error::success();
   }
 

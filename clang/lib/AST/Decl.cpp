@@ -4344,7 +4344,7 @@ void FunctionDecl::setFunctionTemplateSpecialization(
     TemplateArgumentList *TemplateArgs, void *InsertPos,
     TemplateSpecializationKind TSK, const TemplateParameterList *TemplateParams,
     const TemplateArgumentListInfo *TemplateArgsAsWritten,
-    SourceLocation PointOfInstantiation, bool AddSpecialization) {
+    SourceLocation PointOfInstantiation) {
   assert((TemplateOrSpecialization.isNull() ||
           isa<MemberSpecializationInfo *>(TemplateOrSpecialization)) &&
          "Member function is already a specialization");
@@ -4361,8 +4361,7 @@ void FunctionDecl::setFunctionTemplateSpecialization(
           dyn_cast_if_present<MemberSpecializationInfo *>(
               TemplateOrSpecialization));
   TemplateOrSpecialization = Info;
-  if (AddSpecialization)
-    Template->addSpecialization(Info, InsertPos);
+  Template->addSpecialization(Info, InsertPos);
 }
 
 void FunctionDecl::setDependentTemplateSpecialization(
