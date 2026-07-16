@@ -75,16 +75,10 @@ define noundef i64 @or_sge_canonicalization(ptr noundef %p, i64 noundef %a, i64 
 ; CHECK-NEXT:    [[TMP9:%.*]] = shufflevector <3 x i1> [[TMP7]], <3 x i1> [[TMP8]], <3 x i32> <i32 0, i32 1, i32 5>
 ; CHECK-NEXT:    [[TMP10:%.*]] = bitcast <3 x i1> [[TMP9]] to i3
 ; CHECK-NEXT:    [[AND_4:%.*]] = icmp eq i3 [[TMP10]], -1
-; CHECK-NEXT:    br i1 [[AND_4]], label %[[THEN:.*]], label %[[ELSE:.*]]
-; CHECK:       [[THEN]]:
-; CHECK-NEXT:    [[IDX:%.*]] = add nuw nsw i64 [[D]], [[B]]
-; CHECK-NEXT:    [[OOB_NOT:%.*]] = icmp ult i64 [[IDX]], [[A]]
-; CHECK-NEXT:    br i1 [[OOB_NOT]], label %[[CONT:.*]], label %[[TRAP:.*]]
-; CHECK:       [[TRAP]]:
-; CHECK-NEXT:    tail call void @llvm.trap()
-; CHECK-NEXT:    unreachable
+; CHECK-NEXT:    br i1 [[AND_4]], label %[[CONT:.*]], label %[[ELSE:.*]]
 ; CHECK:       [[CONT]]:
-; CHECK-NEXT:    [[ARRAYIDX:%.*]] = getelementptr inbounds nuw [8 x i8], ptr [[P]], i64 [[IDX]]
+; CHECK-NEXT:    [[TMP12:%.*]] = getelementptr inbounds nuw [8 x i8], ptr [[P]], i64 [[D]]
+; CHECK-NEXT:    [[ARRAYIDX:%.*]] = getelementptr inbounds nuw [8 x i8], ptr [[TMP12]], i64 [[B]]
 ; CHECK-NEXT:    [[V:%.*]] = load i64, ptr [[ARRAYIDX]], align 8
 ; CHECK-NEXT:    br label %[[ELSE]]
 ; CHECK:       [[ELSE]]:
