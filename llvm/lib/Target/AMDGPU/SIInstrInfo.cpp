@@ -3307,6 +3307,10 @@ public:
     return CmpInst && MI == CmpInst;
   }
 
+  // Long AMDGPU instruction latencies can make loops with a large MII
+  // profitable.
+  bool allowLargeLoops() const override { return true; }
+
   std::optional<bool> createTripCountGreaterCondition(
       int TC, MachineBasicBlock &MBB,
       SmallVectorImpl<MachineOperand> &CondParam) override {

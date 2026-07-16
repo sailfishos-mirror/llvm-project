@@ -841,6 +841,10 @@ public:
       return true;
     }
 
+    /// Return true if the target permits pipelining loops whose MII exceeds the
+    /// generic default limit.
+    virtual bool allowLargeLoops() const { return false; }
+
     /// Create a condition to determine if the trip count of the loop is greater
     /// than TC, where TC is always one more than for the previous prologue or
     /// 0 if this is being called for the outermost prologue.
