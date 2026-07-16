@@ -13,6 +13,7 @@
 #ifndef LLVM_TRANSFORMS_VECTORIZE_VPLANTRANSFORMS_H
 #define LLVM_TRANSFORMS_VECTORIZE_VPLANTRANSFORMS_H
 
+#include "LoopVectorizationPlanner.h"
 #include "VPlan.h"
 #include "VPlanVerifier.h"
 #include "llvm/ADT/STLFunctionalExtras.h"
@@ -583,13 +584,15 @@ struct VPlanTransforms {
   /// recipes. Non load/store input instructions are left unchanged.
   static void makeMemOpWideningDecisions(VPlan &Plan, VFRange &Range,
                                          VPRecipeBuilder &RecipeBuilder,
-                                         VPCostContext &CostCtx);
+                                         VPCostContext &CostCtx,
+                                         VFSelectionContext &Config);
 
   /// \p MemOps must be updated to contain ones that haven't been processed by
   /// the pass.
   static void multiversionForUnitStridedMemOps(
-      VPlan &Plan, VPCostContext &CostCtx, VPRecipeBuilder &RecipeBuilder,
-      VFRange &Range, SmallVectorImpl<VPInstruction *> &MemOps);
+      VPlan &Plan, VPCostContext &CostCtx, VFSelectionContext &Config,
+      VPRecipeBuilder &RecipeBuilder, VFRange &Range,
+      SmallVectorImpl<VPInstruction *> &MemOps);
 
   /// Make VPlan-based scalarization decision prior to delegating to the ones
   /// made by the legacy CM. Only transforms "usesFirstLaneOnly` def-use chains

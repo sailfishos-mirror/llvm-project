@@ -6741,7 +6741,7 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlan(VPlanPtr Plan,
                         OrigLoop);
 
   RUN_VPLAN_PASS(VPlanTransforms::makeMemOpWideningDecisions, *Plan, Range,
-                 RecipeBuilder, CostCtx);
+                 RecipeBuilder, CostCtx, Config);
 
   RUN_VPLAN_PASS(VPlanTransforms::makeScalarizationDecisions, *Plan, Range);
 

@@ -7348,7 +7348,8 @@ static std::optional<int64_t> getConstantStride(VPValue *Addr, Type *AccessTy,
 
 void VPlanTransforms::makeMemOpWideningDecisions(VPlan &Plan, VFRange &Range,
                                                  VPRecipeBuilder &RecipeBuilder,
-                                                 VPCostContext &CostCtx) {
+                                                 VPCostContext &CostCtx,
+                                                 VFSelectionContext &Config) {
   // Collect all loads/stores first. We will start with ones having simpler
   // decisions followed by more complex ones that are potentially
   // guided/dependent on the simpler ones.
@@ -7494,7 +7495,7 @@ void VPlanTransforms::makeMemOpWideningDecisions(VPlan &Plan, VFRange &Range,
 
   if (EnableVPlanBasedStrideMV)
     RUN_VPLAN_PASS(VPlanTransforms::multiversionForUnitStridedMemOps, Plan,
-                   CostCtx, RecipeBuilder, Range, MemOps);
+                   CostCtx, Config, RecipeBuilder, Range, MemOps);
 
   VPlanTransforms::runPass("delegateMemOpWideningToLegacyCM", ProcessSubset,
                            Plan, [&](VPInstruction *VPI) {
@@ -7507,8 +7508,9 @@ void VPlanTransforms::makeMemOpWideningDecisions(VPlan &Plan, VFRange &Range,
 }
 
 void VPlanTransforms::multiversionForUnitStridedMemOps(
-    VPlan &Plan, VPCostContext &CostCtx, VPRecipeBuilder &RecipeBuilder,
-    VFRange &Range, SmallVectorImpl<VPInstruction *> &MemOps) {
+    VPlan &Plan, VPCostContext &CostCtx, VFSelectionContext &Config,
+    VPRecipeBuilder &RecipeBuilder, VFRange &Range,
+    SmallVectorImpl<VPInstruction *> &MemOps) {
   if (CostCtx.L->getHeader()->getParent()->hasOptSize())
     return;
   SmallVector<VPInstruction *> RemainingOps;
@@ -7529,38 +7531,28 @@ void VPlanTransforms::multiversionForUnitStridedMemOps(
 
     const SCEV *PtrSCEV =
         vputils::getSCEVExprForVPValue(PtrOp, CostCtx.PSE, CostCtx.L);
-    const SCEV *Start = nullptr;
-    const SCEV *Stride = nullptr;
+    const SCEV *Start, *Stride;
 
     if (!match(PtrSCEV, m_scev_AffineAddRec(m_SCEV(Start), m_SCEV(Stride),
-                                            m_SpecificLoop(CostCtx.L)))) {
+                                            m_SpecificLoop(CostCtx.L))))
       return Skip();
-    }
 
     Type *ScalarTy = VPI->getOpcode() == Instruction::Load
                          ? VPI->getScalarType()
                          : VPI->getOperand(0)->getScalarType();
 
     if (VPI->getMask()) {
-      auto &TTI = CostCtx.TTI;
       Instruction *I = VPI->getUnderlyingInstr();
-      unsigned AS = getLoadStoreAddressSpace(I);
-      const Align Alignment = getLoadStoreAlignment(I);
       if (!LoopVectorizationPlanner::getDecisionAndClampRange(
               [&](ElementCount VF) -> bool {
-                Type *VTy = VectorType::get(ScalarTy, VF);
-                return VPI->getOpcode() == Instruction::Load
-                           ? (TTI.isLegalMaskedLoad(VTy, Alignment, AS) ||
-                              TTI.isLegalMaskedGather(VTy, Alignment))
-                           : (TTI.isLegalMaskedStore(VTy, Alignment, AS) ||
-                              TTI.isLegalMaskedScatter(VTy, Alignment));
+                return Config.isLegalMaskedLoadOrStore(I, VF);
               },
               Range))
         return Skip();
     }
 
     const auto *TypeSize = cast<SCEVConstant>(SE->getSizeOfExpr(
-        Stride->getType(), SE->getDataLayout().getTypeStoreSize(ScalarTy)));
+        Stride->getType(), SE->getDataLayout().getTypeAllocSize(ScalarTy)));
 
     auto ReplaceWithUnitStrided = [&]() {
       VPBuilder Builder(VPI);
@@ -7619,6 +7611,9 @@ void VPlanTransforms::multiversionForUnitStridedMemOps(
       MVConst = SE->getTruncateOrSignExtend(MVConst, ToMultiVersion->getType());
     }
 
+    if (match(ToMultiVersion, m_scev_UndefOrPoison()))
+      return Skip();
+
     if (!isa<SCEVUnknown>(ToMultiVersion)) {
       // Match legacy behavior.
       // If/when changed, make sure that explicit poison/undef in the defining
@@ -7628,16 +7623,11 @@ void VPlanTransforms::multiversionForUnitStridedMemOps(
 
     Value *StrideVal = cast<SCEVUnknown>(ToMultiVersion)->getValue();
 
-    if (isa<UndefValue>(StrideVal))
-      return Skip();
-
     const SCEVPredicate *NewPred =
         SE->getComparePredicate(CmpInst::ICMP_EQ, ToMultiVersion, MVConst);
 
     // Check if new predicate implies that backedge is never taken. If so, there
     // is no reason to multiversion for it.
-    SmallVector<const SCEVPredicate *> Preds{&CostCtx.PSE.getPredicate(),
-                                             &StridePredicates, NewPred};
     auto *PredicatedMaxBTC = SE->rewriteUsingPredicate(
         SE->getSymbolicMaxBackedgeTakenCount(CostCtx.L), CostCtx.L,
         StridePredicates.getUnionWith(NewPred, *SE)
@@ -7645,10 +7635,11 @@ void VPlanTransforms::multiversionForUnitStridedMemOps(
 
     if (LoopVectorizationPlanner::getDecisionAndClampRange(
             [&](ElementCount VF) {
-              return SE->isKnownPositive(SE->getMinusSCEV(
+              return SE->isKnownPredicate(
+                  CmpPredicate(ICmpInst::ICMP_SLT), PredicatedMaxBTC,
                   SE->getConstant(PredicatedMaxBTC->getType(),
-                                  VF.isScalable() ? 1 : VF.getFixedValue() - 1),
-                  PredicatedMaxBTC));
+                                  VF.isScalable() ? 1
+                                                  : VF.getFixedValue() - 1));
             },
             Range))
       return Skip();
