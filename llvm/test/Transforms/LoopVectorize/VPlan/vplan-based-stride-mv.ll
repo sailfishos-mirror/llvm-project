@@ -837,6 +837,98 @@ exit:
   ret void
 }
 
+; Both strides should be speculated and combined into a single predicate.
+define void @independent_strides(ptr noalias %p.out, ptr %p0, ptr %p1, i64 %stride0, i64 %stride1) {
+; CHECK-LABEL: VPlan for loop in 'independent_strides'
+; CHECK:  VPlan ' for UF>=1' {
+; CHECK-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
+; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
+; CHECK-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
+; CHECK-NEXT:  Live-in ir<128> = original trip-count
+; CHECK-EMPTY:
+; CHECK-NEXT:  ir-bb<entry>:
+; CHECK-NEXT:  Successor(s): scalar.ph, vector.ph
+; CHECK-EMPTY:
+; CHECK-NEXT:  vector.ph:
+; CHECK-NEXT:  Successor(s): vector loop
+; CHECK-EMPTY:
+; CHECK-NEXT:  <x1> vector loop: {
+; CHECK-NEXT:  vp<[[VP3:%[0-9]+]]> = CANONICAL-IV
+; CHECK-EMPTY:
+; CHECK-NEXT:    vector.body:
+; CHECK-NEXT:      ir<%iv> = WIDEN-INDUCTION nsw ir<0>, ir<1>, vp<[[VP0]]>
+; CHECK-NEXT:      EMIT ir<%iv.next> = add nsw ir<%iv>, ir<1>
+; CHECK-NEXT:      EMIT ir<%idx0> = mul ir<%iv>, ir<%stride0>
+; CHECK-NEXT:      EMIT ir<%idx1> = mul ir<%iv>, ir<%stride1>
+; CHECK-NEXT:      EMIT ir<%gep.ld0> = getelementptr ir<%p0>, ir<%idx0>
+; CHECK-NEXT:      EMIT ir<%gep.ld1> = getelementptr ir<%p1>, ir<%idx1>
+; CHECK-NEXT:      EMIT-SCALAR ir<%ld0> = load ir<%gep.ld0>
+; CHECK-NEXT:      EMIT-SCALAR ir<%ld1> = load ir<%gep.ld1>
+; CHECK-NEXT:      EMIT ir<%val> = add ir<%ld0>, ir<%ld1>
+; CHECK-NEXT:      EMIT ir<%gep.st> = getelementptr ir<%p.out>, ir<%iv>
+; CHECK-NEXT:      EMIT store ir<%val>, ir<%gep.st>
+; CHECK-NEXT:      EMIT ir<%exitcond> = icmp sge ir<%iv.next>, ir<128>
+; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
+; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
+; CHECK-NEXT:    No successors
+; CHECK-NEXT:  }
+; CHECK-NEXT:  Successor(s): middle.block
+; CHECK-EMPTY:
+; CHECK-NEXT:  middle.block:
+; CHECK-NEXT:    EMIT vp<[[VP5:%[0-9]+]]> = exiting-iv-value ir<%iv>
+; CHECK-NEXT:    EMIT vp<%cmp.n> = icmp eq ir<128>, vp<[[VP2]]>
+; CHECK-NEXT:    EMIT branch-on-cond vp<%cmp.n>
+; CHECK-NEXT:  Successor(s): ir-bb<exit>, scalar.ph
+; CHECK-EMPTY:
+; CHECK-NEXT:  ir-bb<exit>:
+; CHECK-NEXT:  No successors
+; CHECK-EMPTY:
+; CHECK-NEXT:  scalar.ph:
+; CHECK-NEXT:    EMIT-SCALAR vp<%bc.resume.val> = phi [ vp<[[VP5]]>, middle.block ], [ ir<0>, ir-bb<entry> ]
+; CHECK-NEXT:  Successor(s): ir-bb<header>
+; CHECK-EMPTY:
+; CHECK-NEXT:  ir-bb<header>:
+; CHECK-NEXT:    IR   %iv = phi i64 [ 0, %entry ], [ %iv.next, %header ] (extra operand: vp<%bc.resume.val> from scalar.ph)
+; CHECK-NEXT:    IR   %iv.next = add nsw i64 %iv, 1
+; CHECK-NEXT:    IR   %idx0 = mul i64 %iv, %stride0
+; CHECK-NEXT:    IR   %idx1 = mul i64 %iv, %stride1
+; CHECK-NEXT:    IR   %gep.ld0 = getelementptr i64, ptr %p0, i64 %idx0
+; CHECK-NEXT:    IR   %gep.ld1 = getelementptr i64, ptr %p1, i64 %idx1
+; CHECK-NEXT:    IR   %ld0 = load i64, ptr %gep.ld0, align 8
+; CHECK-NEXT:    IR   %ld1 = load i64, ptr %gep.ld1, align 8
+; CHECK-NEXT:    IR   %val = add i64 %ld0, %ld1
+; CHECK-NEXT:    IR   %gep.st = getelementptr i64, ptr %p.out, i64 %iv
+; CHECK-NEXT:    IR   store i64 %val, ptr %gep.st, align 8
+; CHECK-NEXT:    IR   %exitcond = icmp slt i64 %iv.next, 128
+; CHECK-NEXT:  No successors
+; CHECK-NEXT:  }
+;
+entry:
+  br label %header
+
+header:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %header ]
+  %iv.next = add nsw i64 %iv, 1
+
+  %idx0 = mul i64 %iv, %stride0
+  %idx1 = mul i64 %iv, %stride1
+
+  %gep.ld0 = getelementptr i64, ptr %p0, i64 %idx0
+  %gep.ld1 = getelementptr i64, ptr %p1, i64 %idx1
+  %ld0 = load i64, ptr %gep.ld0, align 8
+  %ld1 = load i64, ptr %gep.ld1, align 8
+  %val = add i64 %ld0, %ld1
+
+  %gep.st = getelementptr i64, ptr %p.out, i64 %iv
+  store i64 %val, ptr %gep.st, align 8
+
+  %exitcond = icmp slt i64 %iv.next, 128
+  br i1 %exitcond, label %header, label %exit
+
+exit:
+  ret void
+}
+
 ; Speculating one access for unit-strideness guarantees that the other one isn't.
 define void @dependent_strides(ptr noalias %p.out, ptr %p0, ptr %p1, i64 %stride) {
 ; CHECK-LABEL: VPlan for loop in 'dependent_strides'
