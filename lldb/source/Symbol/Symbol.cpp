@@ -514,6 +514,11 @@ Symbol *Symbol::ResolveReExportedSymbol(
         !object_file->ReExportedLibrariesShadowLocalDefinitions())
       return nullptr;
 
+    // Only exported (global or weak) definitions take part in dynamic
+    // linking, so local symbols are never shadowed by a filtee.
+    if (!IsExternal() && !IsWeak())
+      return nullptr;
+
     // Use this symbol's own (version-suffix-stripped) name so the filtees
     // below are searched for it.
     reexport_name = GetName();

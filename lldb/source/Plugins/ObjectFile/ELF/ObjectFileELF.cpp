@@ -2352,11 +2352,6 @@ ObjectFileELF::ParseSymbols(Symtab *symtab, user_id_t start_id,
   SectionList *module_section_list =
       module_sp ? module_sp->GetSectionList() : nullptr;
 
-  // This is modeled after the DT_AUXILIARY and DT_FILTER mechanisms in ELF,
-  // where the actual symbols are defined in another library, while the compiler
-  // generates stubs in the original library.
-  const FileSpecList filtees = GetReExportedLibraries();
-
   // We might have debug information in a separate object, in which case
   // we need to map the sections from that object to the sections in the
   // main object during symbol lookup.  If we had to compare the sections
@@ -2683,16 +2678,15 @@ ObjectFileELF::ParseSymbols(Symtab *symtab, user_id_t start_id,
         flags);                         // Symbol flags.
     if (symbol.getBinding() == STB_WEAK)
       dc_symbol.SetIsWeak(true);
-    // Zero-sized exported function in a filter library: a placeholder the
-    // dynamic linker resolves through the filtees (see
-    // GetReExportedLibraries()).  The re-exported name must not carry the
-    // @VERSION suffix, since it is looked up in the filtee by name.
-    if (filtees.GetSize() > 0 && symbol.getType() == STT_FUNC &&
-        symbol.st_size == 0 && symbol.getBinding() != STB_LOCAL &&
-        symbol_section_sp) {
-      dc_symbol.SetReExportedSymbolName(ConstString(symbol_bare));
-      dc_symbol.SetReExportedSymbolSharedLibrary(filtees.GetFileSpecAtIndex(0));
-    }
+    // Note: symbols in a filter library (DT_FILTER / DT_AUXILIARY) are *not*
+    // marked eSymbolTypeReExported here even though the dynamic linker
+    // resolves them through the filtees: that marking reuses the symbol's
+    // address range as string-pointer storage and requires the symbol to
+    // have no section (see Symbol::SetReExportedSymbolName), which would
+    // corrupt the file-address lookup indexes with pointer values. Filtee
+    // shadowing instead happens at resolution time in
+    // Symbol::ResolveReExportedSymbol via GetReExportedLibraries() and
+    // ReExportedLibrariesShadowLocalDefinitions().
     symtab->AddSymbol(dc_symbol);
   }
 
