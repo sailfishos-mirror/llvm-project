@@ -37,10 +37,14 @@ class ReExportedSymbolTest : public testing::Test {
 } // namespace
 
 // An ELF filter library naming two auxiliary filtees.  Its zero-sized
-// exported functions "foo" and "bar" are placeholders that ObjectFileELF
-// models as re-exported symbols (the dynamic linker resolves them through
-// the filtees).  "bar" is defined by the first filtee, "foo" only by the
-// second, so resolving "foo" exercises the ordered search across filtees.
+// exported functions "foo", "bar" and "open@@FBSD_1.0" are placeholders the
+// dynamic linker resolves through the filtees.  ObjectFileELF leaves them as
+// plain code symbols (re-export marking would clobber their address ranges);
+// Symbol::ResolveReExportedSymbol shadows them at resolution time.  "bar" is
+// defined by the first filtee, "foo" only by the second, so resolving "foo"
+// exercises the ordered search across filtees.  "open@@FBSD_1.0" exercises
+// version-suffix stripping, and the local "hidden_helper" must not be
+// shadowed even though the first filtee exports that name.
 //
 // .dynstr content: "\0libaux1.so\0libaux2.so\0"
 //   offset 0x1: "libaux1.so"
@@ -79,6 +83,11 @@ Sections:
       - Tag:             DT_NULL
         Value:           0x0
 Symbols:
+  - Name:            hidden_helper
+    Type:            STT_FUNC
+    Section:         .text
+    Value:           0x1003
+    Binding:         STB_LOCAL
   - Name:            foo
     Type:            STT_FUNC
     Section:         .text
@@ -89,6 +98,11 @@ Symbols:
     Section:         .text
     Value:           0x1001
     Binding:         STB_GLOBAL
+  - Name:            "open@@FBSD_1.0"
+    Type:            STT_FUNC
+    Section:         .text
+    Value:           0x1001
+    Binding:         STB_WEAK
   # A real (nonzero-sized) function the filter defines itself.  Besides being
   # realistic -- a filter library like libc.so.7 is full of real functions --
   # it gives the object file a code symbol so that SymbolFileSymtab claims the
@@ -122,7 +136,13 @@ Symbols:
     Type:            STT_FUNC
     Section:         .text
     Value:           0x1000
-    Size:            0x4
+    Size:            0x2
+    Binding:         STB_GLOBAL
+  - Name:            hidden_helper
+    Type:            STT_FUNC
+    Section:         .text
+    Value:           0x1002
+    Size:            0x2
     Binding:         STB_GLOBAL
 ...
 )";
@@ -146,7 +166,13 @@ Symbols:
     Type:            STT_FUNC
     Section:         .text
     Value:           0x1000
-    Size:            0x4
+    Size:            0x2
+    Binding:         STB_GLOBAL
+  - Name:            open
+    Type:            STT_FUNC
+    Section:         .text
+    Value:           0x1002
+    Size:            0x2
     Binding:         STB_GLOBAL
 ...
 )";
@@ -159,9 +185,8 @@ static ModuleSP AddModule(Target &target, TestFile &file, const char *name) {
 
   // The module is built from a buffer with no backing file.  Parse everything
   // that depends on that buffer *now*, while the module still has no file:
-  //  - GetReExportedLibraries() populates the dynamic-symbol cache, so that
-  //    when the symbol table is parsed below the filter placeholders are seen
-  //    and marked as re-exports.
+  //  - GetReExportedLibraries() parses and caches the dynamic section, which
+  //    re-export resolution reads later.
   //  - GetSymtab() parses and caches the symbol table (and its symbol file).
   // Renaming afterwards would otherwise make these look for the symbols in the
   // now-nonexistent file.  The name is required so re-export resolution can
@@ -179,20 +204,19 @@ static ModuleSP AddModule(Target &target, TestFile &file, const char *name) {
   return module_sp;
 }
 
-// Find the re-exported placeholder symbol named \p name in \p module_sp by
-// iterating the symbol table.  Looking a re-exported symbol up by name and
-// type through the module goes through the symtab name indexes, whose
-// handling of versioned/placeholder names is orthogonal to what is tested
-// here.
-static const Symbol *FindReExport(const ModuleSP &module_sp,
-                                  llvm::StringRef name) {
+// Find the symbol whose name is \p name, ignoring any @VERSION suffix, in
+// \p module_sp by iterating the symbol table.  Iterating keeps the lookup
+// independent of how the symtab name indexes treat versioned names, which is
+// orthogonal to what is tested here.
+static const Symbol *FindFilterSymbol(const ModuleSP &module_sp,
+                                      llvm::StringRef name) {
   Symtab *symtab = module_sp->GetSymtab();
   if (!symtab)
     return nullptr;
   for (size_t i = 0, e = symtab->GetNumSymbols(); i != e; ++i) {
     const Symbol *symbol = symtab->SymbolAtIndex(i);
-    if (symbol->GetType() == eSymbolTypeReExported &&
-        symbol->GetName().GetStringRef() == name)
+    llvm::StringRef symbol_name = symbol->GetName().GetStringRef();
+    if (symbol_name.substr(0, symbol_name.find('@')) == name)
       return symbol;
   }
   return nullptr;
@@ -242,10 +266,14 @@ TEST_F(ReExportedSymbolTest, ResolveThroughFilteesInOrder) {
   ASSERT_NE(nullptr, filter_symtab);
   ASSERT_GT(filter_symtab->GetNumSymbols(), 0u);
 
-  // "bar" resolves through the library recorded on the symbol itself (the
-  // first filtee).
-  const Symbol *bar = FindReExport(filter_sp, "bar");
+  // The placeholders stay plain code symbols: marking them as re-exported
+  // would reuse their address ranges as string-pointer storage and corrupt
+  // the file-address indexes.
+  const Symbol *bar = FindFilterSymbol(filter_sp, "bar");
   ASSERT_NE(nullptr, bar);
+  EXPECT_EQ(eSymbolTypeCode, bar->GetType());
+
+  // "bar" is found in the first filtee.
   Symbol *bar_def = bar->ResolveReExportedSymbol(*target_sp, filter_sp);
   ASSERT_NE(nullptr, bar_def);
   EXPECT_EQ(ConstString("bar"), bar_def->GetName());
@@ -254,7 +282,7 @@ TEST_F(ReExportedSymbolTest, ResolveThroughFilteesInOrder) {
 
   // "foo" is not defined by the first filtee: resolution must continue with
   // the remaining filtees in declaration order and find it in the second.
-  const Symbol *foo = FindReExport(filter_sp, "foo");
+  const Symbol *foo = FindFilterSymbol(filter_sp, "foo");
   ASSERT_NE(nullptr, foo);
   Symbol *foo_def = foo->ResolveReExportedSymbol(*target_sp, filter_sp);
   ASSERT_NE(nullptr, foo_def);
@@ -262,8 +290,30 @@ TEST_F(ReExportedSymbolTest, ResolveThroughFilteesInOrder) {
   EXPECT_EQ(eSymbolTypeCode, foo_def->GetType());
   EXPECT_EQ(aux2_sp, foo_def->GetAddress().GetModule());
 
-  // Without the containing module only the library recorded on the symbol
-  // is searched, so "foo" cannot be resolved.  This is why callers that
-  // have the module should pass it.
+  // "open@@FBSD_1.0": the @VERSION suffix is stripped before the filtees are
+  // searched, since the filtee exports the plain name.
+  const Symbol *open_sym = FindFilterSymbol(filter_sp, "open");
+  ASSERT_NE(nullptr, open_sym);
+  Symbol *open_def = open_sym->ResolveReExportedSymbol(*target_sp, filter_sp);
+  ASSERT_NE(nullptr, open_def);
+  EXPECT_EQ(ConstString("open"), open_def->GetName());
+  EXPECT_EQ(aux2_sp, open_def->GetAddress().GetModule());
+
+  // A local symbol is invisible to the dynamic linker and must not be
+  // shadowed, even though the first filtee exports the same name.
+  const Symbol *hidden = FindFilterSymbol(filter_sp, "hidden_helper");
+  ASSERT_NE(nullptr, hidden);
+  EXPECT_EQ(nullptr, hidden->ResolveReExportedSymbol(*target_sp, filter_sp));
+
+  // A name no filtee provides resolves to nothing; callers then fall back
+  // to the filter's own (intact) definition.
+  const Symbol *filter_local = FindFilterSymbol(filter_sp, "filter_local");
+  ASSERT_NE(nullptr, filter_local);
+  EXPECT_EQ(nullptr,
+            filter_local->ResolveReExportedSymbol(*target_sp, filter_sp));
+
+  // Without the containing module nothing connects the symbol to the
+  // filtees, so "foo" cannot be resolved.  This is why callers that have
+  // the module should pass it.
   EXPECT_EQ(nullptr, foo->ResolveReExportedSymbol(*target_sp));
 }
