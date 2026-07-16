@@ -92,7 +92,7 @@ int llvm::compileModuleWithNewPM(
     std::unique_ptr<TargetMachine> Target, std::unique_ptr<ToolOutputFile> Out,
     std::unique_ptr<ToolOutputFile> DwoOut, LLVMContext &Context,
     const TargetLibraryInfoImpl &TLII, VerifierKind VK, StringRef PassPipeline,
-    CodeGenFileType FileType) {
+    CodeGenFileType FileType, CGPassBuilderOption &Opt) {
 
   if (!PassPipeline.empty() && TargetPassConfig::hasLimitedCodeGenPipeline()) {
     WithColor::error(errs(), Arg0)
@@ -110,8 +110,6 @@ int llvm::compileModuleWithNewPM(
     OS = BOS.get();
   }
 
-  // Fetch options from TargetPassConfig
-  CGPassBuilderOption Opt = getCGPassBuilderOption();
   Opt.DisableVerify = VK != VerifierKind::InputOutput;
   Opt.DebugPM = DebugPM;
   Opt.RegAlloc = RegAlloc;

@@ -495,6 +495,11 @@ static bool addPass(PassManagerBase &PM, const char *argv0, StringRef PassName,
   return false;
 }
 
+bool targetSupportsNPMBackend(const Triple &T, const CGPassBuilderOption &Opt) {
+  return T.isAMDGCN() &&
+         Opt.EnableGlobalISelOption != cl::boolOrDefault::BOU_TRUE;
+}
+
 static int compileModule(char **argv, SmallVectorImpl<PassPlugin> &PluginList,
                          LLVMContext &Context, std::string &OutputFilename) {
   // Load the module to be compiled...
@@ -749,11 +754,24 @@ static int compileModule(char **argv, SmallVectorImpl<PassPlugin> &PluginList,
   else if (VerifyEach)
     VK = VerifierKind::EachPass;
 
-  if (EnableNewPassManager || !PassPipeline.empty()) {
+  // Fetch options from TargetPassConfig.
+  CGPassBuilderOption Opt = getCGPassBuilderOption();
+  bool UseNPM = false;
+  if (EnableNewPassManager.getNumOccurrences()) {
+    UseNPM = EnableNewPassManager;
+  } else if (!PassPipeline.empty()) {
+    UseNPM = true;
+  } else if (RunPass.getNumOccurrences())
+    UseNPM = false;
+  else if (targetSupportsNPMBackend(TheTriple, Opt)) {
+    UseNPM = true;
+  }
+
+  if (UseNPM) {
     return compileModuleWithNewPM(argv[0], std::move(M), std::move(MIR),
                                   std::move(Target), std::move(Out),
                                   std::move(DwoOut), Context, TLII, VK,
-                                  PassPipeline, codegen::getFileType());
+                                  PassPipeline, codegen::getFileType(), Opt);
   }
 
   // Build up all of the passes that we want to do to the module.
