@@ -85,12 +85,25 @@ def LXD_S_UW  : IndexedLoad<0b101, 0b11, 0, "lxd.s.uw">,
                 Sched<[WriteLDD, ReadMemBase, ReadMemBase]>;
 } // Predicates = [HasStdExtZilx, IsRV64]
 
+// The complexities below are chosen to give the indexed loads a strict
+// priority over the plain reg+imm loads and to encode which form is the more
+// specific match. Without an explicit complexity these patterns tie with the
+// base L{B,H,W,D}[U] patterns (which also match a "reg + reg" address as
+// base+0) and, being listed later, would never be selected. The required
+// ordering is:
+//   base L*  <  scale-0 (unscaled) Zilx  <  scaled Zilx
+// For a given load only the scale-0 form (which leaves the shift as a separate
+// slli) and the exactly-matching scaled form can compete, so a scaled load
+// only needs to outrank its own unscaled form; distinct non-zero scales never
+// compete for the same node.
 class AddrRegReg<int N>
     : ComplexPattern<iPTR, 2, "SelectAddrRegRegFixedScale<"#N#">",
-                     [], [], !add(10, N)>;
+                     [], [], !if(!eq(N, 0), 10, 11)>;
+// The zero-extended-index forms additionally fold the zext, so they are the
+// most specific match and must outrank the plain AddrRegReg forms above.
 class AddrRegZextReg<int N>
     : ComplexPattern<i64, 2, "SelectAddrRegZextRegFixedScale<"#N#", 32>",
-                     [], [], !add(20, N)>;
+                     [], [], !if(!eq(N, 0), 20, 21)>;
 
 def AddrRegReg0 : AddrRegReg<0>;
 def AddrRegReg1 : AddrRegReg<1>;
