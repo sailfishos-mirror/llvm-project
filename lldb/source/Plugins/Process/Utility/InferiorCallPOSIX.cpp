@@ -165,33 +165,31 @@ bool lldb_private::InferiorCallMunmap(Process *process, addr_t addr,
       ConstString("munmap"), eFunctionNameTypeFull, function_options, sc_list);
   const uint32_t count = sc_list.GetSize();
   if (count > 0) {
-    {
-      EvaluateExpressionOptions options;
-      options.SetStopOthers(true);
-      options.SetUnwindOnError(true);
-      options.SetIgnoreBreakpoints(true);
-      options.SetTryAllThreads(true);
-      options.SetDebug(false);
-      options.SetTimeout(process->GetUtilityExpressionTimeout());
-      options.SetTrapExceptions(false);
+    EvaluateExpressionOptions options;
+    options.SetStopOthers(true);
+    options.SetUnwindOnError(true);
+    options.SetIgnoreBreakpoints(true);
+    options.SetTryAllThreads(true);
+    options.SetDebug(false);
+    options.SetTimeout(process->GetUtilityExpressionTimeout());
+    options.SetTrapExceptions(false);
 
-      Address munmap_addr = GetCallableAddress(process->GetTarget(), sc_list);
-      if (munmap_addr.IsValid()) {
-        lldb::addr_t args[] = {addr, length};
-        lldb::ThreadPlanSP call_plan_sp(new ThreadPlanCallFunction(
-            *thread, munmap_addr, CompilerType(), args, options));
-        if (call_plan_sp) {
-          DiagnosticManager diagnostics;
+    Address munmap_addr = GetCallableAddress(process->GetTarget(), sc_list);
+    if (munmap_addr.IsValid()) {
+      lldb::addr_t args[] = {addr, length};
+      lldb::ThreadPlanSP call_plan_sp(new ThreadPlanCallFunction(
+          *thread, munmap_addr, CompilerType(), args, options));
+      if (call_plan_sp) {
+        DiagnosticManager diagnostics;
 
-          StackFrame *frame = thread->GetStackFrameAtIndex(0).get();
-          if (frame) {
-            ExecutionContext exe_ctx;
-            frame->CalculateExecutionContext(exe_ctx);
-            ExpressionResults result = process->RunThreadPlan(
-                exe_ctx, call_plan_sp, options, diagnostics);
-            if (result == eExpressionCompleted) {
-              return true;
-            }
+        StackFrame *frame = thread->GetStackFrameAtIndex(0).get();
+        if (frame) {
+          ExecutionContext exe_ctx;
+          frame->CalculateExecutionContext(exe_ctx);
+          ExpressionResults result = process->RunThreadPlan(
+              exe_ctx, call_plan_sp, options, diagnostics);
+          if (result == eExpressionCompleted) {
+            return true;
           }
         }
       }
