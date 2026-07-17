@@ -280,6 +280,14 @@ static cl::opt<bool> VectorizeReassociatedOps(
     "slp-reassociate-ops", cl::init(true), cl::Hidden,
     cl::desc("Gather operands of associative binary chains into one node."));
 
+/// The family-realigned seed already groups the vectorizable columns; the
+/// VLOperands polish on top is quadratic in the column count, so past this
+/// many columns keep the seed instead.
+static cl::opt<unsigned> ReassocReorderColumnLimit(
+    "slp-reassociate-reorder-limit", cl::init(32), cl::Hidden,
+    cl::desc("Max flattened operand columns for which associative-chain "
+             "reordering runs the full operand reorder."));
+
 static cl::opt<unsigned> LoopAwareTripCount(
     "slp-cost-loop-trip-count", cl::init(2), cl::Hidden,
     cl::desc("Loop trip count, considered by the cost model during "
@@ -424,200 +432,6 @@ getFloorFullVectorNumberOfElements(const TargetTransformInfo &TTI, Type *Ty,
   if (RegVF > Sz)
     return bit_floor(Sz);
   return (Sz / RegVF) * RegVF;
-}
-
-static void transformScalarShuffleIndiciesToVector(unsigned VecTyNumElements,
-                                                   SmallVectorImpl<int> &Mask) {
-  // The ShuffleBuilder implementation use shufflevector to splat an "element".
-  // But the element have different meaning for SLP (scalar) and REVEC
-  // (vector). We need to expand Mask into masks which shufflevector can use
-  // directly.
-  SmallVector<int> NewMask(Mask.size() * VecTyNumElements);
-  for (unsigned I : seq<unsigned>(Mask.size()))
-    for (auto [J, MaskV] : enumerate(MutableArrayRef(NewMask).slice(
-             I * VecTyNumElements, VecTyNumElements)))
-      MaskV = Mask[I] == PoisonMaskElem ? PoisonMaskElem
-                                        : Mask[I] * VecTyNumElements + J;
-  Mask.swap(NewMask);
-}
-
-/// \returns the number of groups of shufflevector
-/// A group has the following features
-/// 1. All of value in a group are shufflevector.
-/// 2. The mask of all shufflevector is isExtractSubvectorMask.
-/// 3. The mask of all shufflevector uses all of the elements of the source.
-/// e.g., it is 1 group (%0)
-/// %1 = shufflevector <16 x i8> %0, <16 x i8> poison,
-///    <8 x i32> <i32 0, i32 1, i32 2, i32 3, i32 4, i32 5, i32 6, i32 7>
-/// %2 = shufflevector <16 x i8> %0, <16 x i8> poison,
-///    <8 x i32> <i32 8, i32 9, i32 10, i32 11, i32 12, i32 13, i32 14, i32 15>
-/// it is 2 groups (%3 and %4)
-/// %5 = shufflevector <8 x i16> %3, <8 x i16> poison,
-///    <4 x i32> <i32 0, i32 1, i32 2, i32 3>
-/// %6 = shufflevector <8 x i16> %3, <8 x i16> poison,
-///    <4 x i32> <i32 4, i32 5, i32 6, i32 7>
-/// %7 = shufflevector <8 x i16> %4, <8 x i16> poison,
-///    <4 x i32> <i32 0, i32 1, i32 2, i32 3>
-/// %8 = shufflevector <8 x i16> %4, <8 x i16> poison,
-///    <4 x i32> <i32 4, i32 5, i32 6, i32 7>
-/// it is 0 group
-/// %12 = shufflevector <8 x i16> %10, <8 x i16> poison,
-///     <4 x i32> <i32 0, i32 1, i32 2, i32 3>
-/// %13 = shufflevector <8 x i16> %11, <8 x i16> poison,
-///     <4 x i32> <i32 0, i32 1, i32 2, i32 3>
-static unsigned getShufflevectorNumGroups(ArrayRef<Value *> VL) {
-  if (VL.empty())
-    return 0;
-  if (!all_of(VL, IsaPred<ShuffleVectorInst>))
-    return 0;
-  auto *SV = cast<ShuffleVectorInst>(VL.front());
-  unsigned SVNumElements =
-      cast<FixedVectorType>(SV->getOperand(0)->getType())->getNumElements();
-  unsigned ShuffleMaskSize = SV->getShuffleMask().size();
-  if (SVNumElements % ShuffleMaskSize != 0)
-    return 0;
-  unsigned GroupSize = SVNumElements / ShuffleMaskSize;
-  if (GroupSize == 0 || (VL.size() % GroupSize) != 0)
-    return 0;
-  unsigned NumGroup = 0;
-  for (size_t I = 0, E = VL.size(); I != E; I += GroupSize) {
-    auto *SV = cast<ShuffleVectorInst>(VL[I]);
-    Value *Src = SV->getOperand(0);
-    ArrayRef<Value *> Group = VL.slice(I, GroupSize);
-    SmallBitVector ExpectedIndex(GroupSize);
-    if (!all_of(Group, [&](Value *V) {
-          auto *SV = cast<ShuffleVectorInst>(V);
-          // From the same source.
-          if (SV->getOperand(0) != Src)
-            return false;
-          int Index;
-          if (!SV->isExtractSubvectorMask(Index))
-            return false;
-          ExpectedIndex.set(Index / ShuffleMaskSize);
-          return true;
-        }))
-      return 0;
-    if (!ExpectedIndex.all())
-      return 0;
-    ++NumGroup;
-  }
-  assert(NumGroup == (VL.size() / GroupSize) && "Unexpected number of groups");
-  return NumGroup;
-}
-
-/// \returns a shufflevector mask which is used to vectorize shufflevectors
-/// e.g.,
-/// %5 = shufflevector <8 x i16> %3, <8 x i16> poison,
-///    <4 x i32> <i32 0, i32 1, i32 2, i32 3>
-/// %6 = shufflevector <8 x i16> %3, <8 x i16> poison,
-///    <4 x i32> <i32 4, i32 5, i32 6, i32 7>
-/// %7 = shufflevector <8 x i16> %4, <8 x i16> poison,
-///    <4 x i32> <i32 0, i32 1, i32 2, i32 3>
-/// %8 = shufflevector <8 x i16> %4, <8 x i16> poison,
-///    <4 x i32> <i32 4, i32 5, i32 6, i32 7>
-/// the result is
-/// <0, 1, 2, 3, 12, 13, 14, 15, 16, 17, 18, 19, 28, 29, 30, 31>
-static SmallVector<int> calculateShufflevectorMask(ArrayRef<Value *> VL) {
-  assert(getShufflevectorNumGroups(VL) && "Not supported shufflevector usage.");
-  auto *SV = cast<ShuffleVectorInst>(VL.front());
-  unsigned SVNumElements =
-      cast<FixedVectorType>(SV->getOperand(0)->getType())->getNumElements();
-  SmallVector<int> Mask;
-  unsigned AccumulateLength = 0;
-  for (Value *V : VL) {
-    auto *SV = cast<ShuffleVectorInst>(V);
-    for (int M : SV->getShuffleMask())
-      Mask.push_back(M == PoisonMaskElem ? PoisonMaskElem
-                                         : AccumulateLength + M);
-    AccumulateLength += SVNumElements;
-  }
-  return Mask;
-}
-
-namespace {
-/// Specifies the way the mask should be analyzed for undefs/poisonous elements
-/// in the shuffle mask.
-enum class UseMask {
-  FirstArg, ///< The mask is expected to be for permutation of 1-2 vectors,
-            ///< check for the mask elements for the first argument (mask
-            ///< indices are in range [0:VF)).
-  SecondArg, ///< The mask is expected to be for permutation of 2 vectors, check
-             ///< for the mask elements for the second argument (mask indices
-             ///< are in range [VF:2*VF))
-  UndefsAsMask ///< Consider undef mask elements (-1) as placeholders for
-               ///< future shuffle elements and mark them as ones as being used
-               ///< in future. Non-undef elements are considered as unused since
-               ///< they're already marked as used in the mask.
-};
-} // namespace
-
-/// Prepares a use bitset for the given mask either for the first argument or
-/// for the second.
-static SmallBitVector buildUseMask(int VF, ArrayRef<int> Mask,
-                                   UseMask MaskArg) {
-  SmallBitVector UseMask(VF, true);
-  for (auto [Idx, Value] : enumerate(Mask)) {
-    if (Value == PoisonMaskElem) {
-      if (MaskArg == UseMask::UndefsAsMask)
-        UseMask.reset(Idx);
-      continue;
-    }
-    if (MaskArg == UseMask::FirstArg && Value < VF)
-      UseMask.reset(Value);
-    else if (MaskArg == UseMask::SecondArg && Value >= VF)
-      UseMask.reset(Value - VF);
-  }
-  return UseMask;
-}
-
-/// Checks if the given value is actually an undefined constant vector.
-/// Also, if the \p UseMask is not empty, tries to check if the non-masked
-/// elements actually mask the insertelement buildvector, if any.
-template <bool IsPoisonOnly = false>
-static SmallBitVector isUndefVector(const Value *V,
-                                    const SmallBitVector &UseMask = {}) {
-  SmallBitVector Res(UseMask.empty() ? 1 : UseMask.size(), true);
-  using T = std::conditional_t<IsPoisonOnly, PoisonValue, UndefValue>;
-  if (isa<T>(V))
-    return Res;
-  auto *VecTy = dyn_cast<FixedVectorType>(V->getType());
-  if (!VecTy)
-    return Res.reset();
-  auto *C = dyn_cast<Constant>(V);
-  if (!C) {
-    if (!UseMask.empty()) {
-      const Value *Base = V;
-      while (auto *II = dyn_cast<InsertElementInst>(Base)) {
-        Base = II->getOperand(0);
-        if (isa<T>(II->getOperand(1)))
-          continue;
-        std::optional<unsigned> Idx = getElementIndex(II);
-        if (!Idx) {
-          Res.reset();
-          return Res;
-        }
-        if (*Idx < UseMask.size() && !UseMask.test(*Idx))
-          Res.reset(*Idx);
-      }
-      // TODO: Add analysis for shuffles here too.
-      if (V == Base) {
-        Res.reset();
-      } else {
-        SmallBitVector SubMask(UseMask.size(), false);
-        Res &= isUndefVector<IsPoisonOnly>(Base, SubMask);
-      }
-    } else {
-      Res.reset();
-    }
-    return Res;
-  }
-  for (unsigned I = 0, E = VecTy->getNumElements(); I != E; ++I) {
-    if (Constant *Elem = C->getAggregateElement(I))
-      if (!isa<T>(Elem) &&
-          (UseMask.empty() || (I < UseMask.size() && !UseMask.test(I))))
-        Res.reset(I);
-  }
-  return Res;
 }
 
 /// Checks if the vector of instructions can be represented as a shuffle, like:
@@ -1594,145 +1408,6 @@ static InstructionsState getSameOpcode(ArrayRef<Value *> VL,
                 }) &&
          "Invalid InstructionsState.");
   return S;
-}
-
-/// \returns True if in-tree use also needs extract. This refers to
-/// possible scalar operand in vectorized instruction.
-static bool doesInTreeUserNeedToExtract(Value *Scalar, Instruction *UserInst,
-                                        TargetLibraryInfo *TLI,
-                                        const TargetTransformInfo *TTI) {
-  if (!UserInst)
-    return false;
-  unsigned Opcode = UserInst->getOpcode();
-  switch (Opcode) {
-  case Instruction::Load: {
-    LoadInst *LI = cast<LoadInst>(UserInst);
-    return (LI->getPointerOperand() == Scalar);
-  }
-  case Instruction::Store: {
-    StoreInst *SI = cast<StoreInst>(UserInst);
-    return (SI->getPointerOperand() == Scalar);
-  }
-  case Instruction::Call: {
-    CallInst *CI = cast<CallInst>(UserInst);
-    Intrinsic::ID ID = getVectorIntrinsicIDForCall(CI, TLI);
-    return any_of(enumerate(CI->args()), [&](auto &&Arg) {
-      return isVectorIntrinsicWithScalarOpAtArg(ID, Arg.index(), TTI) &&
-             Arg.value().get() == Scalar;
-    });
-  }
-  default:
-    return false;
-  }
-}
-
-/// \returns the AA location that is being access by the instruction.
-static MemoryLocation getLocation(Instruction *I) {
-  if (StoreInst *SI = dyn_cast<StoreInst>(I))
-    return MemoryLocation::get(SI);
-  if (LoadInst *LI = dyn_cast<LoadInst>(I))
-    return MemoryLocation::get(LI);
-  return MemoryLocation();
-}
-
-/// \returns True if the instruction is not a volatile or atomic load/store.
-static bool isSimple(Instruction *I) {
-  if (LoadInst *LI = dyn_cast<LoadInst>(I))
-    return LI->isSimple();
-  if (StoreInst *SI = dyn_cast<StoreInst>(I))
-    return SI->isSimple();
-  if (MemIntrinsic *MI = dyn_cast<MemIntrinsic>(I))
-    return !MI->isVolatile();
-  return true;
-}
-
-/// Shuffles \p Mask in accordance with the given \p SubMask.
-/// \param ExtendingManyInputs Supports reshuffling of the mask with not only
-/// one but two input vectors.
-static void addMask(SmallVectorImpl<int> &Mask, ArrayRef<int> SubMask,
-                    bool ExtendingManyInputs = false) {
-  if (SubMask.empty())
-    return;
-  assert(
-      (!ExtendingManyInputs || SubMask.size() > Mask.size() ||
-       // Check if input scalars were extended to match the size of other node.
-       (SubMask.size() == Mask.size() && Mask.back() == PoisonMaskElem)) &&
-      "SubMask with many inputs support must be larger than the mask.");
-  if (Mask.empty()) {
-    Mask.append(SubMask.begin(), SubMask.end());
-    return;
-  }
-  SmallVector<int> NewMask(SubMask.size(), PoisonMaskElem);
-  int TermValue = std::min(Mask.size(), SubMask.size());
-  for (int I = 0, E = SubMask.size(); I < E; ++I) {
-    if (SubMask[I] == PoisonMaskElem ||
-        (!ExtendingManyInputs &&
-         (SubMask[I] >= TermValue || Mask[SubMask[I]] >= TermValue)))
-      continue;
-    NewMask[I] = Mask[SubMask[I]];
-  }
-  Mask.swap(NewMask);
-}
-
-/// Order may have elements assigned special value (size) which is out of
-/// bounds. Such indices only appear on places which correspond to undef values
-/// (see canReuseExtract for details) and used in order to avoid undef values
-/// have effect on operands ordering.
-/// The first loop below simply finds all unused indices and then the next loop
-/// nest assigns these indices for undef values positions.
-/// As an example below Order has two undef positions and they have assigned
-/// values 3 and 7 respectively:
-/// before:  6 9 5 4 9 2 1 0
-/// after:   6 3 5 4 7 2 1 0
-static void fixupOrderingIndices(MutableArrayRef<unsigned> Order) {
-  const size_t Sz = Order.size();
-  SmallBitVector UnusedIndices(Sz, /*t=*/true);
-  SmallBitVector MaskedIndices(Sz);
-  for (unsigned I = 0; I < Sz; ++I) {
-    if (Order[I] < Sz)
-      UnusedIndices.reset(Order[I]);
-    else
-      MaskedIndices.set(I);
-  }
-  if (MaskedIndices.none())
-    return;
-  assert(UnusedIndices.count() == MaskedIndices.count() &&
-         "Non-synced masked/available indices.");
-  int Idx = UnusedIndices.find_first();
-  int MIdx = MaskedIndices.find_first();
-  while (MIdx >= 0) {
-    assert(Idx >= 0 && "Indices must be synced.");
-    Order[MIdx] = Idx;
-    Idx = UnusedIndices.find_next(Idx);
-    MIdx = MaskedIndices.find_next(MIdx);
-  }
-}
-
-/// \returns a bitset for selecting opcodes. false for Opcode0 and true for
-/// Opcode1.
-static SmallBitVector getAltInstrMask(ArrayRef<Value *> VL, Type *ScalarTy,
-                                      unsigned Opcode0, unsigned Opcode1) {
-  unsigned ScalarTyNumElements = getNumElements(ScalarTy);
-  SmallBitVector OpcodeMask(VL.size() * ScalarTyNumElements, false);
-  for (unsigned Lane : seq<unsigned>(VL.size())) {
-    if (isa<PoisonValue>(VL[Lane]))
-      continue;
-    if (cast<Instruction>(VL[Lane])->getOpcode() == Opcode1)
-      OpcodeMask.set(Lane * ScalarTyNumElements,
-                     Lane * ScalarTyNumElements + ScalarTyNumElements);
-  }
-  return OpcodeMask;
-}
-
-/// Replicates the given \p Val \p VF times.
-static SmallVector<Constant *> replicateMask(ArrayRef<Constant *> Val,
-                                             unsigned VF) {
-  assert(none_of(Val, [](Constant *C) { return C->getType()->isVectorTy(); }) &&
-         "Expected scalar constants.");
-  SmallVector<Constant *> NewVal(Val.size() * VF);
-  for (auto [I, V] : enumerate(Val))
-    std::fill_n(NewVal.begin() + I * VF, VF, V);
-  return NewVal;
 }
 
 /// Returns true if widened type of \p Ty elements with size \p Sz represents
@@ -3714,17 +3389,25 @@ public:
     return NonScheduledFirst.contains(V);
   }
 
+  /// Check if \p V is a peeled reassociated scalar still owned by a live
+  /// (non-deleted, non-gathered) tree entry.
+  bool isReassocScalarVectorized(const Value *V) const {
+    auto It = ReassocScalarToTreeEntries.find(V);
+    return It != ReassocScalarToTreeEntries.end() &&
+           any_of(It->second, [&](const TreeEntry *E) {
+             return !DeletedNodes.contains(E) &&
+                    !TransformedToGatherNodes.contains(E);
+           });
+  }
+
   /// Check if the value is vectorized in the tree.
   bool isVectorized(const Value *V) const {
     assert(V && "V cannot be nullptr.");
-    auto IsLive = [&](const TreeEntry *E) {
-      return !DeletedNodes.contains(E) && !TransformedToGatherNodes.contains(E);
-    };
-    if (auto It = ReassocScalarToTreeEntries.find(V);
-        It != ReassocScalarToTreeEntries.end() && any_of(It->second, IsLive))
+    if (isReassocScalarVectorized(V))
       return true;
-    ArrayRef<TreeEntry *> Entries = getTreeEntries(V);
-    return any_of(Entries, IsLive);
+    return any_of(getTreeEntries(V), [&](const TreeEntry *E) {
+      return !DeletedNodes.contains(E) && !TransformedToGatherNodes.contains(E);
+    });
   }
 
   /// Checks if it is legal and profitable to build SplitVectorize node for the
@@ -4021,7 +3704,7 @@ private:
         return {};
       SmallVector<int> Mask;
       inversePermutation(ReorderIndices, Mask);
-      ::addMask(Mask, ReuseShuffleIndices);
+      addMask(Mask, ReuseShuffleIndices);
       return Mask;
     }
 
@@ -4074,7 +3757,7 @@ private:
         if (VL.size() == Scalars.size())
           return IsSame(Scalars, Mask);
         if (VL.size() == ReuseShuffleIndices.size()) {
-          ::addMask(Mask, ReuseShuffleIndices);
+          addMask(Mask, ReuseShuffleIndices);
           return IsSame(Scalars, Mask);
         }
         return false;
@@ -8368,7 +8051,7 @@ BoUpSLP::getReorderingData(const TreeEntry &TE, bool TopToBottom,
         SmallVector<int> Mask;
         fixupOrderingIndices(*CurrentOrder);
         inversePermutation(*CurrentOrder, Mask);
-        ::addMask(Mask, TE.ReuseShuffleIndices);
+        addMask(Mask, TE.ReuseShuffleIndices);
         OrdersType Res(TE.getVectorFactor(), TE.getVectorFactor());
         unsigned Sz = TE.Scalars.size();
         for (int K = 0, E = TE.getVectorFactor() / Sz; K < E; ++K) {
@@ -8394,7 +8077,7 @@ BoUpSLP::getReorderingData(const TreeEntry &TE, bool TopToBottom,
         std::iota(ReorderMask.begin(), ReorderMask.end(), 0);
       else
         inversePermutation(TE.ReorderIndices, ReorderMask);
-      ::addMask(ReorderMask, TE.ReuseShuffleIndices);
+      addMask(ReorderMask, TE.ReuseShuffleIndices);
       unsigned VF = ReorderMask.size();
       OrdersType ResOrder(VF, VF);
       unsigned NumParts = divideCeil(VF, Sz);
@@ -9766,12 +9449,7 @@ void BoUpSLP::buildExternalUses(
 
         // Peeled reassociated scalars are subsumed by the flattened node and
         // erased during vectorization, not external users.
-        if (auto ReassocIt = ReassocScalarToTreeEntries.find(UserInst);
-            ReassocIt != ReassocScalarToTreeEntries.end() &&
-            any_of(ReassocIt->second, [&](const TreeEntry *E) {
-              return !DeletedNodes.contains(E) &&
-                     !TransformedToGatherNodes.contains(E);
-            })) {
+        if (isReassocScalarVectorized(UserInst)) {
           LLVM_DEBUG(dbgs() << "SLP: \tInternal (reassociated) user will be "
                                "removed:"
                             << *U << ".\n");
@@ -13092,12 +12770,10 @@ scanAssociativeOperands(const InstructionsState &S, DominatorTree &DT,
   // A lane whose value is itself a single-use associative instruction with
   // S's opcode; block placement does not matter here (buildTreeRec
   // re-checks that later for whatever columns end up as real leaves).
-  auto GetRealLane = [&](Value *V) -> Instruction * {
+  auto IsRealLane = [&](Value *V) {
     auto *I = dyn_cast<Instruction>(V);
-    if (I && I->getOpcode() == S.getOpcode() && I->isAssociative() &&
-        I->hasOneUse())
-      return I;
-    return nullptr;
+    return I && I->getOpcode() == S.getOpcode() && I->isAssociative() &&
+           I->hasOneUse();
   };
   // Builds on InstructionsCompatibilityAnalysis's own opcode matching
   // (rather than the more permissive getSameOpcode()) so a column that
@@ -13116,7 +12792,7 @@ scanAssociativeOperands(const InstructionsState &S, DominatorTree &DT,
     // consecutive-load grouping with sibling lanes instead. A multi-use
     // load has no such single opportunity to protect.
     if (!all_of(Column, [&](Value *V) {
-          if (isa<PoisonValue>(V) || GetRealLane(V))
+          if (isa<PoisonValue>(V) || IsRealLane(V))
             return true;
           if (!ColS.areInstructionsWithCopyableElements())
             return false;
@@ -13225,15 +12901,6 @@ alignReassociatedOperandsByKey(ArrayRef<BoUpSLP::ValueList> Operands,
       Aligned[Slot][Lane] = Operands[SlotSrcCol[Slot]][Lane];
   }
   return Aligned;
-}
-
-/// True if \p V is the integer identity for \p Opcode (0/1/all-ones). FP
-/// identities are ignored (fast-math may break 0.0/1.0 as identity): the
-/// integer-only ConstantInt cast below never matches the ConstantFP identity
-/// that getBinOpIdentity() returns for FAdd/FMul.
-static bool isReassocIdentityConstant(const Value *V, unsigned Opcode) {
-  const auto *CI = dyn_cast<ConstantInt>(V);
-  return CI && ConstantExpr::getBinOpIdentity(Opcode, CI->getType()) == CI;
 }
 
 /// Rank reassociated operand layouts by vectorizable load columns, other load
@@ -13518,15 +13185,14 @@ void BoUpSLP::buildTreeRec(ArrayRef<Value *> VLRef, unsigned Depth,
   }
   InstructionsCompatibilityAnalysis Analysis(*DT, *DL, *TTI, *TLI);
   SmallVector<ValueList> Operands = Analysis.buildOperands(S, VL);
-  // Flatten associative single-use binary chains into operand columns. Skip
-  // alt-shuffle, copyable, non-associative, and narrow sub-slices of a wider
-  // user. Restricted to BinaryOperator: isAssociative() is also true for
-  // associative intrinsics (e.g. smax/smin/umax/umin), which are CallInst,
-  // not BinaryOperator, and are not supported by the copyable-identity
-  // machinery used below (ConstantExpr::getBinOpIdentity, isSupportedOpcode).
-  bool IsNarrowerThanUser = UserTreeIdx.UserTE &&
-                            UserTreeIdx.UserTE->hasState() &&
-                            UserTreeIdx.UserTE->getVectorFactor() > VL.size();
+  // Flatten associative binary chains into operand columns. Only the peeled
+  // chain links are required to be single-use (they are erased); the root
+  // being flattened may have other uses. Skip alt-shuffle, copyable, and
+  // non-associative nodes. Restricted to BinaryOperator: isAssociative() is
+  // also true for associative intrinsics (e.g. smax/smin/umax/umin), which are
+  // CallInst, not BinaryOperator, and are not supported by the
+  // copyable-identity machinery used below (ConstantExpr::getBinOpIdentity,
+  // isSupportedOpcode).
   SmallVector<Value *> ReassocScalars;
   // Cached below (when the peel is kept) so the reorder step further down
   // does not need to redo the aligning/scoring work.
@@ -13534,9 +13200,9 @@ void BoUpSLP::buildTreeRec(ArrayRef<Value *> VLRef, unsigned Depth,
   std::tuple<unsigned, unsigned, unsigned, int> ReassocPeeledQuality;
   if (VectorizeReassociatedOps && !S.isAltShuffle() &&
       !S.areInstructionsWithCopyableElements() && Operands.size() == 2 &&
-      !IsNarrowerThanUser && all_of(VL, [](Value *V) {
+      all_of(VL, [](Value *V) {
         auto *I = dyn_cast<BinaryOperator>(V);
-        return I && I->isAssociative() && I->hasOneUse();
+        return I && I->isAssociative();
       })) {
     SmallVector<ValueList> NaturalTwoColumns(Operands);
     scanAssociativeOperands(S, *DT, *DL, *TTI, *TLI, *this, Operands,
@@ -13854,21 +13520,28 @@ void BoUpSLP::buildTreeRec(ArrayRef<Value *> VLRef, unsigned Depth,
           TE->dump());
 
       if (!ReassocScalars.empty()) {
-        // Reorder all flattened columns; realign by value family first
-        // (cached above as ReassocAlignedOperands). Keep the reorder only if
-        // column-quality score does not regress vs the peeled order.
-        VLOperands Ops(ReassocAlignedOperands, VL0->getParent(), *this);
-        Ops.reorder();
-        SmallVector<ValueList> Reordered(Operands.size());
-        for (unsigned I : seq<unsigned>(Operands.size()))
-          Reordered[I] = Ops.getVL(I);
-        if (getReassocColumnsQuality(Reordered, *this, S.getOpcode()) >=
-            ReassocPeeledQuality)
-          Operands = std::move(Reordered);
-        else
-          LLVM_DEBUG(dbgs() << "SLP: reassociation reorder loses column "
-                               "structure, keeping the natural operand "
-                               "order.\n");
+        // Realign columns by value family (cached above as
+        // ReassocAlignedOperands), then let VLOperands polish the order,
+        // keeping the polish only if the column-quality score does not regress
+        // vs the peeled order. That polish is quadratic in the column count, so
+        // past ReassocReorderColumnLimit keep the realigned seed, which already
+        // groups the vectorizable columns.
+        if (Operands.size() <= ReassocReorderColumnLimit) {
+          VLOperands Ops(ReassocAlignedOperands, VL0->getParent(), *this);
+          Ops.reorder();
+          SmallVector<ValueList> Reordered =
+              map_to_vector(seq<unsigned>(Operands.size()),
+                            [&](unsigned I) { return Ops.getVL(I); });
+          if (getReassocColumnsQuality(Reordered, *this, S.getOpcode()) >=
+              ReassocPeeledQuality)
+            Operands = std::move(Reordered);
+          else
+            LLVM_DEBUG(dbgs() << "SLP: reassociation reorder loses column "
+                                 "structure, keeping the natural operand "
+                                 "order.\n");
+        } else {
+          Operands = std::move(ReassocAlignedOperands);
+        }
         for (Value *V : ReassocScalars) {
           TE->addReassocScalar(V);
           SmallVectorImpl<const TreeEntry *> &Owners =
@@ -16546,7 +16219,7 @@ class BoUpSLP::ShuffleCostEstimator : public BaseShuffleAnalysis {
                  [](int Idx) { return Idx != PoisonMaskElem && Idx != 0; })) {
         SmallVector<int> ReorderMask;
         inversePermutation(E->ReorderIndices, ReorderMask);
-        ::addMask(CommonMask, ReorderMask);
+        addMask(CommonMask, ReorderMask);
       }
     } else if (V1 && P2.isNull()) {
       // Shuffle single vector.
@@ -17475,10 +17148,10 @@ BoUpSLP::getEntryCost(const TreeEntry *E, ArrayRef<Value *> VectorizedVals,
     } else {
       inversePermutation(E->ReorderIndices, NewMask);
     }
-    ::addMask(Mask, NewMask);
+    addMask(Mask, NewMask);
   }
   if (!E->ReuseShuffleIndices.empty())
-    ::addMask(Mask, E->ReuseShuffleIndices);
+    addMask(Mask, E->ReuseShuffleIndices);
   if (!Mask.empty() && !ShuffleVectorInst::isIdentityMask(Mask, Mask.size())) {
     assert(!isa<StructType>(FinalVecTy) &&
            "Expected non-struct vector type for shuffle cost calculation.");
@@ -20012,10 +19685,10 @@ BoUpSLP::calculateTreeCostAndTrimNonProfitable(ArrayRef<Value *> VectorizedVals,
       } else {
         inversePermutation(TE->ReorderIndices, NewMask);
       }
-      ::addMask(Mask, NewMask);
+      addMask(Mask, NewMask);
     }
     if (!TE->ReuseShuffleIndices.empty())
-      ::addMask(Mask, TE->ReuseShuffleIndices);
+      addMask(Mask, TE->ReuseShuffleIndices);
     if (!Mask.empty() && !ShuffleVectorInst::isIdentityMask(Mask, EntryVF))
       GatherCost += ::getShuffleCost(*TTI, TTI::SK_PermuteSingleSrc,
                                      cast<VectorType>(VecTy), Mask);
@@ -23894,6 +23567,21 @@ Value *BoUpSLP::vectorizeTree(TreeEntry *E) {
            return !SI || isCommutative(SI);
          })))
       I->setHasNoUnsignedWrap(/*b=*/false);
+    // A sub feeding icmp eq/ne 0 may have its operands swapped; nsw does not
+    // survive a - b -> b - a (a - b can be INT_MIN while b - a overflows).
+    if (!MinBWs.contains(E) && Opcode == Instruction::Sub &&
+        any_of(Scalars, [](Value *Scalar) {
+          auto *SI = dyn_cast<Instruction>(Scalar);
+          if (!SI || SI->getOpcode() != Instruction::Sub || !isCommutative(SI))
+            return false;
+          return any_of(SI->uses(), [](const Use &U) {
+            CmpPredicate Pred;
+            return match(U.getUser(),
+                         m_ICmp(Pred, m_Specific(U.get()), m_Zero())) &&
+                   ICmpInst::isEquality(Pred);
+          });
+        }))
+      I->setHasNoSignedWrap(/*b=*/false);
     // Interchanging add/sub negates the constant: nsw only survives if the
     // constant isn't INT_MIN (negating it would overflow); nuw never
     // survives a nonzero constant, since that flips the valid range from
@@ -23928,6 +23616,18 @@ Value *BoUpSLP::vectorizeTree(TreeEntry *E) {
             const auto *CI = dyn_cast<ConstantInt>(Op);
             return CI && CI->getValue().isMinSignedValue();
           });
+        }))
+      I->setHasNoSignedWrap(/*b=*/false);
+    // shl nsw X, BW-1 is not equivalent to mul nsw X, INT_MIN: shl nsw never
+    // poisons at X = -1 (shifted-out bits match the sign bit), but mul nsw
+    // does. A shl lane converted to mul this way must drop nsw.
+    if (!MinBWs.contains(E) && Opcode == Instruction::Mul &&
+        any_of(UniqueInsts, [&](Value *V) {
+          auto *SI = cast<Instruction>(V);
+          if (SI->getOpcode() != Instruction::Shl)
+            return false;
+          const auto *CI = dyn_cast<ConstantInt>(SI->getOperand(1));
+          return CI && CI->getValue() == CI->getBitWidth() - 1;
         }))
       I->setHasNoSignedWrap(/*b=*/false);
     if (auto *ICmp = dyn_cast<ICmpInst>(I); ICmp && It == MinBWs.end())
@@ -24428,10 +24128,8 @@ Value *BoUpSLP::vectorizeTree(TreeEntry *E) {
 
       if (E->hasReassocScalars()) {
         // Vectorize operand columns, then combine pairwise in a balanced tree.
-        SmallVector<Value *> CombinedScalars(E->Scalars.begin(),
-                                             E->Scalars.end());
-        CombinedScalars.append(E->getReassocScalars().begin(),
-                               E->getReassocScalars().end());
+        SmallVector<Value *> CombinedScalars = to_vector(E->Scalars);
+        append_range(CombinedScalars, E->getReassocScalars());
         // Reuse flags when a combine exactly matches a subsumed scalar pair.
         auto MakeOperandKey = [](Value *A, Value *B) {
           return A <= B ? std::make_pair(A, B) : std::make_pair(B, A);
@@ -24487,7 +24185,7 @@ Value *BoUpSLP::vectorizeTree(TreeEntry *E) {
                       MakeOperandKey(LHSScalars[Lane], RHSScalars[Lane]));
                   if (It == ByOperands.end())
                     return false;
-                  ExactMatches.append(It->second.begin(), It->second.end());
+                  append_range(ExactMatches, It->second);
                   Representatives[Lane] = It->second.front();
                   return true;
                 });
@@ -25144,9 +24842,10 @@ bool BoUpSLP::isCoveredByExistingVersionCheck(BasicBlock *BB,
   const Value *Base2 = getUnderlyingObject(Ptr2);
   if (Base1 == Base2)
     return false;
-  if (Base2 < Base1)
-    std::swap(Base1, Base2);
-  return It->second.contains({Base1, Base2});
+  // The recorded pairs keep their discovery order (see
+  // recordRuntimeAliasCheck), so accept either orientation.
+  return It->second.contains({Base1, Base2}) ||
+         It->second.contains({Base2, Base1});
 }
 
 /// Returns true if \p BB's body already contains vector instructions, e.g.
@@ -25186,16 +24885,20 @@ bool BoUpSLP::recordRuntimeAliasCheck(BasicBlock *BB, Instruction *Inst1,
   // Only a single block can be versioned per attempt.
   if (RTChecks.BB && RTChecks.BB != BB)
     return false;
-  // Normalize the pair order so duplicate checks collapse.
-  if (Base2 < Base1)
-    std::swap(Base1, Base2);
+  // A base-object pair is unordered: (Base1, Base2) and (Base2, Base1) are the
+  // same check. Keep it in discovery (program) order and drop the reverse as a
+  // duplicate, rather than ordering by pointer value, which would make the
+  // emitted checks depend on allocation addresses.
   auto Pair = std::make_pair(Base1, Base2);
+  bool Present = RTChecks.BasePairs.contains(Pair) ||
+                 RTChecks.BasePairs.contains({Base2, Base1});
   // After the checks have been validated and bounded, do not introduce new
   // pairs.
   if (RTChecksFinalized)
-    return RTChecks.BasePairs.contains(Pair);
+    return Present;
   RTChecks.BB = BB;
-  RTChecks.BasePairs.insert(Pair);
+  if (!Present)
+    RTChecks.BasePairs.insert(Pair);
   return true;
 }
 
