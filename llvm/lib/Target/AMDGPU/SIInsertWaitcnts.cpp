@@ -175,6 +175,16 @@ public:
   // Returns the set of HWEvents that corresponds to counter \p T.
   virtual HWEvents getWaitEvents(AMDGPU::InstCounterType T) const = 0;
 
+  /// \returns the counter that corresponds to event \p E.
+  AMDGPU::InstCounterType getCounterFromEvent(HWEvents E) const {
+    assert(E.size() == 1 && "Cannot handle a mask of events!");
+    for (auto T : AMDGPU::inst_counter_types()) {
+      if (getWaitEvents(T) & E)
+        return T;
+    }
+    llvm_unreachable("event type has no associated counter");
+  }
+
   // Returns a new waitcnt with all counters except VScnt set to 0. If
   // IncludeVSCnt is true, VScnt is set to 0, otherwise it is set to ~0u.
   // AsyncCnt and TensorCnt always default to ~0u (don't wait for it). They
@@ -285,7 +295,7 @@ struct PreheaderFlushFlags {
   bool FlushDsCnt = false;
 };
 
-class SIInsertWaitcnts : public AMDGPU::WaitcntBracketsInfoBase {
+class SIInsertWaitcnts {
   DenseMap<const Value *, MachineBasicBlock *> SLoadAddresses;
   DenseMap<MachineBasicBlock *, PreheaderFlushFlags> PreheadersToFlush;
   MachineLoopInfo &MLI;
@@ -370,19 +380,6 @@ public:
   bool removeRedundantSoftXcnts(MachineBasicBlock &Block);
   void setSchedulingMode(MachineBasicBlock &MBB, MachineBasicBlock::iterator I,
                          bool ExpertMode) const;
-
-  AMDGPU::InstCounterType getMaxCounter() const override { return MaxCounter; }
-  AMDGPU::HardwareLimits getLimits() const override { return Limits; }
-
-  bool isExpertMode() const override { return IsExpertMode; }
-  bool isTgSplit() const override { return IsTgSplit; }
-
-  const GCNSubtarget &getST() const override { return ST; }
-  const MachineRegisterInfo &getMRI() const override { return MRI; }
-
-  HWEvents getWaitEvents(AMDGPU::InstCounterType T) const override {
-    return WCG->getWaitEvents(T);
-  }
 };
 
 SIInsertWaitcnts::BlockInfo::~BlockInfo() = default;
@@ -2114,11 +2111,20 @@ bool SIInsertWaitcnts::run() {
         MF, AMDGPU::NUM_NORMAL_INST_CNTS, Limits);
   }
 
-  SmemAccessCounter = getCounterFromEvent(HWEvents::SMEM_ACCESS);
+  SmemAccessCounter = WCG->getCounterFromEvent(HWEvents::SMEM_ACCESS);
 
   bool Modified = false;
-
   MachineBasicBlock &EntryBB = MF.front();
+
+  const auto GetWaitEvents = [&](AMDGPU::InstCounterType T) {
+    return WCG->getWaitEvents(T);
+  };
+  const auto GetCounterFromEvent = [&](HWEvents E) {
+    return WCG->getCounterFromEvent(E);
+  };
+  AMDGPU::WaitcntBracketsContext WBC(ST, MRI, TII, TRI, IsTgSplit, IsExpertMode,
+                                     MaxCounter, Limits, GetWaitEvents,
+                                     GetCounterFromEvent);
 
   if (!MFI->isEntryFunction() &&
       !MF.getFunction().hasFnAttribute(Attribute::Naked)) {
@@ -2160,7 +2166,7 @@ bool SIInsertWaitcnts::run() {
       BuildMI(EntryBB, I, DebugLoc(), TII.get(AMDGPU::S_WAITCNT)).addImm(0);
     }
 
-    auto NonKernelInitialState = std::make_unique<WaitcntBrackets>(*this);
+    auto NonKernelInitialState = std::make_unique<WaitcntBrackets>(WBC);
     NonKernelInitialState->setStateOnFunctionEntryOrReturn();
     BlockInfos[&EntryBB].Incoming = std::move(NonKernelInitialState);
 
@@ -2191,13 +2197,13 @@ bool SIInsertWaitcnts::run() {
           *Brackets = *BI.Incoming;
       } else {
         if (!Brackets) {
-          Brackets = std::make_unique<WaitcntBrackets>(*this);
+          Brackets = std::make_unique<WaitcntBrackets>(WBC);
         } else {
           // Reinitialize in-place. N.B. do not do this by assigning from a
           // temporary because the WaitcntBrackets class is large and it could
           // cause this function to use an unreasonable amount of stack space.
           Brackets->~WaitcntBrackets();
-          new (Brackets.get()) WaitcntBrackets(*this);
+          new (Brackets.get()) WaitcntBrackets(WBC);
         }
       }
 

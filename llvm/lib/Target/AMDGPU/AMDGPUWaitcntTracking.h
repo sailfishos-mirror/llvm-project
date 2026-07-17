@@ -64,32 +64,37 @@ static constexpr VMEMID toVMEMID(MCRegUnit RU) {
   return static_cast<unsigned>(RU);
 }
 
-/// Small info struct to abstract-away the class that provides necessary
-/// information to track waitcnts.
-class WaitcntBracketsInfoBase {
-public:
-  virtual ~WaitcntBracketsInfoBase();
+/// Small info struct to provide necessary context for waitcnt tracking.
+struct WaitcntBracketsContext {
+  using GetWaitEventsFn = std::function<HWEvents(InstCounterType)>;
+  using GetCounterFromEventFn = std::function<InstCounterType(HWEvents)>;
 
-  /// \returns the max InstCounterType supported by the target.
-  virtual InstCounterType getMaxCounter() const = 0;
+  WaitcntBracketsContext(const GCNSubtarget &ST, const MachineRegisterInfo &MRI,
+                         const SIInstrInfo &TII, const SIRegisterInfo &TRI,
+                         bool IsTgSplit, bool IsExpertMode,
+                         InstCounterType MaxCounter, HardwareLimits Limits,
+                         GetWaitEventsFn GetWaitEvents,
+                         GetCounterFromEventFn GetCounterFromEvent)
+      : ST(ST), MRI(MRI), TII(TII), TRI(TRI), IsTgSplit(IsTgSplit),
+        IsExpertMode(IsExpertMode), MaxCounter(MaxCounter), Limits(Limits),
+        GetWaitEvents(GetWaitEvents), GetCounterFromEvent(GetCounterFromEvent) {
+  }
 
-  /// \returns the HW limits for each InstCounterType.
-  virtual HardwareLimits getLimits() const = 0;
+  const GCNSubtarget &ST;
+  const MachineRegisterInfo &MRI;
+  const SIInstrInfo &TII;
+  const SIRegisterInfo &TRI;
 
-  virtual bool isExpertMode() const = 0;
-  virtual bool isTgSplit() const = 0;
+  bool IsTgSplit;
+  bool IsExpertMode;
 
-  virtual const GCNSubtarget &getST() const = 0;
-  virtual const MachineRegisterInfo &getMRI() const = 0;
+  InstCounterType MaxCounter;
+  HardwareLimits Limits;
 
-  /// \returns the counter that corresponds to event \p E.
-  InstCounterType getCounterFromEvent(HWEvents E) const;
-
-  /// \returns All HWEvents associated with the counter \p T.
-  virtual HWEvents getWaitEvents(InstCounterType T) const = 0;
-
-  const SIRegisterInfo &getTRI() const;
-  const SIInstrInfo &getTII() const;
+  // TODO: Should we eventually precompute everything into an array and just
+  // store an ArrayRef here instead ?
+  GetWaitEventsFn GetWaitEvents;
+  GetCounterFromEventFn GetCounterFromEvent;
 };
 
 // This objects maintains the current score brackets of each wait counter, and
@@ -102,7 +107,10 @@ public:
 // "s_waitcnt 0" before use.
 class WaitcntBrackets {
 public:
-  WaitcntBrackets(const WaitcntBracketsInfoBase &WBI);
+  /// \param Ctx Context to track waitcnts. This is not copied and is expected
+  /// to outlive the class, as the typical usage pattern for this class implies
+  /// creating one instance for each basic block.
+  WaitcntBrackets(const WaitcntBracketsContext &Ctx);
 
 #ifndef NDEBUG
   ~WaitcntBrackets();
@@ -175,8 +183,16 @@ public:
 #endif
 
 private:
+  HWEvents getWaitEvents(InstCounterType T) const {
+    return Ctx->GetWaitEvents(T);
+  }
+
+  InstCounterType getCounterFromEvent(HWEvents E) const {
+    return Ctx->GetCounterFromEvent(E);
+  }
+
   bool isSmemAccessCounter(InstCounterType T) const {
-    return T == WBI->getCounterFromEvent(HWEvents::SMEM_ACCESS);
+    return T == getCounterFromEvent(HWEvents::SMEM_ACCESS);
   }
 
   MCPhysReg determineVGPR16Dependency(const MachineInstr &MI, InstCounterType T,
@@ -228,7 +244,7 @@ private:
   void setScoreByOperand(const MachineOperand &Op, InstCounterType CntTy,
                          unsigned Val);
 
-  const WaitcntBracketsInfoBase *WBI = nullptr;
+  const WaitcntBracketsContext *Ctx = nullptr;
 
   unsigned ScoreLBs[NUM_INST_CNTS] = {0};
   unsigned ScoreUBs[NUM_INST_CNTS] = {0};

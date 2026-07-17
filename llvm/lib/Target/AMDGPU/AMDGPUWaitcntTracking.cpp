@@ -49,35 +49,12 @@ static bool shouldUpdateAsyncMark(const MachineInstr &MI, InstCounterType T,
 } // namespace
 
 //===----------------------------------------------------------------------===//
-// WaitcntBracketsInfoBase
-//===----------------------------------------------------------------------===//
-
-const SIRegisterInfo &WaitcntBracketsInfoBase::getTRI() const {
-  return *getST().getRegisterInfo();
-}
-
-const SIInstrInfo &WaitcntBracketsInfoBase::getTII() const {
-  return *getST().getInstrInfo();
-}
-
-WaitcntBracketsInfoBase::~WaitcntBracketsInfoBase() = default;
-
-InstCounterType WaitcntBracketsInfoBase::getCounterFromEvent(HWEvents E) const {
-  assert(E.size() == 1 && "Cannot handle a mask of events!");
-  for (auto T : inst_counter_types()) {
-    if (getWaitEvents(T) & E)
-      return T;
-  }
-  llvm_unreachable("event type has no associated counter");
-}
-
-//===----------------------------------------------------------------------===//
 // WaitcntBrackets
 //===----------------------------------------------------------------------===//
 
-WaitcntBrackets::WaitcntBrackets(const WaitcntBracketsInfoBase &WBI)
-    : WBI(&WBI) {
-  assert(WBI.getTRI().getNumRegUnits() < REGUNITS_END);
+WaitcntBrackets::WaitcntBrackets(const WaitcntBracketsContext &Ctx)
+    : Ctx(&Ctx) {
+  assert(Ctx.TRI.getNumRegUnits() < REGUNITS_END);
 }
 
 #ifndef NDEBUG
@@ -157,18 +134,18 @@ void WaitcntBrackets::clearVGPRPendingEvents(MCPhysReg Reg) {
 
 void WaitcntBrackets::setStateOnFunctionEntryOrReturn() {
   setScoreUB(STORE_CNT, getScoreUB(STORE_CNT) + getLimit(STORE_CNT));
-  PendingEvents |= WBI->getWaitEvents(STORE_CNT);
+  PendingEvents |= getWaitEvents(STORE_CNT);
 }
 
 bool WaitcntBrackets::hasPendingEvent(InstCounterType T) const {
-  bool HasPending = (PendingEvents & WBI->getWaitEvents(T)).any();
+  bool HasPending = (PendingEvents & getWaitEvents(T)).any();
   assert(HasPending == !empty(T) &&
          "Expected pending events iff scoreboard is not empty");
   return HasPending;
 }
 
 bool WaitcntBrackets::hasMixedPendingEvents(InstCounterType T) const {
-  HWEvents Events = PendingEvents & WBI->getWaitEvents(T);
+  HWEvents Events = PendingEvents & getWaitEvents(T);
   // Return true if more than one bit is set in Events.
   return Events.size() > 1;
 }
@@ -179,7 +156,7 @@ bool WaitcntBrackets::hasMixedPendingEvents(InstCounterType T) const {
 // this at compile time, so we have to assume it might be applied if the
 // instruction supports it).
 bool WaitcntBrackets::hasPointSampleAccel(const MachineInstr &MI) const {
-  if (!WBI->getST().hasPointSampleAccel() || !SIInstrInfo::isMIMG(MI))
+  if (!Ctx->ST.hasPointSampleAccel() || !SIInstrInfo::isMIMG(MI))
     return false;
 
   const MIMGInfo *Info = getMIMGInfo(MI.getOpcode());
@@ -202,13 +179,13 @@ bool WaitcntBrackets::hasPointSamplePendingVmemTypes(const MachineInstr &MI,
 
 void WaitcntBrackets::updateByEvent(HWEvents E, MachineInstr &Inst) {
   assert(E.size() == 1 && "Expected singular event!");
-  InstCounterType T = WBI->getCounterFromEvent(E);
-  assert(T < WBI->getMaxCounter());
+  InstCounterType T = getCounterFromEvent(E);
+  assert(T < Ctx->MaxCounter);
 
-  const GCNSubtarget &ST = WBI->getST();
-  const SIInstrInfo &TII = WBI->getTII();
-  const SIRegisterInfo &TRI = WBI->getTRI();
-  const MachineRegisterInfo &MRI = WBI->getMRI();
+  const GCNSubtarget &ST = Ctx->ST;
+  const SIInstrInfo &TII = Ctx->TII;
+  const SIRegisterInfo &TRI = Ctx->TRI;
+  const MachineRegisterInfo &MRI = Ctx->MRI;
 
   unsigned UB = getScoreUB(T);
   unsigned Increment = 1;
@@ -423,10 +400,10 @@ void WaitcntBrackets::recordAsyncMark(MachineInstr &Inst) {
 }
 
 void WaitcntBrackets::print(raw_ostream &OS) const {
-  const GCNSubtarget &ST = WBI->getST();
-  const SIRegisterInfo &TRI = WBI->getTRI();
+  const GCNSubtarget &ST = Ctx->ST;
+  const SIRegisterInfo &TRI = Ctx->TRI;
 
-  for (auto T : inst_counter_types(WBI->getMaxCounter())) {
+  for (auto T : inst_counter_types(Ctx->MaxCounter)) {
     unsigned SR = getScoreRange(T);
     switch (T) {
     case LOAD_CNT:
@@ -483,7 +460,8 @@ void WaitcntBrackets::print(raw_ostream &OS) const {
           continue;
         unsigned RelScore = RegScore - LB - 1;
         if (ID < REGUNITS_END) {
-          OS << ' ' << RelScore << ":vRU" << printRegUnit(static_cast<MCRegUnit>(ID), &TRI);
+          OS << ' ' << RelScore << ":vRU"
+             << printRegUnit(static_cast<MCRegUnit>(ID), &TRI);
         } else {
           assert(ID >= LDSDMA_BEGIN && ID < LDSDMA_END &&
                  "Unhandled/unexpected ID value!");
@@ -500,7 +478,8 @@ void WaitcntBrackets::print(raw_ostream &OS) const {
           if (RegScore <= LB)
             continue;
           unsigned RelScore = RegScore - LB - 1;
-          OS << ' ' << RelScore << ":sRU" << printRegUnit(static_cast<MCRegUnit>(ID), &TRI);
+          OS << ' ' << RelScore << ":sRU"
+             << printRegUnit(static_cast<MCRegUnit>(ID), &TRI);
         }
       }
 
@@ -667,7 +646,7 @@ unsigned WaitcntBrackets::getVMemScore(VMEMID TID, InstCounterType T) const {
 }
 
 unsigned WaitcntBrackets::getLimit(InstCounterType T) const {
-  return WBI->getLimits().get(T);
+  return Ctx->Limits.get(T);
 }
 
 void WaitcntBrackets::purgeEmptyTrackingData() {
@@ -684,7 +663,7 @@ void WaitcntBrackets::determineWaitForScore(InstCounterType T,
   // If the score falls within the bracket, we need a waitcnt.
   if ((UB >= ScoreToWait) && (ScoreToWait > LB)) {
     if ((T == LOAD_CNT || T == DS_CNT) && hasPendingFlat() &&
-        !WBI->getST().hasFlatLgkmVMemCountInOrder()) {
+        !Ctx->ST.hasFlatLgkmVMemCountInOrder()) {
       // If there is a pending FLAT operation, and this is a VMem or LGKM
       // waitcnt and the target can report early completion, then we need
       // to force a waitcnt 0.
@@ -756,9 +735,9 @@ Waitcnt WaitcntBrackets::determineAsyncWait(unsigned N) {
 MCPhysReg WaitcntBrackets::determineVGPR16Dependency(const MachineInstr &MI,
                                                      InstCounterType T,
                                                      MCPhysReg Reg) const {
-  const SIRegisterInfo &TRI = WBI->getTRI();
-  const GCNSubtarget &ST = WBI->getST();
-  const SIInstrInfo &TII = WBI->getTII();
+  const SIRegisterInfo &TRI = Ctx->TRI;
+  const GCNSubtarget &ST = Ctx->ST;
+  const SIInstrInfo &TII = Ctx->TII;
 
   const TargetRegisterClass *RC = TRI.getPhysRegBaseClass(Reg);
   unsigned Size = TRI.getRegSizeInBits(*RC);
@@ -783,9 +762,8 @@ MCPhysReg WaitcntBrackets::determineVGPR16Dependency(const MachineInstr &MI,
     return Reg32;
 
   // If hi/lo16 mixed events
-  HWEvents MIEvents =
-      getEventsFor(MI, ST, WBI->isExpertMode(), WBI->isTgSplit());
-  HWEvents OtherHalfEvents = WBI->getWaitEvents(T);
+  HWEvents MIEvents = getEventsFor(MI, ST, Ctx->IsExpertMode, Ctx->IsTgSplit);
+  HWEvents OtherHalfEvents = getWaitEvents(T);
   HWEvents Events = MIEvents & OtherHalfEvents;
   if (Events.size() > 1)
     return Reg32;
@@ -798,7 +776,7 @@ void WaitcntBrackets::determineWaitForPhysReg(InstCounterType T, MCPhysReg Reg,
   if (Reg == SCC) {
     determineWaitForScore(T, SCCScore, Wait);
   } else {
-    bool IsVGPR = WBI->getTRI().isVectorRegister(WBI->getMRI(), Reg);
+    bool IsVGPR = Ctx->TRI.isVectorRegister(Ctx->MRI, Reg);
     if (IsVGPR)
       Reg = determineVGPR16Dependency(MI, T, Reg);
     for (MCRegUnit RU : regunits(Reg))
@@ -820,14 +798,13 @@ void WaitcntBrackets::tryClearSCCWriteEvent(MachineInstr *Inst) {
   if (PendingSCCWrite &&
       PendingSCCWrite->getOpcode() == S_BARRIER_SIGNAL_ISFIRST_IMM &&
       PendingSCCWrite->getOperand(0).getImm() == Inst->getOperand(0).getImm()) {
-    HWEvents SCC_WRITE_PendingEvent = HWEvents::SCC_WRITE;
+    HWEvents SCCWRITEPendingEvent = HWEvents::SCC_WRITE;
     // If this SCC_WRITE is the only pending KM_CNT event, clear counter.
-    if ((PendingEvents & WBI->getWaitEvents(KM_CNT)) ==
-        SCC_WRITE_PendingEvent) {
+    if ((PendingEvents & getWaitEvents(KM_CNT)) == SCCWRITEPendingEvent) {
       setScoreLB(KM_CNT, getScoreUB(KM_CNT));
     }
 
-    PendingEvents -= SCC_WRITE_PendingEvent;
+    PendingEvents -= SCCWRITEPendingEvent;
     PendingSCCWrite = nullptr;
   }
 }
@@ -847,7 +824,7 @@ void WaitcntBrackets::applyWaitcnt(InstCounterType T, unsigned Count) {
     setScoreLB(T, std::max(getScoreLB(T), UB - Count));
   } else {
     setScoreLB(T, UB);
-    PendingEvents -= WBI->getWaitEvents(T);
+    PendingEvents -= getWaitEvents(T);
   }
 
   if (T == KM_CNT && Count == 0 && hasPendingEvent(HWEvents::SMEM_GROUP)) {
@@ -883,17 +860,17 @@ bool WaitcntBrackets::counterOutOfOrder(InstCounterType T) const {
     // On targets without VScnt, LOAD_CNT includes all of STORE_CNT as well.
     // All these events use one counter and do not go out of order with respect
     // to each other.
-    if (!WBI->getST().hasVscnt())
+    if (!Ctx->ST.hasVscnt())
       return false;
 
-    HWEvents Events = PendingEvents & WBI->getWaitEvents(T);
+    HWEvents Events = PendingEvents & getWaitEvents(T);
 
     // If the target does not have extended counters, VMEM_BVH/SAMPLE_READ
     // events are equivalent to VMEM_READ_ACCESS. We do not go out of order in
     // such cases.
     static constexpr HWEvents ExtendedImageEvents =
         HWEvents::VMEM_SAMPLER_READ_ACCESS | HWEvents::VMEM_BVH_READ_ACCESS;
-    if (!WBI->getST().hasExtendedWaitCounts() &&
+    if (!Ctx->ST.hasExtendedWaitCounts() &&
         (Events & ExtendedImageEvents).any()) {
       Events -= ExtendedImageEvents;
       Events |= HWEvents::VMEM_READ_ACCESS;
@@ -974,7 +951,7 @@ bool WaitcntBrackets::mergeAsyncMarks(ArrayRef<MergeInfo> MergeInfos,
   if (MergeCount == 0)
     return StrictDom;
   for (auto Idx : seq_inclusive<unsigned>(1, MergeCount)) {
-    for (auto T : inst_counter_types(WBI->getMaxCounter())) {
+    for (auto T : inst_counter_types(Ctx->MaxCounter)) {
       StrictDom |= mergeScore(MergeInfos[T], AsyncMarks[OurSize - Idx][T],
                               OtherMarks[OtherSize - Idx][T]);
     }
@@ -994,9 +971,9 @@ bool WaitcntBrackets::mergeAsyncMarks(ArrayRef<MergeInfo> MergeInfos,
 iterator_range<MCRegUnitIterator>
 WaitcntBrackets::regunits(MCPhysReg Reg) const {
   assert(Reg != SCC && "Shouldn't be used on SCC");
-  if (!WBI->getTRI().isInAllocatableClass(Reg))
+  if (!Ctx->TRI.isInAllocatableClass(Reg))
     return {{}, {}};
-  return WBI->getTRI().regunits(Reg);
+  return Ctx->TRI.regunits(Reg);
 }
 
 void WaitcntBrackets::setScoreLB(InstCounterType T, unsigned Val) {
@@ -1019,10 +996,10 @@ void WaitcntBrackets::setRegScore(MCPhysReg Reg, InstCounterType T,
                                   unsigned Val) {
   if (Reg == SCC) {
     SCCScore = Val;
-  } else if (WBI->getTRI().isVectorRegister(WBI->getMRI(), Reg)) {
+  } else if (Ctx->TRI.isVectorRegister(Ctx->MRI, Reg)) {
     for (MCRegUnit RU : regunits(Reg))
       VMem[toVMEMID(RU)].Scores[T] = Val;
-  } else if (WBI->getTRI().isSGPRReg(WBI->getMRI(), Reg)) {
+  } else if (Ctx->TRI.isSGPRReg(Ctx->MRI, Reg)) {
     for (MCRegUnit RU : regunits(Reg))
       SGPRs[RU].get(T) = Val;
   } else {
@@ -1048,9 +1025,9 @@ bool WaitcntBrackets::merge(const WaitcntBrackets &Other) {
   // Array to store MergeInfo for each counter type
   MergeInfo MergeInfos[NUM_INST_CNTS];
 
-  for (auto T : inst_counter_types(WBI->getMaxCounter())) {
+  for (auto T : inst_counter_types(Ctx->MaxCounter)) {
     // Merge event flags for this counter
-    const HWEvents &EventsForT = WBI->getWaitEvents(T);
+    const HWEvents &EventsForT = getWaitEvents(T);
     const HWEvents OldEvents = PendingEvents & EventsForT;
     const HWEvents OtherEvents = Other.PendingEvents & EventsForT;
     if (!OldEvents.contains(OtherEvents))
@@ -1113,7 +1090,7 @@ bool WaitcntBrackets::merge(const WaitcntBrackets &Other) {
   }
 
   StrictDom |= mergeAsyncMarks(MergeInfos, Other.AsyncMarks);
-  for (auto T : inst_counter_types(WBI->getMaxCounter()))
+  for (auto T : inst_counter_types(Ctx->MaxCounter))
     StrictDom |= mergeScore(MergeInfos[T], AsyncScore[T], Other.AsyncScore[T]);
 
   purgeEmptyTrackingData();
