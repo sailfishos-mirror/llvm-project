@@ -14,6 +14,7 @@
 #include "WebAssemblyExceptionInfo.h"
 #include "WebAssemblyUtilities.h"
 #include "llvm/ADT/PostOrderIterator.h"
+#include "llvm/CodeGen/MachineBlockFrequencyInfo.h"
 #include "llvm/CodeGen/MachineDominanceFrontier.h"
 #include "llvm/CodeGen/MachineDominators.h"
 #include "llvm/CodeGen/MachineFunctionAnalysisManager.h"
