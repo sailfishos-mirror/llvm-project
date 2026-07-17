@@ -3,10 +3,18 @@
 ; RUN:   | FileCheck -check-prefix=RV32 %s
 ; RUN: sed 's/iXLen/i32/g' %s | llc -mtriple=riscv32 -mattr=+experimental-zilx -verify-machineinstrs \
 ; RUN:   | FileCheck -check-prefix=RV32-ZILX %s
+; RUN: sed 's/iXLen/i32/g' %s | llc -mtriple=riscv32 -mattr=+zba -verify-machineinstrs \
+; RUN:   | FileCheck -check-prefix=RV32-ZBA %s
+; RUN: sed 's/iXLen/i32/g' %s | llc -mtriple=riscv32 -mattr=+zba,+experimental-zilx -verify-machineinstrs \
+; RUN:   | FileCheck -check-prefix=RV32-ZBA-ZILX %s
 ; RUN: sed 's/iXLen/i64/g' %s | llc -mtriple=riscv64 -verify-machineinstrs \
 ; RUN:   | FileCheck -check-prefix=RV64 %s
 ; RUN: sed 's/iXLen/i64/g' %s | llc -mtriple=riscv64 -mattr=+experimental-zilx -verify-machineinstrs \
 ; RUN:   | FileCheck -check-prefix=RV64-ZILX %s
+; RUN: sed 's/iXLen/i64/g' %s | llc -mtriple=riscv64 -mattr=+zba -verify-machineinstrs \
+; RUN:   | FileCheck -check-prefix=RV64-ZBA %s
+; RUN: sed 's/iXLen/i64/g' %s | llc -mtriple=riscv64 -mattr=+zba,+experimental-zilx -verify-machineinstrs \
+; RUN:   | FileCheck -check-prefix=RV64-ZBA-ZILX %s
 
 ;------------------------------------------------------------------------------
 ; Unscaled Load
@@ -24,6 +32,17 @@ define i8 @lxb_anyext(ptr %a, iXLen %b) {
 ; RV32-ZILX-NEXT:    lxb a0, (a0), a1
 ; RV32-ZILX-NEXT:    ret
 ;
+; RV32-ZBA-LABEL: lxb_anyext:
+; RV32-ZBA:       # %bb.0:
+; RV32-ZBA-NEXT:    add a0, a0, a1
+; RV32-ZBA-NEXT:    lbu a0, 0(a0)
+; RV32-ZBA-NEXT:    ret
+;
+; RV32-ZBA-ZILX-LABEL: lxb_anyext:
+; RV32-ZBA-ZILX:       # %bb.0:
+; RV32-ZBA-ZILX-NEXT:    lxb a0, (a0), a1
+; RV32-ZBA-ZILX-NEXT:    ret
+;
 ; RV64-LABEL: lxb_anyext:
 ; RV64:       # %bb.0:
 ; RV64-NEXT:    add a0, a0, a1
@@ -34,6 +53,17 @@ define i8 @lxb_anyext(ptr %a, iXLen %b) {
 ; RV64-ZILX:       # %bb.0:
 ; RV64-ZILX-NEXT:    lxb a0, (a0), a1
 ; RV64-ZILX-NEXT:    ret
+;
+; RV64-ZBA-LABEL: lxb_anyext:
+; RV64-ZBA:       # %bb.0:
+; RV64-ZBA-NEXT:    add a0, a0, a1
+; RV64-ZBA-NEXT:    lbu a0, 0(a0)
+; RV64-ZBA-NEXT:    ret
+;
+; RV64-ZBA-ZILX-LABEL: lxb_anyext:
+; RV64-ZBA-ZILX:       # %bb.0:
+; RV64-ZBA-ZILX-NEXT:    lxb a0, (a0), a1
+; RV64-ZBA-ZILX-NEXT:    ret
   %1 = getelementptr i8, ptr %a, iXLen %b
   %2 = load i8, ptr %1, align 1
   ret i8 %2
@@ -51,6 +81,17 @@ define i32 @lxb(ptr %a, iXLen %b) {
 ; RV32-ZILX-NEXT:    lxb a0, (a0), a1
 ; RV32-ZILX-NEXT:    ret
 ;
+; RV32-ZBA-LABEL: lxb:
+; RV32-ZBA:       # %bb.0:
+; RV32-ZBA-NEXT:    add a0, a0, a1
+; RV32-ZBA-NEXT:    lb a0, 0(a0)
+; RV32-ZBA-NEXT:    ret
+;
+; RV32-ZBA-ZILX-LABEL: lxb:
+; RV32-ZBA-ZILX:       # %bb.0:
+; RV32-ZBA-ZILX-NEXT:    lxb a0, (a0), a1
+; RV32-ZBA-ZILX-NEXT:    ret
+;
 ; RV64-LABEL: lxb:
 ; RV64:       # %bb.0:
 ; RV64-NEXT:    add a0, a0, a1
@@ -61,6 +102,17 @@ define i32 @lxb(ptr %a, iXLen %b) {
 ; RV64-ZILX:       # %bb.0:
 ; RV64-ZILX-NEXT:    lxb a0, (a0), a1
 ; RV64-ZILX-NEXT:    ret
+;
+; RV64-ZBA-LABEL: lxb:
+; RV64-ZBA:       # %bb.0:
+; RV64-ZBA-NEXT:    add a0, a0, a1
+; RV64-ZBA-NEXT:    lb a0, 0(a0)
+; RV64-ZBA-NEXT:    ret
+;
+; RV64-ZBA-ZILX-LABEL: lxb:
+; RV64-ZBA-ZILX:       # %bb.0:
+; RV64-ZBA-ZILX-NEXT:    lxb a0, (a0), a1
+; RV64-ZBA-ZILX-NEXT:    ret
   %1 = getelementptr i8, ptr %a, iXLen %b
   %2 = load i8, ptr %1, align 1
   %3 = sext i8 %2 to i32
@@ -79,6 +131,17 @@ define i8 @lxb_uw_anyext(ptr %a, i32 %b) {
 ; RV32-ZILX-NEXT:    lxb a0, (a0), a1
 ; RV32-ZILX-NEXT:    ret
 ;
+; RV32-ZBA-LABEL: lxb_uw_anyext:
+; RV32-ZBA:       # %bb.0:
+; RV32-ZBA-NEXT:    add a0, a0, a1
+; RV32-ZBA-NEXT:    lbu a0, 0(a0)
+; RV32-ZBA-NEXT:    ret
+;
+; RV32-ZBA-ZILX-LABEL: lxb_uw_anyext:
+; RV32-ZBA-ZILX:       # %bb.0:
+; RV32-ZBA-ZILX-NEXT:    lxb a0, (a0), a1
+; RV32-ZBA-ZILX-NEXT:    ret
+;
 ; RV64-LABEL: lxb_uw_anyext:
 ; RV64:       # %bb.0:
 ; RV64-NEXT:    slli a1, a1, 32
@@ -91,6 +154,17 @@ define i8 @lxb_uw_anyext(ptr %a, i32 %b) {
 ; RV64-ZILX:       # %bb.0:
 ; RV64-ZILX-NEXT:    lxb.uw a0, (a0), a1
 ; RV64-ZILX-NEXT:    ret
+;
+; RV64-ZBA-LABEL: lxb_uw_anyext:
+; RV64-ZBA:       # %bb.0:
+; RV64-ZBA-NEXT:    add.uw a0, a1, a0
+; RV64-ZBA-NEXT:    lbu a0, 0(a0)
+; RV64-ZBA-NEXT:    ret
+;
+; RV64-ZBA-ZILX-LABEL: lxb_uw_anyext:
+; RV64-ZBA-ZILX:       # %bb.0:
+; RV64-ZBA-ZILX-NEXT:    lxb.uw a0, (a0), a1
+; RV64-ZBA-ZILX-NEXT:    ret
   %1 = zext i32 %b to i64
   %2 = getelementptr i8, ptr %a, i64 %1
   %3 = load i8, ptr %2, align 1
@@ -109,6 +183,17 @@ define i32 @lxb_uw(ptr %a, i32 %b) {
 ; RV32-ZILX-NEXT:    lxb a0, (a0), a1
 ; RV32-ZILX-NEXT:    ret
 ;
+; RV32-ZBA-LABEL: lxb_uw:
+; RV32-ZBA:       # %bb.0:
+; RV32-ZBA-NEXT:    add a0, a0, a1
+; RV32-ZBA-NEXT:    lb a0, 0(a0)
+; RV32-ZBA-NEXT:    ret
+;
+; RV32-ZBA-ZILX-LABEL: lxb_uw:
+; RV32-ZBA-ZILX:       # %bb.0:
+; RV32-ZBA-ZILX-NEXT:    lxb a0, (a0), a1
+; RV32-ZBA-ZILX-NEXT:    ret
+;
 ; RV64-LABEL: lxb_uw:
 ; RV64:       # %bb.0:
 ; RV64-NEXT:    slli a1, a1, 32
@@ -121,6 +206,17 @@ define i32 @lxb_uw(ptr %a, i32 %b) {
 ; RV64-ZILX:       # %bb.0:
 ; RV64-ZILX-NEXT:    lxb.uw a0, (a0), a1
 ; RV64-ZILX-NEXT:    ret
+;
+; RV64-ZBA-LABEL: lxb_uw:
+; RV64-ZBA:       # %bb.0:
+; RV64-ZBA-NEXT:    add.uw a0, a1, a0
+; RV64-ZBA-NEXT:    lb a0, 0(a0)
+; RV64-ZBA-NEXT:    ret
+;
+; RV64-ZBA-ZILX-LABEL: lxb_uw:
+; RV64-ZBA-ZILX:       # %bb.0:
+; RV64-ZBA-ZILX-NEXT:    lxb.uw a0, (a0), a1
+; RV64-ZBA-ZILX-NEXT:    ret
   %1 = zext i32 %b to i64
   %2 = getelementptr i8, ptr %a, i64 %1
   %3 = load i8, ptr %2, align 1
@@ -140,6 +236,17 @@ define i32 @lxbu(ptr %a, iXLen %b) {
 ; RV32-ZILX-NEXT:    lxbu a0, (a0), a1
 ; RV32-ZILX-NEXT:    ret
 ;
+; RV32-ZBA-LABEL: lxbu:
+; RV32-ZBA:       # %bb.0:
+; RV32-ZBA-NEXT:    add a0, a0, a1
+; RV32-ZBA-NEXT:    lbu a0, 0(a0)
+; RV32-ZBA-NEXT:    ret
+;
+; RV32-ZBA-ZILX-LABEL: lxbu:
+; RV32-ZBA-ZILX:       # %bb.0:
+; RV32-ZBA-ZILX-NEXT:    lxbu a0, (a0), a1
+; RV32-ZBA-ZILX-NEXT:    ret
+;
 ; RV64-LABEL: lxbu:
 ; RV64:       # %bb.0:
 ; RV64-NEXT:    add a0, a0, a1
@@ -150,6 +257,17 @@ define i32 @lxbu(ptr %a, iXLen %b) {
 ; RV64-ZILX:       # %bb.0:
 ; RV64-ZILX-NEXT:    lxbu a0, (a0), a1
 ; RV64-ZILX-NEXT:    ret
+;
+; RV64-ZBA-LABEL: lxbu:
+; RV64-ZBA:       # %bb.0:
+; RV64-ZBA-NEXT:    add a0, a0, a1
+; RV64-ZBA-NEXT:    lbu a0, 0(a0)
+; RV64-ZBA-NEXT:    ret
+;
+; RV64-ZBA-ZILX-LABEL: lxbu:
+; RV64-ZBA-ZILX:       # %bb.0:
+; RV64-ZBA-ZILX-NEXT:    lxbu a0, (a0), a1
+; RV64-ZBA-ZILX-NEXT:    ret
   %1 = getelementptr i8, ptr %a, iXLen %b
   %2 = load i8, ptr %1, align 1
   %3 = zext i8 %2 to i32
@@ -168,6 +286,17 @@ define i32 @lxbu_uw(ptr %a, i32 %b) {
 ; RV32-ZILX-NEXT:    lxbu a0, (a0), a1
 ; RV32-ZILX-NEXT:    ret
 ;
+; RV32-ZBA-LABEL: lxbu_uw:
+; RV32-ZBA:       # %bb.0:
+; RV32-ZBA-NEXT:    add a0, a0, a1
+; RV32-ZBA-NEXT:    lbu a0, 0(a0)
+; RV32-ZBA-NEXT:    ret
+;
+; RV32-ZBA-ZILX-LABEL: lxbu_uw:
+; RV32-ZBA-ZILX:       # %bb.0:
+; RV32-ZBA-ZILX-NEXT:    lxbu a0, (a0), a1
+; RV32-ZBA-ZILX-NEXT:    ret
+;
 ; RV64-LABEL: lxbu_uw:
 ; RV64:       # %bb.0:
 ; RV64-NEXT:    slli a1, a1, 32
@@ -180,6 +309,17 @@ define i32 @lxbu_uw(ptr %a, i32 %b) {
 ; RV64-ZILX:       # %bb.0:
 ; RV64-ZILX-NEXT:    lxbu.uw a0, (a0), a1
 ; RV64-ZILX-NEXT:    ret
+;
+; RV64-ZBA-LABEL: lxbu_uw:
+; RV64-ZBA:       # %bb.0:
+; RV64-ZBA-NEXT:    add.uw a0, a1, a0
+; RV64-ZBA-NEXT:    lbu a0, 0(a0)
+; RV64-ZBA-NEXT:    ret
+;
+; RV64-ZBA-ZILX-LABEL: lxbu_uw:
+; RV64-ZBA-ZILX:       # %bb.0:
+; RV64-ZBA-ZILX-NEXT:    lxbu.uw a0, (a0), a1
+; RV64-ZBA-ZILX-NEXT:    ret
   %1 = zext i32 %b to i64
   %2 = getelementptr i8, ptr %a, i64 %1
   %3 = load i8, ptr %2, align 1
@@ -199,6 +339,17 @@ define i16 @lxh(ptr %a, iXLen %b) {
 ; RV32-ZILX-NEXT:    lxh a0, (a0), a1
 ; RV32-ZILX-NEXT:    ret
 ;
+; RV32-ZBA-LABEL: lxh:
+; RV32-ZBA:       # %bb.0:
+; RV32-ZBA-NEXT:    add a0, a0, a1
+; RV32-ZBA-NEXT:    lh a0, 0(a0)
+; RV32-ZBA-NEXT:    ret
+;
+; RV32-ZBA-ZILX-LABEL: lxh:
+; RV32-ZBA-ZILX:       # %bb.0:
+; RV32-ZBA-ZILX-NEXT:    lxh a0, (a0), a1
+; RV32-ZBA-ZILX-NEXT:    ret
+;
 ; RV64-LABEL: lxh:
 ; RV64:       # %bb.0:
 ; RV64-NEXT:    add a0, a0, a1
@@ -209,6 +360,17 @@ define i16 @lxh(ptr %a, iXLen %b) {
 ; RV64-ZILX:       # %bb.0:
 ; RV64-ZILX-NEXT:    lxh a0, (a0), a1
 ; RV64-ZILX-NEXT:    ret
+;
+; RV64-ZBA-LABEL: lxh:
+; RV64-ZBA:       # %bb.0:
+; RV64-ZBA-NEXT:    add a0, a0, a1
+; RV64-ZBA-NEXT:    lh a0, 0(a0)
+; RV64-ZBA-NEXT:    ret
+;
+; RV64-ZBA-ZILX-LABEL: lxh:
+; RV64-ZBA-ZILX:       # %bb.0:
+; RV64-ZBA-ZILX-NEXT:    lxh a0, (a0), a1
+; RV64-ZBA-ZILX-NEXT:    ret
   %1 = getelementptr i8, ptr %a, iXLen %b
   %2 = load i16, ptr %1, align 2
   ret i16 %2
@@ -226,6 +388,17 @@ define i16 @lxh_uw(ptr %a, i32 %b) {
 ; RV32-ZILX-NEXT:    lxh a0, (a0), a1
 ; RV32-ZILX-NEXT:    ret
 ;
+; RV32-ZBA-LABEL: lxh_uw:
+; RV32-ZBA:       # %bb.0:
+; RV32-ZBA-NEXT:    add a0, a0, a1
+; RV32-ZBA-NEXT:    lh a0, 0(a0)
+; RV32-ZBA-NEXT:    ret
+;
+; RV32-ZBA-ZILX-LABEL: lxh_uw:
+; RV32-ZBA-ZILX:       # %bb.0:
+; RV32-ZBA-ZILX-NEXT:    lxh a0, (a0), a1
+; RV32-ZBA-ZILX-NEXT:    ret
+;
 ; RV64-LABEL: lxh_uw:
 ; RV64:       # %bb.0:
 ; RV64-NEXT:    slli a1, a1, 32
@@ -238,6 +411,17 @@ define i16 @lxh_uw(ptr %a, i32 %b) {
 ; RV64-ZILX:       # %bb.0:
 ; RV64-ZILX-NEXT:    lxh.uw a0, (a0), a1
 ; RV64-ZILX-NEXT:    ret
+;
+; RV64-ZBA-LABEL: lxh_uw:
+; RV64-ZBA:       # %bb.0:
+; RV64-ZBA-NEXT:    add.uw a0, a1, a0
+; RV64-ZBA-NEXT:    lh a0, 0(a0)
+; RV64-ZBA-NEXT:    ret
+;
+; RV64-ZBA-ZILX-LABEL: lxh_uw:
+; RV64-ZBA-ZILX:       # %bb.0:
+; RV64-ZBA-ZILX-NEXT:    lxh.uw a0, (a0), a1
+; RV64-ZBA-ZILX-NEXT:    ret
   %1 = zext i32 %b to i64
   %2 = getelementptr i8, ptr %a, i64 %1
   %3 = load i16, ptr %2, align 2
@@ -256,6 +440,17 @@ define i32 @lxhu(ptr %a, iXLen %b) {
 ; RV32-ZILX-NEXT:    lxhu a0, (a0), a1
 ; RV32-ZILX-NEXT:    ret
 ;
+; RV32-ZBA-LABEL: lxhu:
+; RV32-ZBA:       # %bb.0:
+; RV32-ZBA-NEXT:    add a0, a0, a1
+; RV32-ZBA-NEXT:    lhu a0, 0(a0)
+; RV32-ZBA-NEXT:    ret
+;
+; RV32-ZBA-ZILX-LABEL: lxhu:
+; RV32-ZBA-ZILX:       # %bb.0:
+; RV32-ZBA-ZILX-NEXT:    lxhu a0, (a0), a1
+; RV32-ZBA-ZILX-NEXT:    ret
+;
 ; RV64-LABEL: lxhu:
 ; RV64:       # %bb.0:
 ; RV64-NEXT:    add a0, a0, a1
@@ -266,6 +461,17 @@ define i32 @lxhu(ptr %a, iXLen %b) {
 ; RV64-ZILX:       # %bb.0:
 ; RV64-ZILX-NEXT:    lxhu a0, (a0), a1
 ; RV64-ZILX-NEXT:    ret
+;
+; RV64-ZBA-LABEL: lxhu:
+; RV64-ZBA:       # %bb.0:
+; RV64-ZBA-NEXT:    add a0, a0, a1
+; RV64-ZBA-NEXT:    lhu a0, 0(a0)
+; RV64-ZBA-NEXT:    ret
+;
+; RV64-ZBA-ZILX-LABEL: lxhu:
+; RV64-ZBA-ZILX:       # %bb.0:
+; RV64-ZBA-ZILX-NEXT:    lxhu a0, (a0), a1
+; RV64-ZBA-ZILX-NEXT:    ret
   %1 = getelementptr i8, ptr %a, iXLen %b
   %2 = load i16, ptr %1, align 2
   %3 = zext i16 %2 to i32
@@ -284,6 +490,17 @@ define i32 @lxhu_uw(ptr %a, i32 %b) {
 ; RV32-ZILX-NEXT:    lxhu a0, (a0), a1
 ; RV32-ZILX-NEXT:    ret
 ;
+; RV32-ZBA-LABEL: lxhu_uw:
+; RV32-ZBA:       # %bb.0:
+; RV32-ZBA-NEXT:    add a0, a0, a1
+; RV32-ZBA-NEXT:    lhu a0, 0(a0)
+; RV32-ZBA-NEXT:    ret
+;
+; RV32-ZBA-ZILX-LABEL: lxhu_uw:
+; RV32-ZBA-ZILX:       # %bb.0:
+; RV32-ZBA-ZILX-NEXT:    lxhu a0, (a0), a1
+; RV32-ZBA-ZILX-NEXT:    ret
+;
 ; RV64-LABEL: lxhu_uw:
 ; RV64:       # %bb.0:
 ; RV64-NEXT:    slli a1, a1, 32
@@ -296,6 +513,17 @@ define i32 @lxhu_uw(ptr %a, i32 %b) {
 ; RV64-ZILX:       # %bb.0:
 ; RV64-ZILX-NEXT:    lxhu.uw a0, (a0), a1
 ; RV64-ZILX-NEXT:    ret
+;
+; RV64-ZBA-LABEL: lxhu_uw:
+; RV64-ZBA:       # %bb.0:
+; RV64-ZBA-NEXT:    add.uw a0, a1, a0
+; RV64-ZBA-NEXT:    lhu a0, 0(a0)
+; RV64-ZBA-NEXT:    ret
+;
+; RV64-ZBA-ZILX-LABEL: lxhu_uw:
+; RV64-ZBA-ZILX:       # %bb.0:
+; RV64-ZBA-ZILX-NEXT:    lxhu.uw a0, (a0), a1
+; RV64-ZBA-ZILX-NEXT:    ret
   %1 = zext i32 %b to i64
   %2 = getelementptr i8, ptr %a, i64 %1
   %3 = load i16, ptr %2, align 2
@@ -315,6 +543,17 @@ define i32 @lxw(ptr %a, iXLen %b) {
 ; RV32-ZILX-NEXT:    lxw a0, (a0), a1
 ; RV32-ZILX-NEXT:    ret
 ;
+; RV32-ZBA-LABEL: lxw:
+; RV32-ZBA:       # %bb.0:
+; RV32-ZBA-NEXT:    add a0, a0, a1
+; RV32-ZBA-NEXT:    lw a0, 0(a0)
+; RV32-ZBA-NEXT:    ret
+;
+; RV32-ZBA-ZILX-LABEL: lxw:
+; RV32-ZBA-ZILX:       # %bb.0:
+; RV32-ZBA-ZILX-NEXT:    lxw a0, (a0), a1
+; RV32-ZBA-ZILX-NEXT:    ret
+;
 ; RV64-LABEL: lxw:
 ; RV64:       # %bb.0:
 ; RV64-NEXT:    add a0, a0, a1
@@ -325,6 +564,17 @@ define i32 @lxw(ptr %a, iXLen %b) {
 ; RV64-ZILX:       # %bb.0:
 ; RV64-ZILX-NEXT:    lxw a0, (a0), a1
 ; RV64-ZILX-NEXT:    ret
+;
+; RV64-ZBA-LABEL: lxw:
+; RV64-ZBA:       # %bb.0:
+; RV64-ZBA-NEXT:    add a0, a0, a1
+; RV64-ZBA-NEXT:    lw a0, 0(a0)
+; RV64-ZBA-NEXT:    ret
+;
+; RV64-ZBA-ZILX-LABEL: lxw:
+; RV64-ZBA-ZILX:       # %bb.0:
+; RV64-ZBA-ZILX-NEXT:    lxw a0, (a0), a1
+; RV64-ZBA-ZILX-NEXT:    ret
   %1 = getelementptr i8, ptr %a, iXLen %b
   %2 = load i32, ptr %1, align 4
   ret i32 %2
@@ -342,6 +592,17 @@ define i32 @lxw_uw(ptr %a, i32 %b) {
 ; RV32-ZILX-NEXT:    lxw a0, (a0), a1
 ; RV32-ZILX-NEXT:    ret
 ;
+; RV32-ZBA-LABEL: lxw_uw:
+; RV32-ZBA:       # %bb.0:
+; RV32-ZBA-NEXT:    add a0, a0, a1
+; RV32-ZBA-NEXT:    lw a0, 0(a0)
+; RV32-ZBA-NEXT:    ret
+;
+; RV32-ZBA-ZILX-LABEL: lxw_uw:
+; RV32-ZBA-ZILX:       # %bb.0:
+; RV32-ZBA-ZILX-NEXT:    lxw a0, (a0), a1
+; RV32-ZBA-ZILX-NEXT:    ret
+;
 ; RV64-LABEL: lxw_uw:
 ; RV64:       # %bb.0:
 ; RV64-NEXT:    slli a1, a1, 32
@@ -354,6 +615,17 @@ define i32 @lxw_uw(ptr %a, i32 %b) {
 ; RV64-ZILX:       # %bb.0:
 ; RV64-ZILX-NEXT:    lxw.uw a0, (a0), a1
 ; RV64-ZILX-NEXT:    ret
+;
+; RV64-ZBA-LABEL: lxw_uw:
+; RV64-ZBA:       # %bb.0:
+; RV64-ZBA-NEXT:    add.uw a0, a1, a0
+; RV64-ZBA-NEXT:    lw a0, 0(a0)
+; RV64-ZBA-NEXT:    ret
+;
+; RV64-ZBA-ZILX-LABEL: lxw_uw:
+; RV64-ZBA-ZILX:       # %bb.0:
+; RV64-ZBA-ZILX-NEXT:    lxw.uw a0, (a0), a1
+; RV64-ZBA-ZILX-NEXT:    ret
   %1 = zext i32 %b to i64
   %2 = getelementptr i8, ptr %a, i64 %1
   %3 = load i32, ptr %2, align 4
@@ -374,6 +646,19 @@ define i64 @lxwu(ptr %a, iXLen %b) {
 ; RV32-ZILX-NEXT:    li a1, 0
 ; RV32-ZILX-NEXT:    ret
 ;
+; RV32-ZBA-LABEL: lxwu:
+; RV32-ZBA:       # %bb.0:
+; RV32-ZBA-NEXT:    add a0, a0, a1
+; RV32-ZBA-NEXT:    lw a0, 0(a0)
+; RV32-ZBA-NEXT:    li a1, 0
+; RV32-ZBA-NEXT:    ret
+;
+; RV32-ZBA-ZILX-LABEL: lxwu:
+; RV32-ZBA-ZILX:       # %bb.0:
+; RV32-ZBA-ZILX-NEXT:    lxw a0, (a0), a1
+; RV32-ZBA-ZILX-NEXT:    li a1, 0
+; RV32-ZBA-ZILX-NEXT:    ret
+;
 ; RV64-LABEL: lxwu:
 ; RV64:       # %bb.0:
 ; RV64-NEXT:    add a0, a0, a1
@@ -384,6 +669,17 @@ define i64 @lxwu(ptr %a, iXLen %b) {
 ; RV64-ZILX:       # %bb.0:
 ; RV64-ZILX-NEXT:    lxwu a0, (a0), a1
 ; RV64-ZILX-NEXT:    ret
+;
+; RV64-ZBA-LABEL: lxwu:
+; RV64-ZBA:       # %bb.0:
+; RV64-ZBA-NEXT:    add a0, a0, a1
+; RV64-ZBA-NEXT:    lwu a0, 0(a0)
+; RV64-ZBA-NEXT:    ret
+;
+; RV64-ZBA-ZILX-LABEL: lxwu:
+; RV64-ZBA-ZILX:       # %bb.0:
+; RV64-ZBA-ZILX-NEXT:    lxwu a0, (a0), a1
+; RV64-ZBA-ZILX-NEXT:    ret
   %1 = getelementptr i8, ptr %a, iXLen %b
   %2 = load i32, ptr %1, align 4
   %3 = zext i32 %2 to i64
@@ -404,6 +700,19 @@ define i64 @lxwu_uw(ptr %a, i32 %b) {
 ; RV32-ZILX-NEXT:    li a1, 0
 ; RV32-ZILX-NEXT:    ret
 ;
+; RV32-ZBA-LABEL: lxwu_uw:
+; RV32-ZBA:       # %bb.0:
+; RV32-ZBA-NEXT:    add a0, a0, a1
+; RV32-ZBA-NEXT:    lw a0, 0(a0)
+; RV32-ZBA-NEXT:    li a1, 0
+; RV32-ZBA-NEXT:    ret
+;
+; RV32-ZBA-ZILX-LABEL: lxwu_uw:
+; RV32-ZBA-ZILX:       # %bb.0:
+; RV32-ZBA-ZILX-NEXT:    lxw a0, (a0), a1
+; RV32-ZBA-ZILX-NEXT:    li a1, 0
+; RV32-ZBA-ZILX-NEXT:    ret
+;
 ; RV64-LABEL: lxwu_uw:
 ; RV64:       # %bb.0:
 ; RV64-NEXT:    slli a1, a1, 32
@@ -416,6 +725,17 @@ define i64 @lxwu_uw(ptr %a, i32 %b) {
 ; RV64-ZILX:       # %bb.0:
 ; RV64-ZILX-NEXT:    lxwu.uw a0, (a0), a1
 ; RV64-ZILX-NEXT:    ret
+;
+; RV64-ZBA-LABEL: lxwu_uw:
+; RV64-ZBA:       # %bb.0:
+; RV64-ZBA-NEXT:    add.uw a0, a1, a0
+; RV64-ZBA-NEXT:    lwu a0, 0(a0)
+; RV64-ZBA-NEXT:    ret
+;
+; RV64-ZBA-ZILX-LABEL: lxwu_uw:
+; RV64-ZBA-ZILX:       # %bb.0:
+; RV64-ZBA-ZILX-NEXT:    lxwu.uw a0, (a0), a1
+; RV64-ZBA-ZILX-NEXT:    ret
   %1 = zext i32 %b to i64
   %2 = getelementptr i8, ptr %a, i64 %1
   %3 = load i32, ptr %2, align 4
@@ -438,6 +758,20 @@ define i64 @lxd(ptr %a, iXLen %b) {
 ; RV32-ZILX-NEXT:    lw a1, 4(a1)
 ; RV32-ZILX-NEXT:    ret
 ;
+; RV32-ZBA-LABEL: lxd:
+; RV32-ZBA:       # %bb.0:
+; RV32-ZBA-NEXT:    add a1, a0, a1
+; RV32-ZBA-NEXT:    lw a0, 0(a1)
+; RV32-ZBA-NEXT:    lw a1, 4(a1)
+; RV32-ZBA-NEXT:    ret
+;
+; RV32-ZBA-ZILX-LABEL: lxd:
+; RV32-ZBA-ZILX:       # %bb.0:
+; RV32-ZBA-ZILX-NEXT:    add a1, a0, a1
+; RV32-ZBA-ZILX-NEXT:    lw a0, 0(a1)
+; RV32-ZBA-ZILX-NEXT:    lw a1, 4(a1)
+; RV32-ZBA-ZILX-NEXT:    ret
+;
 ; RV64-LABEL: lxd:
 ; RV64:       # %bb.0:
 ; RV64-NEXT:    add a0, a0, a1
@@ -448,6 +782,17 @@ define i64 @lxd(ptr %a, iXLen %b) {
 ; RV64-ZILX:       # %bb.0:
 ; RV64-ZILX-NEXT:    lxd a0, (a0), a1
 ; RV64-ZILX-NEXT:    ret
+;
+; RV64-ZBA-LABEL: lxd:
+; RV64-ZBA:       # %bb.0:
+; RV64-ZBA-NEXT:    add a0, a0, a1
+; RV64-ZBA-NEXT:    ld a0, 0(a0)
+; RV64-ZBA-NEXT:    ret
+;
+; RV64-ZBA-ZILX-LABEL: lxd:
+; RV64-ZBA-ZILX:       # %bb.0:
+; RV64-ZBA-ZILX-NEXT:    lxd a0, (a0), a1
+; RV64-ZBA-ZILX-NEXT:    ret
   %1 = getelementptr i8, ptr %a, iXLen %b
   %2 = load i64, ptr %1, align 8
   ret i64 %2
@@ -468,6 +813,20 @@ define i64 @lxd_uw(ptr %a, i32 %b) {
 ; RV32-ZILX-NEXT:    lw a1, 4(a1)
 ; RV32-ZILX-NEXT:    ret
 ;
+; RV32-ZBA-LABEL: lxd_uw:
+; RV32-ZBA:       # %bb.0:
+; RV32-ZBA-NEXT:    add a1, a0, a1
+; RV32-ZBA-NEXT:    lw a0, 0(a1)
+; RV32-ZBA-NEXT:    lw a1, 4(a1)
+; RV32-ZBA-NEXT:    ret
+;
+; RV32-ZBA-ZILX-LABEL: lxd_uw:
+; RV32-ZBA-ZILX:       # %bb.0:
+; RV32-ZBA-ZILX-NEXT:    add a1, a0, a1
+; RV32-ZBA-ZILX-NEXT:    lw a0, 0(a1)
+; RV32-ZBA-ZILX-NEXT:    lw a1, 4(a1)
+; RV32-ZBA-ZILX-NEXT:    ret
+;
 ; RV64-LABEL: lxd_uw:
 ; RV64:       # %bb.0:
 ; RV64-NEXT:    slli a1, a1, 32
@@ -480,6 +839,17 @@ define i64 @lxd_uw(ptr %a, i32 %b) {
 ; RV64-ZILX:       # %bb.0:
 ; RV64-ZILX-NEXT:    lxd.uw a0, (a0), a1
 ; RV64-ZILX-NEXT:    ret
+;
+; RV64-ZBA-LABEL: lxd_uw:
+; RV64-ZBA:       # %bb.0:
+; RV64-ZBA-NEXT:    add.uw a0, a1, a0
+; RV64-ZBA-NEXT:    ld a0, 0(a0)
+; RV64-ZBA-NEXT:    ret
+;
+; RV64-ZBA-ZILX-LABEL: lxd_uw:
+; RV64-ZBA-ZILX:       # %bb.0:
+; RV64-ZBA-ZILX-NEXT:    lxd.uw a0, (a0), a1
+; RV64-ZBA-ZILX-NEXT:    ret
   %1 = zext i32 %b to i64
   %2 = getelementptr i8, ptr %a, i64 %1
   %3 = load i64, ptr %2, align 8
@@ -503,6 +873,17 @@ define i16 @lxh_s_anyext(ptr %a, iXLen %b) {
 ; RV32-ZILX-NEXT:    lxh.s a0, (a0), a1
 ; RV32-ZILX-NEXT:    ret
 ;
+; RV32-ZBA-LABEL: lxh_s_anyext:
+; RV32-ZBA:       # %bb.0:
+; RV32-ZBA-NEXT:    sh1add a0, a1, a0
+; RV32-ZBA-NEXT:    lh a0, 0(a0)
+; RV32-ZBA-NEXT:    ret
+;
+; RV32-ZBA-ZILX-LABEL: lxh_s_anyext:
+; RV32-ZBA-ZILX:       # %bb.0:
+; RV32-ZBA-ZILX-NEXT:    lxh.s a0, (a0), a1
+; RV32-ZBA-ZILX-NEXT:    ret
+;
 ; RV64-LABEL: lxh_s_anyext:
 ; RV64:       # %bb.0:
 ; RV64-NEXT:    slli a1, a1, 1
@@ -514,6 +895,17 @@ define i16 @lxh_s_anyext(ptr %a, iXLen %b) {
 ; RV64-ZILX:       # %bb.0:
 ; RV64-ZILX-NEXT:    lxh.s a0, (a0), a1
 ; RV64-ZILX-NEXT:    ret
+;
+; RV64-ZBA-LABEL: lxh_s_anyext:
+; RV64-ZBA:       # %bb.0:
+; RV64-ZBA-NEXT:    sh1add a0, a1, a0
+; RV64-ZBA-NEXT:    lh a0, 0(a0)
+; RV64-ZBA-NEXT:    ret
+;
+; RV64-ZBA-ZILX-LABEL: lxh_s_anyext:
+; RV64-ZBA-ZILX:       # %bb.0:
+; RV64-ZBA-ZILX-NEXT:    lxh.s a0, (a0), a1
+; RV64-ZBA-ZILX-NEXT:    ret
   %1 = getelementptr i16, ptr %a, iXLen %b
   %2 = load i16, ptr %1, align 2
   ret i16 %2
@@ -532,6 +924,17 @@ define i32 @lxh_s(ptr %a, iXLen %b) {
 ; RV32-ZILX-NEXT:    lxh.s a0, (a0), a1
 ; RV32-ZILX-NEXT:    ret
 ;
+; RV32-ZBA-LABEL: lxh_s:
+; RV32-ZBA:       # %bb.0:
+; RV32-ZBA-NEXT:    sh1add a0, a1, a0
+; RV32-ZBA-NEXT:    lh a0, 0(a0)
+; RV32-ZBA-NEXT:    ret
+;
+; RV32-ZBA-ZILX-LABEL: lxh_s:
+; RV32-ZBA-ZILX:       # %bb.0:
+; RV32-ZBA-ZILX-NEXT:    lxh.s a0, (a0), a1
+; RV32-ZBA-ZILX-NEXT:    ret
+;
 ; RV64-LABEL: lxh_s:
 ; RV64:       # %bb.0:
 ; RV64-NEXT:    slli a1, a1, 1
@@ -543,6 +946,17 @@ define i32 @lxh_s(ptr %a, iXLen %b) {
 ; RV64-ZILX:       # %bb.0:
 ; RV64-ZILX-NEXT:    lxh.s a0, (a0), a1
 ; RV64-ZILX-NEXT:    ret
+;
+; RV64-ZBA-LABEL: lxh_s:
+; RV64-ZBA:       # %bb.0:
+; RV64-ZBA-NEXT:    sh1add a0, a1, a0
+; RV64-ZBA-NEXT:    lh a0, 0(a0)
+; RV64-ZBA-NEXT:    ret
+;
+; RV64-ZBA-ZILX-LABEL: lxh_s:
+; RV64-ZBA-ZILX:       # %bb.0:
+; RV64-ZBA-ZILX-NEXT:    lxh.s a0, (a0), a1
+; RV64-ZBA-ZILX-NEXT:    ret
   %1 = getelementptr i16, ptr %a, iXLen %b
   %2 = load i16, ptr %1, align 2
   %3 = sext i16 %2 to i32
@@ -562,6 +976,17 @@ define i16 @lxh_s_uw_anyext(ptr %a, i32 %b) {
 ; RV32-ZILX-NEXT:    lxh.s a0, (a0), a1
 ; RV32-ZILX-NEXT:    ret
 ;
+; RV32-ZBA-LABEL: lxh_s_uw_anyext:
+; RV32-ZBA:       # %bb.0:
+; RV32-ZBA-NEXT:    sh1add a0, a1, a0
+; RV32-ZBA-NEXT:    lh a0, 0(a0)
+; RV32-ZBA-NEXT:    ret
+;
+; RV32-ZBA-ZILX-LABEL: lxh_s_uw_anyext:
+; RV32-ZBA-ZILX:       # %bb.0:
+; RV32-ZBA-ZILX-NEXT:    lxh.s a0, (a0), a1
+; RV32-ZBA-ZILX-NEXT:    ret
+;
 ; RV64-LABEL: lxh_s_uw_anyext:
 ; RV64:       # %bb.0:
 ; RV64-NEXT:    slli a1, a1, 32
@@ -574,6 +999,17 @@ define i16 @lxh_s_uw_anyext(ptr %a, i32 %b) {
 ; RV64-ZILX:       # %bb.0:
 ; RV64-ZILX-NEXT:    lxh.s.uw a0, (a0), a1
 ; RV64-ZILX-NEXT:    ret
+;
+; RV64-ZBA-LABEL: lxh_s_uw_anyext:
+; RV64-ZBA:       # %bb.0:
+; RV64-ZBA-NEXT:    sh1add.uw a0, a1, a0
+; RV64-ZBA-NEXT:    lh a0, 0(a0)
+; RV64-ZBA-NEXT:    ret
+;
+; RV64-ZBA-ZILX-LABEL: lxh_s_uw_anyext:
+; RV64-ZBA-ZILX:       # %bb.0:
+; RV64-ZBA-ZILX-NEXT:    lxh.s.uw a0, (a0), a1
+; RV64-ZBA-ZILX-NEXT:    ret
   %1 = zext i32 %b to i64
   %2 = getelementptr i16, ptr %a, i64 %1
   %3 = load i16, ptr %2, align 2
@@ -593,6 +1029,17 @@ define i32 @lxh_s_uw(ptr %a, i32 %b) {
 ; RV32-ZILX-NEXT:    lxh.s a0, (a0), a1
 ; RV32-ZILX-NEXT:    ret
 ;
+; RV32-ZBA-LABEL: lxh_s_uw:
+; RV32-ZBA:       # %bb.0:
+; RV32-ZBA-NEXT:    sh1add a0, a1, a0
+; RV32-ZBA-NEXT:    lh a0, 0(a0)
+; RV32-ZBA-NEXT:    ret
+;
+; RV32-ZBA-ZILX-LABEL: lxh_s_uw:
+; RV32-ZBA-ZILX:       # %bb.0:
+; RV32-ZBA-ZILX-NEXT:    lxh.s a0, (a0), a1
+; RV32-ZBA-ZILX-NEXT:    ret
+;
 ; RV64-LABEL: lxh_s_uw:
 ; RV64:       # %bb.0:
 ; RV64-NEXT:    slli a1, a1, 32
@@ -605,6 +1052,17 @@ define i32 @lxh_s_uw(ptr %a, i32 %b) {
 ; RV64-ZILX:       # %bb.0:
 ; RV64-ZILX-NEXT:    lxh.s.uw a0, (a0), a1
 ; RV64-ZILX-NEXT:    ret
+;
+; RV64-ZBA-LABEL: lxh_s_uw:
+; RV64-ZBA:       # %bb.0:
+; RV64-ZBA-NEXT:    sh1add.uw a0, a1, a0
+; RV64-ZBA-NEXT:    lh a0, 0(a0)
+; RV64-ZBA-NEXT:    ret
+;
+; RV64-ZBA-ZILX-LABEL: lxh_s_uw:
+; RV64-ZBA-ZILX:       # %bb.0:
+; RV64-ZBA-ZILX-NEXT:    lxh.s.uw a0, (a0), a1
+; RV64-ZBA-ZILX-NEXT:    ret
   %1 = zext i32 %b to i64
   %2 = getelementptr i16, ptr %a, i64 %1
   %3 = load i16, ptr %2, align 2
@@ -625,6 +1083,17 @@ define i32 @lxhu_s(ptr %a, iXLen %b) {
 ; RV32-ZILX-NEXT:    lxhu.s a0, (a0), a1
 ; RV32-ZILX-NEXT:    ret
 ;
+; RV32-ZBA-LABEL: lxhu_s:
+; RV32-ZBA:       # %bb.0:
+; RV32-ZBA-NEXT:    sh1add a0, a1, a0
+; RV32-ZBA-NEXT:    lhu a0, 0(a0)
+; RV32-ZBA-NEXT:    ret
+;
+; RV32-ZBA-ZILX-LABEL: lxhu_s:
+; RV32-ZBA-ZILX:       # %bb.0:
+; RV32-ZBA-ZILX-NEXT:    lxhu.s a0, (a0), a1
+; RV32-ZBA-ZILX-NEXT:    ret
+;
 ; RV64-LABEL: lxhu_s:
 ; RV64:       # %bb.0:
 ; RV64-NEXT:    slli a1, a1, 1
@@ -636,6 +1105,17 @@ define i32 @lxhu_s(ptr %a, iXLen %b) {
 ; RV64-ZILX:       # %bb.0:
 ; RV64-ZILX-NEXT:    lxhu.s a0, (a0), a1
 ; RV64-ZILX-NEXT:    ret
+;
+; RV64-ZBA-LABEL: lxhu_s:
+; RV64-ZBA:       # %bb.0:
+; RV64-ZBA-NEXT:    sh1add a0, a1, a0
+; RV64-ZBA-NEXT:    lhu a0, 0(a0)
+; RV64-ZBA-NEXT:    ret
+;
+; RV64-ZBA-ZILX-LABEL: lxhu_s:
+; RV64-ZBA-ZILX:       # %bb.0:
+; RV64-ZBA-ZILX-NEXT:    lxhu.s a0, (a0), a1
+; RV64-ZBA-ZILX-NEXT:    ret
   %1 = getelementptr i16, ptr %a, iXLen %b
   %2 = load i16, ptr %1, align 2
   %3 = zext i16 %2 to i32
@@ -655,6 +1135,17 @@ define i32 @lxhu_s_uw(ptr %a, i32 %b) {
 ; RV32-ZILX-NEXT:    lxhu.s a0, (a0), a1
 ; RV32-ZILX-NEXT:    ret
 ;
+; RV32-ZBA-LABEL: lxhu_s_uw:
+; RV32-ZBA:       # %bb.0:
+; RV32-ZBA-NEXT:    sh1add a0, a1, a0
+; RV32-ZBA-NEXT:    lhu a0, 0(a0)
+; RV32-ZBA-NEXT:    ret
+;
+; RV32-ZBA-ZILX-LABEL: lxhu_s_uw:
+; RV32-ZBA-ZILX:       # %bb.0:
+; RV32-ZBA-ZILX-NEXT:    lxhu.s a0, (a0), a1
+; RV32-ZBA-ZILX-NEXT:    ret
+;
 ; RV64-LABEL: lxhu_s_uw:
 ; RV64:       # %bb.0:
 ; RV64-NEXT:    slli a1, a1, 32
@@ -667,6 +1158,17 @@ define i32 @lxhu_s_uw(ptr %a, i32 %b) {
 ; RV64-ZILX:       # %bb.0:
 ; RV64-ZILX-NEXT:    lxhu.s.uw a0, (a0), a1
 ; RV64-ZILX-NEXT:    ret
+;
+; RV64-ZBA-LABEL: lxhu_s_uw:
+; RV64-ZBA:       # %bb.0:
+; RV64-ZBA-NEXT:    sh1add.uw a0, a1, a0
+; RV64-ZBA-NEXT:    lhu a0, 0(a0)
+; RV64-ZBA-NEXT:    ret
+;
+; RV64-ZBA-ZILX-LABEL: lxhu_s_uw:
+; RV64-ZBA-ZILX:       # %bb.0:
+; RV64-ZBA-ZILX-NEXT:    lxhu.s.uw a0, (a0), a1
+; RV64-ZBA-ZILX-NEXT:    ret
   %1 = zext i32 %b to i64
   %2 = getelementptr i16, ptr %a, i64 %1
   %3 = load i16, ptr %2, align 2
@@ -687,6 +1189,17 @@ define i32 @lxw_s_anyext(ptr %a, iXLen %b) {
 ; RV32-ZILX-NEXT:    lxw.s a0, (a0), a1
 ; RV32-ZILX-NEXT:    ret
 ;
+; RV32-ZBA-LABEL: lxw_s_anyext:
+; RV32-ZBA:       # %bb.0:
+; RV32-ZBA-NEXT:    sh2add a0, a1, a0
+; RV32-ZBA-NEXT:    lw a0, 0(a0)
+; RV32-ZBA-NEXT:    ret
+;
+; RV32-ZBA-ZILX-LABEL: lxw_s_anyext:
+; RV32-ZBA-ZILX:       # %bb.0:
+; RV32-ZBA-ZILX-NEXT:    lxw.s a0, (a0), a1
+; RV32-ZBA-ZILX-NEXT:    ret
+;
 ; RV64-LABEL: lxw_s_anyext:
 ; RV64:       # %bb.0:
 ; RV64-NEXT:    slli a1, a1, 2
@@ -698,6 +1211,17 @@ define i32 @lxw_s_anyext(ptr %a, iXLen %b) {
 ; RV64-ZILX:       # %bb.0:
 ; RV64-ZILX-NEXT:    lxw.s a0, (a0), a1
 ; RV64-ZILX-NEXT:    ret
+;
+; RV64-ZBA-LABEL: lxw_s_anyext:
+; RV64-ZBA:       # %bb.0:
+; RV64-ZBA-NEXT:    sh2add a0, a1, a0
+; RV64-ZBA-NEXT:    lw a0, 0(a0)
+; RV64-ZBA-NEXT:    ret
+;
+; RV64-ZBA-ZILX-LABEL: lxw_s_anyext:
+; RV64-ZBA-ZILX:       # %bb.0:
+; RV64-ZBA-ZILX-NEXT:    lxw.s a0, (a0), a1
+; RV64-ZBA-ZILX-NEXT:    ret
   %1 = getelementptr i32, ptr %a, iXLen %b
   %2 = load i32, ptr %1, align 4
   ret i32 %2
@@ -718,6 +1242,19 @@ define i64 @lxw_s(ptr %a, iXLen %b) {
 ; RV32-ZILX-NEXT:    srai a1, a0, 31
 ; RV32-ZILX-NEXT:    ret
 ;
+; RV32-ZBA-LABEL: lxw_s:
+; RV32-ZBA:       # %bb.0:
+; RV32-ZBA-NEXT:    sh2add a0, a1, a0
+; RV32-ZBA-NEXT:    lw a0, 0(a0)
+; RV32-ZBA-NEXT:    srai a1, a0, 31
+; RV32-ZBA-NEXT:    ret
+;
+; RV32-ZBA-ZILX-LABEL: lxw_s:
+; RV32-ZBA-ZILX:       # %bb.0:
+; RV32-ZBA-ZILX-NEXT:    lxw.s a0, (a0), a1
+; RV32-ZBA-ZILX-NEXT:    srai a1, a0, 31
+; RV32-ZBA-ZILX-NEXT:    ret
+;
 ; RV64-LABEL: lxw_s:
 ; RV64:       # %bb.0:
 ; RV64-NEXT:    slli a1, a1, 2
@@ -729,6 +1266,17 @@ define i64 @lxw_s(ptr %a, iXLen %b) {
 ; RV64-ZILX:       # %bb.0:
 ; RV64-ZILX-NEXT:    lxw.s a0, (a0), a1
 ; RV64-ZILX-NEXT:    ret
+;
+; RV64-ZBA-LABEL: lxw_s:
+; RV64-ZBA:       # %bb.0:
+; RV64-ZBA-NEXT:    sh2add a0, a1, a0
+; RV64-ZBA-NEXT:    lw a0, 0(a0)
+; RV64-ZBA-NEXT:    ret
+;
+; RV64-ZBA-ZILX-LABEL: lxw_s:
+; RV64-ZBA-ZILX:       # %bb.0:
+; RV64-ZBA-ZILX-NEXT:    lxw.s a0, (a0), a1
+; RV64-ZBA-ZILX-NEXT:    ret
   %1 = getelementptr i32, ptr %a, iXLen %b
   %2 = load i32, ptr %1, align 4
   %3 = sext i32 %2 to i64
@@ -748,6 +1296,17 @@ define i32 @lxw_s_uw_anyext(ptr %a, i32 %b) {
 ; RV32-ZILX-NEXT:    lxw.s a0, (a0), a1
 ; RV32-ZILX-NEXT:    ret
 ;
+; RV32-ZBA-LABEL: lxw_s_uw_anyext:
+; RV32-ZBA:       # %bb.0:
+; RV32-ZBA-NEXT:    sh2add a0, a1, a0
+; RV32-ZBA-NEXT:    lw a0, 0(a0)
+; RV32-ZBA-NEXT:    ret
+;
+; RV32-ZBA-ZILX-LABEL: lxw_s_uw_anyext:
+; RV32-ZBA-ZILX:       # %bb.0:
+; RV32-ZBA-ZILX-NEXT:    lxw.s a0, (a0), a1
+; RV32-ZBA-ZILX-NEXT:    ret
+;
 ; RV64-LABEL: lxw_s_uw_anyext:
 ; RV64:       # %bb.0:
 ; RV64-NEXT:    slli a1, a1, 32
@@ -760,6 +1319,17 @@ define i32 @lxw_s_uw_anyext(ptr %a, i32 %b) {
 ; RV64-ZILX:       # %bb.0:
 ; RV64-ZILX-NEXT:    lxw.s.uw a0, (a0), a1
 ; RV64-ZILX-NEXT:    ret
+;
+; RV64-ZBA-LABEL: lxw_s_uw_anyext:
+; RV64-ZBA:       # %bb.0:
+; RV64-ZBA-NEXT:    sh2add.uw a0, a1, a0
+; RV64-ZBA-NEXT:    lw a0, 0(a0)
+; RV64-ZBA-NEXT:    ret
+;
+; RV64-ZBA-ZILX-LABEL: lxw_s_uw_anyext:
+; RV64-ZBA-ZILX:       # %bb.0:
+; RV64-ZBA-ZILX-NEXT:    lxw.s.uw a0, (a0), a1
+; RV64-ZBA-ZILX-NEXT:    ret
   %1 = zext i32 %b to i64
   %2 = getelementptr i32, ptr %a, i64 %1
   %3 = load i32, ptr %2, align 4
@@ -781,6 +1351,19 @@ define i64 @lxw_s_uw(ptr %a, i32 %b) {
 ; RV32-ZILX-NEXT:    srai a1, a0, 31
 ; RV32-ZILX-NEXT:    ret
 ;
+; RV32-ZBA-LABEL: lxw_s_uw:
+; RV32-ZBA:       # %bb.0:
+; RV32-ZBA-NEXT:    sh2add a0, a1, a0
+; RV32-ZBA-NEXT:    lw a0, 0(a0)
+; RV32-ZBA-NEXT:    srai a1, a0, 31
+; RV32-ZBA-NEXT:    ret
+;
+; RV32-ZBA-ZILX-LABEL: lxw_s_uw:
+; RV32-ZBA-ZILX:       # %bb.0:
+; RV32-ZBA-ZILX-NEXT:    lxw.s a0, (a0), a1
+; RV32-ZBA-ZILX-NEXT:    srai a1, a0, 31
+; RV32-ZBA-ZILX-NEXT:    ret
+;
 ; RV64-LABEL: lxw_s_uw:
 ; RV64:       # %bb.0:
 ; RV64-NEXT:    slli a1, a1, 32
@@ -793,6 +1376,17 @@ define i64 @lxw_s_uw(ptr %a, i32 %b) {
 ; RV64-ZILX:       # %bb.0:
 ; RV64-ZILX-NEXT:    lxw.s.uw a0, (a0), a1
 ; RV64-ZILX-NEXT:    ret
+;
+; RV64-ZBA-LABEL: lxw_s_uw:
+; RV64-ZBA:       # %bb.0:
+; RV64-ZBA-NEXT:    sh2add.uw a0, a1, a0
+; RV64-ZBA-NEXT:    lw a0, 0(a0)
+; RV64-ZBA-NEXT:    ret
+;
+; RV64-ZBA-ZILX-LABEL: lxw_s_uw:
+; RV64-ZBA-ZILX:       # %bb.0:
+; RV64-ZBA-ZILX-NEXT:    lxw.s.uw a0, (a0), a1
+; RV64-ZBA-ZILX-NEXT:    ret
   %1 = zext i32 %b to i64
   %2 = getelementptr i32, ptr %a, i64 %1
   %3 = load i32, ptr %2, align 4
@@ -815,6 +1409,19 @@ define i64 @lxwu_s(ptr %a, iXLen %b) {
 ; RV32-ZILX-NEXT:    li a1, 0
 ; RV32-ZILX-NEXT:    ret
 ;
+; RV32-ZBA-LABEL: lxwu_s:
+; RV32-ZBA:       # %bb.0:
+; RV32-ZBA-NEXT:    sh2add a0, a1, a0
+; RV32-ZBA-NEXT:    lw a0, 0(a0)
+; RV32-ZBA-NEXT:    li a1, 0
+; RV32-ZBA-NEXT:    ret
+;
+; RV32-ZBA-ZILX-LABEL: lxwu_s:
+; RV32-ZBA-ZILX:       # %bb.0:
+; RV32-ZBA-ZILX-NEXT:    lxw.s a0, (a0), a1
+; RV32-ZBA-ZILX-NEXT:    li a1, 0
+; RV32-ZBA-ZILX-NEXT:    ret
+;
 ; RV64-LABEL: lxwu_s:
 ; RV64:       # %bb.0:
 ; RV64-NEXT:    slli a1, a1, 2
@@ -826,6 +1433,17 @@ define i64 @lxwu_s(ptr %a, iXLen %b) {
 ; RV64-ZILX:       # %bb.0:
 ; RV64-ZILX-NEXT:    lxwu.s a0, (a0), a1
 ; RV64-ZILX-NEXT:    ret
+;
+; RV64-ZBA-LABEL: lxwu_s:
+; RV64-ZBA:       # %bb.0:
+; RV64-ZBA-NEXT:    sh2add a0, a1, a0
+; RV64-ZBA-NEXT:    lwu a0, 0(a0)
+; RV64-ZBA-NEXT:    ret
+;
+; RV64-ZBA-ZILX-LABEL: lxwu_s:
+; RV64-ZBA-ZILX:       # %bb.0:
+; RV64-ZBA-ZILX-NEXT:    lxwu.s a0, (a0), a1
+; RV64-ZBA-ZILX-NEXT:    ret
   %1 = getelementptr i32, ptr %a, iXLen %b
   %2 = load i32, ptr %1, align 4
   %3 = zext i32 %2 to i64
@@ -847,6 +1465,19 @@ define i64 @lxwu_s_uw(ptr %a, i32 %b) {
 ; RV32-ZILX-NEXT:    li a1, 0
 ; RV32-ZILX-NEXT:    ret
 ;
+; RV32-ZBA-LABEL: lxwu_s_uw:
+; RV32-ZBA:       # %bb.0:
+; RV32-ZBA-NEXT:    sh2add a0, a1, a0
+; RV32-ZBA-NEXT:    lw a0, 0(a0)
+; RV32-ZBA-NEXT:    li a1, 0
+; RV32-ZBA-NEXT:    ret
+;
+; RV32-ZBA-ZILX-LABEL: lxwu_s_uw:
+; RV32-ZBA-ZILX:       # %bb.0:
+; RV32-ZBA-ZILX-NEXT:    lxw.s a0, (a0), a1
+; RV32-ZBA-ZILX-NEXT:    li a1, 0
+; RV32-ZBA-ZILX-NEXT:    ret
+;
 ; RV64-LABEL: lxwu_s_uw:
 ; RV64:       # %bb.0:
 ; RV64-NEXT:    slli a1, a1, 32
@@ -859,6 +1490,17 @@ define i64 @lxwu_s_uw(ptr %a, i32 %b) {
 ; RV64-ZILX:       # %bb.0:
 ; RV64-ZILX-NEXT:    lxwu.s.uw a0, (a0), a1
 ; RV64-ZILX-NEXT:    ret
+;
+; RV64-ZBA-LABEL: lxwu_s_uw:
+; RV64-ZBA:       # %bb.0:
+; RV64-ZBA-NEXT:    sh2add.uw a0, a1, a0
+; RV64-ZBA-NEXT:    lwu a0, 0(a0)
+; RV64-ZBA-NEXT:    ret
+;
+; RV64-ZBA-ZILX-LABEL: lxwu_s_uw:
+; RV64-ZBA-ZILX:       # %bb.0:
+; RV64-ZBA-ZILX-NEXT:    lxwu.s.uw a0, (a0), a1
+; RV64-ZBA-ZILX-NEXT:    ret
   %1 = zext i32 %b to i64
   %2 = getelementptr i32, ptr %a, i64 %1
   %3 = load i32, ptr %2, align 4
@@ -883,6 +1525,20 @@ define i64 @lxd_s(ptr %a, iXLen %b) {
 ; RV32-ZILX-NEXT:    lw a1, 4(a1)
 ; RV32-ZILX-NEXT:    ret
 ;
+; RV32-ZBA-LABEL: lxd_s:
+; RV32-ZBA:       # %bb.0:
+; RV32-ZBA-NEXT:    sh3add a1, a1, a0
+; RV32-ZBA-NEXT:    lw a0, 0(a1)
+; RV32-ZBA-NEXT:    lw a1, 4(a1)
+; RV32-ZBA-NEXT:    ret
+;
+; RV32-ZBA-ZILX-LABEL: lxd_s:
+; RV32-ZBA-ZILX:       # %bb.0:
+; RV32-ZBA-ZILX-NEXT:    sh3add a1, a1, a0
+; RV32-ZBA-ZILX-NEXT:    lw a0, 0(a1)
+; RV32-ZBA-ZILX-NEXT:    lw a1, 4(a1)
+; RV32-ZBA-ZILX-NEXT:    ret
+;
 ; RV64-LABEL: lxd_s:
 ; RV64:       # %bb.0:
 ; RV64-NEXT:    slli a1, a1, 3
@@ -894,6 +1550,17 @@ define i64 @lxd_s(ptr %a, iXLen %b) {
 ; RV64-ZILX:       # %bb.0:
 ; RV64-ZILX-NEXT:    lxd.s a0, (a0), a1
 ; RV64-ZILX-NEXT:    ret
+;
+; RV64-ZBA-LABEL: lxd_s:
+; RV64-ZBA:       # %bb.0:
+; RV64-ZBA-NEXT:    sh3add a0, a1, a0
+; RV64-ZBA-NEXT:    ld a0, 0(a0)
+; RV64-ZBA-NEXT:    ret
+;
+; RV64-ZBA-ZILX-LABEL: lxd_s:
+; RV64-ZBA-ZILX:       # %bb.0:
+; RV64-ZBA-ZILX-NEXT:    lxd.s a0, (a0), a1
+; RV64-ZBA-ZILX-NEXT:    ret
   %1 = getelementptr i64, ptr %a, iXLen %b
   %2 = load i64, ptr %1, align 8
   ret i64 %2
@@ -916,6 +1583,20 @@ define i64 @lxd_s_2(ptr %a, iXLen %b) {
 ; RV32-ZILX-NEXT:    lw a1, 100(a1)
 ; RV32-ZILX-NEXT:    ret
 ;
+; RV32-ZBA-LABEL: lxd_s_2:
+; RV32-ZBA:       # %bb.0:
+; RV32-ZBA-NEXT:    sh3add a1, a1, a0
+; RV32-ZBA-NEXT:    lw a0, 96(a1)
+; RV32-ZBA-NEXT:    lw a1, 100(a1)
+; RV32-ZBA-NEXT:    ret
+;
+; RV32-ZBA-ZILX-LABEL: lxd_s_2:
+; RV32-ZBA-ZILX:       # %bb.0:
+; RV32-ZBA-ZILX-NEXT:    sh3add a1, a1, a0
+; RV32-ZBA-ZILX-NEXT:    lw a0, 96(a1)
+; RV32-ZBA-ZILX-NEXT:    lw a1, 100(a1)
+; RV32-ZBA-ZILX-NEXT:    ret
+;
 ; RV64-LABEL: lxd_s_2:
 ; RV64:       # %bb.0:
 ; RV64-NEXT:    slli a1, a1, 3
@@ -928,6 +1609,18 @@ define i64 @lxd_s_2(ptr %a, iXLen %b) {
 ; RV64-ZILX-NEXT:    addi a0, a0, 96
 ; RV64-ZILX-NEXT:    lxd.s a0, (a0), a1
 ; RV64-ZILX-NEXT:    ret
+;
+; RV64-ZBA-LABEL: lxd_s_2:
+; RV64-ZBA:       # %bb.0:
+; RV64-ZBA-NEXT:    sh3add a0, a1, a0
+; RV64-ZBA-NEXT:    ld a0, 96(a0)
+; RV64-ZBA-NEXT:    ret
+;
+; RV64-ZBA-ZILX-LABEL: lxd_s_2:
+; RV64-ZBA-ZILX:       # %bb.0:
+; RV64-ZBA-ZILX-NEXT:    sh3add a0, a1, a0
+; RV64-ZBA-ZILX-NEXT:    ld a0, 96(a0)
+; RV64-ZBA-ZILX-NEXT:    ret
   %1 = add iXLen %b, 12
   %2 = getelementptr i64, ptr %a, iXLen %1
   %3 = load i64, ptr %2, align 8
@@ -951,6 +1644,20 @@ define i64 @lxd_s_uw(ptr %a, i32 %b) {
 ; RV32-ZILX-NEXT:    lw a1, 4(a1)
 ; RV32-ZILX-NEXT:    ret
 ;
+; RV32-ZBA-LABEL: lxd_s_uw:
+; RV32-ZBA:       # %bb.0:
+; RV32-ZBA-NEXT:    sh3add a1, a1, a0
+; RV32-ZBA-NEXT:    lw a0, 0(a1)
+; RV32-ZBA-NEXT:    lw a1, 4(a1)
+; RV32-ZBA-NEXT:    ret
+;
+; RV32-ZBA-ZILX-LABEL: lxd_s_uw:
+; RV32-ZBA-ZILX:       # %bb.0:
+; RV32-ZBA-ZILX-NEXT:    sh3add a1, a1, a0
+; RV32-ZBA-ZILX-NEXT:    lw a0, 0(a1)
+; RV32-ZBA-ZILX-NEXT:    lw a1, 4(a1)
+; RV32-ZBA-ZILX-NEXT:    ret
+;
 ; RV64-LABEL: lxd_s_uw:
 ; RV64:       # %bb.0:
 ; RV64-NEXT:    slli a1, a1, 32
@@ -963,6 +1670,17 @@ define i64 @lxd_s_uw(ptr %a, i32 %b) {
 ; RV64-ZILX:       # %bb.0:
 ; RV64-ZILX-NEXT:    lxd.s.uw a0, (a0), a1
 ; RV64-ZILX-NEXT:    ret
+;
+; RV64-ZBA-LABEL: lxd_s_uw:
+; RV64-ZBA:       # %bb.0:
+; RV64-ZBA-NEXT:    sh3add.uw a0, a1, a0
+; RV64-ZBA-NEXT:    ld a0, 0(a0)
+; RV64-ZBA-NEXT:    ret
+;
+; RV64-ZBA-ZILX-LABEL: lxd_s_uw:
+; RV64-ZBA-ZILX:       # %bb.0:
+; RV64-ZBA-ZILX-NEXT:    lxd.s.uw a0, (a0), a1
+; RV64-ZBA-ZILX-NEXT:    ret
   %1 = zext i32 %b to i64
   %2 = getelementptr i64, ptr %a, i64 %1
   %3 = load i64, ptr %2, align 8
@@ -993,6 +1711,18 @@ define zeroext i8 @lxbu_shl_too_large(ptr %a, iXLen %b) {
 ; RV32-ZILX-NEXT:    lxbu a0, (a0), a1
 ; RV32-ZILX-NEXT:    ret
 ;
+; RV32-ZBA-LABEL: lxbu_shl_too_large:
+; RV32-ZBA:       # %bb.0:
+; RV32-ZBA-NEXT:    sh2add a0, a1, a0
+; RV32-ZBA-NEXT:    lbu a0, 0(a0)
+; RV32-ZBA-NEXT:    ret
+;
+; RV32-ZBA-ZILX-LABEL: lxbu_shl_too_large:
+; RV32-ZBA-ZILX:       # %bb.0:
+; RV32-ZBA-ZILX-NEXT:    slli a1, a1, 2
+; RV32-ZBA-ZILX-NEXT:    lxbu a0, (a0), a1
+; RV32-ZBA-ZILX-NEXT:    ret
+;
 ; RV64-LABEL: lxbu_shl_too_large:
 ; RV64:       # %bb.0:
 ; RV64-NEXT:    slli a1, a1, 2
@@ -1005,6 +1735,18 @@ define zeroext i8 @lxbu_shl_too_large(ptr %a, iXLen %b) {
 ; RV64-ZILX-NEXT:    slli a1, a1, 2
 ; RV64-ZILX-NEXT:    lxbu a0, (a0), a1
 ; RV64-ZILX-NEXT:    ret
+;
+; RV64-ZBA-LABEL: lxbu_shl_too_large:
+; RV64-ZBA:       # %bb.0:
+; RV64-ZBA-NEXT:    sh2add a0, a1, a0
+; RV64-ZBA-NEXT:    lbu a0, 0(a0)
+; RV64-ZBA-NEXT:    ret
+;
+; RV64-ZBA-ZILX-LABEL: lxbu_shl_too_large:
+; RV64-ZBA-ZILX:       # %bb.0:
+; RV64-ZBA-ZILX-NEXT:    slli a1, a1, 2
+; RV64-ZBA-ZILX-NEXT:    lxbu a0, (a0), a1
+; RV64-ZBA-ZILX-NEXT:    ret
   %1 = getelementptr i32, ptr %a, iXLen %b
   %2 = load i8, ptr %1, align 1
   ret i8 %2
@@ -1025,6 +1767,18 @@ define signext i16 @lxh_s_shl_too_large(ptr %a, iXLen %b) {
 ; RV32-ZILX-NEXT:    lxh a0, (a0), a1
 ; RV32-ZILX-NEXT:    ret
 ;
+; RV32-ZBA-LABEL: lxh_s_shl_too_large:
+; RV32-ZBA:       # %bb.0:
+; RV32-ZBA-NEXT:    sh2add a0, a1, a0
+; RV32-ZBA-NEXT:    lh a0, 0(a0)
+; RV32-ZBA-NEXT:    ret
+;
+; RV32-ZBA-ZILX-LABEL: lxh_s_shl_too_large:
+; RV32-ZBA-ZILX:       # %bb.0:
+; RV32-ZBA-ZILX-NEXT:    slli a1, a1, 2
+; RV32-ZBA-ZILX-NEXT:    lxh a0, (a0), a1
+; RV32-ZBA-ZILX-NEXT:    ret
+;
 ; RV64-LABEL: lxh_s_shl_too_large:
 ; RV64:       # %bb.0:
 ; RV64-NEXT:    slli a1, a1, 2
@@ -1037,6 +1791,18 @@ define signext i16 @lxh_s_shl_too_large(ptr %a, iXLen %b) {
 ; RV64-ZILX-NEXT:    slli a1, a1, 2
 ; RV64-ZILX-NEXT:    lxh a0, (a0), a1
 ; RV64-ZILX-NEXT:    ret
+;
+; RV64-ZBA-LABEL: lxh_s_shl_too_large:
+; RV64-ZBA:       # %bb.0:
+; RV64-ZBA-NEXT:    sh2add a0, a1, a0
+; RV64-ZBA-NEXT:    lh a0, 0(a0)
+; RV64-ZBA-NEXT:    ret
+;
+; RV64-ZBA-ZILX-LABEL: lxh_s_shl_too_large:
+; RV64-ZBA-ZILX:       # %bb.0:
+; RV64-ZBA-ZILX-NEXT:    slli a1, a1, 2
+; RV64-ZBA-ZILX-NEXT:    lxh a0, (a0), a1
+; RV64-ZBA-ZILX-NEXT:    ret
   %1 = getelementptr i32, ptr %a, iXLen %b
   %2 = load i16, ptr %1, align 2
   ret i16 %2
@@ -1057,6 +1823,18 @@ define i32 @lxw_s_shl_too_small(ptr %a, iXLen %b) {
 ; RV32-ZILX-NEXT:    lxw a0, (a0), a1
 ; RV32-ZILX-NEXT:    ret
 ;
+; RV32-ZBA-LABEL: lxw_s_shl_too_small:
+; RV32-ZBA:       # %bb.0:
+; RV32-ZBA-NEXT:    sh1add a0, a1, a0
+; RV32-ZBA-NEXT:    lw a0, 0(a0)
+; RV32-ZBA-NEXT:    ret
+;
+; RV32-ZBA-ZILX-LABEL: lxw_s_shl_too_small:
+; RV32-ZBA-ZILX:       # %bb.0:
+; RV32-ZBA-ZILX-NEXT:    slli a1, a1, 1
+; RV32-ZBA-ZILX-NEXT:    lxw a0, (a0), a1
+; RV32-ZBA-ZILX-NEXT:    ret
+;
 ; RV64-LABEL: lxw_s_shl_too_small:
 ; RV64:       # %bb.0:
 ; RV64-NEXT:    slli a1, a1, 1
@@ -1069,6 +1847,18 @@ define i32 @lxw_s_shl_too_small(ptr %a, iXLen %b) {
 ; RV64-ZILX-NEXT:    slli a1, a1, 1
 ; RV64-ZILX-NEXT:    lxw a0, (a0), a1
 ; RV64-ZILX-NEXT:    ret
+;
+; RV64-ZBA-LABEL: lxw_s_shl_too_small:
+; RV64-ZBA:       # %bb.0:
+; RV64-ZBA-NEXT:    sh1add a0, a1, a0
+; RV64-ZBA-NEXT:    lw a0, 0(a0)
+; RV64-ZBA-NEXT:    ret
+;
+; RV64-ZBA-ZILX-LABEL: lxw_s_shl_too_small:
+; RV64-ZBA-ZILX:       # %bb.0:
+; RV64-ZBA-ZILX-NEXT:    slli a1, a1, 1
+; RV64-ZBA-ZILX-NEXT:    lxw a0, (a0), a1
+; RV64-ZBA-ZILX-NEXT:    ret
   %1 = getelementptr i16, ptr %a, iXLen %b
   %2 = load i32, ptr %1, align 4
   ret i32 %2
@@ -1089,6 +1879,18 @@ define i32 @lxw_s_shl_too_large(ptr %a, iXLen %b) {
 ; RV32-ZILX-NEXT:    lxw a0, (a0), a1
 ; RV32-ZILX-NEXT:    ret
 ;
+; RV32-ZBA-LABEL: lxw_s_shl_too_large:
+; RV32-ZBA:       # %bb.0:
+; RV32-ZBA-NEXT:    sh3add a0, a1, a0
+; RV32-ZBA-NEXT:    lw a0, 0(a0)
+; RV32-ZBA-NEXT:    ret
+;
+; RV32-ZBA-ZILX-LABEL: lxw_s_shl_too_large:
+; RV32-ZBA-ZILX:       # %bb.0:
+; RV32-ZBA-ZILX-NEXT:    slli a1, a1, 3
+; RV32-ZBA-ZILX-NEXT:    lxw a0, (a0), a1
+; RV32-ZBA-ZILX-NEXT:    ret
+;
 ; RV64-LABEL: lxw_s_shl_too_large:
 ; RV64:       # %bb.0:
 ; RV64-NEXT:    slli a1, a1, 3
@@ -1101,6 +1903,18 @@ define i32 @lxw_s_shl_too_large(ptr %a, iXLen %b) {
 ; RV64-ZILX-NEXT:    slli a1, a1, 3
 ; RV64-ZILX-NEXT:    lxw a0, (a0), a1
 ; RV64-ZILX-NEXT:    ret
+;
+; RV64-ZBA-LABEL: lxw_s_shl_too_large:
+; RV64-ZBA:       # %bb.0:
+; RV64-ZBA-NEXT:    sh3add a0, a1, a0
+; RV64-ZBA-NEXT:    lw a0, 0(a0)
+; RV64-ZBA-NEXT:    ret
+;
+; RV64-ZBA-ZILX-LABEL: lxw_s_shl_too_large:
+; RV64-ZBA-ZILX:       # %bb.0:
+; RV64-ZBA-ZILX-NEXT:    slli a1, a1, 3
+; RV64-ZBA-ZILX-NEXT:    lxw a0, (a0), a1
+; RV64-ZBA-ZILX-NEXT:    ret
   %1 = getelementptr i64, ptr %a, iXLen %b
   %2 = load i32, ptr %1, align 4
   ret i32 %2
@@ -1123,6 +1937,20 @@ define i64 @lxd_s_shl_too_small(ptr %a, iXLen %b) {
 ; RV32-ZILX-NEXT:    lxw.s a1, (a2), a1
 ; RV32-ZILX-NEXT:    ret
 ;
+; RV32-ZBA-LABEL: lxd_s_shl_too_small:
+; RV32-ZBA:       # %bb.0:
+; RV32-ZBA-NEXT:    sh2add a1, a1, a0
+; RV32-ZBA-NEXT:    lw a0, 0(a1)
+; RV32-ZBA-NEXT:    lw a1, 4(a1)
+; RV32-ZBA-NEXT:    ret
+;
+; RV32-ZBA-ZILX-LABEL: lxd_s_shl_too_small:
+; RV32-ZBA-ZILX:       # %bb.0:
+; RV32-ZBA-ZILX-NEXT:    sh2add a1, a1, a0
+; RV32-ZBA-ZILX-NEXT:    lw a0, 0(a1)
+; RV32-ZBA-ZILX-NEXT:    lw a1, 4(a1)
+; RV32-ZBA-ZILX-NEXT:    ret
+;
 ; RV64-LABEL: lxd_s_shl_too_small:
 ; RV64:       # %bb.0:
 ; RV64-NEXT:    slli a1, a1, 2
@@ -1135,6 +1963,18 @@ define i64 @lxd_s_shl_too_small(ptr %a, iXLen %b) {
 ; RV64-ZILX-NEXT:    slli a1, a1, 2
 ; RV64-ZILX-NEXT:    lxd a0, (a0), a1
 ; RV64-ZILX-NEXT:    ret
+;
+; RV64-ZBA-LABEL: lxd_s_shl_too_small:
+; RV64-ZBA:       # %bb.0:
+; RV64-ZBA-NEXT:    sh2add a0, a1, a0
+; RV64-ZBA-NEXT:    ld a0, 0(a0)
+; RV64-ZBA-NEXT:    ret
+;
+; RV64-ZBA-ZILX-LABEL: lxd_s_shl_too_small:
+; RV64-ZBA-ZILX:       # %bb.0:
+; RV64-ZBA-ZILX-NEXT:    slli a1, a1, 2
+; RV64-ZBA-ZILX-NEXT:    lxd a0, (a0), a1
+; RV64-ZBA-ZILX-NEXT:    ret
   %1 = getelementptr i32, ptr %a, iXLen %b
   %2 = load i64, ptr %1, align 8
   ret i64 %2
@@ -1156,6 +1996,18 @@ define signext i16 @lxh_s_uw_shl_too_large(ptr %a, i32 %b) {
 ; RV32-ZILX-NEXT:    lxh a0, (a0), a1
 ; RV32-ZILX-NEXT:    ret
 ;
+; RV32-ZBA-LABEL: lxh_s_uw_shl_too_large:
+; RV32-ZBA:       # %bb.0:
+; RV32-ZBA-NEXT:    sh2add a0, a1, a0
+; RV32-ZBA-NEXT:    lh a0, 0(a0)
+; RV32-ZBA-NEXT:    ret
+;
+; RV32-ZBA-ZILX-LABEL: lxh_s_uw_shl_too_large:
+; RV32-ZBA-ZILX:       # %bb.0:
+; RV32-ZBA-ZILX-NEXT:    slli a1, a1, 2
+; RV32-ZBA-ZILX-NEXT:    lxh a0, (a0), a1
+; RV32-ZBA-ZILX-NEXT:    ret
+;
 ; RV64-LABEL: lxh_s_uw_shl_too_large:
 ; RV64:       # %bb.0:
 ; RV64-NEXT:    slli a1, a1, 32
@@ -1170,6 +2022,18 @@ define signext i16 @lxh_s_uw_shl_too_large(ptr %a, i32 %b) {
 ; RV64-ZILX-NEXT:    srli a1, a1, 30
 ; RV64-ZILX-NEXT:    lxh a0, (a0), a1
 ; RV64-ZILX-NEXT:    ret
+;
+; RV64-ZBA-LABEL: lxh_s_uw_shl_too_large:
+; RV64-ZBA:       # %bb.0:
+; RV64-ZBA-NEXT:    sh2add.uw a0, a1, a0
+; RV64-ZBA-NEXT:    lh a0, 0(a0)
+; RV64-ZBA-NEXT:    ret
+;
+; RV64-ZBA-ZILX-LABEL: lxh_s_uw_shl_too_large:
+; RV64-ZBA-ZILX:       # %bb.0:
+; RV64-ZBA-ZILX-NEXT:    slli.uw a1, a1, 2
+; RV64-ZBA-ZILX-NEXT:    lxh a0, (a0), a1
+; RV64-ZBA-ZILX-NEXT:    ret
   %1 = zext i32 %b to i64
   %2 = getelementptr i32, ptr %a, i64 %1
   %3 = load i16, ptr %2, align 2
@@ -1192,6 +2056,18 @@ define i32 @lxw_s_uw_shl_too_small(ptr %a, i32 %b) {
 ; RV32-ZILX-NEXT:    lxw a0, (a0), a1
 ; RV32-ZILX-NEXT:    ret
 ;
+; RV32-ZBA-LABEL: lxw_s_uw_shl_too_small:
+; RV32-ZBA:       # %bb.0:
+; RV32-ZBA-NEXT:    sh1add a0, a1, a0
+; RV32-ZBA-NEXT:    lw a0, 0(a0)
+; RV32-ZBA-NEXT:    ret
+;
+; RV32-ZBA-ZILX-LABEL: lxw_s_uw_shl_too_small:
+; RV32-ZBA-ZILX:       # %bb.0:
+; RV32-ZBA-ZILX-NEXT:    slli a1, a1, 1
+; RV32-ZBA-ZILX-NEXT:    lxw a0, (a0), a1
+; RV32-ZBA-ZILX-NEXT:    ret
+;
 ; RV64-LABEL: lxw_s_uw_shl_too_small:
 ; RV64:       # %bb.0:
 ; RV64-NEXT:    slli a1, a1, 32
@@ -1206,6 +2082,18 @@ define i32 @lxw_s_uw_shl_too_small(ptr %a, i32 %b) {
 ; RV64-ZILX-NEXT:    srli a1, a1, 31
 ; RV64-ZILX-NEXT:    lxw a0, (a0), a1
 ; RV64-ZILX-NEXT:    ret
+;
+; RV64-ZBA-LABEL: lxw_s_uw_shl_too_small:
+; RV64-ZBA:       # %bb.0:
+; RV64-ZBA-NEXT:    sh1add.uw a0, a1, a0
+; RV64-ZBA-NEXT:    lw a0, 0(a0)
+; RV64-ZBA-NEXT:    ret
+;
+; RV64-ZBA-ZILX-LABEL: lxw_s_uw_shl_too_small:
+; RV64-ZBA-ZILX:       # %bb.0:
+; RV64-ZBA-ZILX-NEXT:    slli.uw a1, a1, 1
+; RV64-ZBA-ZILX-NEXT:    lxw a0, (a0), a1
+; RV64-ZBA-ZILX-NEXT:    ret
   %1 = zext i32 %b to i64
   %2 = getelementptr i16, ptr %a, i64 %1
   %3 = load i32, ptr %2, align 4
@@ -1228,6 +2116,18 @@ define i32 @lxw_s_uw_shl_too_large(ptr %a, i32 %b) {
 ; RV32-ZILX-NEXT:    lxw a0, (a0), a1
 ; RV32-ZILX-NEXT:    ret
 ;
+; RV32-ZBA-LABEL: lxw_s_uw_shl_too_large:
+; RV32-ZBA:       # %bb.0:
+; RV32-ZBA-NEXT:    sh3add a0, a1, a0
+; RV32-ZBA-NEXT:    lw a0, 0(a0)
+; RV32-ZBA-NEXT:    ret
+;
+; RV32-ZBA-ZILX-LABEL: lxw_s_uw_shl_too_large:
+; RV32-ZBA-ZILX:       # %bb.0:
+; RV32-ZBA-ZILX-NEXT:    slli a1, a1, 3
+; RV32-ZBA-ZILX-NEXT:    lxw a0, (a0), a1
+; RV32-ZBA-ZILX-NEXT:    ret
+;
 ; RV64-LABEL: lxw_s_uw_shl_too_large:
 ; RV64:       # %bb.0:
 ; RV64-NEXT:    slli a1, a1, 32
@@ -1242,6 +2142,18 @@ define i32 @lxw_s_uw_shl_too_large(ptr %a, i32 %b) {
 ; RV64-ZILX-NEXT:    srli a1, a1, 29
 ; RV64-ZILX-NEXT:    lxw a0, (a0), a1
 ; RV64-ZILX-NEXT:    ret
+;
+; RV64-ZBA-LABEL: lxw_s_uw_shl_too_large:
+; RV64-ZBA:       # %bb.0:
+; RV64-ZBA-NEXT:    sh3add.uw a0, a1, a0
+; RV64-ZBA-NEXT:    lw a0, 0(a0)
+; RV64-ZBA-NEXT:    ret
+;
+; RV64-ZBA-ZILX-LABEL: lxw_s_uw_shl_too_large:
+; RV64-ZBA-ZILX:       # %bb.0:
+; RV64-ZBA-ZILX-NEXT:    slli.uw a1, a1, 3
+; RV64-ZBA-ZILX-NEXT:    lxw a0, (a0), a1
+; RV64-ZBA-ZILX-NEXT:    ret
   %1 = zext i32 %b to i64
   %2 = getelementptr i64, ptr %a, i64 %1
   %3 = load i32, ptr %2, align 4
