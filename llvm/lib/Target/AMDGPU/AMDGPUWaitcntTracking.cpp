@@ -460,7 +460,7 @@ void WaitcntBrackets::print(raw_ostream &OS) const {
           continue;
         unsigned RelScore = RegScore - LB - 1;
         if (ID < REGUNITS_END) {
-          OS << ' ' << RelScore << ":vRU"
+          OS << ' ' << RelScore << ":"
              << printRegUnit(static_cast<MCRegUnit>(ID), &TRI);
         } else {
           assert(ID >= LDSDMA_BEGIN && ID < LDSDMA_END &&
@@ -478,7 +478,7 @@ void WaitcntBrackets::print(raw_ostream &OS) const {
           if (RegScore <= LB)
             continue;
           unsigned RelScore = RegScore - LB - 1;
-          OS << ' ' << RelScore << ":sRU"
+          OS << ' ' << RelScore << ":"
              << printRegUnit(static_cast<MCRegUnit>(ID), &TRI);
         }
       }
