@@ -456,7 +456,7 @@ Symbol *Symbol::ResolveReExportedSymbolInModuleSpec(
     module_sp->FindSymbolsWithNameAndType(reexport_name, eSymbolTypeAny,
                                           sc_list);
     for (const SymbolContext &sc : sc_list) {
-      if (!sc.symbol->IsExternal())
+      if (!sc.symbol->IsExternal() && !sc.symbol->IsWeak())
         continue;
       // Don't return a symbol that itself only re-exports the definition
       // (e.g. an ELF filter library's placeholder): the real definition is

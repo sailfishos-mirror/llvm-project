@@ -2678,15 +2678,6 @@ ObjectFileELF::ParseSymbols(Symtab *symtab, user_id_t start_id,
         flags);                         // Symbol flags.
     if (symbol.getBinding() == STB_WEAK)
       dc_symbol.SetIsWeak(true);
-    // Note: symbols in a filter library (DT_FILTER / DT_AUXILIARY) are *not*
-    // marked eSymbolTypeReExported here even though the dynamic linker
-    // resolves them through the filtees: that marking reuses the symbol's
-    // address range as string-pointer storage and requires the symbol to
-    // have no section (see Symbol::SetReExportedSymbolName), which would
-    // corrupt the file-address lookup indexes with pointer values. Filtee
-    // shadowing instead happens at resolution time in
-    // Symbol::ResolveReExportedSymbol via GetReExportedLibraries() and
-    // ReExportedLibrariesShadowLocalDefinitions().
     symtab->AddSymbol(dc_symbol);
   }
 
