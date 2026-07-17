@@ -20,10 +20,9 @@ body: |
     ; CHECK-NEXT: [[COPY3:%[0-9]+]]:sgpr(s32) = COPY $sgpr3
     ; CHECK-NEXT: [[COPY4:%[0-9]+]]:vgpr(s32) = COPY [[COPY3]](s32)
     ; CHECK-NEXT: [[FCANONICALIZE:%[0-9]+]]:vgpr(s32) = G_FCANONICALIZE [[COPY4]]
-    ; CHECK-NEXT: [[AMDGPU_READANYLANE:%[0-9]+]]:sgpr(s32) = G_AMDGPU_READANYLANE [[FCANONICALIZE]]
-    ; CHECK-NEXT: [[BUILD_VECTOR:%[0-9]+]]:sgpr(<2 x s32>) = G_BUILD_VECTOR [[COPY2]](s32), [[AMDGPU_READANYLANE]](s32)
-    ; CHECK-NEXT: [[COPY5:%[0-9]+]]:vgpr(<2 x s32>) = COPY [[BUILD_VECTOR]](<2 x s32>)
-    ; CHECK-NEXT: G_STORE [[COPY5]](<2 x s32>), [[MV]](p1) :: (store (<2 x s32>), addrspace 1)
+    ; CHECK-NEXT: [[COPY5:%[0-9]+]]:vgpr(s32) = COPY [[COPY2]](s32)
+    ; CHECK-NEXT: [[BUILD_VECTOR:%[0-9]+]]:vgpr(<2 x s32>) = G_BUILD_VECTOR [[COPY5]](s32), [[FCANONICALIZE]](s32)
+    ; CHECK-NEXT: G_STORE [[BUILD_VECTOR]](<2 x s32>), [[MV]](p1) :: (store (<2 x s32>), addrspace 1)
     ; CHECK-NEXT: S_ENDPGM 0
     %0:sgpr(s32) = COPY $sgpr0
     %1:sgpr(s32) = COPY $sgpr1
@@ -58,9 +57,10 @@ body: |
     ; CHECK-NEXT: [[COPY2:%[0-9]+]]:vgpr(s32) = COPY $vgpr0
     ; CHECK-NEXT: [[AMDGPU_READANYLANE:%[0-9]+]]:sgpr(s32) = G_AMDGPU_READANYLANE [[COPY2]]
     ; CHECK-NEXT: [[MV1:%[0-9]+]]:sgpr(s64) = G_MERGE_VALUES [[COPY]](s32), [[AMDGPU_READANYLANE]](s32)
-    ; CHECK-NEXT: [[COPY3:%[0-9]+]]:vgpr(s64) = COPY [[MV1]](s64)
+    ; CHECK-NEXT: [[COPY3:%[0-9]+]]:vgpr(s32) = COPY [[COPY]](s32)
+    ; CHECK-NEXT: [[MV2:%[0-9]+]]:vgpr(s64) = G_MERGE_VALUES [[COPY3]](s32), [[COPY2]](s32)
     ; CHECK-NEXT: G_STORE [[MV1]](s64), [[MV]](p1) :: (store (s64), addrspace 1)
-    ; CHECK-NEXT: G_STORE [[COPY3]](s64), [[MV]](p1) :: (store (s64), addrspace 1)
+    ; CHECK-NEXT: G_STORE [[MV2]](s64), [[MV]](p1) :: (store (s64), addrspace 1)
     ; CHECK-NEXT: S_ENDPGM 0
     %0:sgpr(s32) = COPY $sgpr0
     %1:sgpr(s32) = COPY $sgpr1

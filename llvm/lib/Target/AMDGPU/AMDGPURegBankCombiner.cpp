@@ -12,6 +12,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "AMDGPU.h"
+#include "AMDGPUGlobalISelUtils.h"
 #include "AMDGPULegalizerInfo.h"
 #include "AMDGPURegisterBankInfo.h"
 #include "GCNSubtarget.h"
@@ -22,7 +23,9 @@
 #include "llvm/CodeGen/GlobalISel/CombinerInfo.h"
 #include "llvm/CodeGen/GlobalISel/GIMatchTableExecutorImpl.h"
 #include "llvm/CodeGen/GlobalISel/GISelValueTracking.h"
+#include "llvm/CodeGen/GlobalISel/GenericMachineInstrs.h"
 #include "llvm/CodeGen/GlobalISel/MIPatternMatch.h"
+#include "llvm/CodeGen/GlobalISel/Utils.h"
 #include "llvm/CodeGen/MachineDominators.h"
 #include "llvm/CodeGen/TargetPassConfig.h"
 #include "llvm/Target/TargetMachine.h"
@@ -63,6 +66,7 @@ public:
   bool tryCombineAll(MachineInstr &I) const override;
 
   bool isVgprRegBank(Register Reg) const;
+  bool isSgprRegBank(Register Reg) const;
   Register getAsVgpr(Register Reg) const;
 
   struct MinMaxMedOpc {
@@ -103,6 +107,11 @@ public:
   void applyMinMaxToMinMax3(MachineInstr &MI,
                             MinMaxToMinMax3MatchInfo &MatchInfo) const;
 
+  bool matchMergeReadAnyLaneToVgpr(MachineInstr &Copy,
+                                   SmallVector<Register> &Srcs) const;
+  void applyMergeReadAnyLaneToVgpr(MachineInstr &Copy,
+                                   SmallVectorImpl<Register> &Srcs) const;
+
 private:
   SIModeRegisterDefaults getMode() const;
   bool getIEEE() const;
@@ -140,7 +149,12 @@ AMDGPURegBankCombinerImpl::AMDGPURegBankCombinerImpl(
 }
 
 bool AMDGPURegBankCombinerImpl::isVgprRegBank(Register Reg) const {
-  return RBI.getRegBank(Reg, MRI, TRI)->getID() == AMDGPU::VGPRRegBankID;
+  const RegisterBank *RB = RBI.getRegBank(Reg, MRI, TRI);
+  return RB && RB->getID() == AMDGPU::VGPRRegBankID;
+}
+
+bool AMDGPURegBankCombinerImpl::isSgprRegBank(Register Reg) const {
+  return MRI.getRegBankOrNull(Reg) == &RBI.getRegBank(AMDGPU::SGPRRegBankID);
 }
 
 Register AMDGPURegBankCombinerImpl::getAsVgpr(Register Reg) const {
@@ -573,6 +587,73 @@ bool AMDGPURegBankCombinerImpl::matchMinMaxToMinMax3(
 
   MatchInfo = {AMDGPUOpc, R0, R1, R2};
   return true;
+}
+
+// Sgpr0 = G_AMDGPU_READANYLANE Vgpr0
+// Src = G_MERGE_LIKE Sgpr0, Sgpr1, ...
+// Dst = COPY Src
+// ->
+// Vgpr1 = COPY Sgpr1
+// Dst = G_MERGE_LIKE Vgpr0, Vgpr1, ...
+//
+// Merge sources that are not readanylanes have to be uniform, copying them to a
+// vgpr is a broadcast. Requires at least one readanylane source, otherwise this
+// would only move the copy from the merge result to its sources.
+bool AMDGPURegBankCombinerImpl::matchMergeReadAnyLaneToVgpr(
+    MachineInstr &Copy, SmallVector<Register> &Srcs) const {
+  Register Dst = Copy.getOperand(0).getReg();
+  Register Src = Copy.getOperand(1).getReg();
+
+  if (!isVgprRegBank(Dst))
+    return false;
+
+  // Skip physical source registers and source registers with register class.
+  if (!Src.isVirtual() || MRI.getRegClassOrNull(Src))
+    return false;
+
+  auto *Merge = getOpcodeDef<GMergeLikeInstr>(Src, MRI);
+  if (!Merge)
+    return false;
+
+  bool HasReadAnyLaneSrc = false;
+  for (unsigned I = 0; I < Merge->getNumSources(); ++I) {
+    Register MergeSrc = Merge->getSourceReg(I);
+
+    Register RALSrc;
+    if (mi_match(MergeSrc, MRI, AMDGPU::m_GAMDGPUReadAnyLane(m_Reg(RALSrc)))) {
+      Srcs.push_back(RALSrc);
+      HasReadAnyLaneSrc = true;
+      continue;
+    }
+
+    if (isSgprRegBank(MergeSrc)) {
+      Srcs.push_back(MergeSrc);
+      continue;
+    }
+
+    return false;
+  }
+
+  return HasReadAnyLaneSrc;
+}
+
+void AMDGPURegBankCombinerImpl::applyMergeReadAnyLaneToVgpr(
+    MachineInstr &Copy, SmallVectorImpl<Register> &Srcs) const {
+  const RegisterBank &VgprRB = RBI.getRegBank(AMDGPU::VGPRRegBankID);
+  SmallVector<Register, 4> VgprSrcs;
+  for (Register Src : Srcs) {
+    if (isVgprRegBank(Src)) {
+      VgprSrcs.push_back(Src);
+      continue;
+    }
+
+    auto VgprCopy = B.buildCopy({&VgprRB, MRI.getType(Src)}, Src);
+    VgprSrcs.push_back(VgprCopy.getReg(0));
+  }
+
+  Register Dst = Copy.getOperand(0).getReg();
+  B.buildMergeLikeInstr(Dst, VgprSrcs);
+  Copy.eraseFromParent();
 }
 
 bool AMDGPURegBankCombinerImpl::applyD16Load(
