@@ -1821,9 +1821,7 @@ class BuildLockset : public ConstStmtVisitor<BuildLockset> {
 
   // To update the context used in attr-expr translation.  If `S` is non-null,
   // the context is updated to the program point right after 'S'.
-  void updateLocalVarMapCtx(const Stmt *S) {
-      LVarCtx.moveToNextContext(S);
-  }
+  void updateLocalVarMapCtx(const Stmt *S) { LVarCtx.moveToNextContext(S); }
 
   // helper functions
 
