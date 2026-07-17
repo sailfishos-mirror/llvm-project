@@ -7,6 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "WebAssembly.h"
+#include "WebAssemblyExceptionInfo.h"
 #include "WebAssemblyTargetMachine.h"
 #include "llvm/CodeGen/AtomicExpand.h"
 #include "llvm/CodeGen/IndirectBrExpand.h"
@@ -183,22 +184,21 @@ void WebAssemblyCodeGenPassBuilder::addPreEmitPass(
 
   // Do various transformations for exception handling.
   // Every CFG-changing optimizations should come before this.
-  if (TM.Options.ExceptionModel == ExceptionHandling::Wasm) {
-    // TODO(boomanaiden154): WebAssemblyLateEHPrepare
-  }
+  if (TM.Options.ExceptionModel == ExceptionHandling::Wasm)
+    addMachineFunctionPass(WebAssemblyLateEHPreparePass(), PMW);
 
   // Now that we have a prologue and epilogue and all frame indices are
   // rewritten, eliminate SP and FP. This allows them to be stackified,
   // colored, and numbered with the rest of the registers.
-  // TODO(boomanaiden154): WebAssemblyReplacePhysRegs
+  addMachineFunctionPass(WebAssemblyReplacePhysRegsPass(), PMW);
 
   // Preparations and optimizations related to register stackification.
   if (getOptLevel() != CodeGenOptLevel::None) {
     // Depend on LiveIntervals and perform some optimizations on it.
-    // TODO(boomanaiden154): WebAssemblyOptimizeLiveIntervals
+    addMachineFunctionPass(WebAssemblyOptimizeLiveIntervalsPass(), PMW);
 
     // Prepare memory intrinsic calls for register stackifying.
-    // TODO(boomanaiden154): WebAssemblyMemIntrinsicResults
+    addMachineFunctionPass(WebAssemblyMemIntrinsicResultsPass(), PMW);
   }
 
   // Mark registers as representing wasm's value stack. This is a key
@@ -206,18 +206,18 @@ void WebAssemblyCodeGenPassBuilder::addPreEmitPass(
   // MemIntrinsicResults above) very late, so that it sees as much code as
   // possible, including code emitted by PEI and expanded by late tail
   // duplication.
-  // TODO(boomanaiden154): WebAssemblyRegStackify
+  addMachineFunctionPass(WebAssemblyRegStackifyPass(getOptLevel()), PMW);
 
   if (getOptLevel() != CodeGenOptLevel::None) {
     // Run the register coloring pass to reduce the total number of registers.
     // This runs after stackification so that it doesn't consider registers
     // that become stackified.
-    // TODO(boomanaiden154): WebAssemblyRegColoring
+    addMachineFunctionPass(WebAssemblyRegColoringPass(), PMW);
   }
 
   // Sort the blocks of the CFG into topological order, a prerequisite for
   // BLOCK and LOOP markers.
-  // TODO(boomanaiden154): WebAssemblyCFGSort
+  addMachineFunctionPass(WebAssemblyCFGSortPass(), PMW);
 
   // Insert BLOCK and LOOP markers.
   // TODO(boomanaiden154): WebAssemblyCFGStackify
