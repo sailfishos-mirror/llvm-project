@@ -152,7 +152,14 @@ public:
 FunctionPass *createWebAssemblyCleanCodeAfterTrapLegacyPass();
 
 // Late passes.
-FunctionPass *createWebAssemblyReplacePhysRegs();
+class WebAssemblyReplacePhysRegsPass
+    : public RequiredPassInfoMixin<WebAssemblyReplacePhysRegsPass> {
+public:
+  PreservedAnalyses run(MachineFunction &MF,
+                        MachineFunctionAnalysisManager &MFAM);
+};
+
+FunctionPass *createWebAssemblyReplacePhysRegsLegacyPass();
 
 class WebAssemblyNullifyDebugValueListsPass
     : public RequiredPassInfoMixin<WebAssemblyNullifyDebugValueListsPass> {
@@ -162,9 +169,38 @@ public:
 };
 
 FunctionPass *createWebAssemblyNullifyDebugValueListsLegacyPass();
-FunctionPass *createWebAssemblyOptimizeLiveIntervals();
-FunctionPass *createWebAssemblyMemIntrinsicResults();
-FunctionPass *createWebAssemblyRegStackify(CodeGenOptLevel OptLevel);
+
+class WebAssemblyOptimizeLiveIntervalsPass
+    : public RequiredPassInfoMixin<WebAssemblyOptimizeLiveIntervalsPass> {
+public:
+  PreservedAnalyses run(MachineFunction &MF,
+                        MachineFunctionAnalysisManager &MFAM);
+};
+
+FunctionPass *createWebAssemblyOptimizeLiveIntervalsLegacyPass();
+
+class WebAssemblyMemIntrinsicResultsPass
+    : public RequiredPassInfoMixin<WebAssemblyMemIntrinsicResultsPass> {
+public:
+  PreservedAnalyses run(MachineFunction &MF,
+                        MachineFunctionAnalysisManager &MFAM);
+};
+
+FunctionPass *createWebAssemblyMemIntrinsicResultsLegacyPass();
+
+class WebAssemblyRegStackifyPass
+    : public RequiredPassInfoMixin<WebAssemblyRegStackifyPass> {
+private:
+  bool Optimize = false;
+
+public:
+  WebAssemblyRegStackifyPass(CodeGenOptLevel OptLevel)
+      : Optimize(OptLevel != CodeGenOptLevel::None) {}
+  PreservedAnalyses run(MachineFunction &MF,
+                        MachineFunctionAnalysisManager &MFAM);
+};
+
+FunctionPass *createWebAssemblyRegStackifyLegacyPass(CodeGenOptLevel OptLevel);
 FunctionPass *createWebAssemblyRegColoring();
 
 class WebAssemblyFixBrTableDefaultsPass
@@ -184,7 +220,15 @@ public:
 };
 
 FunctionPass *createWebAssemblyFixIrreducibleControlFlowLegacyPass();
-FunctionPass *createWebAssemblyLateEHPrepare();
+
+class WebAssemblyLateEHPreparePass
+    : public RequiredPassInfoMixin<WebAssemblyLateEHPreparePass> {
+public:
+  PreservedAnalyses run(MachineFunction &MF,
+                        MachineFunctionAnalysisManager &MFAM);
+};
+
+FunctionPass *createWebAssemblyLateEHPrepareLegacyPass();
 FunctionPass *createWebAssemblyCFGSort();
 FunctionPass *createWebAssemblyCFGStackify();
 FunctionPass *createWebAssemblyExplicitLocals();
@@ -211,18 +255,18 @@ void initializeWebAssemblyExplicitLocalsPass(PassRegistry &);
 void initializeWebAssemblyFixBrTableDefaultsLegacyPass(PassRegistry &);
 void initializeWebAssemblyFixFunctionBitcastsLegacyPass(PassRegistry &);
 void initializeWebAssemblyFixIrreducibleControlFlowLegacyPass(PassRegistry &);
-void initializeWebAssemblyLateEHPreparePass(PassRegistry &);
+void initializeWebAssemblyLateEHPrepareLegacyPass(PassRegistry &);
 void initializeWebAssemblyLowerBrUnlessPass(PassRegistry &);
 void initializeWebAssemblyLowerEmscriptenEHSjLjLegacyPass(PassRegistry &);
 void initializeWebAssemblyMCLowerPrePassPass(PassRegistry &);
-void initializeWebAssemblyMemIntrinsicResultsPass(PassRegistry &);
+void initializeWebAssemblyMemIntrinsicResultsLegacyPass(PassRegistry &);
 void initializeWebAssemblyNullifyDebugValueListsLegacyPass(PassRegistry &);
-void initializeWebAssemblyOptimizeLiveIntervalsPass(PassRegistry &);
+void initializeWebAssemblyOptimizeLiveIntervalsLegacyPass(PassRegistry &);
 void initializeWebAssemblyPeepholePass(PassRegistry &);
 void initializeWebAssemblyRegColoringPass(PassRegistry &);
 void initializeWebAssemblyRegNumberingPass(PassRegistry &);
-void initializeWebAssemblyRegStackifyPass(PassRegistry &);
-void initializeWebAssemblyReplacePhysRegsPass(PassRegistry &);
+void initializeWebAssemblyRegStackifyLegacyPass(PassRegistry &);
+void initializeWebAssemblyReplacePhysRegsLegacyPass(PassRegistry &);
 void initializeWebAssemblySetP2AlignOperandsLegacyPass(PassRegistry &);
 void initializeWebAssemblyCoalesceFeaturesAndStripAtomicsLegacyPass(
     PassRegistry &);

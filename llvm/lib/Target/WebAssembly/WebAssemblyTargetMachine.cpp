@@ -102,14 +102,14 @@ LLVMInitializeWebAssemblyTarget() {
   initializeWebAssemblyArgumentMoveLegacyPass(PR);
   initializeWebAssemblyAsmPrinterPass(PR);
   initializeWebAssemblySetP2AlignOperandsLegacyPass(PR);
-  initializeWebAssemblyReplacePhysRegsPass(PR);
-  initializeWebAssemblyOptimizeLiveIntervalsPass(PR);
-  initializeWebAssemblyMemIntrinsicResultsPass(PR);
-  initializeWebAssemblyRegStackifyPass(PR);
+  initializeWebAssemblyReplacePhysRegsLegacyPass(PR);
+  initializeWebAssemblyOptimizeLiveIntervalsLegacyPass(PR);
+  initializeWebAssemblyMemIntrinsicResultsLegacyPass(PR);
+  initializeWebAssemblyRegStackifyLegacyPass(PR);
   initializeWebAssemblyRegColoringPass(PR);
   initializeWebAssemblyNullifyDebugValueListsLegacyPass(PR);
   initializeWebAssemblyFixIrreducibleControlFlowLegacyPass(PR);
-  initializeWebAssemblyLateEHPreparePass(PR);
+  initializeWebAssemblyLateEHPrepareLegacyPass(PR);
   initializeWebAssemblyExceptionInfoPass(PR);
   initializeWebAssemblyCFGSortPass(PR);
   initializeWebAssemblyCFGStackifyPass(PR);
@@ -451,20 +451,20 @@ void WebAssemblyPassConfig::addPreEmitPass() {
   // Do various transformations for exception handling.
   // Every CFG-changing optimizations should come before this.
   if (TM->Options.ExceptionModel == ExceptionHandling::Wasm)
-    addPass(createWebAssemblyLateEHPrepare());
+    addPass(createWebAssemblyLateEHPrepareLegacyPass());
 
   // Now that we have a prologue and epilogue and all frame indices are
   // rewritten, eliminate SP and FP. This allows them to be stackified,
   // colored, and numbered with the rest of the registers.
-  addPass(createWebAssemblyReplacePhysRegs());
+  addPass(createWebAssemblyReplacePhysRegsLegacyPass());
 
   // Preparations and optimizations related to register stackification.
   if (getOptLevel() != CodeGenOptLevel::None) {
     // Depend on LiveIntervals and perform some optimizations on it.
-    addPass(createWebAssemblyOptimizeLiveIntervals());
+    addPass(createWebAssemblyOptimizeLiveIntervalsLegacyPass());
 
     // Prepare memory intrinsic calls for register stackifying.
-    addPass(createWebAssemblyMemIntrinsicResults());
+    addPass(createWebAssemblyMemIntrinsicResultsLegacyPass());
   }
 
   // Mark registers as representing wasm's value stack. This is a key
@@ -472,7 +472,7 @@ void WebAssemblyPassConfig::addPreEmitPass() {
   // MemIntrinsicResults above) very late, so that it sees as much code as
   // possible, including code emitted by PEI and expanded by late tail
   // duplication.
-  addPass(createWebAssemblyRegStackify(getOptLevel()));
+  addPass(createWebAssemblyRegStackifyLegacyPass(getOptLevel()));
 
   if (getOptLevel() != CodeGenOptLevel::None) {
     // Run the register coloring pass to reduce the total number of registers.
