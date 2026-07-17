@@ -5806,23 +5806,30 @@ void VPlanTransforms::expandSCEVsToVPInstructions(VPlan &Plan,
                     ->getDebugLoc();
   VPSCEVExpander Expander(Builder, SE, DL);
 
-  // Expand VPExpandSCEVRecipes to VPInstructions using VPSCEVExpander. During
-  // the transition, unsupported VPExpandSCEVRecipes are skipped and left for
-  // late expansion.
+  // Expand VPExpandSCEVRecipes and VPExpandStridePredicatesRecipes to
+  // VPInstructions using VPSCEVExpander. During the transition, unsupported
+  // recipes are skipped and left for late expansion.
   for (VPRecipeBase &R : make_early_inc_range(*Entry)) {
-    auto *ExpSCEV = dyn_cast<VPExpandSCEVRecipe>(&R);
-    if (!ExpSCEV || ExpSCEV->user_empty())
+    auto *Def = dyn_cast<VPSingleDefRecipe>(&R);
+    if (!Def || Def->user_empty())
       continue;
-    Builder.setInsertPoint(ExpSCEV);
-    VPValue *Expanded = Expander.tryToExpand(ExpSCEV->getSCEV());
+
+    auto *ExpStrides = dyn_cast<VPExpandStridePredicatesRecipe>(Def);
+    auto *ExpSCEV = dyn_cast<VPExpandSCEVRecipe>(Def);
+    if (!ExpStrides && !ExpSCEV)
+      continue;
+    Builder.setInsertPoint(Def);
+    VPValue *Expanded =
+        ExpSCEV ? Expander.tryToExpand(ExpSCEV->getSCEV())
+                : Expander.tryToExpandPredicate(ExpStrides->getSCEVPredicate());
     if (!Expanded)
       continue;
-    ExpSCEV->replaceAllUsesWith(Expanded);
+    Def->replaceAllUsesWith(Expanded);
     // TripCount should not be used after expansion to VPInstructions. Reset to
     // poison to avoid dangling references.
-    if (Plan.getTripCount() == ExpSCEV)
-      Plan.resetTripCount(Plan.getPoison(ExpSCEV->getScalarType()));
-    ExpSCEV->eraseFromParent();
+    if (Plan.getTripCount() == Def)
+      Plan.resetTripCount(Plan.getPoison(Def->getScalarType()));
+    Def->eraseFromParent();
   }
 }
 
@@ -5835,17 +5842,6 @@ VPlanTransforms::expandSCEVs(VPlan &Plan, ScalarEvolution &SE) {
   DenseMap<const SCEV *, Value *> ExpandedSCEVs;
   // Expand remaining VPExpandSCEVRecipes to IR instructions using SCEVExpander.
   for (VPRecipeBase &R : make_early_inc_range(*Entry)) {
-    if (auto *ExpStrides = dyn_cast<VPExpandStridePredicatesRecipe>(&R)) {
-      Value *Res = Expander.expandCodeForPredicate(
-          ExpStrides->getSCEVPredicate(), EntryBB->getTerminator());
-      Res->setName("strides.mv.check");
-      VPValue *Exp = Plan.getOrAddLiveIn(Res);
-
-      ExpStrides->replaceAllUsesWith(Exp);
-      ExpStrides->eraseFromParent();
-      continue;
-    }
-
     auto *ExpSCEV = dyn_cast<VPExpandSCEVRecipe>(&R);
     if (!ExpSCEV)
       continue;
@@ -5859,6 +5855,8 @@ VPlanTransforms::expandSCEVs(VPlan &Plan, ScalarEvolution &SE) {
       Plan.resetTripCount(Exp);
     ExpSCEV->eraseFromParent();
   }
+  // NOTE: All current uses of VPExpandStridePredicatesRecipe are expected to be
+  // expandable via VPSCEVExpander, thus no handling here.
   assert(none_of(*Entry,
                  IsaPred<VPExpandSCEVRecipe, VPExpandStridePredicatesRecipe>) &&
          "all VPExpandSCEVRecipes/VPExpandStridePredicatesRecipe must have "

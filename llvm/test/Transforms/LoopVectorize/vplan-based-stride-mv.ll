@@ -2280,8 +2280,8 @@ define void @non_constant_btc(ptr noalias %p.out, ptr %p, i64 %stride, i64 %n) {
 ; COMPARE-NO-MV-LABEL: define void @non_constant_btc(
 ; COMPARE-NO-MV-SAME: ptr noalias [[P_OUT:%.*]], ptr [[P:%.*]], i64 [[STRIDE:%.*]], i64 [[N:%.*]]) {
 ; COMPARE-NO-MV-NEXT:  [[ENTRY:.*]]:
-; COMPARE-NO-MV-NEXT:    [[STRIDES_MV_CHECK:%.*]] = icmp ne i64 [[STRIDE]], 1
 ; COMPARE-NO-MV-NEXT:    [[SMAX:%.*]] = call i64 @llvm.smax.i64(i64 [[N]], i64 1)
+; COMPARE-NO-MV-NEXT:    [[STRIDES_MV_CHECK:%.*]] = icmp ne i64 [[STRIDE]], 1
 ; COMPARE-NO-MV-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[SMAX]], 4
 ; COMPARE-NO-MV-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
 ; COMPARE-NO-MV:       [[VECTOR_PH]]:
@@ -2321,8 +2321,8 @@ define void @non_constant_btc(ptr noalias %p.out, ptr %p, i64 %stride, i64 %n) {
 ; COMPARE-LAA-MV-LABEL: define void @non_constant_btc(
 ; COMPARE-LAA-MV-SAME: ptr noalias [[P_OUT:%.*]], ptr [[P:%.*]], i64 [[STRIDE:%.*]], i64 [[N:%.*]]) {
 ; COMPARE-LAA-MV-NEXT:  [[ENTRY:.*]]:
-; COMPARE-LAA-MV-NEXT:    [[IDENT_CHECK:%.*]] = icmp ne i64 [[STRIDE]], 1
 ; COMPARE-LAA-MV-NEXT:    [[SMAX:%.*]] = call i64 @llvm.smax.i64(i64 [[N]], i64 1)
+; COMPARE-LAA-MV-NEXT:    [[IDENT_CHECK:%.*]] = icmp ne i64 [[STRIDE]], 1
 ; COMPARE-LAA-MV-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[SMAX]], 4
 ; COMPARE-LAA-MV-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
 ; COMPARE-LAA-MV:       [[VECTOR_SCEVCHECK]]:
@@ -2670,8 +2670,8 @@ define void @stride_btc_checks_order(ptr noalias %p.out, ptr %p, i64 %stride, i6
 ; COMPARE-NO-MV-SAME: ptr noalias [[P_OUT:%.*]], ptr [[P:%.*]], i64 [[STRIDE:%.*]], i64 [[M:%.*]]) {
 ; COMPARE-NO-MV-NEXT:  [[ENTRY:.*]]:
 ; COMPARE-NO-MV-NEXT:    [[N:%.*]] = mul i64 [[M]], [[STRIDE]]
-; COMPARE-NO-MV-NEXT:    [[STRIDES_MV_CHECK:%.*]] = icmp ne i64 [[STRIDE]], 1
 ; COMPARE-NO-MV-NEXT:    [[SMAX:%.*]] = call i64 @llvm.smax.i64(i64 [[M]], i64 1)
+; COMPARE-NO-MV-NEXT:    [[STRIDES_MV_CHECK:%.*]] = icmp ne i64 [[STRIDE]], 1
 ; COMPARE-NO-MV-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[SMAX]], 4
 ; COMPARE-NO-MV-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
 ; COMPARE-NO-MV:       [[VECTOR_PH]]:
@@ -2712,8 +2712,8 @@ define void @stride_btc_checks_order(ptr noalias %p.out, ptr %p, i64 %stride, i6
 ; COMPARE-LAA-MV-SAME: ptr noalias [[P_OUT:%.*]], ptr [[P:%.*]], i64 [[STRIDE:%.*]], i64 [[M:%.*]]) {
 ; COMPARE-LAA-MV-NEXT:  [[ENTRY:.*]]:
 ; COMPARE-LAA-MV-NEXT:    [[N:%.*]] = mul i64 [[M]], [[STRIDE]]
-; COMPARE-LAA-MV-NEXT:    [[IDENT_CHECK:%.*]] = icmp ne i64 [[STRIDE]], 1
 ; COMPARE-LAA-MV-NEXT:    [[SMAX1:%.*]] = call i64 @llvm.smax.i64(i64 [[M]], i64 1)
+; COMPARE-LAA-MV-NEXT:    [[IDENT_CHECK:%.*]] = icmp ne i64 [[STRIDE]], 1
 ; COMPARE-LAA-MV-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[SMAX1]], 4
 ; COMPARE-LAA-MV-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
 ; COMPARE-LAA-MV:       [[VECTOR_SCEVCHECK]]:
