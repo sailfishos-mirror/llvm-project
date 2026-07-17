@@ -62,7 +62,7 @@ Sections:
     Flags:           [ SHF_ALLOC, SHF_EXECINSTR ]
     Address:         0x1000
     AddressAlign:    0x10
-    Content:         C3C3C3C3
+    Content:         C3C3C3C3C3C3C3C3
   - Name:            .dynstr
     Type:            SHT_STRTAB
     Flags:           [ SHF_ALLOC ]
@@ -114,6 +114,16 @@ Symbols:
     Value:           0x1002
     Size:            0x2
     Binding:         STB_GLOBAL
+  # A genuine (nonzero-sized) implementation that the first filtee *also*
+  # defines.  The dynamic linker always searches the filtees before the
+  # filter object's own definition, so the filtee must win even though the
+  # filter's definition is real code and not a placeholder.
+  - Name:            dup_impl
+    Type:            STT_FUNC
+    Section:         .text
+    Value:           0x1004
+    Size:            0x2
+    Binding:         STB_GLOBAL
 ...
 )";
 
@@ -130,7 +140,7 @@ Sections:
     Flags:           [ SHF_ALLOC, SHF_EXECINSTR ]
     Address:         0x1000
     AddressAlign:    0x10
-    Content:         C3C3C3C3
+    Content:         C3C3C3C3C3C3C3C3
 Symbols:
   - Name:            bar
     Type:            STT_FUNC
@@ -144,9 +154,18 @@ Symbols:
     Value:           0x1002
     Size:            0x2
     Binding:         STB_GLOBAL
+  - Name:            dup_impl
+    Type:            STT_FUNC
+    Section:         .text
+    Value:           0x1004
+    Size:            0x2
+    Binding:         STB_GLOBAL
 ...
 )";
 
+// The second filtee's definitions are weak: that is how FreeBSD's
+// libsys.so.7 exports its syscall stubs, and weak definitions take part in
+// dynamic linking just like global ones.
 static const char *k_aux2_yaml = R"(
 --- !ELF
 FileHeader:
@@ -167,13 +186,13 @@ Symbols:
     Section:         .text
     Value:           0x1000
     Size:            0x2
-    Binding:         STB_GLOBAL
+    Binding:         STB_WEAK
   - Name:            open
     Type:            STT_FUNC
     Section:         .text
     Value:           0x1002
     Size:            0x2
-    Binding:         STB_GLOBAL
+    Binding:         STB_WEAK
 ...
 )";
 
@@ -311,6 +330,18 @@ TEST_F(ReExportedSymbolTest, ResolveThroughFilteesInOrder) {
   ASSERT_NE(nullptr, filter_local);
   EXPECT_EQ(nullptr,
             filter_local->ResolveReExportedSymbol(*target_sp, filter_sp));
+
+  // Both the filter and the first filtee genuinely define "dup_impl"
+  // (nonzero-sized code on both sides).  The dynamic linker searches the
+  // filtees before the filter object's own definition, so the filtee's
+  // definition must win.
+  const Symbol *dup = FindFilterSymbol(filter_sp, "dup_impl");
+  ASSERT_NE(nullptr, dup);
+  EXPECT_EQ(eSymbolTypeCode, dup->GetType());
+  Symbol *dup_def = dup->ResolveReExportedSymbol(*target_sp, filter_sp);
+  ASSERT_NE(nullptr, dup_def);
+  EXPECT_EQ(ConstString("dup_impl"), dup_def->GetName());
+  EXPECT_EQ(aux1_sp, dup_def->GetAddress().GetModule());
 
   // Without the containing module nothing connects the symbol to the
   // filtees, so "foo" cannot be resolved.  This is why callers that have
