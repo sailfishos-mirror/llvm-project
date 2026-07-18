@@ -46,6 +46,36 @@ subroutine test_inapplicable_assume()
   print *, 1
 end subroutine
 
+! An unselected fallback must not have its clauses lowered.
+! CHECK-LABEL: func.func @_QPtest_unselected_fallback_clause()
+! CHECK:         omp.barrier
+! CHECK:         return
+subroutine test_unselected_fallback_clause()
+  !$omp metadirective &
+  !$omp & when(implementation={vendor(llvm)}: barrier) &
+#ifdef OMP_52
+  !$omp & otherwise(assume holds(.true.))
+#else
+  !$omp & default(assume holds(.true.))
+#endif
+end subroutine
+
+! A statically applicable but lower-ranked candidate must not have its clauses
+! lowered either.
+! CHECK-LABEL: func.func @_QPtest_unselected_ranked_clause()
+! CHECK:         omp.barrier
+! CHECK:         return
+subroutine test_unselected_ranked_clause()
+  !$omp metadirective &
+  !$omp & when(user={condition(score(1): .true.)}: assume holds(.true.)) &
+  !$omp & when(user={condition(score(2): .true.)}: barrier) &
+#ifdef OMP_52
+  !$omp & otherwise(nothing)
+#else
+  !$omp & default(nothing)
+#endif
+end subroutine
+
 ! CHECK-LABEL: func.func @_QPtest_standalone_barrier_match()
 ! CHECK:         omp.barrier
 ! CHECK:         return

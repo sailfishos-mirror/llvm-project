@@ -5994,7 +5994,8 @@ static bool isSupportedMetadirectiveLoopQueue(const ConstructQueue &queue) {
          matchLeafSequence(queue.begin(), queue, Directive::OMPD_do_simd);
 }
 
-static bool isNestedInOpenMPDataEnvironment(lower::pft::Evaluation &eval) {
+static bool isNestedInOpenMPDataEnvironment(lower::pft::Evaluation &eval,
+                                            mlir::Operation *currentOp) {
   for (lower::pft::Evaluation *parent = eval.parentConstruct; parent;
        parent = parent->parentConstruct) {
     if (const auto *omp = parent->getIf<parser::OpenMPConstruct>()) {
@@ -6002,6 +6003,20 @@ static bool isNestedInOpenMPDataEnvironment(lower::pft::Evaluation &eval) {
       if (semantics::omp::HasDataEnvironment(directive))
         return true;
     }
+  }
+
+  // A PFT ancestor can itself be a metadirective, so its source directive does
+  // not reveal the data environment selected during lowering. Check the
+  // already-emitted OpenMP operation ancestry as well.
+  for (mlir::Operation *op = currentOp; op; op = op->getParentOp()) {
+    if (mlir::isa<mlir::omp::DistributeOp, mlir::omp::LoopNestOp,
+                  mlir::omp::ParallelOp, mlir::omp::ScopeOp,
+                  mlir::omp::SectionsOp, mlir::omp::SimdOp, mlir::omp::SingleOp,
+                  mlir::omp::TargetDataOp, mlir::omp::TargetOp,
+                  mlir::omp::TaskgroupOp, mlir::omp::TaskloopContextOp,
+                  mlir::omp::TaskOp, mlir::omp::TeamsOp, mlir::omp::WsloopOp>(
+            op))
+      return true;
   }
   return false;
 }
@@ -6323,21 +6338,21 @@ static void genMetadirective(lower::AbstractConverter &converter,
   // Name resolution cannot give a metadirective variant its own DSA scope, so
   // its loop-IV attribute can otherwise contaminate an enclosing data
   // environment even when the variant is statically inapplicable.
-  if (nestedLoopVariant && isNestedInOpenMPDataEnvironment(eval))
+  if (nestedLoopVariant &&
+      isNestedInOpenMPDataEnvironment(
+          eval, builder.getInsertionBlock()->getParentOp()))
     TODO(converter.genLocation(nestedLoopVariant->source),
          "loop-associated METADIRECTIVE nested in an OpenMP data environment");
 
   bool hasLoopAssociatedCandidate = false;
   for (const MetadirectiveCandidate &candidate : candidates) {
-    if (candidate.spec &&
-        hasLoopAssociatedDirective(makeVariantQueue(*candidate.spec))) {
+    if (candidate.spec && hasLoopAssociatedDirective(candidate.spec->DirId())) {
       hasLoopAssociatedCandidate = true;
       break;
     }
   }
   if (!hasLoopAssociatedCandidate && fallback)
-    hasLoopAssociatedCandidate =
-        hasLoopAssociatedDirective(makeVariantQueue(*fallback));
+    hasLoopAssociatedCandidate = hasLoopAssociatedDirective(fallback->DirId());
   SplicedAssociatedEvaluations splicedAssociatedEvaluations;
   lower::pft::EvaluationList continuationEvaluations;
   llvm::scope_exit restoreEvaluationOwnership([&]() {
