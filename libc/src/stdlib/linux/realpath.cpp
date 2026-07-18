@@ -19,6 +19,7 @@
 #include "src/__support/CPP/string.h"
 #include "src/__support/CPP/string_view.h"
 #include "src/__support/OSUtil/linux/syscall_wrappers/getcwd.h"
+#include "src/__support/OSUtil/linux/syscall_wrappers/readlink.h"
 #include "src/__support/OSUtil/path.h"
 #include "src/__support/common.h"
 #include "src/__support/error_or.h"
@@ -28,6 +29,12 @@
 
 namespace LIBC_NAMESPACE_DECL {
 namespace {
+
+#ifdef SYMLOOP_MAX
+constexpr size_t MAX_SYMLINK_TRAVERSALS = SYMLOOP_MAX;
+#else
+constexpr size_t MAX_SYMLINK_TRAVERSALS = 40;
+#endif
 
 // Container for a fully resolved, canonical path.
 //
@@ -82,6 +89,8 @@ public:
   // Must be free'd by the caller.
   char *release() { return path_.release_c_str(); }
 
+  const char *c_str() const { return path_.c_str(); }
+
   // Copies the content of this path to `dst`.
   void copy_to(char *dst) {
     inline_memcpy(dst, path_.c_str(), path_.size() + 1);
@@ -105,6 +114,52 @@ private:
   cpp::string path_;
 };
 
+// Container for a string that can be quickly prepended.
+template <size_t N> class PrependableString {
+public:
+  LIBC_INLINE size_t size() const { return N - start; }
+
+  LIBC_INLINE bool empty() const { return size() == 0; }
+
+  // Takes a view of the first prefix_length characters from this string.
+  // The view is only valid until the next mutating call to PrependableString.
+  LIBC_INLINE cpp::string_view take_prefix(size_t prefix_length) {
+    if (prefix_length >= size())
+      prefix_length = size();
+
+    cpp::string_view view(buf + start, prefix_length);
+    start += prefix_length;
+    return view;
+  }
+
+  // Discards the first prefix_length characters from this string.
+  LIBC_INLINE void discard_prefix(size_t prefix_length) {
+    take_prefix(prefix_length);
+  }
+
+  // Prepends c to this string. Returns false if there was insufficient space.
+  LIBC_INLINE bool prepend(char c) { return prepend(cpp::string_view(&c, 1)); }
+
+  // Prepends src to this string. Returns false if there was insufficient space.
+  LIBC_INLINE bool prepend(cpp::string_view src) {
+    if (src.size() > start)
+      return false;
+
+    start -= src.size();
+    inline_memcpy(buf + start, src.data(), src.size());
+    return true;
+  }
+
+  // A view over this string.
+  LIBC_INLINE cpp::string_view view() const {
+    return cpp::string_view(buf + start, N - start);
+  }
+
+private:
+  size_t start = N;
+  char buf[N];
+};
+
 // A view over path components yet to be processed by realpath.
 //
 // When `realpath("./a/../b")` is called, the input path can be viewed as
@@ -115,44 +170,83 @@ private:
 //   PendingPath p("./a/..");
 //   assert(p.advance_component() == ".");
 //   assert(p.advance_component() == "a");
+//
+//   p.prepend_components("b/c");
+//   assert(p.advance_component() == "b");
+//   assert(p.advance_component() == "c");
 //   assert(p.advance_component() == "..");
 //   assert(p.empty());
 //   ```
 class PendingPath {
 public:
-  explicit PendingPath(cpp::string_view path) : view_(path) {}
-
   // Whether all path components have been consumed.
-  bool empty() const { return view_.empty(); }
+  LIBC_INLINE bool empty() const { return path.empty(); }
 
   // Takes the next path component,
   // starting with the component closest to the root.
-  cpp::string_view advance_component() {
-    const cpp::string_view path = view_;
+  LIBC_INLINE cpp::string_view advance_component() {
+    const size_t offset = path.view().find_first_not_of(path::SEPARATOR);
+    path.discard_prefix(offset);
 
-    const size_t component_start = path.find_first_not_of(path::SEPARATOR);
-    if (component_start == cpp::string_view::npos) {
-      view_ = "";
-      return "";
+    const size_t length = path.view().find_first_of(path::SEPARATOR);
+    return path.take_prefix(length);
+  }
+
+  // Prepends components to this PendingPath, adding a separator if needed.
+  LIBC_INLINE cpp::optional<Error> prepend_path(cpp::string_view target) {
+    bool needs_separator =
+        !target.ends_with(path::SEPARATOR) && !target.empty() &&
+        !path.view().starts_with(path::SEPARATOR) && !path.empty();
+
+    if (needs_separator) {
+      if (!path.prepend(path::SEPARATOR))
+        return Error(ENAMETOOLONG);
     }
 
-    const size_t component_end =
-        path.find_first_of(path::SEPARATOR, /* From = */ component_start);
-    if (component_end == cpp::string_view::npos) {
-      view_ = "";
-      return path.substr(component_start);
-    }
+    if (!path.prepend(target))
+      return Error(ENAMETOOLONG);
 
-    view_ = view_.substr(component_end);
-    return path.substr(component_start, component_end - component_start);
+    return cpp::nullopt;
   }
 
 private:
-  cpp::string_view view_;
+  PrependableString<PATH_MAX> path;
 };
 
-cpp::optional<Error> resolve_path(PendingPath &pending_path,
+// A buffer for calls to `readlink`.
+class ReadlinkBuffer {
+public:
+  // Calls readlink and returns a view into this buffer.
+  // The view is only valid until the next mutating call to ReadlinkBuffer.
+  ErrorOr<cpp::string_view> readlink(const char *path) {
+    ErrorOr<ssize_t> bytes_written =
+        linux_syscalls::readlink(path, buffer, sizeof(buffer));
+    if (!bytes_written)
+      return Error(bytes_written.error());
+
+    if (*bytes_written <= 0)
+      return Error(EIO); // Should not be possible, check to guard underflow.
+
+    cpp::string_view target(buffer, static_cast<size_t>(*bytes_written));
+    if (target.size() >= sizeof(buffer))
+      return Error(ENAMETOOLONG);
+
+    return target;
+  }
+
+private:
+  char buffer[PATH_MAX];
+};
+
+cpp::optional<Error> resolve_path(cpp::string_view path,
                                   ResolvedPath &resolved_path) {
+  PendingPath pending_path;
+  if (cpp::optional<Error> err = pending_path.prepend_path(path); err)
+    return err;
+
+  ReadlinkBuffer target_buf;
+  size_t symlinks_followed = 0;
+
   while (!pending_path.empty()) {
     cpp::string_view component = pending_path.advance_component();
     if (component.empty() || component == path::CURRENT_DIR_COMPONENT)
@@ -165,6 +259,32 @@ cpp::optional<Error> resolve_path(PendingPath &pending_path,
 
     if (cpp::optional<Error> err = resolved_path.push_component(component); err)
       return err;
+
+    // Try to read the path as a symlink.
+    ErrorOr<cpp::string_view> target =
+        target_buf.readlink(resolved_path.c_str());
+    if (!target) {
+      // Failure with EINVAL is okay, it indicates the path was not a symlink.
+      if (target.error() == EINVAL)
+        continue;
+      return Error(target.error());
+    }
+
+    symlinks_followed += 1;
+    if (symlinks_followed > MAX_SYMLINK_TRAVERSALS)
+      return Error(ELOOP);
+
+    // If we had a symlink, we need to process all its components,
+    // so prepend it to pending_path for subsequent iterations.
+    if (cpp::optional<Error> err = pending_path.prepend_path(*target); err)
+      return err;
+
+    // Strip the symlink component from the resolved path.
+    resolved_path.set_to_parent();
+
+    // If the symlink pointed to an absolute path, reset to root.
+    if (path::is_absolute(*target))
+      resolved_path.set_to_root();
   }
 
   return cpp::nullopt;
@@ -182,15 +302,13 @@ ErrorOr<char *> realpath_impl(const char *__restrict path_cstr,
   if (path.size() >= PATH_MAX)
     return Error(ENAMETOOLONG);
 
-  PendingPath pending_path(path);
-
   ResolvedPath resolved_path;
   if (!path::is_absolute(path)) {
     if (cpp::optional<Error> err = resolved_path.set_to_cwd(); err)
       return *err;
   }
 
-  if (cpp::optional<Error> err = resolve_path(pending_path, resolved_path); err)
+  if (cpp::optional<Error> err = resolve_path(path, resolved_path); err)
     return *err;
 
   if (resolved_path_buf != nullptr) {
