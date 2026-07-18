@@ -5974,6 +5974,14 @@ static bool hasDirectiveAssociation(const ConstructQueue &queue,
   });
 }
 
+static bool hasLoopAssociatedDirective(llvm::omp::Directive directive) {
+  return llvm::any_of(llvm::omp::getLeafConstructsOrSelf(directive),
+                      [](llvm::omp::Directive leaf) {
+                        return llvm::omp::getDirectiveAssociation(leaf) ==
+                               llvm::omp::Association::LoopNest;
+                      });
+}
+
 static bool hasLoopAssociatedDirective(const ConstructQueue &queue) {
   return hasDirectiveAssociation(queue, llvm::omp::Association::LoopNest);
 }
@@ -6307,7 +6315,7 @@ static void genMetadirective(lower::AbstractConverter &converter,
 
   const parser::OmpDirectiveSpecification *nestedLoopVariant = nullptr;
   for (const parser::OmpDirectiveSpecification *spec : directiveVariants) {
-    if (hasLoopAssociatedDirective(makeVariantQueue(*spec))) {
+    if (hasLoopAssociatedDirective(spec->DirId())) {
       nestedLoopVariant = spec;
       break;
     }

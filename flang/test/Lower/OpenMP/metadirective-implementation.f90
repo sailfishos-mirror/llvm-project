@@ -30,6 +30,22 @@ subroutine test_vendor_no_match()
 #endif
 end subroutine
 
+! An inapplicable variant must not have its clauses lowered.
+! CHECK-LABEL: func.func @_QPtest_inapplicable_assume()
+! CHECK:         fir.call @_FortranAioOutputInteger32
+! CHECK-NOT:     fir.call @_FortranAioOutputInteger32
+! CHECK:         return
+subroutine test_inapplicable_assume()
+  !$omp metadirective &
+  !$omp & when(implementation={vendor("unknown")}: assume holds(.true.)) &
+#ifdef OMP_52
+  !$omp & otherwise(nothing)
+#else
+  !$omp & default(nothing)
+#endif
+  print *, 1
+end subroutine
+
 ! CHECK-LABEL: func.func @_QPtest_standalone_barrier_match()
 ! CHECK:         omp.barrier
 ! CHECK:         return
