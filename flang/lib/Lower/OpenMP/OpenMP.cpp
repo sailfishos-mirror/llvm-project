@@ -5978,6 +5978,26 @@ static bool hasLoopAssociatedDirective(const ConstructQueue &queue) {
   return hasDirectiveAssociation(queue, llvm::omp::Association::LoopNest);
 }
 
+static bool isSupportedMetadirectiveLoopQueue(const ConstructQueue &queue) {
+  using llvm::omp::Directive;
+  using lower::omp::matchLeafSequence;
+  return matchLeafSequence(queue.begin(), queue, Directive::OMPD_do) ||
+         matchLeafSequence(queue.begin(), queue, Directive::OMPD_simd) ||
+         matchLeafSequence(queue.begin(), queue, Directive::OMPD_do_simd);
+}
+
+static bool isNestedInOpenMPDataEnvironment(lower::pft::Evaluation &eval) {
+  for (lower::pft::Evaluation *parent = eval.parentConstruct; parent;
+       parent = parent->parentConstruct) {
+    if (const auto *omp = parent->getIf<parser::OpenMPConstruct>()) {
+      llvm::omp::Directive directive = parser::omp::GetOmpDirectiveName(*omp).v;
+      if (semantics::omp::HasDataEnvironment(directive))
+        return true;
+    }
+  }
+  return false;
+}
+
 static bool hasLoopSequenceAssociatedDirective(const ConstructQueue &queue) {
   return hasDirectiveAssociation(queue, llvm::omp::Association::LoopSeq);
 }
@@ -6109,6 +6129,8 @@ static void genMetadirective(lower::AbstractConverter &converter,
       makeVariantMatchContext(builder.getModule(), constructTraits);
 
   llvm::SmallVector<MetadirectiveCandidate, 4> candidates;
+  llvm::SmallVector<const parser::OmpDirectiveSpecification *, 4>
+      directiveVariants;
   // A null directive specification represents either the implicit `nothing`
   // variant or the absence of an explicit otherwise/default clause.
   const parser::OmpDirectiveSpecification *fallback = nullptr;
@@ -6148,6 +6170,8 @@ static void genMetadirective(lower::AbstractConverter &converter,
             std::get_if<parser::OmpClause::When>(&clause.u)) {
       const auto &ctxSel = getContextSelector(*whenClause);
       auto [spec, isExplicit] = getDirectiveVariant(*whenClause);
+      if (spec)
+        directiveVariants.push_back(spec);
 
       // METADIRECTIVE cannot yet honour some selector features that are
       // otherwise accepted; reject them before building the match info.
@@ -6257,14 +6281,20 @@ static void genMetadirective(lower::AbstractConverter &converter,
       candidates.emplace_back(spec, rawVMI, isExplicit);
     } else if (const auto *otherwiseClause =
                    std::get_if<parser::OmpClause::Otherwise>(&clause.u)) {
-      if (otherwiseClause->v && otherwiseClause->v->v)
+      if (otherwiseClause->v && otherwiseClause->v->v) {
         fallback = getFallbackVariant(otherwiseClause->v->v->value());
+        if (fallback)
+          directiveVariants.push_back(fallback);
+      }
     } else if (const auto *defaultClause =
                    std::get_if<parser::OmpClause::Default>(&clause.u)) {
       if (const auto *dirSpecPtr = std::get_if<
               common::Indirection<parser::OmpDirectiveSpecification>>(
-              &defaultClause->v.u))
+              &defaultClause->v.u)) {
         fallback = getFallbackVariant(dirSpecPtr->value());
+        if (fallback)
+          directiveVariants.push_back(fallback);
+      }
     }
   }
 
@@ -6274,6 +6304,20 @@ static void genMetadirective(lower::AbstractConverter &converter,
         buildConstructQueue(converter.getFirOpBuilder().getModule(), semaCtx,
                             eval, spec.source, spec.DirId(), variantClauses)};
   };
+
+  const parser::OmpDirectiveSpecification *nestedLoopVariant = nullptr;
+  for (const parser::OmpDirectiveSpecification *spec : directiveVariants) {
+    if (hasLoopAssociatedDirective(makeVariantQueue(*spec))) {
+      nestedLoopVariant = spec;
+      break;
+    }
+  }
+  // Name resolution cannot give a metadirective variant its own DSA scope, so
+  // its loop-IV attribute can otherwise contaminate an enclosing data
+  // environment even when the variant is statically inapplicable.
+  if (nestedLoopVariant && isNestedInOpenMPDataEnvironment(eval))
+    TODO(converter.genLocation(nestedLoopVariant->source),
+         "loop-associated METADIRECTIVE nested in an OpenMP data environment");
 
   bool hasLoopAssociatedCandidate = false;
   for (const MetadirectiveCandidate &candidate : candidates) {
@@ -6376,6 +6420,10 @@ static void genMetadirective(lower::AbstractConverter &converter,
       if (hasDataSharingClause(queue, semaCtx.langOptions().OpenMPVersion))
         TODO(variantLoc,
              "data-sharing clause in loop-associated METADIRECTIVE variant");
+      if (!isSupportedMetadirectiveLoopQueue(queue))
+        TODO(variantLoc,
+             "loop-associated METADIRECTIVE variant other than DO, SIMD, or "
+             "DO SIMD");
       lower::pft::Evaluation *loopEval = spliceAssociatedDoEval(eval);
       if (!loopEval)
         TODO(variantLoc, "loop-associated METADIRECTIVE without associated DO");

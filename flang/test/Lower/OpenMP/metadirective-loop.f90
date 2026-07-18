@@ -441,24 +441,3 @@ subroutine test_block_nested_do(n, a)
     end do
   end block
 end subroutine
-
-! Data sharing from an ordinary enclosing construct remains available to the
-! selected worksharing loop.
-! CHECK-LABEL: func.func @_QPtest_do_in_parallel(
-! CHECK:         omp.parallel
-! CHECK:           omp.wsloop {{.*}}private({{.*}}Ei_private_i32
-! CHECK:             omp.loop_nest
-! CHECK:               hlfir.assign
-! CHECK:           omp.terminator
-! CHECK:         return
-subroutine test_do_in_parallel(n, a)
-  integer :: n, a(n), i
-  !$omp parallel shared(n, a)
-  !$omp metadirective &
-  !$omp & when(implementation={vendor(llvm)}: do) &
-  !$omp & otherwise(nothing)
-  do i = 1, n
-    a(i) = i
-  end do
-  !$omp end parallel
-end subroutine
