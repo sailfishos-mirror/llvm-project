@@ -15,6 +15,7 @@
 #include "SSAFAnalysesCommon.h"
 #include "clang/ScalableStaticAnalysis/Analyses/EntityPointerLevel/EntityPointerLevel.h"
 #include "clang/ScalableStaticAnalysis/Analyses/EntityPointerLevel/EntityPointerLevelFormat.h"
+#include "clang/ScalableStaticAnalysis/Analyses/PointerFlow/PointerFlow.h"
 #include "clang/ScalableStaticAnalysis/Analyses/PointerFlow/PointerFlowAnalysis.h"
 #include "clang/ScalableStaticAnalysis/Analyses/TypeConstrainedPointers/TypeConstrainedPointers.h"
 #include "clang/ScalableStaticAnalysis/Analyses/UnsafeBufferUsage/UnsafeBufferUsage.h"
@@ -22,6 +23,8 @@
 #include "clang/ScalableStaticAnalysis/Core/Serialization/JSONFormat.h"
 #include "clang/ScalableStaticAnalysis/Core/WholeProgramAnalysis/AnalysisRegistry.h"
 #include "clang/ScalableStaticAnalysis/Core/WholeProgramAnalysis/SummaryAnalysis.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/iterator_range.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/JSON.h"
 #include <memory>
@@ -135,8 +138,7 @@ JSONFormat::AnalysisResultRegistry::Add<UnsafeBufferReachableAnalysisResult>
 /// 2. **C2 (Reachable):** If a pointer is reachable from an unsafe pointer in
 ///    the pointer flow graph (provided by `PointerFlowAnalysisResult`), it is
 ///    also unsafe.
-/// 3. **C3 (Transformable):** Any pointer associated with type-constrained
-///    entities is NOT transformable.
+/// 3. **C3 (Constrained):** Type-constrained entities are NOT unsafe.
 class UnsafeBufferReachableAnalysis
     : public DerivedAnalysis<UnsafeBufferReachableAnalysisResult,
                              PointerFlowAnalysisResult,
@@ -170,11 +172,11 @@ class UnsafeBufferReachableAnalysis
   ///   bound based on the maximum pointer level the pointer type can have.
   struct BoundsPropagationGraph {
   private:
-    const std::map<EntityPointerLevel, EntityPointerLevelSet> &PointerFlows;
+    EdgeSet PointerFlows;
 
   public:
-    BoundsPropagationGraph(const EdgeSet &PointerFlows)
-        : PointerFlows(PointerFlows) {}
+    BoundsPropagationGraph(EdgeSet PointerFlows)
+        : PointerFlows(std::move(PointerFlows)) {}
 
     /// Returns the EntityPointerLevelSet that are reachable from \p Src by
     /// one edge in the BoundsPropagationGraph.
@@ -197,7 +199,6 @@ class UnsafeBufferReachableAnalysis
   };
 
   std::map<EntityId, BoundsPropagationGraph> BPG;
-  const std::set<EntityId> *TypeConstrainedEntities = nullptr;
 
   // Use pointers for efficiency. EPLs are in tree-based containers that only
   // grow. So pointers to them are stable.
@@ -238,24 +239,37 @@ class UnsafeBufferReachableAnalysis
     }
   }
 
-  // Filter out non-transformable pointers from `getResult().Result`, leaving
-  // only those that satisfy C3.
-  void filterTransformablePointers() {
-    assert(TypeConstrainedEntities &&
-           "The initialize(...) method should initialize "
-           "TypeConstrainedEntities to non-null");
-    auto &Result = getResult().Reachables;
+  /// \return a lazy range over the pointers in \p UnsafePtrs whose entity is
+  /// NOT type-constrained (per \p TypeConstraints).
+  auto filterNonConstrainedPointers(
+      const EntityPointerLevelSet &UnsafePtrs,
+      const TypeConstrainedPointersAnalysisResult &TypeConstraints) {
+    return llvm::make_filter_range(
+        UnsafePtrs, [&TypeConstraints](const EntityPointerLevel &EPL) {
+          return !TypeConstraints.contains(EPL.getEntity());
+        });
+  }
 
-    for (auto &[Key, EPLs] : Result) {
-      for (auto ConstrainedEntityId : *TypeConstrainedEntities) {
-        // FIXME: optimization chance here.  Since both sets are sorted, the
-        // next 'equal_range' search can ignore everything before
-        // `NonTransEPLs.second`.
-        auto NonTransEPLs = EPLs.equal_range(ConstrainedEntityId);
+  /// \return a copy of \p Edges but with no edge involving a type-constrained
+  /// entity (per \p TypeConstraints).
+  EdgeSet filterNonConstrainedEdges(
+      const EdgeSet &Edges,
+      const TypeConstrainedPointersAnalysisResult &TypeConstraints) {
+    EdgeSet Result;
 
-        EPLs.erase(NonTransEPLs.first, NonTransEPLs.second);
-      }
+    for (const auto &[Src, Dsts] : Edges) {
+      if (TypeConstraints.contains(Src.getEntity()))
+        continue;
+
+      EntityPointerLevelSet FilteredDsts;
+
+      for (const EntityPointerLevel &Dst : Dsts)
+        if (!TypeConstraints.contains(Dst.getEntity()))
+          FilteredDsts.insert(Dst);
+      if (!FilteredDsts.empty())
+        Result.emplace(Src, std::move(FilteredDsts));
     }
+    return Result;
   }
 
 public:
@@ -263,20 +277,25 @@ public:
   initialize(const PointerFlowAnalysisResult &PtrFlowGraph,
              const TypeConstrainedPointersAnalysisResult &TypeConstraints,
              const UnsafeBufferUsageAnalysisResult &UnsafePtrs) override {
+    // Remove type-constrained pointers from `PtrFlowGraph` and `UnsafePtrs` so
+    // that the final result satisfies C3.
     for (auto &[Id, SubGraph] : PtrFlowGraph.Edges)
-      BPG.try_emplace(Id, BoundsPropagationGraph(SubGraph));
-    TypeConstrainedEntities = &TypeConstraints.Entities;
-    assert(getResult().Reachables.empty());
-    // C1: all pointers in UnsafeBufferUsageAnalysisResult are unsafe
-    getResult().Reachables.insert(UnsafePtrs.begin(), UnsafePtrs.end());
+      BPG.try_emplace(Id, BoundsPropagationGraph(filterNonConstrainedEdges(
+                              SubGraph, TypeConstraints)));
+    for (auto &[Contributor, EPLs] : UnsafePtrs) {
+      auto FilteredRange = filterNonConstrainedPointers(EPLs, TypeConstraints);
+
+      getResult().Reachables[Contributor].insert(FilteredRange.begin(),
+                                                 FilteredRange.end());
+    }
     return llvm::Error::success();
   }
 
   llvm::Expected<bool> step() override {
-    // result meets C1 & C2:
+    // Compute the reachable EPLs from the C1 unsafe pointers over the
+    // pointer-flow graph; both are already C3-filtered, so the result
+    // satisfies C1, C2, and C3.
     computeReachableUnsafePointers();
-    // result meets C1 & C2 & C3:
-    filterTransformablePointers();
     // This is not an iterative algorithm so stop iteration by retruning false:
     return false;
   }

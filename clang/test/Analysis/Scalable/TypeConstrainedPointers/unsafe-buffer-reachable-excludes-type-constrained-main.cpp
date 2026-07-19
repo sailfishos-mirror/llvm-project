@@ -12,7 +12,16 @@
 // RUN: clang-ssaf-analyzer %t/lu.json -o %t/wpa.json \
 // RUN:   -a UnsafeBufferReachableAnalysisResult
 
-// RUN: FileCheck %s --input-file=%t/wpa.json
+// The CHECK lines below use readable tokens instead of inline FileCheck regex.
+// Expand the tokens into regex, then run FileCheck on the expanded copy:
+//   $NS - skip the "namespace" array, up to its closing ']'.
+//   $WS - whitespace, possibly spanning newlines.
+//   $PTR_L1 - a reachable-set entry closing as "}, 1 ]", i.e. pointer level 1.
+// RUN: sed -e 's|$NS|{{([^]]\|[[:space:]])+\\],}}|g' \
+// RUN:     -e 's|$WS|{{[[:space:]]+}}|g' \
+// RUN:     -e 's|$PTR_L1|{{[[:space:]]+\\},[[:space:]]+1[[:space:]]+\\]}}|g' \
+// RUN:     %s > %t/checks.txt
+// RUN: FileCheck %t/checks.txt --input-file=%t/wpa.json
 
 
 int main(int argc, char **argv) {
@@ -25,8 +34,8 @@ void foo(int *q) {
   q[5] = 0;
 }
 
-// CHECK-DAG: "id": [[Q_ID:[0-9]+]],{{([^]]|[[:space:]])+\],[[:space:]]+"suffix": "1",[[:space:]]+"usr": }}"c:@F@foo#*I#"
-// CHECK-DAG: "id": [[ARGV_ID:[0-9]+]],{{([^]]|[[:space:]])+\],[[:space:]]+"suffix": "2",[[:space:]]+"usr": }}"c:@F@main{{.*}}"
+// CHECK-DAG: "id": [[Q_ID:[0-9]+]],$NS$WS"suffix": "1",$WS"usr": "c:@F@foo#*I#"
+// CHECK-DAG: "id": [[ARGV_ID:[0-9]+]],$NS$WS"suffix": "2",$WS"usr": "c:@F@main{{.*}}"
 
 // 'argv' is reported as type-constrained.
 // CHECK: "analysis_name": "TypeConstrainedPointersAnalysisResult"
@@ -34,7 +43,7 @@ void foo(int *q) {
 
 // In the reachable result 'q' is present but 'argv' is not.
 // CHECK: "analysis_name": "UnsafeBufferReachableAnalysisResult"
-// CHECK-DAG: {{\{[[:space:]]+}}"@": [[Q_ID]]{{[[:space:]]+\},[[:space:]]+1[[:space:]]+\]}}
+// CHECK-DAG: "@": [[Q_ID]]$PTR_L1
 // CHECK-NOT: "@": [[ARGV_ID]]
 
 // CHECK: "analysis_name"
