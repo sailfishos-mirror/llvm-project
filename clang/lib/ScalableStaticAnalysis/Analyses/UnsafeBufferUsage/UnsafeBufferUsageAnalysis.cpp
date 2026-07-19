@@ -239,51 +239,38 @@ class UnsafeBufferReachableAnalysis
     }
   }
 
-  /// \return a lazy range over the pointers in \p UnsafePtrs whose entity is
-  /// NOT type-constrained (per \p TypeConstraints).
-  auto filterNonConstrainedPointers(
-      const EntityPointerLevelSet &UnsafePtrs,
-      const TypeConstrainedPointersAnalysisResult &TypeConstraints) {
-    return llvm::make_filter_range(
-        UnsafePtrs, [&TypeConstraints](const EntityPointerLevel &EPL) {
-          return !TypeConstraints.contains(EPL.getEntity());
-        });
-  }
-
-  /// \return a copy of \p Edges but with no edge involving a type-constrained
-  /// entity (per \p TypeConstraints).
-  EdgeSet filterNonConstrainedEdges(
-      const EdgeSet &Edges,
-      const TypeConstrainedPointersAnalysisResult &TypeConstraints) {
-    EdgeSet Result;
-
-    for (const auto &[Src, Dsts] : Edges) {
-      if (TypeConstraints.contains(Src.getEntity()))
-        continue;
-
-      EntityPointerLevelSet FilteredDsts;
-
-      for (const EntityPointerLevel &Dst : Dsts)
-        if (!TypeConstraints.contains(Dst.getEntity()))
-          FilteredDsts.insert(Dst);
-      if (!FilteredDsts.empty())
-        Result.emplace(Src, std::move(FilteredDsts));
-    }
-    return Result;
-  }
-
 public:
   llvm::Error
   initialize(const PointerFlowAnalysisResult &PtrFlowGraph,
              const TypeConstrainedPointersAnalysisResult &TypeConstraints,
              const UnsafeBufferUsageAnalysisResult &UnsafePtrs) override {
-    // Remove type-constrained pointers from `PtrFlowGraph` and `UnsafePtrs` so
-    // that the final result satisfies C3.
-    for (auto &[Id, SubGraph] : PtrFlowGraph.Edges)
-      BPG.try_emplace(Id, BoundsPropagationGraph(filterNonConstrainedEdges(
-                              SubGraph, TypeConstraints)));
+    // Filter out edges involving type-constrained pointers from `PtrFlowGraph`:
+    for (auto &[Id, SubGraph] : PtrFlowGraph.Edges) {
+      EdgeSet FilteredSubGraph;
+
+      for (const auto &[Src, Dsts] : SubGraph) {
+        if (TypeConstraints.contains(Src.getEntity()))
+          continue;
+
+        auto FilteredDstRange = llvm::make_filter_range(
+            Dsts, [&TypeConstraints](const EntityPointerLevel &EPL) {
+              return !TypeConstraints.contains(EPL.getEntity());
+            });
+
+        if (FilteredDstRange.begin() != FilteredDstRange.end())
+          FilteredSubGraph[Src].insert(FilteredDstRange.begin(),
+                                       FilteredDstRange.end());
+      }
+      if (!FilteredSubGraph.empty())
+        BPG.try_emplace(Id, std::move(FilteredSubGraph));
+    }
+
+    // Filter out type-constrained pointers from `UnsafePtrs`:
     for (auto &[Contributor, EPLs] : UnsafePtrs) {
-      auto FilteredRange = filterNonConstrainedPointers(EPLs, TypeConstraints);
+      auto FilteredRange = llvm::make_filter_range(
+          EPLs, [&TypeConstraints](const EntityPointerLevel &EPL) {
+            return !TypeConstraints.contains(EPL.getEntity());
+          });
 
       getResult().Reachables[Contributor].insert(FilteredRange.begin(),
                                                  FilteredRange.end());
