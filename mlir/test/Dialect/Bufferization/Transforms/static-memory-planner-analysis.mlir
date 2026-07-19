@@ -85,35 +85,7 @@ func.func @dynamic_shape_skipped(%n: index) {
 
 // -----
 
-// Test 5: No dealloc - should be skipped
-// CHECK-LABEL: func @no_dealloc_skipped
-func.func @no_dealloc_skipped() {
-  // CHECK: %[[ALLOC:.*]] = memref.alloc() : memref<1024xf32>
-  // CHECK-NOT: memref.subview
-  %alloc = memref.alloc() : memref<1024xf32>
-  return
-}
-
-// -----
-
-// Test 6: Dealloc in different block - should be skipped
-// CHECK-LABEL: func @different_block_skipped
-func.func @different_block_skipped(%cond: i1) {
-  // CHECK: %[[ALLOC:.*]] = memref.alloc() : memref<1024xf32>
-  // CHECK: scf.if
-  // CHECK: memref.dealloc %[[ALLOC]]
-  // CHECK-NOT: memref.subview
-  %alloc = memref.alloc() : memref<1024xf32>
-  scf.if %cond {
-    memref.dealloc %alloc : memref<1024xf32>
-    scf.yield
-  }
-  return
-}
-
-// -----
-
-// Test 7: Multiple allocations with sequential offsets
+// Test 5: Multiple allocations with sequential offsets
 // CHECK-LABEL: func @multiple_sequential
 func.func @multiple_sequential() {
   // Arena: 1024*4 + 512*4 + 2048*4 = 14336 bytes
@@ -140,7 +112,7 @@ func.func @multiple_sequential() {
 
 // -----
 
-// Test 8: Alignment requirements with padding
+// Test 6: Alignment requirements with padding
 // CHECK-LABEL: func @alignment_padding
 func.func @alignment_padding() {
   // Arena: 256*4 + 128*4 + 64*4 = 1792 bytes, alignment = lcm(128,64,128) = 128
@@ -167,7 +139,7 @@ func.func @alignment_padding() {
 
 // -----
 
-// Test 9: LCM arena alignment (alignment=4, alignment=16 → lcm=16).
+// Test 7: LCM arena alignment (alignment=4, alignment=16 → lcm=16).
 // For power-of-2 alignments lcm equals max, but lcm is the correct
 // general formula. Arena must be aligned to 16 so that all views are
 // correctly aligned regardless of their individual requirements.
@@ -193,7 +165,7 @@ func.func @lcm_alignment() {
 
 // -----
 
-// Test 10: Single alloc freed via arith.select-based dealloc.
+// Test 8: Single alloc freed via arith.select-based dealloc.
 // CHECK-LABEL: func @select_single_alloc
 func.func @select_single_alloc() {
   %c = arith.constant true
@@ -210,7 +182,7 @@ func.func @select_single_alloc() {
 
 // -----
 
-// Test 11: Two allocs freed via a shared select-based dealloc.
+// Test 9: Two allocs freed via a shared select-based dealloc.
 // Group constraint: both must be eligible together or neither is.
 // CHECK-LABEL: func @select_shared_dealloc
 func.func @select_shared_dealloc() {
@@ -231,7 +203,7 @@ func.func @select_shared_dealloc() {
 
 // -----
 
-// Test 12: Two allocs, two select-based deallocs (mentor's canonical example).
+// Test 10: Two allocs, two select-based deallocs (mentor's canonical example).
 // %a freed via dealloc(%sel1) or dealloc(%sel2), %b likewise.
 // CHECK-LABEL: func @select_two_deallocs
 func.func @select_two_deallocs() {
