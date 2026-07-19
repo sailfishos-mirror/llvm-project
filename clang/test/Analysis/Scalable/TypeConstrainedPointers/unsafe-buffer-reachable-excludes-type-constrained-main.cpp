@@ -37,13 +37,24 @@ void foo(int *q) {
 // CHECK-DAG: "id": [[Q_ID:[0-9]+]],$NS$WS"suffix": "1",$WS"usr": "c:@F@foo#*I#"
 // CHECK-DAG: "id": [[ARGV_ID:[0-9]+]],$NS$WS"suffix": "2",$WS"usr": "c:@F@main{{.*}}"
 
+// Contributor function ids:
+// CHECK-DAG: "id": [[CONTRIBUTOR_FOO:[0-9]+]],$NS$WS"suffix": "",$WS"usr": "c:@F@foo#*I#"
+// CHECK-DAG: "id": [[CONTRIBUTOR_MAIN:[0-9]+]],$NS$WS"suffix": "",$WS"usr": "c:@F@main{{.*}}"
+
 // 'argv' is reported as type-constrained.
 // CHECK: "analysis_name": "TypeConstrainedPointersAnalysisResult"
 // CHECK: "@": [[ARGV_ID]]
 
 // In the reachable result 'q' is present but 'argv' is not.
 // CHECK: "analysis_name": "UnsafeBufferReachableAnalysisResult"
-// CHECK-DAG: "@": [[Q_ID]]$PTR_L1
+
+// 'foo' contributes unsafe pointer 'q'.
+// CHECK: "@": [[CONTRIBUTOR_FOO]]$WS},$WS[
+// CHECK: "@": [[Q_ID]]$PTR_L1
+// CHECK-NOT: "@":
+
+// 'main' contributes nothing: 'argv' is type-constrained and excluded.
+// CHECK: "@": [[CONTRIBUTOR_MAIN]]$WS},$WS[
 // CHECK-NOT: "@": [[ARGV_ID]]
 
 // CHECK: "analysis_name"
