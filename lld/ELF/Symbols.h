@@ -78,9 +78,17 @@ public:
   // The file from which this symbol was created.
   InputFile *file;
 
-  // The default copy constructor is deleted due to atomic flags. Define one for
-  // places where no atomic is needed.
-  Symbol(const Symbol &o) { memcpy(static_cast<void *>(this), &o, sizeof(o)); }
+  // Although the copy/move constructors/assignment operators are deleted due
+  // to atomic flags, explicitly delete them in case that ever changes. Copying
+  // or moving symbols is not something we want to be able to do implicitly, so
+  // we can reason about pointers and references to symbols keeping their
+  // meanings. Even when we are copying a symbol we'll still be changing some
+  // aspects of it, so this just ensures we're explicit about what is and is
+  // not being copied.
+  Symbol(const Symbol &o) = delete;
+  Symbol(Symbol &&o) = delete;
+  Symbol &operator=(const Symbol &) = delete;
+  Symbol &operator=(Symbol &&) = delete;
 
 protected:
   const char *nameData;
