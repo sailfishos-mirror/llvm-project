@@ -51,6 +51,7 @@
 #include "clang/Lex/Preprocessor.h"
 #include "llvm/ABI/IRTypeMapper.h"
 #include "llvm/ABI/TargetInfo.h"
+#include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -1379,6 +1380,31 @@ void CodeGenModule::Release() {
   if (WCharWidth != getTriple().getDefaultWCharSize())
     getModule().addModuleFlag(llvm::Module::Error, "wchar_size",
                               static_cast<uint32_t>(WCharWidth));
+
+  if (getTypes().isLongDoubleReferenced()) {
+    StringRef LongDoubleType;
+    switch (llvm::APFloat::SemanticsToEnum(getTarget().getLongDoubleFormat())) {
+    case llvm::APFloat::S_IEEEdouble:
+      LongDoubleType = "double";
+      break;
+    case llvm::APFloat::S_IEEEquad:
+      LongDoubleType = "fp128";
+      break;
+    case llvm::APFloat::S_x87DoubleExtended:
+      LongDoubleType = "x86_fp80";
+      break;
+    case llvm::APFloat::S_PPCDoubleDouble:
+      LongDoubleType = "ppc_fp128";
+      break;
+    default:
+      break;
+    }
+
+    if (!LongDoubleType.empty()) {
+      getModule().addModuleFlag(llvm::Module::Error, "long-double-type",
+                                llvm::MDString::get(VMContext, LongDoubleType));
+    }
+  }
 
   if (getTriple().isOSzOS()) {
     getModule().addModuleFlag(llvm::Module::Warning,
