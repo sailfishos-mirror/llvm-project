@@ -2738,29 +2738,36 @@ void LoopVectorizationCostModel::collectLoopUniforms(ElementCount VF) {
     if (Legal->hasUncountableEarlyExit() && TheLoop->getLoopLatch() != E)
       continue;
     auto *Cmp = dyn_cast<Instruction>(E->getTerminator()->getOperand(0));
-    // TODO: This might occur for a multi-exit readonly loop too?
-    //       Excluded for now in LVL.
-    // TODO: Do we have the main IV available somewhere? this feels a little
-    //       fragile.
-    // If we have an exit condition that is actually two conditions combined
-    // via an or, only add the countable comparison as a uniform value.
+    if (!Cmp || !TheLoop->contains(Cmp) || !Cmp->hasOneUse())
+      continue;
+
+    // If we have an exit condition that is actually two conditions (one counted
+    // and the other uncounted) combined via an or, only add the counted
+    // comparison as a uniform value.
     if (Legal->hasUncountableExitWithSideEffects() &&
         TheLoop->getLoopLatch() == E) {
-      Value *Uncounted, *Counted, *IV;
+      Value *Counted, *IVInc;
       using namespace llvm::PatternMatch;
-      if (match(Cmp,
-                m_c_LogicalOr(
-                    m_Value(Uncounted, m_Cmp(m_Load(m_Value()), m_Value())),
-                    m_Value(Counted, m_Cmp(m_Add(m_Value(IV), m_Value()),
-                                           m_Value()))))) {
-        if (isa<PHINode>(IV)) {
+      auto m_Uncounted = []() {
+        return m_c_ICmp(m_Load(m_Value()), m_Value());
+      };
+      auto m_Counted = [](auto &&Counted, auto &&IVInc) {
+        return m_Value(
+            Counted,
+            m_c_ICmp(m_Value(IVInc, m_Add(m_Value(), m_Value())), m_Value()));
+      };
+      if (match(Cmp, m_c_LogicalOr(m_Uncounted(), m_Counted(Counted, IVInc)))) {
+        const SCEV *S = PSE.getSE()->getSCEV(IVInc);
+        if (match(S, m_scev_AffineAddRec(m_SCEV(), m_scev_One(),
+                                         m_SpecificLoop(TheLoop)))) {
           AddToWorklistIfAllowed(cast<Instruction>(Counted));
           continue;
         }
       }
     }
-    if (Cmp && TheLoop->contains(Cmp) && Cmp->hasOneUse())
-      AddToWorklistIfAllowed(Cmp);
+
+    // Normal exit comparisons are uniform.
+    AddToWorklistIfAllowed(Cmp);
   }
 
   auto PrevVF = VF.divideCoefficientBy(2);

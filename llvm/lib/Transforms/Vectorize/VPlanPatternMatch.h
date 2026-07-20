@@ -767,6 +767,12 @@ inline Cmp_match<Op0_t, Op1_t, Instruction::ICmp> m_ICmp(const Op0_t &Op0,
 }
 
 template <typename Op0_t, typename Op1_t>
+inline auto m_c_ICmp(const Op0_t &Op0, const Op1_t &Op1) {
+  return m_CombineOr(Cmp_match<Op0_t, Op1_t, Instruction::ICmp>(Op0, Op1),
+                     Cmp_match<Op1_t, Op0_t, Instruction::ICmp>(Op1, Op0));
+}
+
+template <typename Op0_t, typename Op1_t>
 inline Cmp_match<Op0_t, Op1_t, Instruction::ICmp>
 m_ICmp(CmpPredicate &Pred, const Op0_t &Op0, const Op1_t &Op1) {
   return Cmp_match<Op0_t, Op1_t, Instruction::ICmp>(Pred, Op0, Op1);

@@ -22,6 +22,7 @@
 #include "llvm/Analysis/MustExecute.h"
 #include "llvm/Analysis/OptimizationRemarkEmitter.h"
 #include "llvm/Analysis/ScalarEvolutionExpressions.h"
+#include "llvm/Analysis/ScalarEvolutionPatternMatch.h"
 #include "llvm/Analysis/TargetLibraryInfo.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/Analysis/ValueTracking.h"
@@ -1680,10 +1681,12 @@ bool LoopVectorizationLegality::isVectorizableEarlyExitLoop() {
     // If not a separate counted exit in the latch, then check for a combined
     // countable and uncountable exit.
     BasicBlock *TrueBB, *FalseBB;
-    // Do we know the IV here?
     if (!match(LatchBB->getTerminator(),
-               m_Br(m_c_LogicalOr(m_Value(), m_Cmp(m_Add(m_Value(), m_Value()),
-                                                   m_Value())),
+               m_Br(m_c_LogicalOr(
+                        m_Value(),
+                        m_c_ICmp(m_c_Add(m_Specific(getPrimaryInduction()),
+                                         m_Value()),
+                                 m_Value())),
                     TrueBB, FalseBB))) {
       reportVectorizationFailure(
           "Latch block does not have a countable exit condition",
@@ -1801,29 +1804,49 @@ bool LoopVectorizationLegality::canUncountableExitConditionLoadBeMoved(
   auto *Br = cast<CondBrInst>(ExitingBlock->getTerminator());
 
   using namespace llvm::PatternMatch;
-  Instruction *L = nullptr;
-  Value *Ptr = nullptr;
-  Value *R = nullptr;
-  if (!match(
-          Br->getCondition(),
-          m_CombineOr(m_OneUse(m_c_ICmp(
-                          m_OneUse(m_Instruction(L, m_Load(m_Value(Ptr)))),
-                          m_Value(R))),
-                      m_OneUse(m_LogicalOr(
-                          m_OneUse(m_c_ICmp(
-                              m_OneUse(m_Instruction(L, m_Load(m_Value(Ptr)))),
-                              m_Value(R))),
-                          m_ICmp(m_Add(m_Value(), m_Value()), m_Value())))))) {
+  using namespace llvm::SCEVPatternMatch;
+  Value *Ptr, *L, *R, *IVInc = nullptr;
+  // We want to match either an uncounted condition (loaded value compared
+  // against a loop invariant value) or the combination (via logical or) of
+  // an uncounted condition with a counted condition (integer comparison of
+  // an induction variable for which we can identify an add recurrence within
+  // this loop).
+  auto m_Uncounted = [](auto &&Ptr, auto &&L, auto &&R) {
+    return m_OneUse(
+        m_c_ICmp(m_OneUse(m_Value(L, m_Load(m_Value(Ptr)))), m_Value(R)));
+  };
+  auto m_Counted = [](auto &&IVInc) {
+    return m_c_ICmp(m_Value(IVInc, m_Add(m_Value(), m_Value())), m_Value());
+  };
+
+  if (!match(Br->getCondition(),
+             m_CombineOr(m_Uncounted(Ptr, L, R),
+                         m_OneUse(m_LogicalOr(m_Uncounted(Ptr, L, R),
+                                              m_Counted(IVInc)))))) {
     reportVectorizationFailure(
         "Early exit loop with store but no supported condition load",
         "NoConditionLoadForEarlyExitLoop", ORE, TheLoop);
     return false;
   }
 
+  // Bail if the uncountable exit load is compared against a non-invariant
+  // value.
+  // TODO: Remove this restriction.
   if (!TheLoop->isLoopInvariant(R)) {
     reportVectorizationFailure(
         "Early exit loop with store but no supported condition load",
         "NoConditionLoadForEarlyExitLoop", ORE, TheLoop);
+    return false;
+  }
+
+  // If we have a combined exit, make sure the counted portion is a SCEVAddRec
+  // with a step of 1 within this loop.
+  if (IVInc && !match(PSE.getSE()->getSCEV(IVInc),
+                      m_scev_AffineAddRec(m_SCEV(), m_scev_One(),
+                                          m_SpecificLoop(TheLoop)))) {
+    reportVectorizationFailure(
+        "Uncountable exit loop with unsupported combined condition",
+        "UnsupportedCombinedUncountableCondition", ORE, TheLoop);
     return false;
   }
 
