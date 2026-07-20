@@ -79,13 +79,13 @@ _LIBCPP_PUSH_MACROS
 _LIBCPP_BEGIN_NAMESPACE_STD
 
 template <class _Ref, class _Val>
-using __gen_val = conditional_t<is_void_v<_Val>, remove_cvref_t<_Ref>, _Val>;
+using __gen_val _LIBCPP_NODEBUG = conditional_t<is_void_v<_Val>, remove_cvref_t<_Ref>, _Val>;
 
 template <class _Ref, class _Val>
-using __gen_ref = conditional_t<is_void_v<_Val>, _Ref&&, _Ref>;
+using __gen_ref _LIBCPP_NODEBUG = conditional_t<is_void_v<_Val>, _Ref&&, _Ref>;
 
 template <class _Ref, class _Val>
-using __gen_yielded =
+using __gen_yielded _LIBCPP_NODEBUG =
     conditional_t<is_reference_v<__gen_ref<_Ref, _Val>>, __gen_ref<_Ref, _Val>, const __gen_ref<_Ref, _Val>&>;
 
 template <class, class>
@@ -313,7 +313,7 @@ public:
   _LIBCPP_HIDE_FROM_ABI void return_void() const noexcept {}
 
   _LIBCPP_HIDE_FROM_ABI void unhandled_exception() {
-#    ifndef _LIBCPP_HAS_NO_EXCEPTIONS
+#    if _LIBCPP_HAS_EXCEPTIONS
     if (__is_root()) {
       throw;
     } else {
@@ -338,10 +338,10 @@ concept __gen_stateless_allocator =
 template <class _Allocator>
 class __gen_promise_allocator {
 private:
-  using __rebind           = allocator_traits<_Allocator>::template rebind_alloc<__gen_aligned_block>;
-  using __rebind_size_type = allocator_traits<__rebind>::size_type;
+  using __rebind _LIBCPP_NODEBUG           = allocator_traits<_Allocator>::template rebind_alloc<__gen_aligned_block>;
+  using __rebind_size_type _LIBCPP_NODEBUG = allocator_traits<__rebind>::size_type;
 
-  using __rebind_pointer = allocator_traits<__rebind>::pointer;
+  using __rebind_pointer _LIBCPP_NODEBUG = allocator_traits<__rebind>::pointer;
   static_assert(is_pointer_v<__rebind_pointer>);
 
   _LIBCPP_HIDE_FROM_ABI static void* __alloc(const _Allocator& __al, size_t __size) {
@@ -403,7 +403,7 @@ public:
 template <>
 class __gen_promise_allocator<void> {
 private:
-  using __dealloc_fn = void (*)(void*, size_t) noexcept;
+  using __dealloc_fn _LIBCPP_NODEBUG = void (*)(void*, size_t) noexcept;
 
   template <class _Allocator>
   _LIBCPP_HIDE_FROM_ABI static void* __alloc(const _Allocator& __al, size_t __size) {
@@ -502,8 +502,8 @@ public:
 template <class _Ref, class _Val>
 class __gen_iter_provider<_Ref, _Val>::__iterator {
 private:
-  using __val = __gen_val<_Ref, _Val>;
-  using __ref = __gen_ref<_Ref, _Val>;
+  using __val _LIBCPP_NODEBUG = __gen_val<_Ref, _Val>;
+  using __ref _LIBCPP_NODEBUG = __gen_ref<_Ref, _Val>;
 
 public:
   using value_type      = __val;
@@ -543,14 +543,14 @@ private:
 template <class _Ref, class _Val = void, class _Allocator = void>
 class generator : public ranges::view_interface<generator<_Ref, _Val, _Allocator>> {
 private:
-  using __val = __gen_val<_Ref, _Val>;
+  using __val _LIBCPP_NODEBUG = __gen_val<_Ref, _Val>;
   static_assert(same_as<remove_cvref_t<__val>, __val> && is_object_v<__val>);
 
-  using __ref = __gen_ref<_Ref, _Val>;
+  using __ref _LIBCPP_NODEBUG = __gen_ref<_Ref, _Val>;
   static_assert(is_reference_v<__ref> ||
                 (same_as<remove_cvref_t<__ref>, __ref> && is_object_v<__ref> && copy_constructible<__ref>));
 
-  using __rref = conditional_t<is_lvalue_reference_v<_Ref>, remove_reference_t<_Ref>&&, _Ref>;
+  using __rref _LIBCPP_NODEBUG = conditional_t<is_lvalue_reference_v<_Ref>, remove_reference_t<_Ref>&&, _Ref>;
   static_assert(common_reference_with<__ref&&, __val&> && common_reference_with<__ref&&, __rref&&> &&
                 common_reference_with<__rref&&, const __val&>);
 
