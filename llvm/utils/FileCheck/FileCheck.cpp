@@ -425,7 +425,7 @@ static std::string GetCheckTypeAbbreviation(Check::FileCheckType Ty) {
   llvm_unreachable("unknown FileCheckType");
 }
 
-template <> struct DenseMapInfo<SMLoc> {
+template <> struct llvm::DenseMapInfo<SMLoc> {
   static unsigned getHashValue(const SMLoc &Loc) {
     return DenseMapInfo<const char *>::getHashValue(Loc.getPointer());
   }
