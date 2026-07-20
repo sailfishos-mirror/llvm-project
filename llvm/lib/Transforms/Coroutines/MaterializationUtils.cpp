@@ -405,12 +405,8 @@ void coro::doRematerializations(
   // See if there are materializable instructions across suspend points
   // We record these as the starting point to also identify materializable
   // defs of uses in these operations
-  SmallDenseMap<Value *, bool> AvailMemo;
   for (Instruction &I : instructions(F)) {
     if (!IsMaterializable(I))
-      continue;
-    if (!allOperandsAvailableAfterSuspend(I, IsMaterializable, Checker,
-                                          AvailMemo))
       continue;
     for (User *U : I.users())
       if (Checker.isDefinitionAcrossSuspend(I, U))
@@ -428,6 +424,9 @@ void coro::doRematerializations(
   // correct. We also rely on CSE removing duplicate defs for remats of
   // different instructions with a def in common (rather than maintaining more
   // complex graphs for each suspend point)
+
+  // Caches whether values are available after a suspend point.
+  SmallDenseMap<Value *, bool> AvailMemo;
 
   // We can do this by adding new nodes to the list for each suspend
   // point. Then using standard GraphTraits to give a reverse post-order
