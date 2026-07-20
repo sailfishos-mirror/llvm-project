@@ -5806,30 +5806,23 @@ void VPlanTransforms::expandSCEVsToVPInstructions(VPlan &Plan,
                     ->getDebugLoc();
   VPSCEVExpander Expander(Builder, SE, DL);
 
-  // Expand VPExpandSCEVRecipes and VPExpandStridePredicatesRecipes to
-  // VPInstructions using VPSCEVExpander. During the transition, unsupported
-  // recipes are skipped and left for late expansion.
+  // Expand VPExpandSCEVRecipes to VPInstructions using VPSCEVExpander. During
+  // the transition, unsupported VPExpandSCEVRecipes are skipped and left for
+  // late expansion.
   for (VPRecipeBase &R : make_early_inc_range(*Entry)) {
-    auto *Def = dyn_cast<VPSingleDefRecipe>(&R);
-    if (!Def || Def->user_empty())
+    auto *ExpSCEV = dyn_cast<VPExpandSCEVRecipe>(&R);
+    if (!ExpSCEV || ExpSCEV->user_empty())
       continue;
-
-    auto *ExpStrides = dyn_cast<VPExpandStridePredicatesRecipe>(Def);
-    auto *ExpSCEV = dyn_cast<VPExpandSCEVRecipe>(Def);
-    if (!ExpStrides && !ExpSCEV)
-      continue;
-    Builder.setInsertPoint(Def);
-    VPValue *Expanded =
-        ExpSCEV ? Expander.tryToExpand(ExpSCEV->getSCEV())
-                : Expander.tryToExpandPredicate(ExpStrides->getSCEVPredicate());
+    Builder.setInsertPoint(ExpSCEV);
+    VPValue *Expanded = Expander.tryToExpand(ExpSCEV->getSCEV());
     if (!Expanded)
       continue;
-    Def->replaceAllUsesWith(Expanded);
+    ExpSCEV->replaceAllUsesWith(Expanded);
     // TripCount should not be used after expansion to VPInstructions. Reset to
     // poison to avoid dangling references.
-    if (Plan.getTripCount() == Def)
-      Plan.resetTripCount(Plan.getPoison(Def->getScalarType()));
-    Def->eraseFromParent();
+    if (Plan.getTripCount() == ExpSCEV)
+      Plan.resetTripCount(Plan.getPoison(ExpSCEV->getScalarType()));
+    ExpSCEV->eraseFromParent();
   }
 }
 
@@ -5855,12 +5848,8 @@ VPlanTransforms::expandSCEVs(VPlan &Plan, ScalarEvolution &SE) {
       Plan.resetTripCount(Exp);
     ExpSCEV->eraseFromParent();
   }
-  // NOTE: All current uses of VPExpandStridePredicatesRecipe are expected to be
-  // expandable via VPSCEVExpander, thus no handling here.
-  assert(none_of(*Entry,
-                 IsaPred<VPExpandSCEVRecipe, VPExpandStridePredicatesRecipe>) &&
-         "all VPExpandSCEVRecipes/VPExpandStridePredicatesRecipe must have "
-         "been expanded");
+  assert(none_of(*Entry, IsaPred<VPExpandSCEVRecipe>) &&
+         "all VPExpandSCEVRecipes must have been expanded");
   // Add IR instructions in the entry basic block but not in the VPIRBasicBlock
   // to the VPIRBasicBlock.
   auto EI = Entry->begin();
@@ -7674,15 +7663,20 @@ void VPlanTransforms::multiversionForUnitStridedMemOps(
 
   VPBasicBlock *Entry = Plan.getEntry();
   VPBuilder Builder(Entry);
-
-  auto *Pred = Builder.createExpandSCEVPredicate(StridePredicates);
+  DebugLoc DL = cast<VPIRBasicBlock>(Entry)
+                    ->getIRBasicBlock()
+                    ->getTerminator()
+                    ->getDebugLoc();
+  VPSCEVExpander Expander(Builder, *SE, DL);
+  VPValue *Pred = Expander.tryToExpandPredicate(&StridePredicates);
+  assert(Pred && "Must be expandable!");
 
   auto *StridesCheckBB = Plan.createVPBasicBlock("strides.check");
   VPBasicBlock *ScalarPH = Plan.getScalarPreheader();
   VPBlockUtils::insertBlockBefore(StridesCheckBB, Plan.getVectorPreheader());
   VPBlockUtils::connectBlocks(StridesCheckBB, ScalarPH);
-  // SCEVExpander::expandCodeForPredicate would negate the condition, so scalar
-  // preheader should be the first successor.
+  // SCEVExpander/VPSCEVExpander::expandCodeForPredicate negate the condition,
+  // so scalar preheader should be the first successor.
   std::swap(StridesCheckBB->getSuccessors()[0],
             StridesCheckBB->getSuccessors()[1]);
   Builder.setInsertPoint(StridesCheckBB);

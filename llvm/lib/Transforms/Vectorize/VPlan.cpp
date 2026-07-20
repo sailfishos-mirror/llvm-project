@@ -677,9 +677,7 @@ void VPBasicBlock::print(raw_ostream &O, const Twine &Indent,
   auto RecipeIndent = Indent + "  ";
   for (const VPRecipeBase &Recipe : *this) {
     Recipe.print(O, RecipeIndent, SlotTracker);
-    // SCEVPredicate::print adds a newline so we don't want to add one for it:
-    if (!isa<VPExpandStridePredicatesRecipe>(Recipe))
-      O << '\n';
+    O << '\n';
   }
 
   printSuccessors(O, Indent);

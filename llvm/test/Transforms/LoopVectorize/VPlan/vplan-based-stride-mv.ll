@@ -12,7 +12,7 @@ define void @basic(ptr noalias %p.out, ptr %p, i64 %stride) {
 ; CHECK-NEXT:  Live-in ir<128> = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
-; CHECK-NEXT:    EMIT vp<[[VP3:%[0-9]+]]> = EXPAND SCEVPredicate Equal predicate: %stride == 1
+; CHECK-NEXT:    EMIT vp<[[VP3:%[0-9]+]]> = icmp ne ir<%stride>, ir<1>
 ; CHECK-NEXT:  Successor(s): scalar.ph, strides.check
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  strides.check:
@@ -156,7 +156,7 @@ define void @byte_gep_scaled_stride(ptr noalias %p.out, ptr %p, i64 %stride) {
 ; CHECK-NEXT:  Live-in ir<128> = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
-; CHECK-NEXT:    EMIT vp<[[VP3:%[0-9]+]]> = EXPAND SCEVPredicate Equal predicate: %stride == 1
+; CHECK-NEXT:    EMIT vp<[[VP3:%[0-9]+]]> = icmp ne ir<%stride>, ir<1>
 ; CHECK-NEXT:  Successor(s): scalar.ph, strides.check
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  strides.check:
@@ -669,7 +669,7 @@ define void @shared_stride(ptr noalias %p.out, ptr %p0, ptr %p1, i64 %stride) {
 ; CHECK-NEXT:  Live-in ir<128> = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
-; CHECK-NEXT:    EMIT vp<[[VP3:%[0-9]+]]> = EXPAND SCEVPredicate Equal predicate: %stride == 1
+; CHECK-NEXT:    EMIT vp<[[VP3:%[0-9]+]]> = icmp ne ir<%stride>, ir<1>
 ; CHECK-NEXT:  Successor(s): scalar.ph, strides.check
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  strides.check:
@@ -766,19 +766,20 @@ define void @independent_strides(ptr noalias %p.out, ptr %p0, ptr %p1, i64 %stri
 ; CHECK-NEXT:  Live-in ir<128> = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
-; CHECK-NEXT:    EMIT vp<[[VP3:%[0-9]+]]> = EXPAND SCEVPredicate Equal predicate: %stride0 == 1
-; CHECK-NEXT:  Equal predicate: %stride1 == 1
+; CHECK-NEXT:    EMIT vp<[[VP3:%[0-9]+]]> = icmp ne ir<%stride0>, ir<1>
+; CHECK-NEXT:    EMIT vp<[[VP4:%[0-9]+]]> = icmp ne ir<%stride1>, ir<1>
+; CHECK-NEXT:    EMIT vp<[[VP5:%[0-9]+]]> = or vp<[[VP3]]>, vp<[[VP4]]>
 ; CHECK-NEXT:  Successor(s): scalar.ph, strides.check
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  strides.check:
-; CHECK-NEXT:    EMIT branch-on-cond vp<[[VP3]]>
+; CHECK-NEXT:    EMIT branch-on-cond vp<[[VP5]]>
 ; CHECK-NEXT:  Successor(s): scalar.ph, vector.ph
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  vector.ph:
 ; CHECK-NEXT:  Successor(s): vector loop
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  <x1> vector loop: {
-; CHECK-NEXT:  vp<[[VP5:%[0-9]+]]> = CANONICAL-IV
+; CHECK-NEXT:  vp<[[VP7:%[0-9]+]]> = CANONICAL-IV
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    vector.body:
 ; CHECK-NEXT:      ir<%iv> = WIDEN-INDUCTION nsw ir<0>, ir<1>, vp<[[VP0]]>
@@ -787,23 +788,23 @@ define void @independent_strides(ptr noalias %p.out, ptr %p0, ptr %p1, i64 %stri
 ; CHECK-NEXT:      EMIT ir<%idx1> = mul ir<%iv>, ir<1>
 ; CHECK-NEXT:      EMIT ir<%gep.ld0> = getelementptr ir<%p0>, ir<%idx0>
 ; CHECK-NEXT:      EMIT ir<%gep.ld1> = getelementptr ir<%p1>, ir<%idx1>
-; CHECK-NEXT:      vp<[[VP6:%[0-9]+]]> = vector-pointer ir<%gep.ld0>, ir<8>
-; CHECK-NEXT:      WIDEN ir<%ld0> = load vp<[[VP6]]>
-; CHECK-NEXT:      vp<[[VP7:%[0-9]+]]> = vector-pointer ir<%gep.ld1>, ir<8>
-; CHECK-NEXT:      WIDEN ir<%ld1> = load vp<[[VP7]]>
+; CHECK-NEXT:      vp<[[VP8:%[0-9]+]]> = vector-pointer ir<%gep.ld0>, ir<8>
+; CHECK-NEXT:      WIDEN ir<%ld0> = load vp<[[VP8]]>
+; CHECK-NEXT:      vp<[[VP9:%[0-9]+]]> = vector-pointer ir<%gep.ld1>, ir<8>
+; CHECK-NEXT:      WIDEN ir<%ld1> = load vp<[[VP9]]>
 ; CHECK-NEXT:      EMIT ir<%val> = add ir<%ld0>, ir<%ld1>
 ; CHECK-NEXT:      EMIT ir<%gep.st> = getelementptr ir<%p.out>, ir<%iv>
-; CHECK-NEXT:      vp<[[VP8:%[0-9]+]]> = vector-pointer ir<%gep.st>, ir<1>
-; CHECK-NEXT:      WIDEN store vp<[[VP8]]>, ir<%val>
+; CHECK-NEXT:      vp<[[VP10:%[0-9]+]]> = vector-pointer ir<%gep.st>, ir<1>
+; CHECK-NEXT:      WIDEN store vp<[[VP10]]>, ir<%val>
 ; CHECK-NEXT:      EMIT ir<%exitcond> = icmp sge ir<%iv.next>, ir<128>
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP5]]>, vp<[[VP1]]>
+; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP7]]>, vp<[[VP1]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
 ; CHECK-NEXT:  Successor(s): middle.block
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  middle.block:
-; CHECK-NEXT:    EMIT vp<[[VP10:%[0-9]+]]> = exiting-iv-value ir<%iv>
+; CHECK-NEXT:    EMIT vp<[[VP12:%[0-9]+]]> = exiting-iv-value ir<%iv>
 ; CHECK-NEXT:    EMIT vp<%cmp.n> = icmp eq ir<128>, vp<[[VP2]]>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%cmp.n>
 ; CHECK-NEXT:  Successor(s): ir-bb<exit>, scalar.ph
@@ -812,7 +813,7 @@ define void @independent_strides(ptr noalias %p.out, ptr %p0, ptr %p1, i64 %stri
 ; CHECK-NEXT:  No successors
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  scalar.ph:
-; CHECK-NEXT:    EMIT-SCALAR vp<%bc.resume.val> = phi [ vp<[[VP10]]>, middle.block ], [ ir<0>, ir-bb<entry> ], [ ir<0>, strides.check ]
+; CHECK-NEXT:    EMIT-SCALAR vp<%bc.resume.val> = phi [ vp<[[VP12]]>, middle.block ], [ ir<0>, ir-bb<entry> ], [ ir<0>, strides.check ]
 ; CHECK-NEXT:  Successor(s): ir-bb<header>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<header>:
@@ -867,7 +868,7 @@ define void @dependent_strides(ptr noalias %p.out, ptr %p0, ptr %p1, i64 %stride
 ; CHECK-NEXT:  Live-in ir<128> = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
-; CHECK-NEXT:    EMIT vp<[[VP3:%[0-9]+]]> = EXPAND SCEVPredicate Equal predicate: %stride == 1
+; CHECK-NEXT:    EMIT vp<[[VP3:%[0-9]+]]> = icmp ne ir<%stride>, ir<1>
 ; CHECK-NEXT:  Successor(s): scalar.ph, strides.check
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  strides.check:
@@ -971,7 +972,7 @@ define void @dependent_strides_reverse_order(ptr noalias %p.out, ptr %p0, ptr %p
 ; CHECK-NEXT:  Live-in ir<128> = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
-; CHECK-NEXT:    EMIT vp<[[VP3:%[0-9]+]]> = EXPAND SCEVPredicate Equal predicate: %stride == 1
+; CHECK-NEXT:    EMIT vp<[[VP3:%[0-9]+]]> = icmp ne ir<%stride>, ir<1>
 ; CHECK-NEXT:  Successor(s): scalar.ph, strides.check
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  strides.check:
@@ -1266,7 +1267,7 @@ define void @strided_interleave(ptr noalias %p.out, ptr %p, i64 %stride) {
 ; CHECK-NEXT:  Live-in ir<128> = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
-; CHECK-NEXT:    EMIT vp<[[VP3:%[0-9]+]]> = EXPAND SCEVPredicate Equal predicate: %stride == 1
+; CHECK-NEXT:    EMIT vp<[[VP3:%[0-9]+]]> = icmp ne ir<%stride>, ir<1>
 ; CHECK-NEXT:  Successor(s): scalar.ph, strides.check
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  strides.check:
@@ -1366,7 +1367,7 @@ define void @in_loop_base(ptr noalias %p.out, ptr %p, i64 %stride, i64 %offset) 
 ; CHECK-NEXT:  Live-in ir<128> = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
-; CHECK-NEXT:    EMIT vp<[[VP3:%[0-9]+]]> = EXPAND SCEVPredicate Equal predicate: %stride == 1
+; CHECK-NEXT:    EMIT vp<[[VP3:%[0-9]+]]> = icmp ne ir<%stride>, ir<1>
 ; CHECK-NEXT:  Successor(s): scalar.ph, strides.check
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  strides.check:
@@ -1459,7 +1460,7 @@ define void @base_not_in_ir(ptr noalias %p.out, ptr %p, i64 %stride, i64 %offset
 ; CHECK-NEXT:  Live-in ir<128> = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
-; CHECK-NEXT:    EMIT vp<[[VP3:%[0-9]+]]> = EXPAND SCEVPredicate Equal predicate: %stride == 1
+; CHECK-NEXT:    EMIT vp<[[VP3:%[0-9]+]]> = icmp ne ir<%stride>, ir<1>
 ; CHECK-NEXT:  Successor(s): scalar.ph, strides.check
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  strides.check:
@@ -1733,7 +1734,7 @@ define void @non_constant_btc(ptr noalias %p.out, ptr %p, i64 %stride, i64 %n) {
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
 ; CHECK-NEXT:    EMIT vp<[[VP3]]> = EXPAND SCEV (1 smax %n)
-; CHECK-NEXT:    EMIT vp<[[VP4:%[0-9]+]]> = EXPAND SCEVPredicate Equal predicate: %stride == 1
+; CHECK-NEXT:    EMIT vp<[[VP4:%[0-9]+]]> = icmp ne ir<%stride>, ir<1>
 ; CHECK-NEXT:  Successor(s): scalar.ph, strides.check
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  strides.check:
@@ -1992,7 +1993,7 @@ define void @stride_btc_checks_order(ptr noalias %p.out, ptr %p, i64 %stride, i6
 ; CHECK-NEXT:  ir-bb<entry>:
 ; CHECK-NEXT:    IR   %n = mul i64 %m, %stride
 ; CHECK-NEXT:    EMIT vp<[[VP3]]> = EXPAND SCEV (1 smax %m)
-; CHECK-NEXT:    EMIT vp<[[VP4:%[0-9]+]]> = EXPAND SCEVPredicate Equal predicate: %stride == 1
+; CHECK-NEXT:    EMIT vp<[[VP4:%[0-9]+]]> = icmp ne ir<%stride>, ir<1>
 ; CHECK-NEXT:  Successor(s): scalar.ph, strides.check
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  strides.check:
@@ -2082,7 +2083,7 @@ define void @stride_dependent_btc_non_preventive(ptr noalias %p.out, ptr %p, i64
 ; CHECK-NEXT:  ir-bb<entry>:
 ; CHECK-NEXT:    IR   %n = add i64 %stride, 3
 ; CHECK-NEXT:    EMIT vp<[[VP3]]> = EXPAND SCEV 4
-; CHECK-NEXT:    EMIT vp<[[VP4:%[0-9]+]]> = EXPAND SCEVPredicate Equal predicate: %stride == 1
+; CHECK-NEXT:    EMIT vp<[[VP4:%[0-9]+]]> = icmp ne ir<%stride>, ir<1>
 ; CHECK-NEXT:  Successor(s): scalar.ph, strides.check
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  strides.check:
@@ -2205,7 +2206,7 @@ define void @stride_btc_independent_memdep_triple_check(ptr %p, ptr noalias %p2,
 ; CHECK-NEXT:    IR   %p.out = getelementptr i8, ptr %p2, i64 %out.offset
 ; CHECK-NEXT:    IR   %n = add i64 %stride, 3
 ; CHECK-NEXT:    EMIT vp<[[VP3]]> = EXPAND SCEV 4
-; CHECK-NEXT:    EMIT vp<[[VP4:%[0-9]+]]> = EXPAND SCEVPredicate Equal predicate: %stride == 1
+; CHECK-NEXT:    EMIT vp<[[VP4:%[0-9]+]]> = icmp ne ir<%stride>, ir<1>
 ; CHECK-NEXT:  Successor(s): scalar.ph, strides.check
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  strides.check:
@@ -2391,7 +2392,7 @@ define void @nd_array_last_idx(ptr noalias %p.out, ptr %p, i64 %stride) {
 ; CHECK-NEXT:  Live-in ir<128> = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
-; CHECK-NEXT:    EMIT vp<[[VP3:%[0-9]+]]> = EXPAND SCEVPredicate Equal predicate: %stride == 1
+; CHECK-NEXT:    EMIT vp<[[VP3:%[0-9]+]]> = icmp ne ir<%stride>, ir<1>
 ; CHECK-NEXT:  Successor(s): scalar.ph, strides.check
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  strides.check:
@@ -2642,7 +2643,7 @@ define void @sext_stride(ptr noalias %p.out, ptr %p, i32 %stride.i32) {
 ; CHECK-NEXT:  Live-in ir<128> = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
-; CHECK-NEXT:    EMIT vp<[[VP3:%[0-9]+]]> = EXPAND SCEVPredicate Equal predicate: %stride.i32 == 1
+; CHECK-NEXT:    EMIT vp<[[VP3:%[0-9]+]]> = icmp ne ir<%stride.i32>, ir<1>
 ; CHECK-NEXT:  Successor(s): scalar.ph, strides.check
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  strides.check:
@@ -2732,7 +2733,7 @@ define void @trunc_stride(ptr noalias %p.out, ptr %p, i64 %stride.i64) {
 ; CHECK-NEXT:  Live-in ir<128> = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
-; CHECK-NEXT:    EMIT vp<[[VP3:%[0-9]+]]> = EXPAND SCEVPredicate Equal predicate: %stride.i64 == 1
+; CHECK-NEXT:    EMIT vp<[[VP3:%[0-9]+]]> = icmp ne ir<%stride.i64>, ir<1>
 ; CHECK-NEXT:  Successor(s): scalar.ph, strides.check
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  strides.check:
@@ -2824,7 +2825,7 @@ define void @trunc_ext_stride(ptr noalias %p.out, ptr %p0, ptr %p1, i32 %stride)
 ; CHECK-NEXT:  ir-bb<entry>:
 ; CHECK-NEXT:    IR   %stride.trunc = trunc i32 %stride to i16
 ; CHECK-NEXT:    IR   %stride.ext = sext i32 %stride to i64
-; CHECK-NEXT:    EMIT vp<[[VP3:%[0-9]+]]> = EXPAND SCEVPredicate Equal predicate: %stride == 1
+; CHECK-NEXT:    EMIT vp<[[VP3:%[0-9]+]]> = icmp ne ir<%stride>, ir<1>
 ; CHECK-NEXT:  Successor(s): scalar.ph, strides.check
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  strides.check:
@@ -3104,7 +3105,7 @@ define void @basic_strided_store(ptr noalias %p.out, ptr %p, i64 %stride) {
 ; CHECK-NEXT:  Live-in ir<128> = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
-; CHECK-NEXT:    EMIT vp<[[VP3:%[0-9]+]]> = EXPAND SCEVPredicate Equal predicate: %stride == 1
+; CHECK-NEXT:    EMIT vp<[[VP3:%[0-9]+]]> = icmp ne ir<%stride>, ir<1>
 ; CHECK-NEXT:  Successor(s): scalar.ph, strides.check
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  strides.check:
@@ -3192,7 +3193,7 @@ define void @ptr_vec_use(ptr noalias %p.out, ptr noalias %p.ptr.out, ptr %p, i64
 ; CHECK-NEXT:  Live-in ir<128> = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
-; CHECK-NEXT:    EMIT vp<[[VP3:%[0-9]+]]> = EXPAND SCEVPredicate Equal predicate: %stride == 1
+; CHECK-NEXT:    EMIT vp<[[VP3:%[0-9]+]]> = icmp ne ir<%stride>, ir<1>
 ; CHECK-NEXT:  Successor(s): scalar.ph, strides.check
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  strides.check:
@@ -3288,7 +3289,7 @@ define void @stride_idx_vec_use(ptr noalias %p.out, ptr %p, i64 %stride) {
 ; CHECK-NEXT:  Live-in ir<128> = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
-; CHECK-NEXT:    EMIT vp<[[VP3:%[0-9]+]]> = EXPAND SCEVPredicate Equal predicate: %stride == 1
+; CHECK-NEXT:    EMIT vp<[[VP3:%[0-9]+]]> = icmp ne ir<%stride>, ir<1>
 ; CHECK-NEXT:  Successor(s): scalar.ph, strides.check
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  strides.check:
@@ -3379,7 +3380,7 @@ define void @offset_stride_idx_vec_use(ptr noalias %p.out, ptr %p, i64 %stride) 
 ; CHECK-NEXT:  Live-in ir<128> = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
-; CHECK-NEXT:    EMIT vp<[[VP3:%[0-9]+]]> = EXPAND SCEVPredicate Equal predicate: %stride == 1
+; CHECK-NEXT:    EMIT vp<[[VP3:%[0-9]+]]> = icmp ne ir<%stride>, ir<1>
 ; CHECK-NEXT:  Successor(s): scalar.ph, strides.check
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  strides.check:
@@ -3501,7 +3502,7 @@ define void @test_rewrite_iv_scevs(i32 %start, ptr %dst) {
 ; CHECK-NEXT:    IR   %start.ext = zext i32 %start to i64
 ; CHECK-NEXT:    EMIT vp<[[VP3:%[0-9]+]]> = EXPAND SCEV 1
 ; CHECK-NEXT:    EMIT vp<[[VP4]]> = EXPAND SCEV 99
-; CHECK-NEXT:    EMIT vp<[[VP5:%[0-9]+]]> = EXPAND SCEVPredicate Equal predicate: %start == 1
+; CHECK-NEXT:    EMIT vp<[[VP5:%[0-9]+]]> = icmp ne ir<%start>, ir<1>
 ; CHECK-NEXT:  Successor(s): scalar.ph, strides.check
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  strides.check:

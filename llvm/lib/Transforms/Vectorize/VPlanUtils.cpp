@@ -426,9 +426,8 @@ bool vputils::isSingleScalar(const VPValue *VPV) {
   if (auto *Expr = dyn_cast<VPExpressionRecipe>(VPV))
     return Expr->isVectorToScalar();
 
-  // VPExpandSCEVRecipes and VPExpandStridePredicatesRecipe must be placed in
-  // the entry and are always uniform.
-  return isa<VPExpandSCEVRecipe, VPExpandStridePredicatesRecipe>(VPV);
+  // VPExpandSCEVRecipes must be placed in the entry and are always uniform.
+  return isa<VPExpandSCEVRecipe>(VPV);
 }
 
 bool vputils::isUniformAcrossVFsAndUFs(const VPValue *V) {
