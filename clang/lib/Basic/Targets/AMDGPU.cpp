@@ -162,6 +162,19 @@ bool AMDGPUTargetInfo::initFeatureMap(
 
   using namespace llvm::AMDGPU;
 
+  // If no CPU was specified but the triple carries an AMDGPU subarch (e.g.
+  // "amdgpu12.00"), derive the CPU from it.
+  // An explicit -target-cpu still takes precedence.
+  std::string SubArchCPU;
+  if (CPU.empty() && getTriple().isAMDGCN()) {
+    llvm::AMDGPU::GPUKind Kind =
+        getGPUKindFromSubArch(getTriple().getSubArch());
+    if (Kind != GK_NONE) {
+      SubArchCPU = getArchNameAMDGCN(Kind).str();
+      CPU = SubArchCPU;
+    }
+  }
+
   if (!TargetInfo::initFeatureMap(Features, Diags, CPU, FeatureVec))
     return false;
 
@@ -191,8 +204,11 @@ void AMDGPUTargetInfo::fillValidCPUList(
 AMDGPUTargetInfo::AMDGPUTargetInfo(const llvm::Triple &Triple,
                                    const TargetOptions &Opts)
     : TargetInfo(Triple),
-      GPUKind(Triple.isAMDGCN() ? llvm::AMDGPU::parseArchAMDGCN(Opts.CPU)
-                                : llvm::AMDGPU::parseArchR600(Opts.CPU)),
+      GPUKind(Triple.isAMDGCN()
+                  ? (Opts.CPU.empty() ? llvm::AMDGPU::getGPUKindFromSubArch(
+                                            Triple.getSubArch())
+                                      : llvm::AMDGPU::parseArchAMDGCN(Opts.CPU))
+                  : llvm::AMDGPU::parseArchR600(Opts.CPU)),
       GPUFeatures(Triple.isAMDGCN() ? llvm::AMDGPU::getArchAttrAMDGCN(GPUKind)
                                     : llvm::AMDGPU::getArchAttrR600(GPUKind)) {
   resetDataLayout();
