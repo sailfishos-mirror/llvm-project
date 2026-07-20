@@ -917,15 +917,13 @@ VPValue *VPSCEVExpander::tryToExpandPredicate(const SCEVPredicate *Pred) {
     }
 
     if (Checks.empty())
-      return Builder.getPlan().getOrAddLiveIn(
-          ConstantInt::getFalse(Builder.getPlan().getContext()));
+      return Builder.getPlan().getFalse();
 
     VPValue *Result = Checks[0];
-    for (VPValue *Check : ArrayRef<VPValue *>(Checks).drop_front())
+    for (VPValue *Check : drop_begin(Checks))
       Result = Builder.createOr(Result, Check, DL);
     return Result;
   }
 
-  assert(false && "We shouldn't be generating that kind of predicate!");
-  return nullptr;
+  llvm_unreachable("Unhandled predicate");
 }

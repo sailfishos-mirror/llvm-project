@@ -7491,7 +7491,8 @@ void VPlanTransforms::makeMemOpWideningDecisions(VPlan &Plan, VFRange &Range,
         return ReplaceWith(VPI, WidenedR);
       });
 
-  if (EnableVPlanBasedStrideMV)
+  if (EnableVPlanBasedStrideMV &&
+      !CostCtx.L->getHeader()->getParent()->hasOptSize())
     RUN_VPLAN_PASS(VPlanTransforms::multiversionForUnitStridedMemOps, Plan,
                    CostCtx, Config, RecipeBuilder, Range, MemOps);
 
@@ -7509,8 +7510,6 @@ void VPlanTransforms::multiversionForUnitStridedMemOps(
     VPlan &Plan, VPCostContext &CostCtx, VFSelectionContext &Config,
     VPRecipeBuilder &RecipeBuilder, VFRange &Range,
     SmallVectorImpl<VPInstruction *> &MemOps) {
-  if (CostCtx.L->getHeader()->getParent()->hasOptSize())
-    return;
   SmallVector<VPInstruction *> RemainingOps;
 
   ScalarEvolution *SE = CostCtx.PSE.getSE();
@@ -7591,9 +7590,9 @@ void VPlanTransforms::multiversionForUnitStridedMemOps(
     if (match(Stride, m_scev_c_Mul(m_SCEVConstant(StrideConstantMultiplier),
                                    m_SCEV(StrideNonConstantMultiplier)))) {
       if (TypeSize != StrideConstantMultiplier) {
-        // TODO: Support `TypeSize = N * StrideCosntantMultiplier`,
+        // TODO: Support `TypeSize = N * StrideConstantMultiplier`,
         // including negative `N`. For now, only process when they're equal,
-        // which matches the usefull part of the legacy behavior that
+        // which matches the useful part of the legacy behavior that
         // multiversiones GEP index for stride one.
         return Skip();
       }
@@ -7634,7 +7633,7 @@ void VPlanTransforms::multiversionForUnitStridedMemOps(
     if (LoopVectorizationPlanner::getDecisionAndClampRange(
             [&](ElementCount VF) {
               return SE->isKnownPredicate(
-                  CmpPredicate(ICmpInst::ICMP_SLT), PredicatedMaxBTC,
+                  ICmpInst::ICMP_SLT, PredicatedMaxBTC,
                   SE->getConstant(PredicatedMaxBTC->getType(),
                                   VF.isScalable() ? 1
                                                   : VF.getFixedValue() - 1));
@@ -7679,7 +7678,7 @@ void VPlanTransforms::multiversionForUnitStridedMemOps(
   auto *Pred = Builder.createExpandSCEVPredicate(StridePredicates);
 
   auto *StridesCheckBB = Plan.createVPBasicBlock("strides.check");
-  VPBlockBase *ScalarPH = Plan.getScalarPreheader();
+  VPBasicBlock *ScalarPH = Plan.getScalarPreheader();
   VPBlockUtils::insertBlockBefore(StridesCheckBB, Plan.getVectorPreheader());
   VPBlockUtils::connectBlocks(StridesCheckBB, ScalarPH);
   // SCEVExpander::expandCodeForPredicate would negate the condition, so scalar
@@ -7689,7 +7688,7 @@ void VPlanTransforms::multiversionForUnitStridedMemOps(
   Builder.setInsertPoint(StridesCheckBB);
   Builder.createNaryOp(VPInstruction::BranchOnCond, Pred);
 
-  for (VPRecipeBase &R : cast<VPBasicBlock>(ScalarPH)->phis()) {
+  for (VPRecipeBase &R : ScalarPH->phis()) {
     auto &Phi = cast<VPPhi>(R);
     Phi.addIncoming(Phi.getIncomingValueForBlock(Entry));
   }

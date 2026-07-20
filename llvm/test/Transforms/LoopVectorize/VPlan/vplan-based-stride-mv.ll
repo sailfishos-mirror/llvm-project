@@ -89,64 +89,9 @@ exit:
   ret void
 }
 
+; Unit-stride speculation isn't even attempted, so no VPlan dumps.
+; CHECK-NOT: @basic_optsize
 define void @basic_optsize(ptr noalias %p.out, ptr %p, i64 %stride) #0 {
-; CHECK-LABEL: VPlan for loop in 'basic_optsize'
-; CHECK:  VPlan ' for UF>=1' {
-; CHECK-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
-; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
-; CHECK-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
-; CHECK-NEXT:  Live-in ir<128> = original trip-count
-; CHECK-EMPTY:
-; CHECK-NEXT:  ir-bb<entry>:
-; CHECK-NEXT:  Successor(s): scalar.ph, vector.ph
-; CHECK-EMPTY:
-; CHECK-NEXT:  vector.ph:
-; CHECK-NEXT:  Successor(s): vector loop
-; CHECK-EMPTY:
-; CHECK-NEXT:  <x1> vector loop: {
-; CHECK-NEXT:  vp<[[VP3:%[0-9]+]]> = CANONICAL-IV
-; CHECK-EMPTY:
-; CHECK-NEXT:    vector.body:
-; CHECK-NEXT:      ir<%iv> = WIDEN-INDUCTION nsw ir<0>, ir<1>, vp<[[VP0]]>
-; CHECK-NEXT:      EMIT ir<%iv.next> = add nsw ir<%iv>, ir<1>
-; CHECK-NEXT:      EMIT ir<%idx> = mul ir<%iv>, ir<%stride>
-; CHECK-NEXT:      EMIT ir<%gep.ld> = getelementptr ir<%p>, ir<%idx>
-; CHECK-NEXT:      EMIT-SCALAR ir<%ld> = load ir<%gep.ld>
-; CHECK-NEXT:      EMIT ir<%gep.st> = getelementptr ir<%p.out>, ir<%iv>
-; CHECK-NEXT:      vp<[[VP4:%[0-9]+]]> = vector-pointer ir<%gep.st>, ir<1>
-; CHECK-NEXT:      WIDEN store vp<[[VP4]]>, ir<%ld>
-; CHECK-NEXT:      EMIT ir<%exitcond> = icmp sge ir<%iv.next>, ir<128>
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
-; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
-; CHECK-NEXT:    No successors
-; CHECK-NEXT:  }
-; CHECK-NEXT:  Successor(s): middle.block
-; CHECK-EMPTY:
-; CHECK-NEXT:  middle.block:
-; CHECK-NEXT:    EMIT vp<[[VP6:%[0-9]+]]> = exiting-iv-value ir<%iv>
-; CHECK-NEXT:    EMIT vp<%cmp.n> = icmp eq ir<128>, vp<[[VP2]]>
-; CHECK-NEXT:    EMIT branch-on-cond vp<%cmp.n>
-; CHECK-NEXT:  Successor(s): ir-bb<exit>, scalar.ph
-; CHECK-EMPTY:
-; CHECK-NEXT:  ir-bb<exit>:
-; CHECK-NEXT:  No successors
-; CHECK-EMPTY:
-; CHECK-NEXT:  scalar.ph:
-; CHECK-NEXT:    EMIT-SCALAR vp<%bc.resume.val> = phi [ vp<[[VP6]]>, middle.block ], [ ir<0>, ir-bb<entry> ]
-; CHECK-NEXT:  Successor(s): ir-bb<header>
-; CHECK-EMPTY:
-; CHECK-NEXT:  ir-bb<header>:
-; CHECK-NEXT:    IR   %iv = phi i64 [ 0, %entry ], [ %iv.next, %header ] (extra operand: vp<%bc.resume.val> from scalar.ph)
-; CHECK-NEXT:    IR   %iv.next = add nsw i64 %iv, 1
-; CHECK-NEXT:    IR   %idx = mul i64 %iv, %stride
-; CHECK-NEXT:    IR   %gep.ld = getelementptr i64, ptr %p, i64 %idx
-; CHECK-NEXT:    IR   %ld = load i64, ptr %gep.ld, align 8
-; CHECK-NEXT:    IR   %gep.st = getelementptr i64, ptr %p.out, i64 %iv
-; CHECK-NEXT:    IR   store i64 %ld, ptr %gep.st, align 8
-; CHECK-NEXT:    IR   %exitcond = icmp slt i64 %iv.next, 128
-; CHECK-NEXT:  No successors
-; CHECK-NEXT:  }
-;
 entry:
   br label %header
 
@@ -171,64 +116,9 @@ exit:
 
 attributes #0 = { optsize }
 
+; Unit-stride speculation isn't even attempted, so no VPlan dumps.
+; CHECK-NOT: @basic_minsize
 define void @basic_minsize(ptr noalias %p.out, ptr %p, i64 %stride) #1 {
-; CHECK-LABEL: VPlan for loop in 'basic_minsize'
-; CHECK:  VPlan ' for UF>=1' {
-; CHECK-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
-; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
-; CHECK-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
-; CHECK-NEXT:  Live-in ir<128> = original trip-count
-; CHECK-EMPTY:
-; CHECK-NEXT:  ir-bb<entry>:
-; CHECK-NEXT:  Successor(s): scalar.ph, vector.ph
-; CHECK-EMPTY:
-; CHECK-NEXT:  vector.ph:
-; CHECK-NEXT:  Successor(s): vector loop
-; CHECK-EMPTY:
-; CHECK-NEXT:  <x1> vector loop: {
-; CHECK-NEXT:  vp<[[VP3:%[0-9]+]]> = CANONICAL-IV
-; CHECK-EMPTY:
-; CHECK-NEXT:    vector.body:
-; CHECK-NEXT:      ir<%iv> = WIDEN-INDUCTION nsw ir<0>, ir<1>, vp<[[VP0]]>
-; CHECK-NEXT:      EMIT ir<%iv.next> = add nsw ir<%iv>, ir<1>
-; CHECK-NEXT:      EMIT ir<%idx> = mul ir<%iv>, ir<%stride>
-; CHECK-NEXT:      EMIT ir<%gep.ld> = getelementptr ir<%p>, ir<%idx>
-; CHECK-NEXT:      EMIT-SCALAR ir<%ld> = load ir<%gep.ld>
-; CHECK-NEXT:      EMIT ir<%gep.st> = getelementptr ir<%p.out>, ir<%iv>
-; CHECK-NEXT:      vp<[[VP4:%[0-9]+]]> = vector-pointer ir<%gep.st>, ir<1>
-; CHECK-NEXT:      WIDEN store vp<[[VP4]]>, ir<%ld>
-; CHECK-NEXT:      EMIT ir<%exitcond> = icmp sge ir<%iv.next>, ir<128>
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
-; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
-; CHECK-NEXT:    No successors
-; CHECK-NEXT:  }
-; CHECK-NEXT:  Successor(s): middle.block
-; CHECK-EMPTY:
-; CHECK-NEXT:  middle.block:
-; CHECK-NEXT:    EMIT vp<[[VP6:%[0-9]+]]> = exiting-iv-value ir<%iv>
-; CHECK-NEXT:    EMIT vp<%cmp.n> = icmp eq ir<128>, vp<[[VP2]]>
-; CHECK-NEXT:    EMIT branch-on-cond vp<%cmp.n>
-; CHECK-NEXT:  Successor(s): ir-bb<exit>, scalar.ph
-; CHECK-EMPTY:
-; CHECK-NEXT:  ir-bb<exit>:
-; CHECK-NEXT:  No successors
-; CHECK-EMPTY:
-; CHECK-NEXT:  scalar.ph:
-; CHECK-NEXT:    EMIT-SCALAR vp<%bc.resume.val> = phi [ vp<[[VP6]]>, middle.block ], [ ir<0>, ir-bb<entry> ]
-; CHECK-NEXT:  Successor(s): ir-bb<header>
-; CHECK-EMPTY:
-; CHECK-NEXT:  ir-bb<header>:
-; CHECK-NEXT:    IR   %iv = phi i64 [ 0, %entry ], [ %iv.next, %header ] (extra operand: vp<%bc.resume.val> from scalar.ph)
-; CHECK-NEXT:    IR   %iv.next = add nsw i64 %iv, 1
-; CHECK-NEXT:    IR   %idx = mul i64 %iv, %stride
-; CHECK-NEXT:    IR   %gep.ld = getelementptr i64, ptr %p, i64 %idx
-; CHECK-NEXT:    IR   %ld = load i64, ptr %gep.ld, align 8
-; CHECK-NEXT:    IR   %gep.st = getelementptr i64, ptr %p.out, i64 %iv
-; CHECK-NEXT:    IR   store i64 %ld, ptr %gep.st, align 8
-; CHECK-NEXT:    IR   %exitcond = icmp slt i64 %iv.next, 128
-; CHECK-NEXT:  No successors
-; CHECK-NEXT:  }
-;
 entry:
   br label %header
 
