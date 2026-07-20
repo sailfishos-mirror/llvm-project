@@ -14,6 +14,7 @@
 #ifndef LLVM_SUPPORT_CODEGEN_H
 #define LLVM_SUPPORT_CODEGEN_H
 
+#include "llvm/ADT/StringRef.h"
 #include <cstdint>
 #include <optional>
 
@@ -68,7 +69,31 @@ namespace llvm {
     Soft,    // Soft float.
     Hard     // Hard float.
   };
+
+  /// Parse the string spelling used by the "float-abi" IR module flag into an
+  /// ABIType.
+  inline std::optional<ABIType> parseABIType(StringRef S) {
+    if (S == "soft")
+      return Soft;
+    if (S == "hard")
+      return Hard;
+    return std::nullopt;
   }
+
+  /// Returns the string spelling used by the "float-abi" IR module flag for a
+  /// Soft or Hard ABIType. Default has no spelling.
+  inline StringRef getABITypeName(ABIType ABI) {
+    switch (ABI) {
+    case Soft:
+      return "soft";
+    case Hard:
+      return "hard";
+    case Default:
+      break;
+    }
+    return "";
+  }
+  } // namespace FloatABI
 
   enum class EABI {
     Unknown,
