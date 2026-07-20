@@ -124,7 +124,7 @@ public:
         break;
       case DW_CFA_AARCH64_set_ra_state: {
         uint64_t RAState = Data.getULEB128(C);
-        uint64_t FactoredOffset = (uint64_t)Data.getSLEB128(C);
+        uint64_t FactoredOffset = static_cast<uint64_t>(Data.getSLEB128(C));
         addInstruction(Opcode, RAState, FactoredOffset);
         break;
       }

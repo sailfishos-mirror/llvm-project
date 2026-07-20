@@ -4,6 +4,10 @@
 ; -mbranch-protection=+pc enables branch protection. If the feature +pauth-lr
 ; is available (v9.5a onwards) then non-NOP instructions are used; otherwise
 ; NOP instructions are used.
+;
+; Independently, -aarch64-cfi-llvm-set-ra-sign-state picks which CFI directive
+; describes that signing: the legacy .cfi_negate_ra_state[_with_pc] ("never",
+; the default), or the new .cfi_set_ra_state ("pauth-lr"/"always").
 
 ; There are 6 cases to cover:
 
@@ -17,16 +21,19 @@
 
 ; sign-return-address-pauth-lr.ll is identical, with the addition of the function
 ; attribute, which enables -mbranch-protection=pac-ret+pc, and therefore tests
-; the remaining parameter combinations in the table:
+; the remaining parameter combinations in the table, each with the legacy
+; negate-based CFI, and the new set-based CFI.
 
 ; RUN: llc -mtriple=aarch64              < %s | FileCheck --check-prefixes=CHECK,COMPAT %s
 ; RUN: llc -mtriple=aarch64 -mattr=v8.3a < %s | FileCheck --check-prefixes=CHECK,V83A %s
 ; RUN: llc -mtriple=aarch64 -mattr=v9a -mattr=pauth-lr < %s | FileCheck --check-prefixes=PAUTHLR %s
-; RUN: llc -mtriple=aarch64              -aarch64-cfi-llvm-set-ra-sign-state=pauth-lr < %s | FileCheck --check-prefixes=CFISET-CHECK,CFISET-COMPAT %s
-; RUN: llc -mtriple=aarch64 -mattr=v8.3a -aarch64-cfi-llvm-set-ra-sign-state=pauth-lr < %s | FileCheck --check-prefixes=CFISET-CHECK,CFISET-V83A %s
-; RUN: llc -mtriple=aarch64              -aarch64-cfi-llvm-set-ra-sign-state=never < %s | FileCheck --check-prefixes=NEGATE-CHECK,NEGATE-COMPAT %s
-; RUN: llc -mtriple=aarch64 -mattr=v8.3a -aarch64-cfi-llvm-set-ra-sign-state=never < %s | FileCheck --check-prefixes=NEGATE-CHECK,NEGATE-V83A %s
-; RUN: llc -mtriple=aarch64 -mattr=v9a -mattr=pauth-lr -aarch64-cfi-llvm-set-ra-sign-state=never < %s | FileCheck --check-prefixes=NEGATE-PAUTHLR %s
+;
+; RUN: llc -mtriple=aarch64                     -aarch64-cfi-llvm-set-ra-sign-state=pauth-lr < %s | FileCheck --check-prefixes=CFISET-CHECK,CFISET-COMPAT %s
+; RUN: llc -mtriple=aarch64 -mattr=v8.3a        -aarch64-cfi-llvm-set-ra-sign-state=pauth-lr < %s | FileCheck --check-prefixes=CFISET-CHECK,CFISET-V83A %s
+;
+; RUN: llc -mtriple=aarch64                     -aarch64-cfi-llvm-set-ra-sign-state=never    < %s | FileCheck --check-prefixes=NEGATE-CHECK,NEGATE-COMPAT %s
+; RUN: llc -mtriple=aarch64 -mattr=v8.3a        -aarch64-cfi-llvm-set-ra-sign-state=never    < %s | FileCheck --check-prefixes=NEGATE-CHECK,NEGATE-V83A %s
+; RUN: llc -mtriple=aarch64 -mattr=v9a,pauth-lr -aarch64-cfi-llvm-set-ra-sign-state=never    < %s | FileCheck --check-prefixes=NEGATE-PAUTHLR %s
 
 ; See also: sign-return-address-pauth-lr-mir.ll
 
