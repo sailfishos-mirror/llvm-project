@@ -4979,9 +4979,13 @@ Value *ScalarExprEmitter::EmitSub(const BinOpInfo &op) {
 
   // Do the raw subtraction part.
   llvm::Value *LHS
-    = Builder.CreatePtrToInt(op.LHS, CGF.PtrDiffTy, "sub.ptr.lhs.cast");
+    = Builder.CreatePtrToAddr(op.LHS, "sub.ptr.lhs.cast");
   llvm::Value *RHS
-    = Builder.CreatePtrToInt(op.RHS, CGF.PtrDiffTy, "sub.ptr.rhs.cast");
+    = Builder.CreatePtrToAddr(op.RHS, "sub.ptr.rhs.cast");
+  if (LHS->getType() != CGF.PtrDiffTy)
+    LHS = Builder.CreateZExtOrTrunc(LHS, CGF.PtrDiffTy, "sub.ptr.lhs.ext");
+  if (RHS->getType() != CGF.PtrDiffTy)
+    RHS = Builder.CreateZExtOrTrunc(RHS, CGF.PtrDiffTy, "sub.ptr.lhs.ext");
   Value *diffInChars = Builder.CreateSub(LHS, RHS, "sub.ptr.sub");
 
   // Okay, figure out the element size.
