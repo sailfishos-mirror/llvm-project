@@ -6075,6 +6075,7 @@ enum class MetadirectiveLoopIVMarking {
   NestTooShallow,   // Fewer DO loops than the variant's COLLAPSE/ORDERED needs.
   NonCanonicalLoop, // An affected loop is a DO WHILE or has no loop control.
   IndirectIV,       // An affected induction variable is POINTER or ALLOCATABLE.
+  AssociateIV,      // An affected induction variable is an ASSOCIATE name.
 };
 
 /// Mark loop induction variable data-sharing attributes for a
@@ -6082,7 +6083,9 @@ enum class MetadirectiveLoopIVMarking {
 /// because the variant is resolved at lowering time. Return a non-`Marked`
 /// result, leaving the diagnostic to the caller, when the associated loop nest
 /// is shallower than the variant's COLLAPSE/ORDERED requires or an affected
-/// loop is not a canonical DO loop, POINTER, or ALLOCATABLE.
+/// loop is not a canonical DO loop or an affected induction variable requires
+/// construct-scoped name resolution that metadirective lowering cannot yet
+/// reproduce.
 static MetadirectiveLoopIVMarking
 markMetadirectiveLoopIVs(semantics::SemanticsContext &semaCtx,
                          const parser::OmpDirectiveSpecification &spec,
@@ -6123,6 +6126,12 @@ markMetadirectiveLoopIVs(semantics::SemanticsContext &semaCtx,
     if (!doConstruct->IsDoNormal() && !doConstruct->IsDoConcurrent())
       return MetadirectiveLoopIVMarking::NonCanonicalLoop;
     if (semantics::Symbol *sym = getIterationVariableSymbol(*doEval)) {
+      // Ordinary OpenMP name resolution creates a construct-scoped symbol for
+      // an ASSOCIATE-name induction variable. Marking the associate name after
+      // name resolution cannot create the private or lastprivate binding that
+      // loop lowering requires.
+      if (sym->GetUltimate().has<semantics::AssocEntityDetails>())
+        return MetadirectiveLoopIVMarking::AssociateIV;
       // Ordinary OpenMP semantic resolution creates a construct-scoped symbol
       // for a POINTER or ALLOCATABLE induction variable. A metadirective
       // variant is selected too late for that name-resolution step, and marking
@@ -6354,6 +6363,7 @@ static void genMetadirective(lower::AbstractConverter &converter,
   if (!hasLoopAssociatedCandidate && fallback)
     hasLoopAssociatedCandidate = hasLoopAssociatedDirective(fallback->DirId());
   SplicedAssociatedEvaluations splicedAssociatedEvaluations;
+  lower::pft::Evaluation *associatedLoopEval = nullptr;
   lower::pft::EvaluationList continuationEvaluations;
   llvm::scope_exit restoreEvaluationOwnership([&]() {
     if (!continuationEvaluations.empty()) {
@@ -6366,6 +6376,7 @@ static void genMetadirective(lower::AbstractConverter &converter,
   if (hasLoopAssociatedCandidate) {
     if (lower::pft::Evaluation *loopEval =
             spliceAssociatedDoEval(eval, &splicedAssociatedEvaluations)) {
+      associatedLoopEval = loopEval;
       if (lower::pft::FunctionLikeUnit *owningProc =
               eval.getOwningProcedure()) {
         if (owningProc->getEntryEval() &&
@@ -6396,6 +6407,17 @@ static void genMetadirective(lower::AbstractConverter &converter,
       // loop. They are common continuation code, not part of each replacement.
       continuationEvaluations.splice(continuationEvaluations.end(), nested,
                                      std::next(loopIt), nested.end());
+
+      // Unstructured evaluations own PFT blocks in the function region. Moving
+      // a continuation away from those blocks and lowering it after variant
+      // selection leaves their ownership inconsistent.
+      auto unstructuredContinuation = llvm::find_if(
+          continuationEvaluations, [](lower::pft::Evaluation &continuation) {
+            return continuation.lowerAsUnstructured();
+          });
+      if (unstructuredContinuation != continuationEvaluations.end())
+        TODO(converter.genLocation(unstructuredContinuation->position),
+             "unstructured continuation in loop-associated METADIRECTIVE");
     }
   }
 
@@ -6450,6 +6472,12 @@ static void genMetadirective(lower::AbstractConverter &converter,
       lower::pft::Evaluation *loopEval = spliceAssociatedDoEval(eval);
       if (!loopEval)
         TODO(variantLoc, "loop-associated METADIRECTIVE without associated DO");
+      // Unstructured loops own PFT blocks that cannot be reused by begin/end
+      // metadirectives or alternate ENTRY lowering without independent block
+      // mappings. Keep Part 2 conservative for all such loops.
+      if (loopEval->lowerAsUnstructured())
+        TODO(variantLoc, "unstructured associated DO in loop-associated "
+                         "METADIRECTIVE variant");
       SymbolDSAGuard dsaGuard;
       MetadirectiveLoopIVMarking marking =
           markMetadirectiveLoopIVs(semaCtx, *spec, *loopEval, dsaGuard);
@@ -6462,6 +6490,9 @@ static void genMetadirective(lower::AbstractConverter &converter,
                          "loop (a DO WHILE or a DO without loop control)");
       if (marking == MetadirectiveLoopIVMarking::IndirectIV)
         TODO(variantLoc, "POINTER or ALLOCATABLE loop iteration variable in "
+                         "loop-associated METADIRECTIVE variant");
+      if (marking == MetadirectiveLoopIVMarking::AssociateIV)
+        TODO(variantLoc, "ASSOCIATE name loop iteration variable in "
                          "loop-associated METADIRECTIVE variant");
       genOMPDispatch(converter, symTable, semaCtx, eval, variantLoc, queue,
                      queue.begin());
@@ -6586,6 +6617,14 @@ static void genMetadirective(lower::AbstractConverter &converter,
         break;
       }
     }
+
+    // Unstructured evaluations own PFT blocks that lowering reparents into the
+    // generated region. They cannot be reused for both sides of a runtime
+    // selection until each arm can receive an independent block mapping.
+    if (associatedLoopEval && associatedLoopEval->lowerAsUnstructured())
+      TODO(converter.genLocation(candidate.dynamicCond->source),
+           "unstructured associated DO in loop-associated METADIRECTIVE "
+           "variant");
 
     mlir::Location condLoc =
         converter.genLocation(candidate.dynamicCond->source);
