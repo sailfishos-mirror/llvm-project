@@ -286,7 +286,6 @@ Action *BottomUpVec::vectorizeRec(ArrayRef<Value *> Bndl,
       DebugBndlCnt++ >= StopBundle && StopBundle != StopBundleDisabled;
   LLVM_DEBUG(dbgs() << DEBUG_PREFIX << "canVectorize() Bundle:\n";
              VecUtils::dump(Bndl));
-  /// TODO: Enable scheduling for topdown vectorization
   const auto &LegalityRes = StopForDebug ? Legality.getForcedPackForDebugging()
                                          : Legality.canVectorize(Bndl);
   LLVM_DEBUG(dbgs() << DEBUG_PREFIX << "Legality: " << LegalityRes << "\n");
@@ -294,11 +293,7 @@ Action *BottomUpVec::vectorizeRec(ArrayRef<Value *> Bndl,
   if (Dir == SchedDirection::TopDown) {
     // A non-Widen result means we can't extend the vectorized region into
     // this bundle, so leave its instructions scalar and don't record an
-    // action for it. The scalar users of the already-widened defs get their
-    // values through the unpacks emitted by emitUnpacksForExternalUses().
-    // Note: The DiamondReuse* results are unreachable in the top-down
-    // direction because getNextUserBundles() skips already-vectorized users,
-    // so a bundle never contains instructions registered in IMaps.
+    // action for it.
     if (LegalityRes.getSubclassID() != LegalityResultID::Widen)
       return nullptr;
 

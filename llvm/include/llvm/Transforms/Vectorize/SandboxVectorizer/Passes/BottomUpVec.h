@@ -30,7 +30,7 @@ namespace llvm::sandboxir {
 /// The "seed slice" is a vector of instructions that can be used as a starting
 /// point for vectorization, like stores (loads) to consecutive memory
 /// addresses. Starting from the seed instructions, it walks up (down) the
-/// def-use (use-def) chains looking for more instructions that can be
+/// use-def (def-use) chains looking for more instructions that can be
 /// vectorized. This pass will generate vector code if it can legally vectorize
 /// the code, regardless of whether it is profitable or not. For now
 /// profitability is checked at the end of the region pass pipeline by a
@@ -43,7 +43,7 @@ private:
   static constexpr StringRef TopDownArgStr = "top-down";
   static constexpr StringRef BottomUpArgStr = "bottom-up";
   /// Direction for vectorization, defaults to bottom-up.
-  SchedDirection Dir = SchedDirection::BottomUp;
+  SchedDirection Dir;
   /// The original instructions that are potentially dead after vectorization.
   DenseSet<Instruction *> DeadInstrCandidates;
   /// Maps scalars to vectors.
@@ -94,8 +94,8 @@ private:
   /// vectorize in vectorizeRec().
   unsigned DebugBndlCnt = 0;
 
-  /// Recursively try to vectorize \p Bndl. For bottom-up vectorization \p
-  /// UserBndl tracks the bundle of users that led to this recursion.
+  /// Recursively try to vectorize \p Bndl. \p UserBndl identifies the
+  /// users that this recursive call originates from.
   Action *vectorizeRec(ArrayRef<Value *> Bndl, ArrayRef<Value *> UserBndl,
                        unsigned Depth, LegalityAnalysis &Legality);
   /// If the values in \p Bndl have external users, then emit unpacks and
@@ -109,6 +109,7 @@ private:
 
 public:
   BottomUpVec(StringRef AuxArg) : RegionPass("bottom-up-vec") {
+    /// TODO: Drop the AuxArg.empty() part
     if (AuxArg.empty() || AuxArg == BottomUpArgStr) {
       Dir = SchedDirection::BottomUp;
     } else if (AuxArg == TopDownArgStr) {
