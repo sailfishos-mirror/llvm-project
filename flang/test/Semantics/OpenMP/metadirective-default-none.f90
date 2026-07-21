@@ -197,6 +197,19 @@ subroutine nested_private(n, a)
   end do
 end subroutine
 
+subroutine nested_firstprivate(n, a, x)
+  integer :: n, a(n), x, i
+  !$omp metadirective &
+  !$omp& when(implementation={vendor(llvm)}: &
+  !$omp& parallel do default(none) shared(n, a)) default(nothing)
+  do i = 1, n
+    !ERROR: The DEFAULT(NONE) clause requires that 'x' must be listed in a data-sharing attribute clause
+    !$omp task firstprivate(x)
+    a(i) = x
+    !$omp end task
+  end do
+end subroutine
+
 subroutine nested_implicit(n, a)
   integer :: n, a(n), i
   !$omp metadirective &

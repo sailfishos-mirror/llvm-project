@@ -75,12 +75,10 @@ bool HasNestedPrivateDSA(const Symbol &symbol, const Scope &scope) {
   if (symbol.test(Symbol::Flag::OmpPreDetermined)) {
     return true;
   }
-  static const Symbol::Flags privatizingFlags{Symbol::Flag::OmpPrivate,
-      Symbol::Flag::OmpFirstPrivate, Symbol::Flag::OmpLastPrivate,
-      Symbol::Flag::OmpLinear, Symbol::Flag::OmpReduction,
-      Symbol::Flag::OmpInReduction};
+  // Only PRIVATE on an enclosed construct avoids an implicit reference in the
+  // enclosing construct. Other explicit DSAs still require an outer DSA.
   return symbol.test(Symbol::Flag::OmpExplicit) &&
-      (symbol.flags() & privatizingFlags).any();
+      symbol.test(Symbol::Flag::OmpPrivate);
 }
 
 class MetadirectiveDefaultNoneChecker {
