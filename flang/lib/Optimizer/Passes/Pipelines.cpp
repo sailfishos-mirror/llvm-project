@@ -73,13 +73,6 @@ void addAVC(mlir::PassManager &pm, const llvm::OptimizationLevel &optLevel) {
       pm, disableFirAvc, [&]() { return createArrayValueCopyPass(options); });
 }
 
-void addMemoryAllocationOpt(mlir::PassManager &pm) {
-  addNestedPassConditionally<mlir::func::FuncOp>(pm, disableFirMao, [&]() {
-    return fir::createMemoryAllocationOpt(
-        {dynamicArrayStackToHeapAllocation, arrayStackAllocationThreshold});
-  });
-}
-
 void addAllocationPlacement(mlir::PassManager &pm, bool stackArrays) {
   addNestedPassConditionally<mlir::func::FuncOp>(
       pm, disableAllocationPlacement, [&]() {
@@ -234,12 +227,7 @@ void createDefaultFIROptimizerPassPipeline(mlir::PassManager &pm,
 
   pm.addPass(mlir::createCSEPass());
 
-  if (enableAllocationPlacement)
-    fir::addAllocationPlacement(pm, pc.StackArrays);
-  else if (pc.StackArrays)
-    pm.addPass(fir::createStackArrays());
-  else
-    fir::addMemoryAllocationOpt(pm);
+  fir::addAllocationPlacement(pm, pc.StackArrays);
 
   // FIR Inliner Callback
   pc.invokeFIRInlinerCallback(pm, pc.OptLevel);
