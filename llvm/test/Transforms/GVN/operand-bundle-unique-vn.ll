@@ -7,11 +7,11 @@ define i32 @f(ptr %p) {
 ; CHECK-LABEL: define i32 @f(
 ; CHECK-SAME: ptr [[P:%.*]]) {
 ; CHECK-NEXT:    [[U:%.*]] = call i32 @g(i1 true) #[[ATTR1:[0-9]+]] [ "foo"(ptr [[P]]) ]
-; CHECK-NEXT:    [[V:%.*]] = call i32 @g(i1 true) #[[ATTR1]] [ "foo"(ptr [[P]]) ]
+; CHECK-NEXT:    [[V:%.*]] = call i32 @g(i1 true) #[[ATTR1]] [ "bar"(ptr [[P]]) ]
 ; CHECK-NEXT:    ret i32 [[V]]
 ;
   %u = call i32 @g(i1 true) memory(none) ["foo"(ptr %p)]
-  %v = call i32 @g(i1 true) memory(none) ["foo"(ptr %p)]
+  %v = call i32 @g(i1 true) memory(none) ["bar"(ptr %p)]
   ret i32 %v
 }
 
