@@ -63,6 +63,18 @@ static ReductionOpsSet reductionLogicalSet{
 
 namespace Fortran::semantics {
 
+template <>
+std::string ClauseSetToString(const AccClauseSet &set,
+    std::function<llvm::StringRef(llvm::acc::Clause)> getName) {
+  std::string list;
+  set.IterateOverMembers([&](llvm::acc::Clause o) {
+    if (!list.empty())
+      list.append(", ");
+    list.append(parser::ToUpperCaseLetters(getName(o)));
+  });
+  return list;
+}
+
 static constexpr inline AccClauseSet
     computeConstructOnlyAllowedAfterDeviceTypeClauses{
         llvm::acc::Clause::ACCC_async, llvm::acc::Clause::ACCC_wait,
