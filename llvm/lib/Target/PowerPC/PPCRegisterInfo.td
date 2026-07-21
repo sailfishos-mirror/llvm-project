@@ -408,8 +408,8 @@ def SPILLTOVSRRC : PPCRegisterClass<[i64, f64], 64,
 // Register class for single precision scalars in VSX registers
 def VSSRC : PPCRegisterClass<[f32], 32, (add VSFRC)>;
 
-// PowerPC has no f16 arithmetic instructions. F16 values must use VSX registers 
-// to utilize the VSX conversion instructions. Suppress pressure set generation 
+// PowerPC has no f16 arithmetic instructions. F16 values must use VSX registers
+// to utilize the VSX conversion instructions. Suppress pressure set generation
 // to preserve VSSRC pressure index.
 let GeneratePressureSet = 0 in {
   // f16 occupies the low bits of a 64-bit VSX scalar register (shared with

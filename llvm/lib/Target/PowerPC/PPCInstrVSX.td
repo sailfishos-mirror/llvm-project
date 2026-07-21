@@ -4068,21 +4068,21 @@ let Predicates = [HasP9Vector] in {
   def : Pat<(store f16:$src, ForceXForm:$dst),
             (STXSIHX (COPY_TO_REGCLASS $src, VHFRC), ForceXForm:$dst)>;
 
-  // FP_ROUND to f16 container.
-  def : Pat<(f16 (fpround f64:$src)),
+  // FP_ROUND to f16 container (any_fpround also covers the strict-FP node).
+  def : Pat<(f16 (any_fpround f64:$src)),
             (COPY_TO_REGCLASS (XSCVDPHP $src), VHFRC)>;
 
-  def : Pat<(f16 (fpround f32:$src)),
+  def : Pat<(f16 (any_fpround f32:$src)),
             (COPY_TO_REGCLASS
               (XSCVDPHP (COPY_TO_REGCLASS $src, VSFRC)), // treat as f64 container for the op
               VHFRC)>;
 
-  // FP_EXTEND from f16 container -> f64.
-  def : Pat<(f64 (fpextend f16:$src)),
+  // FP_EXTEND from f16 container -> f64 (any_fpextend also covers strict).
+  def : Pat<(f64 (any_fpextend f16:$src)),
             (XSCVHPDP (COPY_TO_REGCLASS $src, VHFRC))>;
 
   // FP_EXTEND from f16 container -> f32.
-  def : Pat<(f32 (fpextend f16:$src)),
+  def : Pat<(f32 (any_fpextend f16:$src)),
             (COPY_TO_REGCLASS
               (XSCVHPDP (COPY_TO_REGCLASS $src, VHFRC)),
               VSSRC)>;
