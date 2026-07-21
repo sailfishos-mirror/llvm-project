@@ -6260,7 +6260,8 @@ bool DeclarationVisitor::Pre(const parser::IntrinsicStmt &x) {
 }
 void DeclarationVisitor::DeclareIntrinsic(const parser::Name &name) {
   HandleAttributeStmt(Attr::INTRINSIC, name);
-  if (!IsIntrinsic(name.source, std::nullopt)) {
+  const bool isKnownIntrinsic{IsIntrinsic(name.source, std::nullopt)};
+  if (!isKnownIntrinsic) {
     Say(name.source, "'%s' is not a known intrinsic procedure"_err_en_US);
   }
   auto &symbol{DEREF(FindSymbol(name))};
@@ -6285,7 +6286,7 @@ void DeclarationVisitor::DeclareIntrinsic(const parser::Name &name) {
             "INTRINSIC statement for explicitly-typed '%s'"_en_US, name.source);
       }
     }
-    if (!symbol.test(Symbol::Flag::Function) &&
+    if (isKnownIntrinsic && !symbol.test(Symbol::Flag::Function) &&
         !symbol.test(Symbol::Flag::Subroutine) &&
         !context().intrinsics().IsDualIntrinsic(name.source.ToString())) {
       if (context().intrinsics().IsIntrinsicFunction(name.source.ToString())) {
