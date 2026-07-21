@@ -306,10 +306,6 @@ Action *BottomUpVec::vectorizeRec(ArrayRef<Value *> Bndl,
     // Walk down the def-use chain. Each lane in \p Bndl may feed several
     // users, so we form every compatible user bundle and recurse into each
     // one.
-    //
-    // Recursing right after forming each bundle marks its instructions as
-    // vectorized (pre-order registration), which prevents sibling bundles
-    // from claiming the same instruction and guarantees termination.
     for (const auto &NextUserBndl : VecUtils::getNextUserBundles(Bndl, *IMaps))
       vectorizeRec(NextUserBndl, Bndl, Depth + 1, Legality);
 
