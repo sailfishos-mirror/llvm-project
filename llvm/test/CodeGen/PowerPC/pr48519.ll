@@ -14,11 +14,13 @@ define void @julia__typed_vcat_20() #0 {
 ; CHECK-NEXT:    li r30, 0
 ; CHECK-NEXT:    li r3, 1
 ; CHECK-NEXT:    std r0, 64(r1)
-; CHECK-NEXT:    .p2align 5
+; CHECK-NEXT:    .p2align 4
 ; CHECK-NEXT:  .LBB0_1: # %bb3
 ; CHECK-NEXT:    #
 ; CHECK-NEXT:    addi r3, r3, -1
-; CHECK-NEXT:    bl __floatdihf
+; CHECK-NEXT:    mtfprd f0, r3
+; CHECK-NEXT:    xscvsxddp f1, f0
+; CHECK-NEXT:    bl __truncdfhf2
 ; CHECK-NEXT:    nop
 ; CHECK-NEXT:    addi r30, r30, -1
 ; CHECK-NEXT:    li r3, 0
@@ -30,25 +32,21 @@ define void @julia__typed_vcat_20() #0 {
 ;
 ; CHECK-P9-LABEL: julia__typed_vcat_20:
 ; CHECK-P9:       # %bb.0: # %bb
-; CHECK-P9-NEXT:    mflr r0
-; CHECK-P9-NEXT:    std r30, -16(r1) # 8-byte Folded Spill
-; CHECK-P9-NEXT:    stdu r1, -48(r1)
-; CHECK-P9-NEXT:    li r30, 0
+; CHECK-P9-NEXT:    li r3, 0
+; CHECK-P9-NEXT:    mtctr r3
 ; CHECK-P9-NEXT:    li r3, 1
-; CHECK-P9-NEXT:    std r0, 64(r1)
 ; CHECK-P9-NEXT:    .p2align 5
 ; CHECK-P9-NEXT:  .LBB0_1: # %bb3
 ; CHECK-P9-NEXT:    #
 ; CHECK-P9-NEXT:    addi r3, r3, -1
-; CHECK-P9-NEXT:    bl __floatdihf
-; CHECK-P9-NEXT:    nop
-; CHECK-P9-NEXT:    addi r30, r30, -1
+; CHECK-P9-NEXT:    mtfprd f0, r3
 ; CHECK-P9-NEXT:    li r3, 0
-; CHECK-P9-NEXT:    cmpldi r30, 0
-; CHECK-P9-NEXT:    bc 12, gt, .LBB0_1
+; CHECK-P9-NEXT:    xscvsxddp f0, f0
+; CHECK-P9-NEXT:    xscvdphp f0, f0
+; CHECK-P9-NEXT:    bdnz .LBB0_1
 ; CHECK-P9-NEXT:  # %bb.2: # %bb11
 ; CHECK-P9-NEXT:    li r3, 128
-; CHECK-P9-NEXT:    stxsihx f1, 0, r3
+; CHECK-P9-NEXT:    stxsihx f0, 0, r3
 bb:
   %i = load i64, ptr addrspace(11) null, align 8
   %i1 = call { i64, i1 } @llvm.ssub.with.overflow.i64(i64 %i, i64 0)

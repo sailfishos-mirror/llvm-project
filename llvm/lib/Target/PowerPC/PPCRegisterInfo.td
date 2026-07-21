@@ -412,7 +412,11 @@ def VSSRC : PPCRegisterClass<[f32], 32, (add VSFRC)>;
 // to utilize the VSX conversion instructions. Suppress pressure set generation 
 // to preserve VSSRC pressure index.
 let GeneratePressureSet = 0 in {
-  def VHFRC : PPCRegisterClass<[f16], 16, (add VSFRC)>;
+  // f16 occupies the low bits of a 64-bit VSX scalar register (shared with
+  // VSFRC). There is no 2-byte VSX store on Power8 (STXSIHX is Power9-only), so
+  // VHFRC spills the full doubleword via the 8-byte VSX spill. Force an 8-byte
+  // spill size so the stack slot matches the STXSDX/DFSTOREf64 store width.
+  def VHFRC : PPCRegisterClassWithSize<[f16], 16, (add VSFRC), 64>;
 }
 
 def CRBITRC : PPCRegisterClassWithSize<[i1], 32,

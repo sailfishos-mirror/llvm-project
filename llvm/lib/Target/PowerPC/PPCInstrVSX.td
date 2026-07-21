@@ -4087,16 +4087,12 @@ let Predicates = [HasP9Vector] in {
               (XSCVHPDP (COPY_TO_REGCLASS $src, VHFRC)),
               VSSRC)>;
 
-  // fabs, fneg, fcopysign: intentionally handled via bit manipulation on ALL
-  // hardware including P9+. The round-trip through f64 via XSCVHPDP/XSCVDPHP
-  // does not preserve NaN payloads (signalling NaN -> quiet NaN, payload bits
-  // corrupted). These operations must be pure bit moves. See llvm/llvm-project#97981.
 }
 
-// P8 has no halfword VSX memory ops. Load/store goes through GPR roundtrip.
-// These patterns also fire on P9 (P9 satisfies HasP8Vector), providing
-// the fabs/fneg/fcopysign patterns for all hardware.
-let Predicates = [HasP8Vector] in {
+// P8 has no halfword VSX memory ops, so f16 load/store goes through a GPR
+// roundtrip. Restricted to !P9 because P9 selects the dedicated LXSIHZX/STXSIHX
+// patterns above; without NoP9Vector these would redundantly also match on P9.
+let Predicates = [HasP8Vector, NoP9Vector] in {
   // Store f16: Move VSX half container -> GPR, then Store Halfword.
   def : Pat<(store f16:$src, xoaddr:$dst),
             (STHX (MFVSRWZ (COPY_TO_REGCLASS $src, VHFRC)), xoaddr:$dst)>;
@@ -4108,7 +4104,15 @@ let Predicates = [HasP8Vector] in {
             (COPY_TO_REGCLASS (MTVSRWZ (LHZX xoaddr:$src)), VHFRC)>;
   def : Pat<(f16 (load iaddrX16:$src)),
             (COPY_TO_REGCLASS (MTVSRWZ (LHZ  iaddrX16:$src)), VHFRC)>;
+}
 
+// fabs, fneg, and fcopysign for f16 are intentionally pure bit manipulations on
+// ALL hardware including P9+, NOT conversion round-trips. A round-trip through
+// f64 via XSCVHPDP/XSCVDPHP does not preserve NaN payloads (signalling NaN ->
+// quiet NaN, payload bits corrupted); these operations must be value-preserving
+// bit moves. Hence [HasP8Vector] (fires on P8 and P9 alike), not NoP9Vector.
+// See llvm/llvm-project#97981.
+let Predicates = [HasP8Vector] in {
   // fabs: clear sign bit (AND with 0x7FFF in the 16-bit lane).
   def : Pat<(fabs f16:$src),
             (COPY_TO_REGCLASS

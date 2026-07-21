@@ -517,15 +517,24 @@ define i64 @test_fptosi_i64(ptr %p) nounwind {
 ;
 ; P8-LABEL: test_fptosi_i64:
 ; P8:       # %bb.0:
+; P8-NEXT:    mflr r0
+; P8-NEXT:    stdu r1, -32(r1)
+; P8-NEXT:    std r0, 48(r1)
 ; P8-NEXT:    lhzx r3, 0, r3
-; P8-NEXT:    mtfprwz f0, r3
-; P8-NEXT:    xscvdpsxds f0, f0
+; P8-NEXT:    mtfprwz f1, r3
+; P8-NEXT:    bl __extendhfsf2
+; P8-NEXT:    nop
+; P8-NEXT:    xscvdpsxds f0, f1
 ; P8-NEXT:    mffprd r3, f0
+; P8-NEXT:    addi r1, r1, 32
+; P8-NEXT:    ld r0, 16(r1)
+; P8-NEXT:    mtlr r0
 ; P8-NEXT:    blr
 ;
 ; P9-LABEL: test_fptosi_i64:
 ; P9:       # %bb.0:
 ; P9-NEXT:    lxsihzx f0, 0, r3
+; P9-NEXT:    xscvhpdp f0, f0
 ; P9-NEXT:    xscvdpsxds f0, f0
 ; P9-NEXT:    mffprd r3, f0
 ; P9-NEXT:    blr
@@ -572,8 +581,8 @@ define void @test_sitofp_i64(i64 %a, ptr %p) nounwind {
 ; PPC32-NEXT:    stw r0, 20(r1)
 ; PPC32-NEXT:    stw r30, 8(r1) # 4-byte Folded Spill
 ; PPC32-NEXT:    mr r30, r5
-; PPC32-NEXT:    bl __floatdisf
-; PPC32-NEXT:    bl __truncsfhf2
+; PPC32-NEXT:    bl __floatdidf
+; PPC32-NEXT:    bl __truncdfhf2
 ; PPC32-NEXT:    sth r3, 0(r30)
 ; PPC32-NEXT:    lwz r30, 8(r1) # 4-byte Folded Reload
 ; PPC32-NEXT:    lwz r0, 20(r1)
@@ -586,9 +595,11 @@ define void @test_sitofp_i64(i64 %a, ptr %p) nounwind {
 ; P8-NEXT:    mflr r0
 ; P8-NEXT:    std r30, -16(r1) # 8-byte Folded Spill
 ; P8-NEXT:    stdu r1, -48(r1)
+; P8-NEXT:    mtfprd f0, r3
 ; P8-NEXT:    std r0, 64(r1)
 ; P8-NEXT:    mr r30, r4
-; P8-NEXT:    bl __floatdihf
+; P8-NEXT:    xscvsxddp f1, f0
+; P8-NEXT:    bl __truncdfhf2
 ; P8-NEXT:    nop
 ; P8-NEXT:    mffprwz r3, f1
 ; P8-NEXT:    sthx r3, 0, r30
@@ -600,18 +611,10 @@ define void @test_sitofp_i64(i64 %a, ptr %p) nounwind {
 ;
 ; P9-LABEL: test_sitofp_i64:
 ; P9:       # %bb.0:
-; P9-NEXT:    mflr r0
-; P9-NEXT:    std r30, -16(r1) # 8-byte Folded Spill
-; P9-NEXT:    stdu r1, -48(r1)
-; P9-NEXT:    std r0, 64(r1)
-; P9-NEXT:    mr r30, r4
-; P9-NEXT:    bl __floatdihf
-; P9-NEXT:    nop
-; P9-NEXT:    stxsihx f1, 0, r30
-; P9-NEXT:    addi r1, r1, 48
-; P9-NEXT:    ld r0, 16(r1)
-; P9-NEXT:    ld r30, -16(r1) # 8-byte Folded Reload
-; P9-NEXT:    mtlr r0
+; P9-NEXT:    mtfprd f0, r3
+; P9-NEXT:    xscvsxddp f0, f0
+; P9-NEXT:    xscvdphp f0, f0
+; P9-NEXT:    stxsihx f0, 0, r4
 ; P9-NEXT:    blr
 ;
 ; SOFT-LABEL: test_sitofp_i64:
@@ -621,10 +624,9 @@ define void @test_sitofp_i64(i64 %a, ptr %p) nounwind {
 ; SOFT-NEXT:    stdu r1, -48(r1)
 ; SOFT-NEXT:    std r0, 64(r1)
 ; SOFT-NEXT:    mr r30, r4
-; SOFT-NEXT:    bl __floatdisf
+; SOFT-NEXT:    bl __floatdidf
 ; SOFT-NEXT:    nop
-; SOFT-NEXT:    clrldi r3, r3, 32
-; SOFT-NEXT:    bl __truncsfhf2
+; SOFT-NEXT:    bl __truncdfhf2
 ; SOFT-NEXT:    nop
 ; SOFT-NEXT:    sth r3, 0(r30)
 ; SOFT-NEXT:    addi r1, r1, 48
@@ -637,24 +639,13 @@ define void @test_sitofp_i64(i64 %a, ptr %p) nounwind {
 ; BE:       # %bb.0:
 ; BE-NEXT:    mflr r0
 ; BE-NEXT:    stdu r1, -144(r1)
-; BE-NEXT:    sradi r5, r3, 53
 ; BE-NEXT:    std r0, 160(r1)
-; BE-NEXT:    addi r5, r5, 1
-; BE-NEXT:    cmpldi r5, 1
-; BE-NEXT:    std r30, 128(r1) # 8-byte Folded Spill
-; BE-NEXT:    mr r30, r4
-; BE-NEXT:    ble cr0, .LBB12_2
-; BE-NEXT:  # %bb.1:
-; BE-NEXT:    clrldi r4, r3, 53
-; BE-NEXT:    addi r4, r4, 2047
-; BE-NEXT:    or r3, r4, r3
-; BE-NEXT:    rldicr r3, r3, 0, 52
-; BE-NEXT:  .LBB12_2:
 ; BE-NEXT:    std r3, 120(r1)
 ; BE-NEXT:    lfd f0, 120(r1)
-; BE-NEXT:    fcfid f0, f0
-; BE-NEXT:    frsp f1, f0
-; BE-NEXT:    bl __truncsfhf2
+; BE-NEXT:    fcfid f1, f0
+; BE-NEXT:    std r30, 128(r1) # 8-byte Folded Spill
+; BE-NEXT:    mr r30, r4
+; BE-NEXT:    bl __truncdfhf2
 ; BE-NEXT:    nop
 ; BE-NEXT:    sth r3, 0(r30)
 ; BE-NEXT:    ld r30, 128(r1) # 8-byte Folded Reload
@@ -682,15 +673,24 @@ define i64 @test_fptoui_i64(ptr %p) nounwind {
 ;
 ; P8-LABEL: test_fptoui_i64:
 ; P8:       # %bb.0:
+; P8-NEXT:    mflr r0
+; P8-NEXT:    stdu r1, -32(r1)
+; P8-NEXT:    std r0, 48(r1)
 ; P8-NEXT:    lhzx r3, 0, r3
-; P8-NEXT:    mtfprwz f0, r3
-; P8-NEXT:    xscvdpuxds f0, f0
+; P8-NEXT:    mtfprwz f1, r3
+; P8-NEXT:    bl __extendhfsf2
+; P8-NEXT:    nop
+; P8-NEXT:    xscvdpuxds f0, f1
 ; P8-NEXT:    mffprd r3, f0
+; P8-NEXT:    addi r1, r1, 32
+; P8-NEXT:    ld r0, 16(r1)
+; P8-NEXT:    mtlr r0
 ; P8-NEXT:    blr
 ;
 ; P9-LABEL: test_fptoui_i64:
 ; P9:       # %bb.0:
 ; P9-NEXT:    lxsihzx f0, 0, r3
+; P9-NEXT:    xscvhpdp f0, f0
 ; P9-NEXT:    xscvdpuxds f0, f0
 ; P9-NEXT:    mffprd r3, f0
 ; P9-NEXT:    blr
@@ -766,9 +766,11 @@ define void @test_uitofp_i64(i64 %a, ptr %p) nounwind {
 ; P8-NEXT:    mflr r0
 ; P8-NEXT:    std r30, -16(r1) # 8-byte Folded Spill
 ; P8-NEXT:    stdu r1, -48(r1)
+; P8-NEXT:    mtfprd f0, r3
 ; P8-NEXT:    std r0, 64(r1)
 ; P8-NEXT:    mr r30, r4
-; P8-NEXT:    bl __floatundihf
+; P8-NEXT:    xscvuxddp f1, f0
+; P8-NEXT:    bl __truncdfhf2
 ; P8-NEXT:    nop
 ; P8-NEXT:    mffprwz r3, f1
 ; P8-NEXT:    sthx r3, 0, r30
@@ -780,18 +782,10 @@ define void @test_uitofp_i64(i64 %a, ptr %p) nounwind {
 ;
 ; P9-LABEL: test_uitofp_i64:
 ; P9:       # %bb.0:
-; P9-NEXT:    mflr r0
-; P9-NEXT:    std r30, -16(r1) # 8-byte Folded Spill
-; P9-NEXT:    stdu r1, -48(r1)
-; P9-NEXT:    std r0, 64(r1)
-; P9-NEXT:    mr r30, r4
-; P9-NEXT:    bl __floatundihf
-; P9-NEXT:    nop
-; P9-NEXT:    stxsihx f1, 0, r30
-; P9-NEXT:    addi r1, r1, 48
-; P9-NEXT:    ld r0, 16(r1)
-; P9-NEXT:    ld r30, -16(r1) # 8-byte Folded Reload
-; P9-NEXT:    mtlr r0
+; P9-NEXT:    mtfprd f0, r3
+; P9-NEXT:    xscvuxddp f0, f0
+; P9-NEXT:    xscvdphp f0, f0
+; P9-NEXT:    stxsihx f0, 0, r4
 ; P9-NEXT:    blr
 ;
 ; SOFT-LABEL: test_uitofp_i64:
@@ -1672,9 +1666,8 @@ define float @test_sitofp_fadd_i32(i32 %a, ptr %b) nounwind {
 ; PPC32-NEXT:    lfd f0, 8(r1)
 ; PPC32-NEXT:    lfs f1, .LCPI19_0@l(r3)
 ; PPC32-NEXT:    stfd f31, 24(r1) # 8-byte Folded Spill
-; PPC32-NEXT:    fsub f0, f0, f1
-; PPC32-NEXT:    frsp f1, f0
-; PPC32-NEXT:    bl __truncsfhf2
+; PPC32-NEXT:    fsub f1, f0, f1
+; PPC32-NEXT:    bl __truncdfhf2
 ; PPC32-NEXT:    clrlwi r3, r3, 16
 ; PPC32-NEXT:    bl __extendhfsf2
 ; PPC32-NEXT:    mr r3, r30
@@ -1696,18 +1689,12 @@ define float @test_sitofp_fadd_i32(i32 %a, ptr %b) nounwind {
 ; P8-NEXT:    mflr r0
 ; P8-NEXT:    stfd f30, -16(r1) # 8-byte Folded Spill
 ; P8-NEXT:    stfd f31, -8(r1) # 8-byte Folded Spill
-; P8-NEXT:    stdu r1, -64(r1)
-; P8-NEXT:    std r0, 80(r1)
-; P8-NEXT:    xoris r3, r3, 32768
+; P8-NEXT:    stdu r1, -48(r1)
+; P8-NEXT:    mtfprwa f0, r3
+; P8-NEXT:    std r0, 64(r1)
 ; P8-NEXT:    lhzx r4, 0, r4
-; P8-NEXT:    stw r3, 40(r1)
-; P8-NEXT:    addis r3, r2, .LCPI19_0@toc@ha
 ; P8-NEXT:    mtfprwz f31, r4
-; P8-NEXT:    lis r4, 17200
-; P8-NEXT:    lfs f1, .LCPI19_0@toc@l(r3)
-; P8-NEXT:    stw r4, 44(r1)
-; P8-NEXT:    lfd f0, 40(r1)
-; P8-NEXT:    xssubdp f1, f0, f1
+; P8-NEXT:    xscvsxddp f1, f0
 ; P8-NEXT:    bl __truncdfhf2
 ; P8-NEXT:    nop
 ; P8-NEXT:    bl __extendhfsf2
@@ -1721,7 +1708,7 @@ define float @test_sitofp_fadd_i32(i32 %a, ptr %b) nounwind {
 ; P8-NEXT:    nop
 ; P8-NEXT:    bl __extendhfsf2
 ; P8-NEXT:    nop
-; P8-NEXT:    addi r1, r1, 64
+; P8-NEXT:    addi r1, r1, 48
 ; P8-NEXT:    ld r0, 16(r1)
 ; P8-NEXT:    lfd f31, -8(r1) # 8-byte Folded Reload
 ; P8-NEXT:    lfd f30, -16(r1) # 8-byte Folded Reload
@@ -1730,18 +1717,12 @@ define float @test_sitofp_fadd_i32(i32 %a, ptr %b) nounwind {
 ;
 ; P9-LABEL: test_sitofp_fadd_i32:
 ; P9:       # %bb.0:
-; P9-NEXT:    xoris r3, r3, 32768
+; P9-NEXT:    mtfprwa f1, r3
 ; P9-NEXT:    lxsihzx f0, 0, r4
-; P9-NEXT:    lis r4, 17200
-; P9-NEXT:    stw r3, -8(r1)
-; P9-NEXT:    addis r3, r2, .LCPI19_0@toc@ha
-; P9-NEXT:    stw r4, -4(r1)
-; P9-NEXT:    lfd f1, -8(r1)
-; P9-NEXT:    lfs f2, .LCPI19_0@toc@l(r3)
-; P9-NEXT:    xssubdp f1, f1, f2
+; P9-NEXT:    xscvsxddp f1, f1
 ; P9-NEXT:    xscvdphp f1, f1
-; P9-NEXT:    xscvhpdp f1, f1
 ; P9-NEXT:    xscvhpdp f0, f0
+; P9-NEXT:    xscvhpdp f1, f1
 ; P9-NEXT:    xsaddsp f0, f0, f1
 ; P9-NEXT:    xscvdphp f0, f0
 ; P9-NEXT:    xscvhpdp f1, f0
@@ -1756,10 +1737,9 @@ define float @test_sitofp_fadd_i32(i32 %a, ptr %b) nounwind {
 ; SOFT-NEXT:    extsw r3, r3
 ; SOFT-NEXT:    std r0, 80(r1)
 ; SOFT-NEXT:    mr r30, r4
-; SOFT-NEXT:    bl __floatsisf
+; SOFT-NEXT:    bl __floatsidf
 ; SOFT-NEXT:    nop
-; SOFT-NEXT:    clrldi r3, r3, 32
-; SOFT-NEXT:    bl __truncsfhf2
+; SOFT-NEXT:    bl __truncdfhf2
 ; SOFT-NEXT:    nop
 ; SOFT-NEXT:    mr r29, r3
 ; SOFT-NEXT:    lhz r3, 0(r30)
@@ -1795,10 +1775,9 @@ define float @test_sitofp_fadd_i32(i32 %a, ptr %b) nounwind {
 ; BE-NEXT:    lhz r30, 0(r4)
 ; BE-NEXT:    std r3, 112(r1)
 ; BE-NEXT:    lfd f0, 112(r1)
-; BE-NEXT:    fcfid f0, f0
+; BE-NEXT:    fcfid f1, f0
 ; BE-NEXT:    stfd f31, 136(r1) # 8-byte Folded Spill
-; BE-NEXT:    frsp f1, f0
-; BE-NEXT:    bl __truncsfhf2
+; BE-NEXT:    bl __truncdfhf2
 ; BE-NEXT:    nop
 ; BE-NEXT:    clrldi r3, r3, 48
 ; BE-NEXT:    bl __extendhfsf2
