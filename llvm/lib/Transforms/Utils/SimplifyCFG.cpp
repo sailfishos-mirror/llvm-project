@@ -3234,11 +3234,7 @@ bool SimplifyCFGOpt::speculativelyExecuteBB(CondBrInst *BI,
   if (!Options.SpeculateBlocks)
     return false;
 
-  // Be conservative for now. FP select instruction can often be expensive.
   Value *BrCond = BI->getCondition();
-  if (isa<FCmpInst>(BrCond))
-    return false;
-
   BasicBlock *BB = BI->getParent();
   BasicBlock *EndBB = ThenBB->getTerminator()->getSuccessor(0);
   InstructionCost Budget =
@@ -3454,7 +3450,10 @@ bool SimplifyCFGOpt::speculativelyExecuteBB(CondBrInst *BI,
     Value *TrueV = ThenV, *FalseV = OrigV;
     if (Invert)
       std::swap(TrueV, FalseV);
-    Value *V = Builder.CreateSelect(BrCond, TrueV, FalseV, "spec.select", BI);
+    // Propagate fast-math flags from the phi node to the replacement select.
+    Value *V = Builder.CreateSelectFMF(BrCond, TrueV, FalseV,
+                                       isa<FPMathOperator>(PN) ? &PN : nullptr,
+                                       "spec.select", BI);
     PN.setIncomingValue(OrigI, V);
     PN.setIncomingValue(ThenI, V);
   }

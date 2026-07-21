@@ -4,15 +4,10 @@
 define float @spec_fcmp_multi_pred(float %x, float %scale, i1 %other) {
 ; CHECK-LABEL: @spec_fcmp_multi_pred(
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    br i1 [[OTHER:%.*]], label [[MERGE:%.*]], label [[CHECK:%.*]]
-; CHECK:       check:
 ; CHECK-NEXT:    [[CMP:%.*]] = fcmp ogt float [[X:%.*]], 0.000000e+00
-; CHECK-NEXT:    br i1 [[CMP]], label [[THEN:%.*]], label [[MERGE]]
-; CHECK:       then:
 ; CHECK-NEXT:    [[SCALED:%.*]] = fmul float [[X]], [[SCALE:%.*]]
-; CHECK-NEXT:    br label [[MERGE]]
-; CHECK:       merge:
-; CHECK-NEXT:    [[R:%.*]] = phi float [ 0.000000e+00, [[ENTRY:%.*]] ], [ [[SCALED]], [[THEN]] ], [ 1.000000e+00, [[CHECK]] ]
+; CHECK-NEXT:    [[SPEC_SELECT:%.*]] = select i1 [[CMP]], float [[SCALED]], float 1.000000e+00
+; CHECK-NEXT:    [[R:%.*]] = select i1 [[OTHER:%.*]], float 0.000000e+00, float [[SPEC_SELECT]]
 ; CHECK-NEXT:    ret float [[R]]
 ;
 entry:
@@ -34,15 +29,10 @@ merge:
 define float @spec_fcmp_multi_pred_fmf(float %x, float %scale, i1 %other) {
 ; CHECK-LABEL: @spec_fcmp_multi_pred_fmf(
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    br i1 [[OTHER:%.*]], label [[MERGE:%.*]], label [[CHECK:%.*]]
-; CHECK:       check:
 ; CHECK-NEXT:    [[CMP:%.*]] = fcmp ogt float [[X:%.*]], 0.000000e+00
-; CHECK-NEXT:    br i1 [[CMP]], label [[THEN:%.*]], label [[MERGE]]
-; CHECK:       then:
 ; CHECK-NEXT:    [[ADD:%.*]] = fadd float [[X]], [[SCALE:%.*]]
-; CHECK-NEXT:    br label [[MERGE]]
-; CHECK:       merge:
-; CHECK-NEXT:    [[R:%.*]] = phi nsz float [ 0.000000e+00, [[ENTRY:%.*]] ], [ [[ADD]], [[THEN]] ], [ 1.000000e+00, [[CHECK]] ]
+; CHECK-NEXT:    [[SPEC_SELECT:%.*]] = select nsz i1 [[CMP]], float [[ADD]], float 1.000000e+00
+; CHECK-NEXT:    [[R:%.*]] = select nsz i1 [[OTHER:%.*]], float 0.000000e+00, float [[SPEC_SELECT]]
 ; CHECK-NEXT:    ret float [[R]]
 ;
 entry:
@@ -64,15 +54,10 @@ merge:
 define double @spec_fcmp_double(double %x, double %scale, i1 %other) {
 ; CHECK-LABEL: @spec_fcmp_double(
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    br i1 [[OTHER:%.*]], label [[MERGE:%.*]], label [[CHECK:%.*]]
-; CHECK:       check:
 ; CHECK-NEXT:    [[CMP:%.*]] = fcmp ogt double [[X:%.*]], 0.000000e+00
-; CHECK-NEXT:    br i1 [[CMP]], label [[THEN:%.*]], label [[MERGE]]
-; CHECK:       then:
 ; CHECK-NEXT:    [[SCALED:%.*]] = fmul double [[X]], [[SCALE:%.*]]
-; CHECK-NEXT:    br label [[MERGE]]
-; CHECK:       merge:
-; CHECK-NEXT:    [[R:%.*]] = phi double [ 0.000000e+00, [[ENTRY:%.*]] ], [ [[SCALED]], [[THEN]] ], [ 1.000000e+00, [[CHECK]] ]
+; CHECK-NEXT:    [[SPEC_SELECT:%.*]] = select i1 [[CMP]], double [[SCALED]], double 1.000000e+00
+; CHECK-NEXT:    [[R:%.*]] = select i1 [[OTHER:%.*]], double 0.000000e+00, double [[SPEC_SELECT]]
 ; CHECK-NEXT:    ret double [[R]]
 ;
 entry:
@@ -94,15 +79,10 @@ merge:
 define float @spec_fcmp_inverted(float %x, float %scale, i1 %other) {
 ; CHECK-LABEL: @spec_fcmp_inverted(
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    br i1 [[OTHER:%.*]], label [[MERGE:%.*]], label [[CHECK:%.*]]
-; CHECK:       check:
 ; CHECK-NEXT:    [[CMP:%.*]] = fcmp ogt float [[X:%.*]], 0.000000e+00
-; CHECK-NEXT:    br i1 [[CMP]], label [[MERGE]], label [[THEN:%.*]]
-; CHECK:       then:
 ; CHECK-NEXT:    [[SCALED:%.*]] = fmul float [[X]], [[SCALE:%.*]]
-; CHECK-NEXT:    br label [[MERGE]]
-; CHECK:       merge:
-; CHECK-NEXT:    [[R:%.*]] = phi float [ 0.000000e+00, [[ENTRY:%.*]] ], [ [[SCALED]], [[THEN]] ], [ 1.000000e+00, [[CHECK]] ]
+; CHECK-NEXT:    [[SPEC_SELECT:%.*]] = select i1 [[CMP]], float 1.000000e+00, float [[SCALED]]
+; CHECK-NEXT:    [[R:%.*]] = select i1 [[OTHER:%.*]], float 0.000000e+00, float [[SPEC_SELECT]]
 ; CHECK-NEXT:    ret float [[R]]
 ;
 entry:
