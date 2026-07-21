@@ -5750,13 +5750,35 @@ struct EnsureImmediateInvocationInDefaultArgs
         continue;
 
       auto *VD = cast<VarDecl>(C->getCapturedVar());
+      // The default member initializer is rebuilt at its point of use, where
+      // the lambda is no longer dependent, so any init-capture pack has already
+      // been expanded into separate captures.
+      assert(!VD->isParameterPack() &&
+             "unexpanded init-capture pack while rebuilding a default member "
+             "initializer");
+
       Expr *Init = CaptureInits[I];
       ExprResult NewInit =
           TransformInitializer(Init, VD->getInitStyle() == VarDecl::CallInit);
       if (NewInit.isInvalid())
         return ExprError();
-      Changed |= NewInit.get() != Init;
-      CaptureInits[I] = NewInit.get();
+
+      // TransformInitializer strips the CXXConstructExpr that a copy or move
+      // initialization produces, expecting the enclosing context to rebuild the
+      // initialization. Rebuild the capture's initialization sequence here so
+      // the closure still constructs its captured member; otherwise CodeGen is
+      // left with a bare initializer for a non-trivially copyable capture and
+      // crashes.
+      Expr *NewInitE = NewInit.get();
+      QualType CaptureType = SemaRef.buildLambdaInitCaptureInitialization(
+          C->getLocation(), C->getCaptureKind() == LCK_ByRef,
+          /*EllipsisLoc=*/SourceLocation(), /*NumExpansions=*/std::nullopt,
+          VD->getIdentifier(), VD->getInitStyle() != VarDecl::CInit, NewInitE);
+      if (CaptureType.isNull() || !NewInitE)
+        return ExprError();
+
+      Changed |= NewInitE != Init;
+      CaptureInits[I] = NewInitE;
     }
 
     LambdaExpr *Lambda = E;
