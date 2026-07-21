@@ -33,13 +33,14 @@ SmallVector<BundleTy> VecUtils::getNextUserBundles(ArrayRef<Value *> Bndl,
 
   Value *V0 = Bndl[0];
   DenseSet<User *> SeenUsers;
+  SmallPtrSet<Instruction *, 4> Claimed;
   // For each user U0 of lane 0, try to form a bundle of matching users across
   // all lanes.
   for (User *U0 : V0->users()) {
     if (!SeenUsers.insert(U0).second)
       continue;
     auto *UI0 = dyn_cast<Instruction>(U0);
-    if (!UI0 || IMaps.isVectorized(UI0))
+    if (!UI0 || IMaps.isVectorized(UI0) || Claimed.contains(UI0))
       continue;
 
     // The operand indices at which lane 0's user U0 uses lane 0's value V0.
@@ -52,8 +53,10 @@ SmallVector<BundleTy> VecUtils::getNextUserBundles(ArrayRef<Value *> Bndl,
     // Find a distinct matching user for each of the remaining lanes.
     BundleTy NextUserBndl;
     NextUserBndl.push_back(UI0);
-    SmallPtrSet<Instruction *, 4> Claimed;
+    // Tentatively claim UI0; roll back if a full bundle can't be formed.
+    SmallVector<Instruction *, 4> NewlyClaimed;
     Claimed.insert(UI0);
+    NewlyClaimed.push_back(UI0);
     for (Value *V : drop_begin(Bndl)) {
       Instruction *Match = nullptr;
       for (User *U : V->users()) {
@@ -80,11 +83,18 @@ SmallVector<BundleTy> VecUtils::getNextUserBundles(ArrayRef<Value *> Bndl,
         break;
       }
       Claimed.insert(Match);
+      NewlyClaimed.push_back(Match);
       NextUserBndl.push_back(Match);
     }
 
-    if (NextUserBndl.size() == Bndl.size())
+    if (NextUserBndl.size() == Bndl.size()) {
       Bundles.emplace_back(std::move(NextUserBndl));
+    } else {
+      // Failed to form a full bundle; release the instructions we tentatively
+      // claimed so they remain available for other lane-0 users.
+      for (Instruction *I : NewlyClaimed)
+        Claimed.erase(I);
+    }
   }
   return Bundles;
 }

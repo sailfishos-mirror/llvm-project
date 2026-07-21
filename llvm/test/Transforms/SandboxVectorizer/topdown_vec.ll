@@ -250,26 +250,25 @@ define void @user_operand_index_mismatch(ptr %ptr, ptr %ptr2, float %x) {
   ret void
 }
 
-; ld0 has two fadd users; the first bundle {fadd0,fadd1} vectorizes fadd1.
-; When matching the second bundle, fadd1 is skipped (already vectorized) and
-; fadd1b is chosen instead.
+; ld0/ld1 each have two fadd users: one adding %a and one adding %b. The two
+; user bundles must not fight over the same instruction: getNextUserBundles()
+; tracks claimed users across all bundles it forms, so once {fadd0b,fadd1b} is
+; claimed, the second bundle picks {fadd0,fadd1} rather than reusing fadd1b.
+; Both bundles widen, producing two fadd <2 x float>.
 define void @user_already_vectorized(ptr %ptr, ptr %ptr2, float %a, float %b) {
 ; CHECK-LABEL: define void @user_already_vectorized(
 ; CHECK-SAME: ptr [[PTR:%.*]], ptr [[PTR2:%.*]], float [[A:%.*]], float [[B:%.*]]) {
 ; CHECK-NEXT:    [[PTR0:%.*]] = getelementptr float, ptr [[PTR]], i32 0
-; CHECK-NEXT:    [[PACK:%.*]] = insertelement <2 x float> poison, float [[B]], i32 0, !sandboxvec [[META8:![0-9]+]]
-; CHECK-NEXT:    [[PACK2:%.*]] = insertelement <2 x float> [[PACK]], float [[B]], i32 1, !sandboxvec [[META8]]
+; CHECK-NEXT:    [[PACK2:%.*]] = insertelement <2 x float> poison, float [[A]], i32 0, !sandboxvec [[META8:![0-9]+]]
+; CHECK-NEXT:    [[PACK3:%.*]] = insertelement <2 x float> [[PACK2]], float [[A]], i32 1, !sandboxvec [[META8]]
+; CHECK-NEXT:    [[PACK:%.*]] = insertelement <2 x float> poison, float [[B]], i32 0, !sandboxvec [[META8]]
+; CHECK-NEXT:    [[PACK1:%.*]] = insertelement <2 x float> [[PACK]], float [[B]], i32 1, !sandboxvec [[META8]]
 ; CHECK-NEXT:    [[PTR2_0:%.*]] = getelementptr float, ptr [[PTR2]], i32 0
-; CHECK-NEXT:    [[PTR2_1:%.*]] = getelementptr float, ptr [[PTR2]], i32 1
 ; CHECK-NEXT:    [[PTR2_2:%.*]] = getelementptr float, ptr [[PTR2]], i32 2
 ; CHECK-NEXT:    [[VECL:%.*]] = load <2 x float>, ptr [[PTR0]], align 4, !sandboxvec [[META8]]
-; CHECK-NEXT:    [[UNPACK:%.*]] = extractelement <2 x float> [[VECL]], i32 0, !sandboxvec [[META8]]
-; CHECK-NEXT:    [[UNPACK1:%.*]] = extractelement <2 x float> [[VECL]], i32 1, !sandboxvec [[META8]]
-; CHECK-NEXT:    [[FADD0:%.*]] = fadd float [[UNPACK]], [[A]]
-; CHECK-NEXT:    [[VEC:%.*]] = fadd <2 x float> [[VECL]], [[PACK2]], !sandboxvec [[META8]]
-; CHECK-NEXT:    [[FADD1:%.*]] = fadd float [[UNPACK1]], [[A]]
-; CHECK-NEXT:    store float [[FADD0]], ptr [[PTR2_0]], align 4
-; CHECK-NEXT:    store float [[FADD1]], ptr [[PTR2_1]], align 4
+; CHECK-NEXT:    [[VEC4:%.*]] = fadd <2 x float> [[VECL]], [[PACK3]], !sandboxvec [[META8]]
+; CHECK-NEXT:    [[VEC:%.*]] = fadd <2 x float> [[VECL]], [[PACK1]], !sandboxvec [[META8]]
+; CHECK-NEXT:    store <2 x float> [[VEC4]], ptr [[PTR2_0]], align 4, !sandboxvec [[META8]]
 ; CHECK-NEXT:    store <2 x float> [[VEC]], ptr [[PTR2_2]], align 4, !sandboxvec [[META8]]
 ; CHECK-NEXT:    ret void
 ;
@@ -424,6 +423,32 @@ define void @user_stores_not_consecutive(ptr %ptr, ptr %ptr2) {
   store float %ld1, ptr %ptr2_2, align 4
   ret void
 }
+
+; FIXME: Following test needs diamond reuse multi-input support in topdown
+; vectorizer.
+;define void @user_diamond_reuse_multi_input(ptr %ptr, ptr %ptr2) {
+;  %ptr0 = getelementptr float, ptr %ptr, i32 0
+;  %ptr1 = getelementptr float, ptr %ptr, i32 1
+;  %ptr2_0 = getelementptr float, ptr %ptr2, i32 0
+;  %ptr2_2 = getelementptr float, ptr %ptr2, i32 2
+;
+;  %ld0 = load float, ptr %ptr0, align 4
+;  %ld1 = load float, ptr %ptr1, align 4
+;
+;  %sub0 = fsub float %ld0, 0.000000e+00
+;  %sub1 = fsub float %ld1, 1.000000e+00
+;
+;  %add0 = fadd float %ld0, 0.000000e+00
+;  %add1 = fadd float %ld1, 0.000000e+00
+;
+;  %diam0 = fsub float %sub0, %add0
+;  %diam1 = fsub float %sub1, %add1
+;
+;  store float %diam0, ptr %ptr2_0, align 4
+;  store float %diam1, ptr %ptr2_2, align 4
+;  ret void
+;}
+
 ;.
 ; CHECK: [[META0]] = distinct !{!"sandboxregion"}
 ; CHECK: [[META1]] = distinct !{!"sandboxregion"}
