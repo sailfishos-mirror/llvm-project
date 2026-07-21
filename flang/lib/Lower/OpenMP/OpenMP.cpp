@@ -54,6 +54,7 @@
 #include "mlir/Dialect/OpenMP/OpenMPDialect.h"
 #include "mlir/IR/IRMapping.h"
 #include "mlir/Support/StateStack.h"
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/ScopeExit.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -5976,60 +5977,6 @@ static bool hasDirectiveAssociation(const ConstructQueue &queue,
   });
 }
 
-static bool isSupportedMetadirectiveLoopQueue(const ConstructQueue &queue) {
-  using llvm::omp::Directive;
-  using lower::omp::matchLeafSequence;
-  return matchLeafSequence(queue.begin(), queue, Directive::OMPD_do) ||
-         matchLeafSequence(queue.begin(), queue, Directive::OMPD_simd) ||
-         matchLeafSequence(queue.begin(), queue, Directive::OMPD_do_simd);
-}
-
-static bool isNestedInOpenMPDataEnvironment(lower::pft::Evaluation &eval,
-                                            mlir::Operation *currentOp) {
-  for (lower::pft::Evaluation *parent = eval.parentConstruct; parent;
-       parent = parent->parentConstruct) {
-    if (const auto *omp = parent->getIf<parser::OpenMPConstruct>()) {
-      llvm::omp::Directive directive = parser::omp::GetOmpDirectiveName(*omp).v;
-      if (semantics::omp::HasDataEnvironment(directive))
-        return true;
-    }
-  }
-
-  // A PFT ancestor can itself be a metadirective, so its source directive does
-  // not reveal the data environment selected during lowering. Check the
-  // already-emitted OpenMP operation ancestry as well.
-  for (mlir::Operation *op = currentOp; op; op = op->getParentOp()) {
-    if (mlir::isa<mlir::omp::DistributeOp, mlir::omp::LoopNestOp,
-                  mlir::omp::ParallelOp, mlir::omp::ScopeOp,
-                  mlir::omp::SectionsOp, mlir::omp::SimdOp, mlir::omp::SingleOp,
-                  mlir::omp::TargetDataOp, mlir::omp::TargetOp,
-                  mlir::omp::TaskgroupOp, mlir::omp::TaskloopContextOp,
-                  mlir::omp::TaskOp, mlir::omp::TeamsOp, mlir::omp::WsloopOp>(
-            op))
-      return true;
-  }
-  return false;
-}
-
-static bool
-hasUnsupportedDataEnvironmentDirective(const ConstructQueue &queue) {
-  return llvm::any_of(queue, [](const auto &item) {
-    return llvm::omp::allParallelSet.test(item.id) ||
-           llvm::omp::taskGeneratingSet.test(item.id) ||
-           llvm::omp::allTeamsSet.test(item.id);
-  });
-}
-
-static bool hasUnsupportedDataSharingClause(const ConstructQueue &queue,
-                                            unsigned version) {
-  return llvm::any_of(queue, [version](const auto &item) {
-    return llvm::any_of(item.clauses, [version](const Clause &ompClause) {
-      return std::holds_alternative<clause::Default>(ompClause.u) ||
-             llvm::omp::isDataSharingAttributeClause(ompClause.id, version);
-    });
-  });
-}
-
 class SymbolDSAGuard {
 public:
   ~SymbolDSAGuard() {
@@ -6037,19 +5984,281 @@ public:
       sym->flags() = flags;
   }
 
-  void setSymbolDSA(semantics::Symbol &sym, semantics::Symbol::Flag dsa) {
+  void setSymbolDSA(semantics::Symbol &sym, semantics::Symbol::Flags flags) {
     if (!llvm::any_of(savedFlags,
                       [&](const auto &entry) { return entry.first == &sym; }))
       savedFlags.emplace_back(&sym, sym.flags());
-    using Symbol = semantics::Symbol;
-    semantics::SetSymbolDSA(sym,
-                            Symbol::Flags{Symbol::Flag::OmpPreDetermined, dsa});
+    semantics::SetSymbolDSA(sym, flags);
+  }
+
+  void setPredeterminedSymbolDSA(semantics::Symbol &sym,
+                                 semantics::Symbol::Flag dsa) {
+    setSymbolDSA(sym, {semantics::Symbol::Flag::OmpPreDetermined, dsa});
   }
 
 private:
   llvm::SmallVector<std::pair<semantics::Symbol *, semantics::Symbol::Flags>, 4>
       savedFlags;
 };
+
+static bool hasStaticStorageDuration(const semantics::Symbol &sym) {
+  const semantics::Symbol &ultimate = sym.GetUltimate();
+  return ultimate.owner().kind() == semantics::Scope::Kind::Module ||
+         ultimate.test(semantics::Symbol::Flag::InDataStmt) ||
+         ultimate.attrs().test(semantics::Attr::SAVE) ||
+         ultimate.test(semantics::Symbol::Flag::InCommonBlock);
+}
+
+static semantics::Symbol &
+getMetadirectiveDSASymbol(semantics::Symbol &sym,
+                          const semantics::Scope &regionScope) {
+  // Preserve symbols created for nested constructs and apply the selected
+  // variant's DSA to the host binding visible at the variant boundary.
+  semantics::Symbol *dsaSym = &sym;
+  while (&dsaSym->owner() != &regionScope &&
+         regionScope.Contains(dsaSym->owner())) {
+    const auto *hostAssoc = dsaSym->detailsIf<semantics::HostAssocDetails>();
+    if (!hostAssoc)
+      break;
+    dsaSym = &const_cast<semantics::Symbol &>(hostAssoc->symbol());
+  }
+  return *dsaSym;
+}
+
+/// Recompute implicit task captures against the selected variant's temporary
+/// host DSA while preserving explicit and predetermined task attributes.
+class NestedTaskDSAVisitor {
+public:
+  NestedTaskDSAVisitor(SymbolDSAGuard &dsaGuard, unsigned version)
+      : dsaGuard{dsaGuard}, version{version} {}
+
+  template <typename T>
+  bool Pre(const T &) {
+    return true;
+  }
+
+  template <typename T>
+  void Post(const T &) {}
+
+  bool Pre(const parser::OpenMPConstruct &construct) {
+    llvm::omp::Directive dir = parser::omp::GetOmpDirectiveName(construct).v;
+    if (createsDataEnvironment(dir))
+      dataEnvironments.push_back(dir);
+    return true;
+  }
+
+  void Post(const parser::OpenMPConstruct &construct) {
+    llvm::omp::Directive dir = parser::omp::GetOmpDirectiveName(construct).v;
+    if (createsDataEnvironment(dir))
+      dataEnvironments.pop_back();
+  }
+
+  bool Pre(const parser::Name &name) {
+    using Symbol = semantics::Symbol;
+    using Flag = Symbol::Flag;
+
+    if (dataEnvironments.empty() ||
+        !llvm::omp::taskGeneratingSet.test(dataEnvironments.back()) ||
+        !name.symbol)
+      return true;
+
+    Symbol &sym = *name.symbol;
+    if (sym.test(Flag::OmpExplicit) || sym.test(Flag::OmpPreDetermined))
+      return true;
+    const auto *hostAssoc = sym.detailsIf<semantics::HostAssocDetails>();
+    if (!hostAssoc)
+      return true;
+
+    Symbol::Flags hostDSA = semantics::GetSymbolDSA(hostAssoc->symbol());
+    if (hostDSA.test(Flag::OmpShared) ||
+        (hostDSA.none() && hasStaticStorageDuration(hostAssoc->symbol()))) {
+      dsaGuard.setSymbolDSA(sym, {Flag::OmpShared});
+    } else {
+      dsaGuard.setSymbolDSA(sym, {Flag::OmpFirstPrivate, Flag::OmpImplicit});
+    }
+    return true;
+  }
+
+private:
+  bool createsDataEnvironment(llvm::omp::Directive dir) const {
+    return llvm::omp::allParallelSet.test(dir) ||
+           llvm::omp::taskGeneratingSet.test(dir) ||
+           llvm::omp::allTargetSet.test(dir) ||
+           (version >= 52 && llvm::omp::allTeamsSet.test(dir));
+  }
+
+  SymbolDSAGuard &dsaGuard;
+  unsigned version;
+  llvm::SmallVector<llvm::omp::Directive, 4> dataEnvironments;
+};
+
+static void markNestedTaskDSAs(lower::pft::Evaluation &eval,
+                               SymbolDSAGuard &dsaGuard, unsigned version) {
+  NestedTaskDSAVisitor visitor{dsaGuard, version};
+  eval.visit([&](const auto &node) { parser::Walk(node, visitor); });
+}
+
+/// Reconstruct data-sharing attributes for a loop variant selected during
+/// lowering. Normal OpenMP constructs receive these attributes from semantic
+/// resolution, but a metadirective's variant is not known at that point.
+static void markMetadirectiveDSAs(semantics::SemanticsContext &semaCtx,
+                                  const ConstructQueue &queue,
+                                  lower::pft::Evaluation &loopEval,
+                                  SymbolDSAGuard &dsaGuard) {
+  using Symbol = semantics::Symbol;
+  using Flag = Symbol::Flag;
+
+  llvm::DenseMap<const Symbol *, Symbol::Flags> explicitDSAs;
+  llvm::SmallVector<Symbol *, 8> explicitSymbols;
+  std::optional<Flag> defaultDSA;
+  bool hasParallel = false;
+  bool hasTask = false;
+
+  const auto *doConstruct = loopEval.getIf<parser::DoConstruct>();
+  assert(doConstruct && "expected associated DO evaluation");
+  const auto source = parser::GetSource(*doConstruct);
+  assert(source && "expected source for associated DO");
+  const semantics::Scope &regionScope = semaCtx.FindScope(*source);
+
+  auto recordExplicitDSA = [&](const ObjectList &objects, Flag dsa) {
+    for (const Object &object : objects) {
+      Symbol *sym = object.sym();
+      explicitDSAs[&sym->GetUltimate()].set(dsa);
+      explicitDSAs[&sym->GetUltimate()].set(Flag::OmpExplicit);
+      explicitSymbols.push_back(sym);
+    }
+  };
+
+  for (const auto &item : queue) {
+    hasParallel = hasParallel || llvm::omp::allParallelSet.test(item.id);
+    hasTask = hasTask || llvm::omp::taskGeneratingSet.test(item.id);
+    for (const Clause &clause : item.clauses) {
+      if (const auto *privateClause = std::get_if<clause::Private>(&clause.u)) {
+        recordExplicitDSA(privateClause->v, Flag::OmpPrivate);
+      } else if (const auto *firstprivateClause =
+                     std::get_if<clause::Firstprivate>(&clause.u)) {
+        recordExplicitDSA(firstprivateClause->v, Flag::OmpFirstPrivate);
+      } else if (const auto *lastprivateClause =
+                     std::get_if<clause::Lastprivate>(&clause.u)) {
+        recordExplicitDSA(std::get<ObjectList>(lastprivateClause->t),
+                          Flag::OmpLastPrivate);
+      } else if (const auto *sharedClause =
+                     std::get_if<clause::Shared>(&clause.u)) {
+        recordExplicitDSA(sharedClause->v, Flag::OmpShared);
+      } else if (const auto *linearClause =
+                     std::get_if<clause::Linear>(&clause.u)) {
+        recordExplicitDSA(std::get<ObjectList>(linearClause->t),
+                          Flag::OmpLinear);
+      } else if (const auto *reductionClause =
+                     std::get_if<clause::Reduction>(&clause.u)) {
+        recordExplicitDSA(std::get<ObjectList>(reductionClause->t),
+                          Flag::OmpReduction);
+      } else if (const auto *defaultClause =
+                     std::get_if<clause::Default>(&clause.u)) {
+        using DSA = clause::Default::DataSharingAttribute;
+        switch (defaultClause->v) {
+        case DSA::Firstprivate:
+          defaultDSA = Flag::OmpFirstPrivate;
+          break;
+        case DSA::None:
+          defaultDSA = Flag::OmpNone;
+          break;
+        case DSA::Private:
+          defaultDSA = Flag::OmpPrivate;
+          break;
+        case DSA::Shared:
+          defaultDSA = Flag::OmpShared;
+          break;
+        }
+      }
+    }
+  }
+
+  for (Symbol *sym : explicitSymbols) {
+    Symbol &dsaSym = getMetadirectiveDSASymbol(*sym, regionScope);
+    dsaGuard.setSymbolDSA(dsaSym, explicitDSAs.lookup(&dsaSym.GetUltimate()));
+  }
+
+  lower::pft::visitAllSymbols(loopEval, [&](const Symbol &constSym) {
+    Symbol &referencedSym = const_cast<Symbol &>(constSym);
+    Symbol &sym = getMetadirectiveDSASymbol(referencedSym, regionScope);
+    if (!semantics::omp::IsPrivatizable(sym))
+      return;
+
+    const Symbol &ultimate = sym.GetUltimate();
+    if (&ultimate.owner() != &regionScope &&
+        regionScope.Contains(ultimate.owner())) {
+      // Automatic objects declared inside the associated loop already have
+      // private storage; static objects declared there are shared.
+      if (hasStaticStorageDuration(ultimate))
+        dsaGuard.setPredeterminedSymbolDSA(sym, Flag::OmpShared);
+      return;
+    }
+
+    if (auto it = explicitDSAs.find(&ultimate); it != explicitDSAs.end()) {
+      dsaGuard.setSymbolDSA(sym, it->second);
+      return;
+    }
+
+    if (defaultDSA) {
+      if (*defaultDSA != Flag::OmpNone)
+        dsaGuard.setSymbolDSA(sym, {*defaultDSA});
+      return;
+    }
+
+    if (hasTask) {
+      Symbol::Flags enclosingDSA = semantics::GetSymbolDSA(sym);
+      if (enclosingDSA.test(Flag::OmpShared) ||
+          (enclosingDSA.none() && hasStaticStorageDuration(sym))) {
+        dsaGuard.setSymbolDSA(sym, {Flag::OmpShared});
+      } else {
+        dsaGuard.setSymbolDSA(sym, {Flag::OmpFirstPrivate, Flag::OmpImplicit});
+      }
+    } else if (hasParallel) {
+      dsaGuard.setSymbolDSA(sym, {Flag::OmpShared});
+    }
+  });
+}
+
+/// Mark eligible sequential DO indices in a metadirective variant's generated
+/// region as private, mimicking
+/// `OmpAttributeVisitor::ResolveSeqLoopIndexInParallelOrTaskConstruct`, which
+/// cannot run because the variant is only resolved during lowering.
+static void markSequentialLoopIVs(
+    lower::pft::Evaluation &eval, SymbolDSAGuard &dsaGuard,
+    const llvm::SmallPtrSetImpl<const semantics::Symbol *> &clauseSyms,
+    unsigned version) {
+  using Symbol = semantics::Symbol;
+  if (!eval.hasNestedEvaluations())
+    return;
+  for (lower::pft::Evaluation &nested : eval.getNestedEvaluations()) {
+    // Do not assign a predetermined DSA across an unresolved nested
+    // metadirective: its selected variant may create a new data environment
+    // or give the loop index an explicit DSA.
+    if (isMetadirectiveEval(nested))
+      continue;
+
+    // A nested construct with its own data environment (for example, parallel,
+    // task, teams, or target) owns the loops it contains. Do not descend into
+    // such constructs.
+    if (const auto *ompConstruct = nested.getIf<parser::OpenMPConstruct>()) {
+      llvm::omp::Directive dir =
+          parser::omp::GetOmpDirectiveName(*ompConstruct).v;
+      if (llvm::omp::allParallelSet.test(dir) ||
+          llvm::omp::taskGeneratingSet.test(dir) ||
+          llvm::omp::allTargetSet.test(dir) ||
+          (version >= 52 && llvm::omp::allTeamsSet.test(dir)))
+        continue;
+    }
+    // Skip predetermined indices and indices named in a variant clause.
+    if (nested.getIf<parser::DoConstruct>())
+      if (Symbol *sym = getIterationVariableSymbol(nested))
+        if (!sym->test(Symbol::Flag::OmpPreDetermined) &&
+            !clauseSyms.contains(sym))
+          dsaGuard.setPredeterminedSymbolDSA(*sym, Symbol::Flag::OmpPrivate);
+    markSequentialLoopIVs(nested, dsaGuard, clauseSyms, version);
+  }
+}
 
 enum class MetadirectiveLoopIVMarking {
   Marked,           // Induction variables marked (or there was nothing to do).
@@ -6119,10 +6328,30 @@ markMetadirectiveLoopIVs(semantics::SemanticsContext &semaCtx,
       // the descriptor-backed source symbol cannot recreate it.
       if (semantics::IsAllocatableOrObjectPointer(sym))
         return MetadirectiveLoopIVMarking::IndirectIV;
-      dsaGuard.setSymbolDSA(*sym, ivDSA);
+      dsaGuard.setPredeterminedSymbolDSA(*sym, ivDSA);
     }
     if (level + 1 < affectedDepth)
       doEval = tryGetNestedDoConstruct(*doEval);
+  }
+
+  // A selected parallel, task, or teams variant also predetermines the DSA of
+  // sequential loop indices in its generated region. Semantic resolution
+  // cannot do this because the variant is not selected until lowering.
+  bool privatizesNestedSeqLoopIVs =
+      llvm::omp::allParallelSet.test(spec.DirId()) ||
+      llvm::omp::taskGeneratingSet.test(spec.DirId()) ||
+      (semaCtx.langOptions().OpenMPVersion >= 52 &&
+       llvm::omp::allTeamsSet.test(spec.DirId()));
+  if (privatizesNestedSeqLoopIVs) {
+    llvm::SmallPtrSet<const semantics::Symbol *, 4> clauseSyms;
+    for (const parser::OmpClause &clause : spec.Clauses().v)
+      if (const parser::OmpObjectList *objects =
+              parser::omp::GetOmpObjectList(clause))
+        for (const parser::OmpObject &object : objects->v)
+          if (const semantics::Symbol *sym = makeObject(object, semaCtx).sym())
+            clauseSyms.insert(sym);
+    markSequentialLoopIVs(*doEval, dsaGuard, clauseSyms,
+                          semaCtx.langOptions().OpenMPVersion);
   }
 
   return MetadirectiveLoopIVMarking::Marked;
@@ -6314,15 +6543,6 @@ static void genMetadirective(lower::AbstractConverter &converter,
       hasDirectiveAssociation(fallback->DirId(),
                               llvm::omp::Association::LoopNest))
     nestedLoopVariant = fallback;
-  // Name resolution cannot give a metadirective variant its own DSA scope, so
-  // a selectable loop variant's loop-IV attribute can otherwise contaminate
-  // an enclosing data environment.
-  if (nestedLoopVariant &&
-      isNestedInOpenMPDataEnvironment(
-          eval, builder.getInsertionBlock()->getParentOp()))
-    TODO(converter.genLocation(nestedLoopVariant->source),
-         "loop-associated METADIRECTIVE nested in an OpenMP data environment");
-
   bool hasLoopAssociatedCandidate = nestedLoopVariant != nullptr;
   SplicedAssociatedEvaluations splicedAssociatedEvaluations;
   lower::pft::Evaluation *associatedLoopEval = nullptr;
@@ -6400,18 +6620,14 @@ static void genMetadirective(lower::AbstractConverter &converter,
     bool hasLoopAssociation =
         hasDirectiveAssociation(queue, llvm::omp::Association::LoopNest);
     if (hasLoopAssociation) {
-      if (hasUnsupportedDataEnvironmentDirective(queue))
+      if (llvm::any_of(queue, [](const auto &item) {
+            return llvm::omp::allTeamsSet.test(item.id);
+          }))
         TODO(variantLoc,
-             "data-environment construct in loop-associated METADIRECTIVE "
-             "variant");
-      if (hasUnsupportedDataSharingClause(queue,
-                                          semaCtx.langOptions().OpenMPVersion))
+             "TEAMS construct in loop-associated METADIRECTIVE variant");
+      if (!enableDelayedPrivatization)
         TODO(variantLoc,
-             "data-sharing clause in loop-associated METADIRECTIVE variant");
-      if (!isSupportedMetadirectiveLoopQueue(queue))
-        TODO(variantLoc,
-             "loop-associated METADIRECTIVE variant other than DO, SIMD, or "
-             "DO SIMD");
+             "loop-associated METADIRECTIVE without delayed privatization");
       lower::pft::Evaluation *loopEval = spliceAssociatedDoEval(eval);
       if (!loopEval)
         TODO(variantLoc, "loop-associated METADIRECTIVE without associated DO");
@@ -6422,6 +6638,7 @@ static void genMetadirective(lower::AbstractConverter &converter,
         TODO(variantLoc, "unstructured associated DO in loop-associated "
                          "METADIRECTIVE variant");
       SymbolDSAGuard dsaGuard;
+      markMetadirectiveDSAs(semaCtx, queue, *loopEval, dsaGuard);
       MetadirectiveLoopIVMarking marking =
           markMetadirectiveLoopIVs(semaCtx, *spec, *loopEval, dsaGuard);
       if (marking == MetadirectiveLoopIVMarking::NestTooShallow)
@@ -6437,6 +6654,8 @@ static void genMetadirective(lower::AbstractConverter &converter,
       if (marking == MetadirectiveLoopIVMarking::AssociateIV)
         TODO(variantLoc, "ASSOCIATE name loop iteration variable in "
                          "loop-associated METADIRECTIVE variant");
+      markNestedTaskDSAs(*loopEval, dsaGuard,
+                         semaCtx.langOptions().OpenMPVersion);
       genOMPDispatch(converter, symTable, semaCtx, eval, variantLoc, queue,
                      queue.begin());
       return;

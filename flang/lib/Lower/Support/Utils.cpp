@@ -661,10 +661,42 @@ bool isEqual(const Fortran::evaluate::Component *x,
 
 void copyFirstPrivateSymbol(lower::AbstractConverter &converter,
                             const semantics::Symbol *sym,
-                            mlir::OpBuilder::InsertPoint *copyAssignIP) {
-  if (sym->test(semantics::Symbol::Flag::OmpFirstPrivate) ||
-      sym->test(semantics::Symbol::Flag::LocalityLocalInit))
+                            mlir::OpBuilder::InsertPoint *copyAssignIP,
+                            bool allowNonHostAssocFirstprivate) {
+  if (!sym->test(semantics::Symbol::Flag::OmpFirstPrivate) &&
+      !sym->test(semantics::Symbol::Flag::LocalityLocalInit))
+    return;
+
+  if (sym->has<semantics::HostAssocDetails>()) {
     converter.copyHostAssociateVar(*sym, copyAssignIP);
+    return;
+  }
+
+  assert(allowNonHostAssocFirstprivate &&
+         "unexpected firstprivate symbol without host association");
+
+  // A metadirective selected during lowering has no semantic construct in
+  // which to create a host-association symbol. Its privatizer copy region
+  // still provides the source one level up and the private destination in the
+  // shallow scope.
+  fir::FirOpBuilder &builder = converter.getFirOpBuilder();
+  mlir::OpBuilder::InsertionGuard guard(builder);
+  if (copyAssignIP && copyAssignIP->isSet())
+    builder.restoreInsertionPoint(*copyAssignIP);
+  lower::SymbolBox hostBox = converter.lookupOneLevelUpSymbol(*sym);
+  lower::SymbolBox privBox = converter.shallowLookupSymbol(*sym);
+  assert(hostBox && privBox &&
+         "expected bindings for non-host-associated firstprivate symbol");
+  if (hostBox.getAddr() == privBox.getAddr())
+    return;
+
+  fir::FortranVariableFlagsEnum attrs = fir::FortranVariableFlagsEnum::None;
+  if (semantics::IsAllocatable(sym->GetUltimate()))
+    attrs = attrs | fir::FortranVariableFlagsEnum::allocatable;
+  if (semantics::IsPointer(sym->GetUltimate()))
+    attrs = attrs | fir::FortranVariableFlagsEnum::pointer;
+  converter.copyVar(converter.getCurrentLocation(), privBox.getAddr(),
+                    hostBox.getAddr(), attrs);
 }
 
 static bool isDynamicallySizedBoxArrayType(mlir::Type type) {
@@ -689,7 +721,8 @@ void privatizeSymbol(
     llvm::SmallPtrSet<const semantics::Symbol *, 16> &mightHaveReadHostSym,
     const semantics::Symbol *symToPrivatize, OperandsStructType *clauseOps,
     std::optional<llvm::omp::Directive> dir,
-    bool forceHeapAllocationForPrivateDynamicArrays) {
+    bool forceHeapAllocationForPrivateDynamicArrays,
+    bool allowNonHostAssocFirstprivate) {
   constexpr bool isDoConcurrent =
       std::is_same_v<OpType, fir::LocalitySpecifierOp>;
   mlir::OpBuilder::InsertPoint dcIP;
@@ -890,7 +923,8 @@ void privatizeSymbol(
       addSymbol(1, symToPrivatize);
 
       auto ip = firOpBuilder.saveInsertionPoint();
-      copyFirstPrivateSymbol(converter, symToPrivatize, &ip);
+      copyFirstPrivateSymbol(converter, symToPrivatize, &ip,
+                             allowNonHostAssocFirstprivate);
 
       if constexpr (std::is_same_v<OpType, mlir::omp::PrivateClauseOp>) {
         mlir::omp::YieldOp::create(
@@ -927,7 +961,8 @@ privatizeSymbol<mlir::omp::PrivateClauseOp, mlir::omp::PrivateClauseOps>(
     const semantics::Symbol *symToPrivatize,
     mlir::omp::PrivateClauseOps *clauseOps,
     std::optional<llvm::omp::Directive> dir,
-    bool forceHeapAllocationForPrivateDynamicArrays);
+    bool forceHeapAllocationForPrivateDynamicArrays,
+    bool allowNonHostAssocFirstprivate);
 
 template void
 privatizeSymbol<fir::LocalitySpecifierOp, fir::LocalitySpecifierOperands>(
@@ -938,6 +973,7 @@ privatizeSymbol<fir::LocalitySpecifierOp, fir::LocalitySpecifierOperands>(
     const semantics::Symbol *symToPrivatize,
     fir::LocalitySpecifierOperands *clauseOps,
     std::optional<llvm::omp::Directive> dir,
-    bool forceHeapAllocationForPrivateDynamicArrays);
+    bool forceHeapAllocationForPrivateDynamicArrays,
+    bool allowNonHostAssocFirstprivate);
 
 } // end namespace Fortran::lower

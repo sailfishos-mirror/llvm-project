@@ -250,19 +250,24 @@ void DataSharingProcessor::copyLastPrivateSymbol(
   assert(isMetadirectiveEval(eval) &&
          "unexpected lastprivate symbol without host association");
 
-  // Metadirective loop IVs can be marked lastprivate during lowering, after
-  // semantic host-association symbols would normally be created. Copy from the
-  // private binding back to the one-level-up binding directly.
+  // A metadirective selected during lowering has no semantic construct in
+  // which to create a host-association symbol. Copy from the private binding
+  // back to the one-level-up binding directly.
   mlir::OpBuilder::InsertionGuard guard(firOpBuilder);
   if (lastPrivIP)
     firOpBuilder.restoreInsertionPoint(*lastPrivIP);
   lower::SymbolBox hostBox = converter.lookupOneLevelUpSymbol(*sym);
   lower::SymbolBox privBox = converter.shallowLookupSymbol(*sym);
-  assert(hostBox && privBox &&
-         "expected symbol bindings for lastprivate loop IV");
-  if (hostBox.getAddr() != privBox.getAddr())
+  assert(hostBox && privBox && "expected bindings for lastprivate symbol");
+  if (hostBox.getAddr() != privBox.getAddr()) {
+    fir::FortranVariableFlagsEnum attrs = fir::FortranVariableFlagsEnum::None;
+    if (semantics::IsAllocatable(sym->GetUltimate()))
+      attrs = attrs | fir::FortranVariableFlagsEnum::allocatable;
+    if (semantics::IsPointer(sym->GetUltimate()))
+      attrs = attrs | fir::FortranVariableFlagsEnum::pointer;
     converter.copyVar(converter.getCurrentLocation(), hostBox.getAddr(),
-                      privBox.getAddr(), fir::FortranVariableFlagsEnum::None);
+                      privBox.getAddr(), attrs);
+  }
 }
 
 void DataSharingProcessor::collectOmpObjectListSymbol(
@@ -792,7 +797,7 @@ void DataSharingProcessor::privatizeSymbol(
                                   mlir::omp::PrivateClauseOps>(
       converter, firOpBuilder, symTable, allPrivatizedSymbols,
       mightHaveReadHostSym, symToPrivatize, clauseOps, dir,
-      forceHeapAllocationForPrivateDynamicArrays);
+      forceHeapAllocationForPrivateDynamicArrays, isMetadirectiveEval(eval));
 }
 } // namespace omp
 } // namespace lower
