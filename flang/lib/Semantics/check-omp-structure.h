@@ -393,6 +393,9 @@ private:
   void CheckCrayPointee(const parser::OmpObjectList &objectList,
       llvm::StringRef clause, bool suggestToUseCrayPointer = true);
   void GetSymbolsInObjectList(const parser::OmpObjectList &, SymbolSourceMap &);
+  void CheckDefaultNoneInAssociatedLoop(
+      const parser::OmpDirectiveSpecification &, const parser::DoConstruct &,
+      UnorderedSymbolSet &diagnosed);
   void CheckDefinableObjects(SymbolSourceMap &, const llvm::omp::Clause);
   void CheckCopyingPolymorphicAllocatable(
       SymbolSourceMap &, const llvm::omp::Clause);
@@ -504,6 +507,7 @@ private:
   struct MetadirectiveLoopVariant {
     const parser::traits::OmpContextSelectorSpecification *selector;
     const parser::OmpDirectiveSpecification *spec;
+    bool checkDefaultNoneInAssociatedLoop;
   };
   std::vector<MetadirectiveLoopVariant> metadirectiveLoopVariants_;
   std::vector<std::size_t> metadirectiveVariantScopeStarts_;
