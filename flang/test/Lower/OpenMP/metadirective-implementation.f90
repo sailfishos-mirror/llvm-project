@@ -1,6 +1,5 @@
 ! Test lowering of OpenMP metadirective with implementation selectors.
 
-! RUN: %flang_fc1 -fopenmp -emit-hlfir -fopenmp-version=50 %s -o - | FileCheck %s
 ! RUN: %flang_fc1 -fopenmp -emit-hlfir -fopenmp-version=51 %s -o - | FileCheck %s
 ! RUN: %flang_fc1 -fopenmp -emit-hlfir -fopenmp-version=52 -cpp -DOMP_52 %s -o - | FileCheck %s
 
@@ -23,6 +22,52 @@ end subroutine
 subroutine test_vendor_no_match()
   !$omp metadirective &
   !$omp & when(implementation={vendor("unknown")}: taskwait) &
+#ifdef OMP_52
+  !$omp & otherwise(nothing)
+#else
+  !$omp & default(nothing)
+#endif
+end subroutine
+
+! An inapplicable variant must not have its clauses lowered.
+! CHECK-LABEL: func.func @_QPtest_inapplicable_assume()
+! CHECK:         fir.call @_FortranAioOutputInteger32
+! CHECK-NOT:     fir.call @_FortranAioOutputInteger32
+! CHECK:         return
+subroutine test_inapplicable_assume()
+  !$omp metadirective &
+  !$omp & when(implementation={vendor("unknown")}: assume holds(.true.)) &
+#ifdef OMP_52
+  !$omp & otherwise(nothing)
+#else
+  !$omp & default(nothing)
+#endif
+  print *, 1
+end subroutine
+
+! An unselected fallback must not have its clauses lowered.
+! CHECK-LABEL: func.func @_QPtest_unselected_fallback_clause()
+! CHECK:         omp.barrier
+! CHECK:         return
+subroutine test_unselected_fallback_clause()
+  !$omp metadirective &
+  !$omp & when(implementation={vendor(llvm)}: barrier) &
+#ifdef OMP_52
+  !$omp & otherwise(assume holds(.true.))
+#else
+  !$omp & default(assume holds(.true.))
+#endif
+end subroutine
+
+! A statically applicable but lower-ranked candidate must not have its clauses
+! lowered either.
+! CHECK-LABEL: func.func @_QPtest_unselected_ranked_clause()
+! CHECK:         omp.barrier
+! CHECK:         return
+subroutine test_unselected_ranked_clause()
+  !$omp metadirective &
+  !$omp & when(user={condition(score(1): .true.)}: assume holds(.true.)) &
+  !$omp & when(user={condition(score(2): .true.)}: barrier) &
 #ifdef OMP_52
   !$omp & otherwise(nothing)
 #else
