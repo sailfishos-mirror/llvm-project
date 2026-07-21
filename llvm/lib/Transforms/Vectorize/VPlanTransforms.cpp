@@ -7499,19 +7499,13 @@ void VPlanTransforms::multiversionForUnitStridedMemOps(
     VPlan &Plan, VPCostContext &CostCtx, VFSelectionContext &Config,
     VPRecipeBuilder &RecipeBuilder, VFRange &Range,
     SmallVectorImpl<VPInstruction *> &MemOps) {
-  SmallVector<VPInstruction *> RemainingOps;
-
   ScalarEvolution *SE = CostCtx.PSE.getSE();
-
   PredicatedScalarEvolution StrideMVPSE(*SE, const_cast<Loop &>(*CostCtx.L));
-
   SCEVUnionPredicate StridePredicates({}, *SE);
 
-  // Use `for_each` so that we could do `return Skip();`.
-  for_each(MemOps, [&](VPInstruction *VPI) {
-    auto Skip = [&]() { RemainingOps.push_back(VPI); };
+  erase_if(MemOps, [&](VPInstruction *VPI) -> bool {
     if (RecipeBuilder.isConsecutiveWithoutVPlanBasedStrideSpeculation(VPI))
-      return Skip();
+      return false;
     auto *PtrOp = VPI->getOpcode() == Instruction::Load ? VPI->getOperand(0)
                                                         : VPI->getOperand(1);
 
@@ -7521,7 +7515,7 @@ void VPlanTransforms::multiversionForUnitStridedMemOps(
 
     if (!match(PtrSCEV, m_scev_AffineAddRec(m_SCEV(Start), m_SCEV(Stride),
                                             m_SpecificLoop(CostCtx.L))))
-      return Skip();
+      return false;
 
     Type *ScalarTy = VPI->getOpcode() == Instruction::Load
                          ? VPI->getScalarType()
@@ -7534,7 +7528,7 @@ void VPlanTransforms::multiversionForUnitStridedMemOps(
                 return Config.isLegalMaskedLoadOrStore(I, VF);
               },
               Range))
-        return Skip();
+        return false;
     }
 
     const auto *TypeSize = cast<SCEVConstant>(SE->getSizeOfExpr(
@@ -7564,11 +7558,11 @@ void VPlanTransforms::multiversionForUnitStridedMemOps(
 
     if (isa<SCEVConstant>(Stride)) {
       if (Stride != TypeSize)
-        return Skip();
+        return false;
 
       // Earlier MV helped with this memory operation too.
       ReplaceWithUnitStrided();
-      return;
+      return true;
     }
 
     const SCEVConstant *StrideConstantMultiplier;
@@ -7583,13 +7577,13 @@ void VPlanTransforms::multiversionForUnitStridedMemOps(
         // including negative `N`. For now, only process when they're equal,
         // which matches the useful part of the legacy behavior that
         // multiversiones GEP index for stride one.
-        return Skip();
+        return false;
       }
       ToMultiVersion = StrideNonConstantMultiplier;
       MVConst = SE->getOne(ToMultiVersion->getType());
     } else if (!TypeSize->isOne()) {
       // Likewise - try to match legacy behavior.
-      return Skip();
+      return false;
     }
 
     while (auto *C = dyn_cast<SCEVIntegralCastExpr>(ToMultiVersion)) {
@@ -7598,13 +7592,13 @@ void VPlanTransforms::multiversionForUnitStridedMemOps(
     }
 
     if (match(ToMultiVersion, m_scev_UndefOrPoison()))
-      return Skip();
+      return false;
 
     if (!isa<SCEVUnknown>(ToMultiVersion)) {
       // Match legacy behavior.
       // If/when changed, make sure that explicit poison/undef in the defining
       // expression doesn't cause any issues.
-      return Skip();
+      return false;
     }
 
     Value *StrideVal = cast<SCEVUnknown>(ToMultiVersion)->getValue();
@@ -7628,7 +7622,7 @@ void VPlanTransforms::multiversionForUnitStridedMemOps(
                                                   : VF.getFixedValue() - 1));
             },
             Range))
-      return Skip();
+      return false;
 
     StridePredicates = StridePredicates.getUnionWith(NewPred, *SE);
 
@@ -7654,9 +7648,8 @@ void VPlanTransforms::multiversionForUnitStridedMemOps(
         ReplaceMVUses(U);
 
     ReplaceWithUnitStrided();
+    return true;
   });
-
-  MemOps.swap(RemainingOps);
 
   if (StridePredicates.isAlwaysTrue())
     return;
