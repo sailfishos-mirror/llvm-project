@@ -389,6 +389,13 @@ latest release, please see the [Clang Web Site](https://clang.llvm.org) or the
 
 #### AIX Support
 
+- Added the `-mloadtime-comment-vars=` option, which accepts a comma-separated
+  list of mangled variable names to preserve in the final object file as
+  loadtime identifying strings. This complements `#pragma comment(copyright,
+  ...)` for codebases that embed identifying strings in source variables. A
+  named variable that cannot be preserved is diagnosed with
+  `-Wloadtime-comment-var`.
+
 #### NetBSD Support
 
 #### WebAssembly Support
