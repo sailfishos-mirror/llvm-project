@@ -82,8 +82,6 @@ bool PPCTargetInfo::handleTargetFeatures(std::vector<std::string> &Features,
       HasQuadwordAtomics = true;
     } else if (Feature == "+longcall") {
       UseLongCalls = true;
-    } else if (Feature == "+float16") {
-      HasFloat16 = true;
     }
     // TODO: Finish this list and add an assert that we've handled them
     // all.
@@ -506,7 +504,6 @@ static bool ppcUserFeaturesCheck(DiagnosticsEngine &Diags,
     Found |= FindVSXSubfeature("+crypto", "-mcrypto", "-msoft-float");
     Found |= FindVSXSubfeature("+power10-vector", "-mpower10-vector",
                                "-msoft-float");
-    Found |= FindVSXSubfeature("+float16", "-mfloat16", "-msoft-float");
   }
   if (Found)
     return false;
@@ -556,14 +553,6 @@ bool PPCTargetInfo::initFeatureMap(
     // We have __float128 on PPC but not pre-VSX targets.
     Diags.Report(diag::err_opt_not_valid_with_opt) << "-mfloat128" << CPU;
     return false;
-  }
-
-  if (!(ArchDefs & ArchDefinePwr8)) {
-    if (llvm::is_contained(FeaturesVec, "+float16")) {
-      // Reject -mfloat16 on pre-Power8 CPUs.
-      Diags.Report(diag::err_opt_not_valid_with_opt) << "-mfloat16" << CPU;
-      return false;
-    }
   }
 
   if (!(ArchDefs & ArchDefinePwr10)) {
@@ -845,6 +834,16 @@ void PPCTargetInfo::adjust(DiagnosticsEngine &Diags, LangOptions &Opts,
                            const TargetInfo *Aux) {
   if (HasAltivec)
     Opts.AltiVec = 1;
+  if (Opts.PPCFloat16) {
+    if (FloatABI == SoftFloat)
+      Diags.Report(diag::err_opt_not_valid_with_opt)
+          << "-mfloat16" << "-msoft-float";
+    else if (!(ArchDefs & ArchDefinePwr8))
+      Diags.Report(diag::err_opt_not_valid_with_opt)
+          << "-mfloat16" << getTargetOpts().CPU;
+    else
+      HasFloat16 = true;
+  }
   TargetInfo::adjust(Diags, Opts, Aux);
   if (LongDoubleFormat != &llvm::APFloat::IEEEdouble())
     LongDoubleFormat = Opts.PPCIEEELongDouble
