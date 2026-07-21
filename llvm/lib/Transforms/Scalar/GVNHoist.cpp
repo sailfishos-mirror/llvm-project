@@ -66,8 +66,10 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
-#include "llvm/Transforms/Scalar/GVN.h"
+#include "llvm/Transforms/Scalar/GVNValueTable.h"
+#include "llvm/Transforms/Scalar/GVNHoist.h"
 #include "llvm/Transforms/Utils/Local.h"
+
 #include <algorithm>
 #include <cassert>
 #include <memory>
@@ -163,7 +165,7 @@ class InsnInfo {
 
 public:
   // Inserts I and its value number in VNtoScalars.
-  void insert(Instruction *I, GVNPass::ValueTable &VN) {
+  void insert(Instruction *I, GVNValueTable &VN) {
     // Scalar instruction.
     unsigned V = VN.lookupOrAdd(I);
     VNtoScalars[{V, InvalidVN}].push_back(I);
@@ -178,7 +180,7 @@ class LoadInfo {
 
 public:
   // Insert Load and the value number of its memory address in VNtoLoads.
-  void insert(LoadInst *Load, GVNPass::ValueTable &VN) {
+  void insert(LoadInst *Load, GVNValueTable &VN) {
     if (Load->isSimple()) {
       unsigned V = VN.lookupOrAdd(Load->getPointerOperand());
       // With opaque pointers we may have loads from the same pointer with
@@ -197,7 +199,7 @@ class StoreInfo {
 public:
   // Insert the Store and a hash number of the store address and the stored
   // value in VNtoStores.
-  void insert(StoreInst *Store, GVNPass::ValueTable &VN) {
+  void insert(StoreInst *Store, GVNValueTable &VN) {
     if (!Store->isSimple())
       return;
     // Hash the store address and the stored value.
@@ -217,7 +219,7 @@ class CallInfo {
 
 public:
   // Insert Call and its value numbering in one of the VNtoCalls* containers.
-  void insert(CallInst *Call, GVNPass::ValueTable &VN) {
+  void insert(CallInst *Call, GVNValueTable &VN) {
     // A call that doesNotAccessMemory is handled as a Scalar,
     // onlyReadsMemory will be handled as a Load instruction,
     // all other calls will be handled as stores.
@@ -260,7 +262,7 @@ public:
   unsigned int rank(const Value *V) const;
 
 private:
-  GVNPass::ValueTable VN;
+  GVNValueTable VN;
   DominatorTree *DT;
   PostDominatorTree *PDT;
   AliasAnalysis *AA;
