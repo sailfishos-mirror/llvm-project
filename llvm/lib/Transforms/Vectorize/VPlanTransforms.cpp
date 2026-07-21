@@ -7616,7 +7616,7 @@ void VPlanTransforms::multiversionForUnitStridedMemOps(
     if (LoopVectorizationPlanner::getDecisionAndClampRange(
             [&](ElementCount VF) {
               return SE->isKnownPredicate(
-                  ICmpInst::ICMP_SLT, PredicatedMaxBTC,
+                  ICmpInst::ICMP_ULT, PredicatedMaxBTC,
                   SE->getConstant(PredicatedMaxBTC->getType(),
                                   VF.isScalable() ? 1
                                                   : VF.getFixedValue() - 1));
@@ -7633,7 +7633,9 @@ void VPlanTransforms::multiversionForUnitStridedMemOps(
       VPValue *To = Plan.getConstantInt(
           From->getScalarType(),
           cast<SCEVConstant>(MVConst)->getAPInt().getLimitedValue());
-      // TODO: Why is "If" necessary?
+
+      // Original scalar loop can still use `From`, make sure to only rewrite
+      // uses inside the vector loop that we guard with the checks.
       From->replaceUsesWithIf(To, [&](VPUser &U, unsigned) {
         auto *R = cast<VPRecipeBase>(&U);
         return R->getRegion() ||
@@ -7697,13 +7699,12 @@ void VPlanTransforms::multiversionForUnitStridedMemOps(
     R->eraseFromParent();
   };
 
-  if (auto *R = dyn_cast<VPExpandSCEVRecipe>(Plan.getTripCount())) {
-    RewriteVPExpandSCEV(R);
-  }
-
   for (auto &R : make_early_inc_range(*Entry))
     if (auto *ExpandSCEV = dyn_cast<VPExpandSCEVRecipe>(&R))
       RewriteVPExpandSCEV(ExpandSCEV);
+
+  if (auto *R = dyn_cast<VPExpandSCEVRecipe>(Plan.getTripCount()))
+    RewriteVPExpandSCEV(R);
 }
 
 void VPlanTransforms::makeScalarizationDecisions(VPlan &Plan, VFRange &Range) {
