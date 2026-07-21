@@ -38,6 +38,7 @@ What's New in Libc++ 24.0.0?
 Implemented Papers
 ------------------
 
+- P0493R5: Atomic minimum/maximum (`Github <https://llvm.org/PR105418>`__)
 - P2502R2: ``std::generator``: Synchronous Coroutine Generator for Ranges (`Github <https://llvm.org/PR105226>`__)
 - P2787R1: ``pmr::generator`` - Promise Types are not Values (`Github <https://llvm.org/PR105263>`__)
 
