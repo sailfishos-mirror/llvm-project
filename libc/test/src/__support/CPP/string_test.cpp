@@ -291,6 +291,13 @@ TEST(LlvmLibcStringTest, SelfAssignAtCapacityTest) {
   ASSERT_EQ(s, longer_string);
 }
 
+TEST(LlvmLibcStringTest, SelfMoveAssign) {
+  string s("aaa");
+  s = move(s);
+
+  ASSERT_STREQ(s.c_str(), "aaa");
+}
+
 TEST(LlvmLibcStringTest, SelfAppendAtCapacityTest) {
   string s("aaa");
 
