@@ -10962,7 +10962,8 @@ BoUpSLP::TreeEntry::EntryState BoUpSLP::getScalarsVectorizationState(
     for (Value *V : VL) {
       // A copyable element stands in for the call via a substituted
       // idempotent operand, so it is exempt from the checks below.
-      if (S.isCopyableElement(V))
+      // Also skip poisons.
+      if (isa<PoisonValue>(V) || S.isCopyableElement(V))
         continue;
       CallInst *CI2 = dyn_cast<CallInst>(V);
       if (!CI2 || CI2->getCalledFunction() != F ||
@@ -11559,10 +11560,14 @@ class InstructionsCompatibilityAnalysis {
   }
 
   /// Checks if \p I can be the main op for copyable analysis: a supported
-  /// binary operator or an integer min/max intrinsic, the only call with a
-  /// well-defined idempotent value (FP min/max lacks one because of NaNs).
+  /// binary operator, fmuladd, or an integer min/max intrinsic, the only
+  /// call with a well-defined idempotent value (FP min/max lacks one because of
+  /// NaNs).
   static bool isSupportedMainOp(Instruction *I) {
-    return isSupportedOpcode(I->getOpcode()) || isa<MinMaxIntrinsic>(I);
+    if (!I)
+      return false;
+    return isSupportedOpcode(I->getOpcode()) || isa<MinMaxIntrinsic>(I) ||
+           RecurrenceDescriptor::isFMulAddIntrinsic(I);
   }
 
   /// Identifies the best candidate value, which represents main opcode
@@ -11688,6 +11693,14 @@ class InstructionsCompatibilityAnalysis {
   /// instruction and its actual operands should be returned, or it is a
   /// copyable element and its should be represented as idempotent instruction.
   SmallVector<Value *> getOperands(const InstructionsState &S, Value *V) const {
+    if (RecurrenceDescriptor::isFMulAddIntrinsic(MainOp)) {
+      // fmuladd(0.0, -0.0, V) == -0.0 + V == V for every V. Other intrinsics
+      // (e.g. min/max) use the generic idempotent value path below.
+      if (!S.isCopyableElement(V))
+        return convertTo(cast<Instruction>(V), S).second;
+      Type *Ty = MainOp->getType();
+      return {ConstantFP::getZero(Ty), ConstantFP::getNegativeZero(Ty), V};
+    }
     if (isa<PoisonValue>(V))
       return {V, V};
     if (!S.isCopyableElement(V))
@@ -12205,14 +12218,19 @@ public:
         VectorCost = TTI.getArithmeticInstrCost(MainOpcode, VecTy, Kind);
         break;
       default:
-        // Instruction::Call returns above before reaching this switch.
+        // Calls (min/max, fmuladd) return above before reaching this switch.
         llvm_unreachable("Unexpected instruction.");
       }
       if (VectorCost > ScalarCost)
         return OrigS;
       return S;
     }
-    assert(Operands.size() == 2 && "Unexpected number of operands!");
+    // fmuladd is the only 3-operand copyable main op and stores the copyable
+    // value in the addend, so it needs different handling than the 2-operand
+    // ops (binary operators and min/max intrinsics).
+    const bool IsFMulAdd = RecurrenceDescriptor::isFMulAddIntrinsic(MainOp);
+    assert((Operands.size() == 2 || (IsFMulAdd && Operands.size() == 3)) &&
+           "Unexpected number of operands!");
     unsigned CopyableNum =
         count_if(VL, [&](Value *V) { return S.isCopyableElement(V); });
     if (CopyableNum < VL.size() / 2)
@@ -12227,8 +12245,8 @@ public:
         }))
       return OrigS;
     // Check profitability if number of copyables > VL.size() / 2.
-    // 1. Reorder operands for better matching.
-    if (isCommutative(MainOp)) {
+    // 1. Reorder operands for better matching (2-operand ops only).
+    if (!IsFMulAdd && isCommutative(MainOp)) {
       Value *BestFrontOp = nullptr;
       for (auto [OpL, OpR] : zip(Operands.front(), Operands.back())) {
         // Make instructions the first operands.
@@ -12261,8 +12279,10 @@ public:
         }
       }
     }
-    // 2. Check, if operands can be vectorized.
-    if (count_if(Operands.back(), IsaPred<Instruction>) > 1)
+    // 2. Check if operands can be vectorized. fmuladd's addend may hold many
+    // instructions (e.g. a run of loads), so this check applies to the
+    // 2-operand ops only; fmuladd checks the addend column below instead.
+    if (!IsFMulAdd && count_if(Operands.back(), IsaPred<Instruction>) > 1)
       return OrigS;
     auto CheckOperand = [&](ArrayRef<Value *> Ops) {
       if (allConstant(Ops) || isSplat(Ops))
@@ -12297,7 +12317,11 @@ public:
           count_if(Ops, [&](Value *V) { return OpS.isCopyableElement(V); });
       return CopyableNum <= VL.size() / 2;
     };
-    if (!CheckOperand(Operands.front()))
+    // The copyable value lands in the addend (back) for fmuladd, and in the
+    // first operand (front) for 2-operand ops.
+    ArrayRef<Value *> OperandToCheck =
+        IsFMulAdd ? Operands.back() : Operands.front();
+    if (!CheckOperand(OperandToCheck))
       return OrigS;
 
     return S;
@@ -12310,10 +12334,13 @@ public:
     if (S.areInstructionsWithCopyableElements()) {
       MainOp = S.getMainOp();
       MainOpcode = S.getOpcode();
-      // Min/max is commutative, so this yields 2 args and never counts the
-      // trailing callee operand.
+      // A call's operand count includes the trailing callee, so use the
+      // number of arguments as the column count (2 for min/max, 3 for
+      // fmuladd). Only the 2-operand case takes the commutative operand
+      // normalization path below.
+      auto *CI = dyn_cast<CallInst>(MainOp);
       const unsigned NumMainOpOperands =
-          ::getNumberOfPotentiallyCommutativeOps(MainOp);
+          CI ? CI->arg_size() : MainOp->getNumOperands();
       const bool IsCommutative =
           isCommutative(MainOp) && NumMainOpOperands == 2;
       Operands.assign(NumMainOpOperands,
