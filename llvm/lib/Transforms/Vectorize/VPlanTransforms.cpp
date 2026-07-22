@@ -7682,29 +7682,26 @@ void VPlanTransforms::multiversionForUnitStridedMemOps(
     Phi.addIncoming(Phi.getIncomingValueForBlock(Entry));
   }
 
-  auto RewriteVPExpandSCEV = [&](VPExpandSCEVRecipe *R) {
-    const SCEV *S = R->getSCEV();
-    Builder.setInsertPoint(R);
+  for (auto &R : make_early_inc_range(*Entry)) {
+    auto *ExpandSCEV = dyn_cast<VPExpandSCEVRecipe>(&R);
+    if (!ExpandSCEV)
+      continue;
+
+    const SCEV *S = ExpandSCEV->getSCEV();
+    Builder.setInsertPoint(ExpandSCEV);
     const SCEV *NewS =
         SE->rewriteUsingPredicate(S, CostCtx.L, StridePredicates);
     if (NewS == S)
       return;
     auto *NewR = Builder.createExpandSCEV(NewS);
-    R->replaceAllUsesWith(NewR);
+    ExpandSCEV->replaceAllUsesWith(NewR);
 
     // If this recipe is a trip count then we need to reset it explicitly.
-    if (R == Plan.getTripCount())
+    if (ExpandSCEV == Plan.getTripCount())
       Plan.resetTripCount(NewR);
 
-    R->eraseFromParent();
-  };
-
-  for (auto &R : make_early_inc_range(*Entry))
-    if (auto *ExpandSCEV = dyn_cast<VPExpandSCEVRecipe>(&R))
-      RewriteVPExpandSCEV(ExpandSCEV);
-
-  if (auto *R = dyn_cast<VPExpandSCEVRecipe>(Plan.getTripCount()))
-    RewriteVPExpandSCEV(R);
+    ExpandSCEV->eraseFromParent();
+  }
 }
 
 void VPlanTransforms::makeScalarizationDecisions(VPlan &Plan, VFRange &Range) {
