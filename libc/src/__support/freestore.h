@@ -317,16 +317,15 @@ TLSFFreeStoreImpl<CONFIG>::remove_first_fit_in_list(size_t index, size_t size) {
 template <typename CONFIG>
 LIBC_INLINE BlockRef
 TLSFFreeStoreImpl<CONFIG>::find_and_remove_fit(size_t size) {
+  // Fast path for small linear bins if UNIT_SIZE == MIN_ALIGN
   if constexpr (CONFIG::UNIT_SIZE == BlockRef::MIN_ALIGN) {
     size_t index = align_up(size, CONFIG::UNIT_SIZE) >> UNIT_SIZE_LOG2;
-    if (LIBC_LIKELY(index <= EXP_BASE)) {
-      if (get_bit(index)) {
-        BlockRef block = free_lists[index].front();
-        free_lists[index].pop();
-        if (free_lists[index].empty())
-          clear_bit(index);
-        return block;
-      }
+    if (LIBC_LIKELY(index <= EXP_BASE && get_bit(index))) {
+      BlockRef block = free_lists[index].front();
+      free_lists[index].pop();
+      if (free_lists[index].empty())
+        clear_bit(index);
+      return block;
     }
   }
 
@@ -342,7 +341,7 @@ TLSFFreeStoreImpl<CONFIG>::find_and_remove_fit(size_t size) {
   // 1. Try oversized bins (guaranteed fit, but larger).
   size_t oversized_bit = find_first_bit_set_after(bit_index);
   if (LIBC_LIKELY(oversized_bit < TOTAL_BITS)) {
-    if (oversized_bit == TOTAL_BITS - 1) {
+    if (LIBC_UNLIKELY(oversized_bit == TOTAL_BITS - 1)) {
       if constexpr (USE_TRIE)
         return find_and_remove_fit_in_trie(size);
       else
