@@ -27,17 +27,13 @@
 
 namespace LIBC_NAMESPACE_DECL {
 
-/// Configuration for TLSFFreeStore.
-template <size_t UNIT_SIZE_VAL, size_t STEP_SIZE_BITS_VAL,
-          size_t NUM_STEP_BITS_VAL, size_t NUM_TABLE_ENTRIES_VAL,
-          bool USE_TRIE_FOR_OVERFLOW_BIN_VAL = false>
-struct TLSFFreeStoreConfig {
-  static constexpr size_t UNIT_SIZE = UNIT_SIZE_VAL;
-  static constexpr size_t STEP_SIZE_BITS = STEP_SIZE_BITS_VAL;
-  static constexpr size_t NUM_STEP_BITS = NUM_STEP_BITS_VAL;
-  static constexpr size_t NUM_TABLE_ENTRIES = NUM_TABLE_ENTRIES_VAL;
-  static constexpr bool USE_TRIE_FOR_OVERFLOW_BIN =
-      USE_TRIE_FOR_OVERFLOW_BIN_VAL;
+/// Default configuration for TLSFFreeStore.
+struct DefaultFreeStoreConfig {
+  static constexpr size_t UNIT_SIZE = BlockRef::MIN_ALIGN;
+  static constexpr size_t STEP_SIZE_BITS = 3;
+  static constexpr size_t NUM_STEP_BITS = 2;
+  static constexpr size_t NUM_TABLE_ENTRIES = sizeof(uintptr_t) == 8 ? 3 : 6;
+  static constexpr bool USE_TRIE_FOR_OVERFLOW_BIN = true;
 };
 
 // A two-level segregated fit store for free blocks.
@@ -366,18 +362,10 @@ TLSFFreeStoreImpl<CONFIG>::find_and_remove_fit(size_t size) {
   return BlockRef();
 }
 
-template <size_t UNIT_SIZE, size_t STEP_SIZE_BITS, size_t NUM_STEP_BITS,
-          size_t NUM_TABLE_ENTRIES, bool USE_TRIE = false>
-using TLSFFreeStore = TLSFFreeStoreImpl<TLSFFreeStoreConfig<
-    UNIT_SIZE, STEP_SIZE_BITS, NUM_STEP_BITS, NUM_TABLE_ENTRIES, USE_TRIE>>;
+template <typename CONFIG = DefaultFreeStoreConfig>
+using TLSFFreeStore = TLSFFreeStoreImpl<CONFIG>;
 
-#ifndef LIBC_COPT_USE_TRIE_FOR_OVERFLOW_BIN
-#define LIBC_COPT_USE_TRIE_FOR_OVERFLOW_BIN false
-#endif
-
-using FreeStore =
-    TLSFFreeStore<BlockRef::MIN_ALIGN, 3, 2, (sizeof(uintptr_t) == 8 ? 3 : 6),
-                  LIBC_COPT_USE_TRIE_FOR_OVERFLOW_BIN>;
+using FreeStore = TLSFFreeStore<DefaultFreeStoreConfig>;
 
 } // namespace LIBC_NAMESPACE_DECL
 
