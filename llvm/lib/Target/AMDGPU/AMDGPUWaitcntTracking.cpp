@@ -189,7 +189,8 @@ void WaitcntBrackets::updateByEvent(HWEvents E, MachineInstr &Inst) {
 
   unsigned UB = getScoreUB(T);
   unsigned Increment = 1;
-  if (T == VA_VDST && getHasMatrixScale(Inst.getOpcode()) &&
+  if ((T == AMDGPU::VA_VDST_RD || T == AMDGPU::VA_VDST_WR) &&
+      getHasMatrixScale(Inst.getOpcode()) &&
       ST.hasVOP3PX2IncrementsVaVdstTwice()) {
     // V_WMMA_SCALE instructions use VOP3PX2 encoding. Hardware treats this as
     // two VOP3P instructions and increments VA_VDST twice.
@@ -286,14 +287,23 @@ void WaitcntBrackets::updateByEvent(HWEvents E, MachineInstr &Inst) {
     }
     for (const MachineOperand &Op : Inst.all_uses())
       setScoreByOperand(Op, T, CurrScore);
-  } else if (T == VA_VDST || T == VM_VSRC) {
+  } else if (T == AMDGPU::VA_VDST_RD || T == AMDGPU::VA_VDST_WR ||
+             T == AMDGPU::VM_VSRC) {
     // Match the score to the VGPR destination or source registers as
     // appropriate
     for (const MachineOperand &Op : Inst.operands()) {
-      if (!Op.isReg() || (T == VA_VDST && Op.isUse()) ||
-          (T == VM_VSRC && Op.isDef()))
+      if (!Op.isReg())
         continue;
-      if (TRI.isVectorRegister(MRI, Op.getReg()))
+
+      // Skip based on counter type and operand type
+      if (T == AMDGPU::VA_VDST_RD && Op.isDef())
+        continue; // RD tracks reads only
+      if (T == AMDGPU::VA_VDST_WR && Op.isUse())
+        continue; // WR tracks writes only
+      if (T == AMDGPU::VM_VSRC && Op.isDef())
+        continue;
+
+      if (TRI.isVectorRegister(Ctx->MRI, Op.getReg()))
         setScoreByOperand(Op, T, CurrScore);
     }
   } else /* LGKM_CNT || EXP_CNT || VS_CNT || NUM_INST_CNTS */ {
@@ -436,8 +446,11 @@ void WaitcntBrackets::print(raw_ostream &OS) const {
     case ASYNC_CNT:
       OS << "    ASYNC_CNT(" << SR << "):";
       break;
-    case VA_VDST:
-      OS << "    VA_VDST(" << SR << "): ";
+    case AMDGPU::VA_VDST_RD:
+      OS << "    VA_VDST_RD(" << SR << "): ";
+      break;
+    case AMDGPU::VA_VDST_WR:
+      OS << "    VA_VDST_WR(" << SR << "): ";
       break;
     case VM_VSRC:
       OS << "    VM_VSRC(" << SR << "): ";
@@ -566,7 +579,8 @@ void WaitcntBrackets::simplifyWaitcnt(const Waitcnt &CheckWait,
   simplifyWaitcnt(UpdateWait, BVH_CNT);
   simplifyWaitcnt(UpdateWait, KM_CNT);
   simplifyXcnt(CheckWait, UpdateWait);
-  simplifyWaitcnt(UpdateWait, VA_VDST);
+  simplifyWaitcnt(UpdateWait, VA_VDST_RD);
+  simplifyWaitcnt(UpdateWait, VA_VDST_WR);
   simplifyVmVsrc(CheckWait, UpdateWait);
   simplifyWaitcnt(UpdateWait, ASYNC_CNT);
 }
@@ -610,14 +624,25 @@ void WaitcntBrackets::simplifyXcnt(const Waitcnt &CheckWait,
 
 void WaitcntBrackets::simplifyVmVsrc(const Waitcnt &CheckWait,
                                      Waitcnt &UpdateWait) const {
-  // Waiting for some counters implies waiting for VM_VSRC, since an
-  // instruction that decrements a counter on completion would have
-  // decremented VM_VSRC once its VGPR operands had been read.
-  if (CheckWait.get(VM_VSRC) >=
-      std::min({CheckWait.get(LOAD_CNT), CheckWait.get(STORE_CNT),
-                CheckWait.get(SAMPLE_CNT), CheckWait.get(BVH_CNT),
-                CheckWait.get(DS_CNT)}))
-    UpdateWait.set(VM_VSRC, ~0u);
+  // Waiting for a VMEM counter (like LOAD_CNT) implies an equivalent wait for
+  // VM_VSRC, because if the VMEM operation has completed then it must surely
+  // have read its VGPR sources, but only if there are no other outstanding VMEM
+  // operations that use a different counter (like SAMPLE_CNT).
+  static constexpr AMDGPU::InstCounterType VmemCounters[] = {
+      AMDGPU::LOAD_CNT, AMDGPU::STORE_CNT, AMDGPU::SAMPLE_CNT, AMDGPU::BVH_CNT,
+      AMDGPU::DS_CNT};
+  HWEvents VmemEvents = llvm::accumulate(
+      VmemCounters, HWEvents(), [&](HWEvents Acc, AMDGPU::InstCounterType T) {
+        return Acc | getWaitEvents(T);
+      });
+  HWEvents PendingVmemEvents = PendingEvents & VmemEvents;
+  for (AMDGPU::InstCounterType T : VmemCounters) {
+    unsigned CheckCount = CheckWait.get(T);
+    if (UpdateWait.get(AMDGPU::VM_VSRC) >= CheckCount &&
+        (CheckCount == 0 || !counterOutOfOrder(T)) &&
+        (PendingVmemEvents & ~getWaitEvents(T)) == 0)
+      UpdateWait.set(AMDGPU::VM_VSRC, ~0u);
+  }
   simplifyWaitcnt(UpdateWait, VM_VSRC);
 }
 
