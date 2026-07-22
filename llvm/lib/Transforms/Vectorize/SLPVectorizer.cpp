@@ -19199,21 +19199,21 @@ InstructionCost BoUpSLP::getTreeCost(InstructionCost TreeCost,
   };
   // Reject vectorization if the vector code would produce more instructions
   // than the scalar code. The cost model may underestimate overhead from
-  // shuffles, inserts, and extracts.
+  // shuffles, inserts, and extracts. The same guard also covers wider store
+  // roots inside a loop, where a greedily widened store repeats its
+  // underpriced shuffle overhead on every iteration.
   // FIXME: remove this as soon as correct fractional model is landed for all
   // targets.
+  const TreeEntry &Root = *VectorizableTree.front();
+  const Loop *RootLoop =
+      Root.hasState() ? LI->getLoopFor(Root.getMainOp()->getParent()) : nullptr;
+  bool IsWideStoreRoot = RootLoop && Root.getOpcode() == Instruction::Store &&
+                         Root.getVectorFactor() > 2;
   if (SLPInstCountCheck && TTI->preferSLPInstCountCheck() &&
-      VectorizableTree.front()->getVectorFactor() == 2 &&
+      (Root.getVectorFactor() == 2 || IsWideStoreRoot) &&
       SLPCostThreshold == 0 &&
-      (!SLPReVec ||
-       !isa<VectorType>(
-           VectorizableTree.front()->Scalars.front()->getType()))) {
-    // Loop containing the tree root; null for flat code or disabled
-    // loop-aware modeling. Shared by both calls below.
-    const Loop *TreeLoop = nullptr;
-    if (LoopAwareTripCount != 0 && VectorizableTree.front()->hasState())
-      TreeLoop =
-          LI->getLoopFor(VectorizableTree.front()->getMainOp()->getParent());
+      (!SLPReVec || !isa<VectorType>(Root.Scalars.front()->getType()))) {
+    const Loop *TreeLoop = LoopAwareTripCount != 0 ? RootLoop : nullptr;
     uint64_t NumScalar = getNumScalarInsts(TreeLoop);
     uint64_t NumVector = getNumVectorInsts(TreeLoop);
     LLVM_DEBUG(dbgs() << "SLP: Inst count check: vector=" << NumVector
