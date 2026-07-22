@@ -379,7 +379,9 @@ def CONVERT_PPCF128_F128 : RuntimeLibcall;
 //
 // The O*_F* and UO_F* libcalls return a simple 0/1 boolean value.
 //
-// The FCMP3_PRED_*_F* libcalls return a three-way (-1/0/1) result.
+// The FCMP3_PRED_*_F* libcalls return a three-way (-1/0/1) result, one symbol
+// per predicate. FCMP3_F* is a generic three-way compare for ABIs with one
+// symbol serving every predicate (e.g. MSP430's __mspabi_cmpd).
 foreach FPTy = ["F32", "F64", "F128", "PPCF128"] in {
   def OEQ_#FPTy : RuntimeLibcall;
   def UNE_#FPTy : RuntimeLibcall;
@@ -395,6 +397,8 @@ foreach FPTy = ["F32", "F64", "F128", "PPCF128"] in {
   def FCMP3_PRED_OLT_#FPTy : RuntimeLibcall;
   def FCMP3_PRED_OLE_#FPTy : RuntimeLibcall;
   def FCMP3_PRED_OGT_#FPTy : RuntimeLibcall;
+
+  def FCMP3_#FPTy : RuntimeLibcall;
 }
 
 // Memory
@@ -2766,18 +2770,9 @@ def __mspabi_fltulf : RuntimeLibcallImpl<UINTTOFP_I32_F32>;
 def __mspabi_fltullf : RuntimeLibcallImpl<UINTTOFP_I64_F32>;
 
 // Floating point comparisons - EABI Table 7
-def __mspabi_cmpd__oeq : RuntimeLibcallImpl<FCMP3_PRED_OEQ_F64, "__mspabi_cmpd">;
-def __mspabi_cmpd__une : RuntimeLibcallImpl<FCMP3_PRED_UNE_F64, "__mspabi_cmpd">;
-def __mspabi_cmpd__oge : RuntimeLibcallImpl<FCMP3_PRED_OGE_F64, "__mspabi_cmpd">;
-def __mspabi_cmpd__olt : RuntimeLibcallImpl<FCMP3_PRED_OLT_F64, "__mspabi_cmpd">;
-def __mspabi_cmpd__ole : RuntimeLibcallImpl<FCMP3_PRED_OLE_F64, "__mspabi_cmpd">;
-def __mspabi_cmpd__ogt : RuntimeLibcallImpl<FCMP3_PRED_OGT_F64, "__mspabi_cmpd">;
-def __mspabi_cmpf__oeq : RuntimeLibcallImpl<FCMP3_PRED_OEQ_F32, "__mspabi_cmpf">;
-def __mspabi_cmpf__une : RuntimeLibcallImpl<FCMP3_PRED_UNE_F32, "__mspabi_cmpf">;
-def __mspabi_cmpf__oge : RuntimeLibcallImpl<FCMP3_PRED_OGE_F32, "__mspabi_cmpf">;
-def __mspabi_cmpf__olt : RuntimeLibcallImpl<FCMP3_PRED_OLT_F32, "__mspabi_cmpf">;
-def __mspabi_cmpf__ole : RuntimeLibcallImpl<FCMP3_PRED_OLE_F32, "__mspabi_cmpf">;
-def __mspabi_cmpf__ogt : RuntimeLibcallImpl<FCMP3_PRED_OGT_F32, "__mspabi_cmpf">;
+// A single three-way compare symbol serves every predicate.
+def __mspabi_cmpd : RuntimeLibcallImpl<FCMP3_F64>;
+def __mspabi_cmpf : RuntimeLibcallImpl<FCMP3_F32>;
 
 // Floating point arithmetic - EABI Table 8
 def __mspabi_addd : RuntimeLibcallImpl<ADD_F64>;
@@ -2859,7 +2854,7 @@ defvar MSP430DefaultOptOut = [
   __fixdfdi, __fixunsdfsi, __modsi3, __floatunsisf,
   __fixunsdfdi, __ltsf2, __floatdisf, __floatdidf,
   __lshrsi3, __subsf3, __umodhi3, __floatunsidf,
-  __floatundidf, __gtdf2, __eqdf2, __gedf2, __ltdf2, __ledf2,
+  __floatundidf, __gtdf2, __eqdf2, __gedf2, __ltdf2, __ledf2, __nedf2,
   __adddf3, __divdf3, __divdi3, __moddi3,
   __muldf3, __subdf3, __udivdi3, __umoddi3
 ];
@@ -2911,18 +2906,8 @@ def MSP430SystemLibrary
       __mspabi_fltullf,
 
       // Floating point comparisons - EABI Table 7
-      LibcallsWithCC<(add __mspabi_cmpd__oeq,
-                          __mspabi_cmpd__une,
-                          __mspabi_cmpd__oge,
-                          __mspabi_cmpd__olt,
-                          __mspabi_cmpd__ole,
-                          __mspabi_cmpd__ogt), MSP430_BUILTIN>,
-      __mspabi_cmpf__oeq,
-      __mspabi_cmpf__une,
-      __mspabi_cmpf__oge,
-      __mspabi_cmpf__olt,
-      __mspabi_cmpf__ole,
-      __mspabi_cmpf__ogt,
+      LibcallsWithCC<(add __mspabi_cmpd), MSP430_BUILTIN>,
+      __mspabi_cmpf,
 
       // Floating point arithmetic - EABI Table 8
       LibcallsWithCC<(add __mspabi_addd,
