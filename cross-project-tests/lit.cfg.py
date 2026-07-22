@@ -92,7 +92,13 @@ if is_msvc:
 # use_clang() and use_lld() respectively, so set them to "", if needed.
 if not hasattr(config, "clang_src_dir"):
     config.clang_src_dir = ""
-llvm_config.use_clang(required=("clang" in config.llvm_enabled_projects))
+# Facebook T92898286
+should_test_bolt = get_required_attr(config, "llvm_test_bolt")
+if should_test_bolt:
+    llvm_config.use_clang(required=("clang" in config.llvm_enabled_projects), additional_flags=["--post-link-optimize"])
+else:
+    llvm_config.use_clang(required=("clang" in config.llvm_enabled_projects))
+# End Facebook T92898286
 
 if not hasattr(config, "lld_src_dir"):
     config.lld_src_dir = ""
@@ -501,3 +507,9 @@ def get_dbgeng_version():
 dbgeng_version = get_dbgeng_version()
 if dbgeng_version and dbgeng_version >= (10, 0, 19041, 0):
     config.available_features.add("dbgeng-10-19041")
+
+# Facebook T92898286
+# Ensure the user's PYTHONPATH is included.
+if "PYTHONPATH" in os.environ:
+    config.environment["PYTHONPATH"] = os.environ["PYTHONPATH"]
+# End Facebook T92898286

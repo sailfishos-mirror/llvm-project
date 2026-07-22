@@ -1,0 +1,15 @@
+load("@fbsource//third-party/llvm-project/build_defs:defs.bzl", "llvm_library")
+
+oncall("bolt")
+
+llvm_library(
+    name = "shared_math_headers_for_apfloat",
+    exported_headers = glob([
+        "hdr/**/*.h",
+        "shared/**/*.h",
+        "src/__support/**/*.h",
+        "include/**/*.h",
+    ]),
+    public_include_directories = ["."],
+    visibility = ["PUBLIC"],
+)

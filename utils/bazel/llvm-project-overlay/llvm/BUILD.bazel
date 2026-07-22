@@ -12,7 +12,7 @@ load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
 load("//mlir:tblgen.bzl", "gentbl_cc_library", "gentbl_filegroup", "td_library")
 load(":binary_alias.bzl", "binary_alias")
 load(":config.bzl", "llvm_config_defines")
-load(":driver.bzl", "generate_driver_selects", "generate_driver_tools_def", "llvm_driver_cc_binary")
+load(":driver.bzl", "llvm_driver_cc_binary")
 load(":enum_targets_gen.bzl", "enum_targets_gen")
 load(":targets.bzl", "llvm_targets")
 
@@ -51,7 +51,6 @@ exports_files([
     "include/llvm/Frontend/OpenMP/OMP.td",
     "include/llvm/IR/Intrinsics.td",
     "include/llvm/Option/OptParser.td",
-    "utils/lit/lit.py",
     # This one is needed for building and vendoring out lldb from off tree.
     "utils/lldbDataFormatters.py",
 ])
@@ -84,28 +83,10 @@ config_setting(
 )
 
 config_setting(
-    name = "linux_ppc64le",
-    constraint_values = [
-        "@platforms//os:linux",
-        "@platforms//cpu:ppc",
-    ],
-    visibility = ["//visibility:public"],
-)
-
-config_setting(
     name = "linux_riscv64",
     constraint_values = [
         "@platforms//os:linux",
         "@platforms//cpu:riscv64",
-    ],
-    visibility = ["//visibility:public"],
-)
-
-config_setting(
-    name = "linux_s390x",
-    constraint_values = [
-        "@platforms//os:linux",
-        "@platforms//cpu:s390x",
     ],
     visibility = ["//visibility:public"],
 )
@@ -475,7 +456,7 @@ cc_library(
         # be an empty library unless zstd is enabled, in which case it will
         # both provide the necessary dependencies and configuration defines.
         "//third-party:zstd",
-        "//libc:shared_math_headers_for_apfloat",
+        "@llvm_libc//shared_math_headers_for_apfloat",
     ],
 )
 
@@ -822,32 +803,6 @@ cc_library(
         ":Support",
         ":TargetParser",
     ],
-)
-
-# Command line flag to control which tools get included in the llvm driver binary.
-# The macro also returns the selected tool dependencies.
-driver_tool_deps = generate_driver_selects(name = "driver-tools")
-
-generate_driver_tools_def(
-    name = "gen_llvm_driver_tools_def",
-    out = "LLVMDriverTools.def",
-    driver_tools = ":driver-tools",
-)
-
-# Workaround inability to put `.def` files into `srcs` with a library
-cc_library(
-    name = "llvm_driver_tools_def_lib",
-    includes = ["."],
-    textual_hdrs = ["LLVMDriverTools.def"],
-)
-
-cc_binary(
-    name = "llvm",
-    srcs = glob(["tools/llvm-driver/*.cpp"]),
-    deps = [
-        ":Support",
-        ":llvm_driver_tools_def_lib",
-    ] + driver_tool_deps,
 )
 
 cc_binary(
@@ -6596,11 +6551,13 @@ cc_library(
     ],
 )
 
-py_binary(
+# Compatibility alias: the lit sources have moved to //llvm/utils/lit:lit
+# (a py_library, matching where the upstream tool actually lives). Kept
+# here so downstream callers of `//llvm:lit` don't break.
+alias(
     name = "lit",
     testonly = True,
-    srcs = ["utils/lit/lit.py"] + glob(["utils/lit/lit/**/*.py"]),
-    imports = ["utils/lit"],
+    actual = "//llvm/utils/lit:lit_bin",
 )
 
 py_binary(
