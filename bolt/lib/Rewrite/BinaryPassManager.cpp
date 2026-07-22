@@ -12,6 +12,7 @@
 #include "bolt/Passes/AllocCombiner.h"
 #include "bolt/Passes/AsmDump.h"
 #include "bolt/Passes/CMOVConversion.h"
+#include "bolt/Passes/CreateClonesAtOrigin.h"
 #include "bolt/Passes/FixRISCVCallsPass.h"
 #include "bolt/Passes/FixRelaxationPass.h"
 #include "bolt/Passes/FrameOptimizer.h"
@@ -529,9 +530,18 @@ Error BinaryFunctionPassManager::runAllPasses(BinaryContext &BC) {
   // memory profiling data.
   Manager.registerPass(std::make_unique<ReorderData>());
 
+  // Create clones at origin (if --clone-at-origin is specified).
+  // This must run before PatchEntries so that cloned functions are skipped
+  // during patching.
+  if (BC.HasRelocations)
+    Manager.registerPass(std::make_unique<CreateClonesAtOrigin>());
+
   // Patch original function entries
   if (BC.HasRelocations)
     Manager.registerPass(std::make_unique<PatchEntries>());
+
+  // Assign each function an output section.
+  Manager.registerPass(std::make_unique<AssignSections>());
 
   if (BC.isAArch64()) {
     Manager.registerPass(

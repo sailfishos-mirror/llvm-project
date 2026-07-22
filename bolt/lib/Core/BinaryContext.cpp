@@ -1791,8 +1791,15 @@ void BinaryContext::preprocessDWODebugInfo() {
       }
       // Prevent failures when DWOName is already an absolute path.
       sys::path::make_absolute(DWOCompDir, AbsolutePath);
+      // Extract only the .dwo CU DIE here: we just need the DWO unit pointer
+      // (for DWOCUs) and the isDWOUnit()/DWOId checks. The full DIE vector is
+      // never read off this cached array -- every consumer streams the DIEs on
+      // demand with DWARFDebugInfoEntry::extractFast (DIEBuilder::
+      // constructFromUnit / collectReferencedTypeSignatures).
       DWARFUnit *DWOCU =
-          DwarfUnit->getNonSkeletonUnitDIE(false, AbsolutePath).getDwarfUnit();
+          DwarfUnit
+              ->getNonSkeletonUnitDIE(/*ExtractUnitDIEOnly=*/true, AbsolutePath)
+              .getDwarfUnit();
       if (!DWOCU->isDWOUnit()) {
         this->outs()
             << "BOLT-WARNING: Debug Fission: DWO debug information for "
@@ -2021,13 +2028,6 @@ void BinaryContext::collectDebugScopeBoundaries() {
       continue;
     DWARFUnit *DIEUnit = CUDie.getDwarfUnit();
 
-    // For split DWARF, preprocessDWODebugInfo already fully extracts the .dwo's
-    // DIE array.
-    if (DIEUnit->isDWOUnit()) {
-      for (const DWARFDebugInfoEntry &Entry : DIEUnit->dies())
-        processScopeDie(DWARFDie(DIEUnit, &Entry));
-      continue;
-    }
     // Walk the unit's DIEs by streaming them one at a time. Track nesting depth
     // with a counter: a DIE with children descends a level (++), a null entry
     // (sibling-chain terminator) ascends (--), the unit-end offset limits the
@@ -2663,8 +2663,8 @@ BinaryContext::createInjectedBinaryFunction(const std::string &Name,
   setSymbolToFunctionMap(BF->getSymbol(), BF);
   BF->CurrentState = BinaryFunction::State::CFG;
 
-  if (!getOutputBinaryFunctions().empty())
-    getOutputBinaryFunctions().push_back(BF);
+  if (!OutputFunctions.empty())
+    OutputFunctions.push_back(BF);
 
   return BF;
 }
@@ -2704,6 +2704,12 @@ BinaryContext::createInstructionPatch(uint64_t Address,
     PBF->setAnonymous(true);
 
   return PBF;
+}
+
+BinaryFunction *
+BinaryContext::createThunkBinaryFunction(const std::string &Name) {
+  static NameResolver NR;
+  return createInjectedBinaryFunction(NR.uniquify(Name));
 }
 
 std::pair<size_t, size_t>
