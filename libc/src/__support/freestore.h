@@ -250,7 +250,7 @@ LIBC_INLINE FreeTrie TLSFFreeStoreImpl<CONFIG>::get_trie() {
 template <typename CONFIG>
 LIBC_INLINE void
 TLSFFreeStoreImpl<CONFIG>::set_trie(const FreeTrie &trie) {
-  free_lists[TOTAL_BITS - 1].trie_root = trie.get_root();
+  free_lists[TOTAL_BITS - 1].trie_root = trie.root();
 }
 
 template <typename CONFIG>
@@ -324,7 +324,7 @@ TLSFFreeStoreImpl<CONFIG>::remove_first_fit_in_list(size_t index, size_t size) {
         clear_bit(index);
       return cur->block();
     }
-    cur = cur->next_node();
+    cur = cur->next();
   } while (cur != begin_node);
 
   return BlockRef();

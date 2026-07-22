@@ -52,8 +52,8 @@ void FreeTrie::replace_node(Node *node, Node *new_node) {
                 "no reference to child node found in parent");
     parent_child = new_node;
   } else {
-    LIBC_ASSERT(root == node && "non-root node had no parent");
-    root = new_node;
+    LIBC_ASSERT(root_ == node && "non-root node had no parent");
+    root_ = new_node;
   }
   if (node->lower)
     node->lower->parent = new_node;

@@ -137,7 +137,7 @@ TEST(LlvmLibcFreeTrie, ConstructorWithRoot) {
   FreeTrie::Node *root = nullptr;
   FreeTrie trie({0, 4096}, root);
   EXPECT_TRUE(trie.empty());
-  EXPECT_EQ(trie.get_root(), static_cast<FreeTrie::Node *>(nullptr));
+  EXPECT_EQ(trie.root(), static_cast<FreeTrie::Node *>(nullptr));
 
   byte mem[1024];
   optional<BlockRef> maybeBlock = BlockRef::init(mem);
@@ -146,5 +146,5 @@ TEST(LlvmLibcFreeTrie, ConstructorWithRoot) {
   trie.push(block);
 
   EXPECT_FALSE(trie.empty());
-  EXPECT_NE(trie.get_root(), static_cast<FreeTrie::Node *>(nullptr));
+  EXPECT_NE(trie.root(), static_cast<FreeTrie::Node *>(nullptr));
 }
