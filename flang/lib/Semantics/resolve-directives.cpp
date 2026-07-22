@@ -544,6 +544,7 @@ public:
   }
   bool Pre(const parser::OmpMetadirectiveDirective &x) {
     PushContext(x.v.source, llvm::omp::Directive::OMPD_metadirective);
+    ClearDataSharingAttributeObjects();
     return true;
   }
   void Post(const parser::OmpMetadirectiveDirective &) { PopContext(); }
@@ -719,6 +720,42 @@ public:
   void Post(const parser::OmpDeclareVariantDirective &) { PopContext(); };
 
   // 2.15.3 Data-Sharing Attribute Clauses
+  bool Pre(const parser::OmpClause::When &) {
+    if (!dirContext_.empty() &&
+        GetContext().directive == llvm::omp::Directive::OMPD_metadirective) {
+      PushMetadirectiveDSAState(currScope());
+      ClearDataSharingAttributeObjects();
+    }
+    return true;
+  }
+  void Post(const parser::OmpClause::When &) {
+    if (!dirContext_.empty() &&
+        GetContext().directive == llvm::omp::Directive::OMPD_metadirective)
+      PopMetadirectiveDSAState();
+  }
+  bool Pre(const parser::OmpClause::Otherwise &) {
+    if (!dirContext_.empty() &&
+        GetContext().directive == llvm::omp::Directive::OMPD_metadirective) {
+      PushMetadirectiveDSAState(currScope());
+      ClearDataSharingAttributeObjects();
+    }
+    return true;
+  }
+  void Post(const parser::OmpClause::Otherwise &) {
+    if (!dirContext_.empty() &&
+        GetContext().directive == llvm::omp::Directive::OMPD_metadirective)
+      PopMetadirectiveDSAState();
+  }
+  bool Pre(const parser::OmpDefaultClause &x) {
+    if (!dirContext_.empty() &&
+        GetContext().directive == llvm::omp::Directive::OMPD_metadirective &&
+        std::holds_alternative<
+            common::Indirection<parser::OmpDirectiveSpecification>>(x.u)) {
+      PushMetadirectiveDSAState(currScope());
+      ClearDataSharingAttributeObjects();
+    }
+    return true;
+  }
   bool Pre(const parser::OmpClause::Inclusive &x) {
     ResolveOmpObjectList(x.v, Symbol::Flag::OmpInclusiveScan);
     return false;
@@ -982,6 +1019,52 @@ public:
   }
 
 private:
+  /// Name resolution does not create a scope for each metadirective
+  /// replacement. Preserve the active data-sharing attributes while resolving
+  /// each replacement so they do not leak into another replacement or the
+  /// associated body.
+  struct MetadirectiveDSAState {
+    std::vector<Scope *> scopes;
+    std::map<Symbol *, Symbol::Flags> savedFlags;
+  };
+
+  void PushMetadirectiveDSAState(Scope &scope) {
+    MetadirectiveDSAState state;
+    auto saveScope = [&](Scope &scope) {
+      for (Scope *savedScope : state.scopes)
+        if (savedScope == &scope)
+          return;
+      state.scopes.push_back(&scope);
+      for (auto &[_, symbol] : scope)
+        state.savedFlags.try_emplace(&*symbol, symbol->flags());
+    };
+
+    // Privatizing a clause object can also update enclosing directive scopes.
+    for (DirContext &context : dirContext_)
+      saveScope(context.scope);
+    saveScope(scope);
+    metadirectiveDSAStates_.push_back(std::move(state));
+  }
+
+  void PopMetadirectiveDSAState() {
+    CHECK(!metadirectiveDSAStates_.empty());
+    MetadirectiveDSAState &state = metadirectiveDSAStates_.back();
+    Symbol::Flags dsaFlags{GetDataSharingAttributeFlags()};
+    dsaFlags.set(Symbol::Flag::OmpExplicit);
+    dsaFlags.set(Symbol::Flag::OmpImplicit);
+    dsaFlags.set(Symbol::Flag::OmpPreDetermined);
+    for (Scope *scope : state.scopes) {
+      for (auto &[_, symbol] : *scope) {
+        if (auto it = state.savedFlags.find(&*symbol);
+            it != state.savedFlags.end())
+          SetSymbolDSA(*symbol, it->second & dsaFlags);
+        else
+          SetSymbolDSA(*symbol, {});
+      }
+    }
+    metadirectiveDSAStates_.pop_back();
+  }
+
   Symbol::Flags dataSharingAttributeFlags{GetDataSharingAttributeFlags()};
 
   Symbol::Flags dataMappingAttributeFlags{Symbol::Flag::OmpMapTo,
@@ -1013,6 +1096,7 @@ private:
     ExecutionPart,
   };
   std::vector<PartKind> partStack_;
+  std::vector<MetadirectiveDSAState> metadirectiveDSAStates_;
 
   // Predetermined DSA rules
   void PrivatizeAssociatedLoopIndex(const parser::OpenMPLoopConstruct &);
@@ -2485,6 +2569,14 @@ void OmpAttributeVisitor::Post(const parser::OmpDefaultClause &x) {
   // The DEFAULT clause may also be used on METADIRECTIVE. In that case
   // there is nothing to do.
   using DataSharingAttribute = parser::OmpDefaultClause::DataSharingAttribute;
+  if (!dirContext_.empty() &&
+      GetContext().directive == llvm::omp::Directive::OMPD_metadirective) {
+    if (std::holds_alternative<
+            common::Indirection<parser::OmpDirectiveSpecification>>(x.u))
+      PopMetadirectiveDSAState();
+    return;
+  }
+
   if (auto *dsa{std::get_if<DataSharingAttribute>(&x.u)}) {
     if (!dirContext_.empty()) {
       switch (*dsa) {

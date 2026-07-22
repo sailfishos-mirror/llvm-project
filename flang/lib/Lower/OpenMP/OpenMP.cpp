@@ -6098,17 +6098,19 @@ static void markNestedTaskDSAs(lower::pft::Evaluation &eval,
   eval.visit([&](const auto &node) { parser::Walk(node, visitor); });
 }
 
+using ExplicitDSAMap =
+    llvm::DenseMap<const semantics::Symbol *, semantics::Symbol::Flags>;
+
 /// Reconstruct data-sharing attributes for a loop variant selected during
 /// lowering. Normal OpenMP constructs receive these attributes from semantic
 /// resolution, but a metadirective's variant is not known at that point.
-static void markMetadirectiveDSAs(semantics::SemanticsContext &semaCtx,
-                                  const ConstructQueue &queue,
-                                  lower::pft::Evaluation &loopEval,
-                                  SymbolDSAGuard &dsaGuard) {
+static ExplicitDSAMap markMetadirectiveDSAs(
+    semantics::SemanticsContext &semaCtx, const ConstructQueue &queue,
+    lower::pft::Evaluation &loopEval, SymbolDSAGuard &dsaGuard) {
   using Symbol = semantics::Symbol;
   using Flag = Symbol::Flag;
 
-  llvm::DenseMap<const Symbol *, Symbol::Flags> explicitDSAs;
+  ExplicitDSAMap explicitDSAs;
   llvm::SmallVector<Symbol *, 8> explicitSymbols;
   std::optional<Flag> defaultDSA;
   bool hasParallel = false;
@@ -6218,6 +6220,8 @@ static void markMetadirectiveDSAs(semantics::SemanticsContext &semaCtx,
       dsaGuard.setSymbolDSA(sym, {Flag::OmpShared});
     }
   });
+
+  return explicitDSAs;
 }
 
 /// Mark eligible sequential DO indices in a metadirective variant's generated
@@ -6280,6 +6284,7 @@ static MetadirectiveLoopIVMarking
 markMetadirectiveLoopIVs(semantics::SemanticsContext &semaCtx,
                          const parser::OmpDirectiveSpecification &spec,
                          lower::pft::Evaluation &loopEval,
+                         const ExplicitDSAMap &explicitDSAs,
                          SymbolDSAGuard &dsaGuard) {
   using Symbol = semantics::Symbol;
 
@@ -6328,7 +6333,11 @@ markMetadirectiveLoopIVs(semantics::SemanticsContext &semaCtx,
       // the descriptor-backed source symbol cannot recreate it.
       if (semantics::IsAllocatableOrObjectPointer(sym))
         return MetadirectiveLoopIVMarking::IndirectIV;
-      dsaGuard.setPredeterminedSymbolDSA(*sym, ivDSA);
+      Symbol::Flags ivFlags{Symbol::Flag::OmpPreDetermined, ivDSA};
+      if (auto it = explicitDSAs.find(&sym->GetUltimate());
+          it != explicitDSAs.end())
+        ivFlags |= it->second;
+      dsaGuard.setSymbolDSA(*sym, ivFlags);
     }
     if (level + 1 < affectedDepth)
       doEval = tryGetNestedDoConstruct(*doEval);
@@ -6633,14 +6642,15 @@ static void genMetadirective(lower::AbstractConverter &converter,
         TODO(variantLoc, "loop-associated METADIRECTIVE without associated DO");
       // Unstructured loops own PFT blocks that cannot be reused by begin/end
       // metadirectives or alternate ENTRY lowering without independent block
-      // mappings. Keep Part 2 conservative for all such loops.
+      // mappings. Keep this path conservative for all such loops.
       if (loopEval->lowerAsUnstructured())
         TODO(variantLoc, "unstructured associated DO in loop-associated "
                          "METADIRECTIVE variant");
       SymbolDSAGuard dsaGuard;
-      markMetadirectiveDSAs(semaCtx, queue, *loopEval, dsaGuard);
-      MetadirectiveLoopIVMarking marking =
-          markMetadirectiveLoopIVs(semaCtx, *spec, *loopEval, dsaGuard);
+      ExplicitDSAMap explicitDSAs =
+          markMetadirectiveDSAs(semaCtx, queue, *loopEval, dsaGuard);
+      MetadirectiveLoopIVMarking marking = markMetadirectiveLoopIVs(
+          semaCtx, *spec, *loopEval, explicitDSAs, dsaGuard);
       if (marking == MetadirectiveLoopIVMarking::NestTooShallow)
         TODO(variantLoc, "METADIRECTIVE variant with COLLAPSE or ORDERED "
                          "requires a deeper perfectly-nested loop nest than "

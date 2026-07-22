@@ -832,6 +832,24 @@ subroutine test_taskloop_implicit_firstprivate(n, a)
   end do
 end subroutine
 
+! An explicitly lastprivate induction variable remains predetermined private
+! and is copied back after the selected worksharing loop.
+! CHECK-LABEL: func.func @_QPtest_lastprivate_iv(
+! CHECK:         %[[IV_ORIG:.*]]:2 = hlfir.declare {{.*}} {uniq_name = "_QFtest_lastprivate_ivEi"}
+! CHECK:         omp.wsloop private(@_QFtest_lastprivate_ivEi_private_i32
+! CHECK:           omp.loop_nest
+! CHECK:             fir.if
+! CHECK:               %[[IV_VALUE:.*]] = fir.load %{{.*}} : !fir.ref<i32>
+! CHECK:               hlfir.assign %[[IV_VALUE]] to %[[IV_ORIG]]#0
+subroutine test_lastprivate_iv(n)
+  integer :: n, i
+  !$omp metadirective &
+  !$omp & when(implementation={vendor(llvm)}: do lastprivate(i)) &
+  !$omp & otherwise(nothing)
+  do i = 1, n
+  end do
+end subroutine
+
 ! CHECK-LABEL: func.func @_QPtest_lastprivate_pointer(
 ! CHECK:         %[[P_ORIG:.*]]:2 = hlfir.declare {{.*}} {fortran_attrs = #fir.var_attrs<pointer>, uniq_name = "_QFtest_lastprivate_pointerEp"}
 ! CHECK:         omp.wsloop private(@_QFtest_lastprivate_pointerEp_private_box_ptr_i32
@@ -851,17 +869,17 @@ subroutine test_lastprivate_pointer(n, a, p)
   end do
 end subroutine
 
-! Each dynamic arm must reconstruct and then restore its own DSA state. The
-! parallel variant privatizes x; the worksharing fallback inherits the
-! original x.
+! Each dynamic arm must reconstruct its own DSA state. One parallel variant
+! privatizes x and the other shares it.
 ! CHECK-LABEL: func.func @_QPtest_dynamic_dsa_isolation(
 ! CHECK:         fir.if {{.*}} {
 ! CHECK:           omp.parallel {
 ! CHECK:             omp.wsloop private(@_QFtest_dynamic_dsa_isolationEx_private_i32
 ! CHECK:         } else {
+! CHECK:           omp.parallel {
 ! CHECK-NOT:       @_QFtest_dynamic_dsa_isolationEx_private_i32
-! CHECK:           omp.wsloop private(@_QFtest_dynamic_dsa_isolationEi_private_i32
-! CHECK-NOT:       @_QFtest_dynamic_dsa_isolationEx_private_i32
+! CHECK:             omp.wsloop private(@_QFtest_dynamic_dsa_isolationEi_private_i32
+! CHECK-NOT:         @_QFtest_dynamic_dsa_isolationEx_private_i32
 ! CHECK:         }
 ! CHECK:         return
 subroutine test_dynamic_dsa_isolation(flag, n, a, x)
@@ -869,11 +887,67 @@ subroutine test_dynamic_dsa_isolation(flag, n, a, x)
   integer :: n, a(n), x, i
   !$omp metadirective &
   !$omp & when(user={condition(flag)}: parallel do private(x) shared(n, a)) &
-  !$omp & otherwise(do)
+  !$omp & otherwise(parallel do shared(x, n, a))
   do i = 1, n
     x = i
     a(i) = x
   end do
+end subroutine
+
+! A DSA from one dynamic replacement must not affect nested task capture in
+! another replacement. The parallel arm makes x private, while the DO arm
+! inherits the shared x from the enclosing parallel region.
+! CHECK-LABEL: func.func @_QPtest_dynamic_task_dsa_isolation(
+! CHECK:         %[[X:.*]]:2 = hlfir.declare {{.*}} {uniq_name = "_QFtest_dynamic_task_dsa_isolationEx"}
+! CHECK:         omp.parallel
+! CHECK:           fir.if
+! CHECK:             omp.parallel
+! CHECK:               omp.wsloop private(@_QFtest_dynamic_task_dsa_isolationEx_private_i32
+! CHECK:                   omp.task private({{.*}}@_QFtest_dynamic_task_dsa_isolationEx_firstprivate_i32
+! CHECK:           } else {
+! CHECK-NOT:         @_QFtest_dynamic_task_dsa_isolationEx_firstprivate_i32
+! CHECK:             omp.wsloop private(@_QFtest_dynamic_task_dsa_isolationEi_private_i32
+! CHECK-NOT:           @_QFtest_dynamic_task_dsa_isolationEx_firstprivate_i32
+! CHECK:                 omp.task private(@_QFtest_dynamic_task_dsa_isolationEi_firstprivate_i32
+! CHECK-NOT:               @_QFtest_dynamic_task_dsa_isolationEx_firstprivate_i32
+! CHECK:                   fir.load %[[X]]#0
+subroutine test_dynamic_task_dsa_isolation(flag, n, a, x)
+  logical, intent(in) :: flag
+  integer :: n, a(n), x, i
+  !$omp parallel shared(flag, n, a, x)
+  !$omp metadirective &
+  !$omp & when(user={condition(flag)}: parallel do private(x) shared(n, a)) &
+  !$omp & otherwise(do)
+  do i = 1, n
+    !$omp task
+    a(i) = x
+    !$omp end task
+  end do
+  !$omp end parallel
+end subroutine
+
+! A DEFAULT clause belongs to its replacement, not to the begin/end
+! metadirective context. The shared arm must not inherit the private fallback.
+! CHECK-LABEL: func.func @_QPtest_dynamic_default_dsa_isolation(
+! CHECK:         fir.if
+! CHECK:           omp.parallel {
+! CHECK-NOT:         @_QFtest_dynamic_default_dsa_isolationEx_private_i32
+! CHECK:             omp.wsloop private(@_QFtest_dynamic_default_dsa_isolationEi_private_i32
+! CHECK-NOT:         @_QFtest_dynamic_default_dsa_isolationEx_private_i32
+! CHECK:         } else {
+! CHECK:           omp.parallel private(@_QFtest_dynamic_default_dsa_isolationEx_private_i32
+! CHECK:             omp.wsloop private(@_QFtest_dynamic_default_dsa_isolationEi_private_i32
+subroutine test_dynamic_default_dsa_isolation(flag, n, a, x)
+  logical, intent(in) :: flag
+  integer :: n, a(n), x, i
+  !$omp begin metadirective &
+  !$omp & when(user={condition(flag)}: parallel do default(shared)) &
+  !$omp & otherwise(parallel do default(private) shared(n, a))
+  do i = 1, n
+    x = i
+    a(i) = x
+  end do
+  !$omp end metadirective
 end subroutine
 
 ! CHECK-LABEL: func.func @_QPtest_parallel_do_default_firstprivate(
