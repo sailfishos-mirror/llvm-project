@@ -34,6 +34,7 @@ struct DefaultFreeStoreConfig {
   static constexpr size_t NUM_STEP_BITS = 2;
   static constexpr size_t NUM_TABLE_ENTRIES = sizeof(uintptr_t) == 8 ? 3 : 6;
   static constexpr bool USE_TRIE_FOR_OVERFLOW_BIN = true;
+  static constexpr size_t LINEAR_SCAN_LIMIT = 16;
 };
 
 // A two-level segregated fit store for free blocks.
@@ -313,6 +314,7 @@ TLSFFreeStoreImpl<CONFIG>::remove_first_fit_in_list(size_t index, size_t size) {
     return BlockRef();
 
   FreeList::Node *cur = begin_node;
+  size_t count = 0;
   do {
     if (cur->size() >= size) {
       free_lists[index].list.remove(cur);
@@ -321,7 +323,8 @@ TLSFFreeStoreImpl<CONFIG>::remove_first_fit_in_list(size_t index, size_t size) {
       return cur->block();
     }
     cur = cur->next();
-  } while (cur != begin_node);
+    ++count;
+  } while (cur != begin_node && count < CONFIG::LINEAR_SCAN_LIMIT);
 
   return BlockRef();
 }
