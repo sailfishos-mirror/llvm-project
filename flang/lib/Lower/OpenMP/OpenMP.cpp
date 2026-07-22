@@ -52,6 +52,8 @@
 #include "mlir/Dialect/OpenMP/OpenMPDialect.h"
 #include "mlir/IR/IRMapping.h"
 #include "mlir/Support/StateStack.h"
+#include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallSet.h"
@@ -3282,6 +3284,59 @@ genParallelOp(lower::AbstractConverter &converter, lower::SymMap &symTable,
               bool isComposite = false) {
   assert((!enableDelayedPrivatization || dsp) &&
          "expected valid DataSharingProcessor");
+
+  if (!clauseOps.allocateVars.empty()) {
+    llvm::DenseMap<const semantics::Symbol *, int64_t> privateSlots;
+    for (auto [index, object] : llvm::enumerate(args.priv.objects)) {
+      const semantics::Symbol *symbol = object.sym();
+      if (!symbol)
+        TODO(loc, "ALLOCATE clause private item without a semantic symbol");
+      const semantics::Symbol *ultimate = &symbol->GetUltimate();
+      if (!privateSlots.try_emplace(ultimate, index).second)
+        TODO(loc, "ALLOCATE clause item has multiple private storage slots");
+    }
+
+    llvm::DenseSet<const semantics::Symbol *> allocateSymbols;
+    for (const Clause &clause : item->clauses) {
+      if (clause.id != llvm::omp::Clause::OMPC_allocate)
+        continue;
+      const auto &allocate = std::get<clause::Allocate>(clause.u);
+      const auto &objects = std::get<ObjectList>(allocate.t);
+      for (const Object &object : objects) {
+        const semantics::Symbol *symbol = object.sym();
+        if (!symbol)
+          TODO(loc, "ALLOCATE clause item without a semantic symbol");
+        const semantics::Symbol *ultimate = &symbol->GetUltimate();
+        if (!allocateSymbols.insert(ultimate).second)
+          TODO(loc, "ALLOCATE clause item appears more than once");
+
+        auto privateSlot = privateSlots.find(ultimate);
+        if (privateSlot == privateSlots.end())
+          TODO(loc, "ALLOCATE clause item has no private storage slot");
+
+        auto type = evaluate::DynamicType::From(*ultimate);
+        bool supportedDataSharing =
+            symbol->test(semantics::Symbol::Flag::OmpPrivate) ||
+            symbol->test(semantics::Symbol::Flag::OmpFirstPrivate);
+        bool supportedType =
+            ultimate->Rank() == 0 &&
+            !semantics::IsAllocatableOrPointer(*ultimate) && type &&
+            type->category() != common::TypeCategory::Derived &&
+            !type->RequiresDescriptor() &&
+            !type->HasDeferredOrAssumedTypeParameter();
+        if (!supportedDataSharing || !supportedType)
+          TODO(loc,
+               "ALLOCATE clause currently supports only fixed-size intrinsic "
+               "scalar PRIVATE or FIRSTPRIVATE items");
+
+        clauseOps.allocatePrivateIndices.push_back(privateSlot->second);
+      }
+    }
+
+    if (clauseOps.allocatePrivateIndices.size() !=
+        clauseOps.allocateVars.size())
+      TODO(loc, "ALLOCATE clause private storage mapping is incomplete");
+  }
 
   OpWithBodyGenInfo genInfo =
       OpWithBodyGenInfo(converter, symTable, semaCtx, loc, eval,
