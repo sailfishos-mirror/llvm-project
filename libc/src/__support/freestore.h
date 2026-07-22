@@ -109,8 +109,6 @@ protected:
   static constexpr size_t TOTAL_BITS =
       CONFIG::NUM_TABLE_ENTRIES * BITS_PER_ENTRY;
   static constexpr bool USE_TRIE = CONFIG::USE_TRIE_FOR_OVERFLOW_BIN;
-  static constexpr size_t OVERFLOW_WIDTH =
-      size_t(1) << (cpp::numeric_limits<size_t>::digits - 2);
 
 public:
   static constexpr size_t MIN_OUTER_SIZE = align_up(
@@ -121,6 +119,8 @@ public:
   LIBC_INLINE TLSFFreeStoreImpl &
   operator=(const TLSFFreeStoreImpl &other) = delete;
 
+  LIBC_INLINE static constexpr size_t index_to_min_size(size_t index);
+  LIBC_INLINE void set_range(FreeTrie::SizeRange range);
   LIBC_INLINE void insert(BlockRef block);
   LIBC_INLINE void remove(BlockRef block);
   LIBC_INLINE BlockRef remove_best_fit(size_t size) {
@@ -142,6 +142,7 @@ protected:
 
   cpp::array<uintptr_t, CONFIG::NUM_TABLE_ENTRIES> lookup_table{};
   cpp::array<ListOrTrie, TOTAL_BITS> free_lists{};
+  FreeTrie::SizeRange trie_range{index_to_min_size(TOTAL_BITS - 1), 1};
 
   LIBC_INLINE static constexpr size_t size_to_bit_index(size_t size);
   LIBC_INLINE void set_bit(size_t bit_index);
@@ -214,9 +215,36 @@ TLSFFreeStoreImpl<CONFIG>::find_first_bit_set_after(size_t bit_index) const {
 }
 
 template <typename CONFIG>
+LIBC_INLINE constexpr size_t
+TLSFFreeStoreImpl<CONFIG>::index_to_min_size(size_t index) {
+  if (index <= EXP_BASE)
+    return index << UNIT_SIZE_LOG2;
+
+  size_t local_index = index - EXP_BASE;
+  size_t exp_index = local_index >> CONFIG::NUM_STEP_BITS;
+  size_t linear_index = local_index & (NUM_STEPS - 1);
+
+  size_t row_base = (EXP_BASE << exp_index) << UNIT_SIZE_LOG2;
+  size_t step_size = (STEP_SIZE << exp_index) << UNIT_SIZE_LOG2;
+  return row_base + linear_index * step_size;
+}
+
+template <typename CONFIG>
+LIBC_INLINE void
+TLSFFreeStoreImpl<CONFIG>::set_range(FreeTrie::SizeRange range) {
+  if constexpr (USE_TRIE) {
+    size_t heap_max = range.min + range.width;
+    size_t overflow_min = index_to_min_size(TOTAL_BITS - 1);
+    size_t width = 1;
+    if (heap_max > overflow_min)
+      width = cpp::bit_ceil(heap_max - overflow_min);
+    trie_range = FreeTrie::SizeRange(overflow_min, width);
+  }
+}
+
+template <typename CONFIG>
 LIBC_INLINE FreeTrie TLSFFreeStoreImpl<CONFIG>::get_trie() {
-  return FreeTrie(FreeTrie::SizeRange(0, OVERFLOW_WIDTH),
-                  free_lists[TOTAL_BITS - 1].trie_root);
+  return FreeTrie(trie_range, free_lists[TOTAL_BITS - 1].trie_root);
 }
 
 template <typename CONFIG>
