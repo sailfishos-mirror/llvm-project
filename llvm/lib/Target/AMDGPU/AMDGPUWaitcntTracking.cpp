@@ -78,6 +78,13 @@ WaitcntBrackets::~WaitcntBrackets() {
 }
 #endif
 
+void WaitcntBrackets::verify() {
+  // These track the same underlying hardware counter so the score ranges
+  // should be identical.
+  assert(getScoreLB(AMDGPU::VA_VDST_RD) == getScoreLB(AMDGPU::VA_VDST_WR));
+  assert(getScoreUB(AMDGPU::VA_VDST_RD) == getScoreUB(AMDGPU::VA_VDST_WR));
+}
+
 void WaitcntBrackets::setScoreByOperand(const MachineOperand &Op,
                                         InstCounterType CntTy, unsigned Score) {
   setRegScore(Op.getReg().asMCReg(), CntTy, Score);
@@ -835,8 +842,16 @@ void WaitcntBrackets::tryClearSCCWriteEvent(MachineInstr *Inst) {
 }
 
 void WaitcntBrackets::applyWaitcnt(const Waitcnt &Wait) {
-  for (InstCounterType T : inst_counter_types())
-    applyWaitcnt(Wait, T);
+  for (AMDGPU::InstCounterType T : AMDGPU::inst_counter_types()) {
+    unsigned Cnt;
+    if (T == AMDGPU::VA_VDST_RD || T == AMDGPU::VA_VDST_WR) {
+      Cnt =
+          std::min(Wait.get(AMDGPU::VA_VDST_RD), Wait.get(AMDGPU::VA_VDST_WR));
+    } else {
+      Cnt = Wait.get(T);
+    }
+    applyWaitcnt(T, Cnt);
+  }
 }
 
 void WaitcntBrackets::applyWaitcnt(InstCounterType T, unsigned Count) {

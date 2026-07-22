@@ -116,6 +116,9 @@ public:
   ~WaitcntBrackets();
 #endif
 
+  // Do some internal consistency checks.
+  void verify();
+
   unsigned getOutstanding(InstCounterType T) const {
     return ScoreUBs[T] - ScoreLBs[T];
   }
