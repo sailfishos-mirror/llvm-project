@@ -8,6 +8,7 @@
 
 #include "bolt/Core/DIEBuilder.h"
 #include "bolt/Core/BinaryContext.h"
+#include "bolt/Core/DebugData.h"
 #include "bolt/Core/ParallelUtilities.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/BinaryFormat/Dwarf.h"
@@ -284,26 +285,15 @@ void DIEBuilder::buildTypeUnits(DebugStrOffsetsWriter *StrOffsetWriter,
 }
 
 /// Collects the signatures of all type units referenced (via DW_FORM_ref_sig8)
-/// by any DIE of \p U.
-///
-/// The DIEs are streamed one at a time with DWARFDebugInfoEntry::extractFast so
-/// the unit's full DIE vector is never materialized -- this keeps RSS down
-/// during debug-info processing, where BOLT is already memory-heavy.
+/// by any DIE of \p U. The DIEs are streamed with forEachDIEInUnit so the
+/// unit's full DIE vector is never materialized.
 ///
 /// Note: De-duplication of the collected signatures is handled at the outer
 /// level by registerUnit.
 static void collectReferencedTypeSignatures(DWARFUnit &U,
                                             DenseSet<uint64_t> &ProcessedTU,
                                             SmallVectorImpl<uint64_t> &TUlist) {
-  DWARFDataExtractor DebugInfoData = U.getDebugInfoExtractor();
-  uint64_t DIEOffset = U.getOffset() + U.getHeaderSize();
-  const uint64_t NextCUOffset = U.getNextUnitOffset();
-  DWARFDebugInfoEntry DIEEntry;
-  while (DIEOffset < NextCUOffset &&
-         DIEEntry.extractFast(U, &DIEOffset, DebugInfoData, NextCUOffset, 0)) {
-    if (!DIEEntry.getAbbreviationDeclarationPtr())
-      continue; // Null entry: terminator of a sibling chain.
-    DWARFDie Die(&U, &DIEEntry);
+  forEachDIEInUnit(U, [&](const DWARFDie &Die) {
     for (const DWARFAttribute &Attr : Die.attributes()) {
       if (Attr.Value.getForm() != dwarf::DW_FORM_ref_sig8)
         continue;
@@ -312,7 +302,7 @@ static void collectReferencedTypeSignatures(DWARFUnit &U,
         if (ProcessedTU.insert(*Signature).second)
           TUlist.push_back(*Signature);
     }
-  }
+  });
 }
 
 void DIEBuilder::buildDWPTypeUnitsForUnit(DWARFUnit &U) {
