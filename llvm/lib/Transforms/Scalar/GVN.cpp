@@ -342,6 +342,8 @@ uint32_t GVNValueTable::lookupOrAddCall(CallInst *C) {
   }
 
   // Conservatively assign unique value numbers to calls with operand bundles.
+  // TODO: Bundle names could be included in the value numbering expression to
+  // allow combining calls with identical bundles.
   if (C->hasOperandBundles()) {
     ValueNumbering[C] = NextValueNumber;
     return NextValueNumber++;
