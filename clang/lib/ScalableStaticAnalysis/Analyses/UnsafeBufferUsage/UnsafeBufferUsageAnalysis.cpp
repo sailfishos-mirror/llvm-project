@@ -244,6 +244,11 @@ public:
   initialize(const PointerFlowAnalysisResult &PtrFlowGraph,
              const TypeConstrainedPointersAnalysisResult &TypeConstraints,
              const UnsafeBufferUsageAnalysisResult &UnsafePtrs) override {
+    auto HasNoTypeConstraint =
+        [&TypeConstraints](const EntityPointerLevel &EPL) {
+          return !TypeConstraints.contains(EPL.getEntity());
+        };
+
     // Filter out edges involving type-constrained pointers from `PtrFlowGraph`:
     for (auto &[Id, SubGraph] : PtrFlowGraph.Edges) {
       EdgeSet FilteredSubGraph;
@@ -252,12 +257,10 @@ public:
         if (TypeConstraints.contains(Src.getEntity()))
           continue;
 
-        auto FilteredDstRange = llvm::make_filter_range(
-            Dsts, [&TypeConstraints](const EntityPointerLevel &EPL) {
-              return !TypeConstraints.contains(EPL.getEntity());
-            });
+        auto FilteredDstRange =
+            llvm::make_filter_range(Dsts, HasNoTypeConstraint);
 
-        if (FilteredDstRange.begin() != FilteredDstRange.end())
+        if (!FilteredDstRange.empty())
           FilteredSubGraph[Src].insert(FilteredDstRange.begin(),
                                        FilteredDstRange.end());
       }
@@ -267,10 +270,7 @@ public:
 
     // Filter out type-constrained pointers from `UnsafePtrs`:
     for (auto &[Contributor, EPLs] : UnsafePtrs) {
-      auto FilteredRange = llvm::make_filter_range(
-          EPLs, [&TypeConstraints](const EntityPointerLevel &EPL) {
-            return !TypeConstraints.contains(EPL.getEntity());
-          });
+      auto FilteredRange = llvm::make_filter_range(EPLs, HasNoTypeConstraint);
 
       getResult().Reachables[Contributor].insert(FilteredRange.begin(),
                                                  FilteredRange.end());
