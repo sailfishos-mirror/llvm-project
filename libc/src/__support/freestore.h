@@ -317,6 +317,19 @@ TLSFFreeStoreImpl<CONFIG>::remove_first_fit_in_list(size_t index, size_t size) {
 template <typename CONFIG>
 LIBC_INLINE BlockRef
 TLSFFreeStoreImpl<CONFIG>::find_and_remove_fit(size_t size) {
+  if constexpr (CONFIG::UNIT_SIZE == BlockRef::MIN_ALIGN) {
+    size_t index = align_up(size, CONFIG::UNIT_SIZE) >> UNIT_SIZE_LOG2;
+    if (LIBC_LIKELY(index <= EXP_BASE)) {
+      if (get_bit(index)) {
+        BlockRef block = free_lists[index].front();
+        free_lists[index].pop();
+        if (free_lists[index].empty())
+          clear_bit(index);
+        return block;
+      }
+    }
+  }
+
   size_t bit_index = size_to_bit_index(size);
 
   if (LIBC_UNLIKELY(bit_index >= TOTAL_BITS - 1)) {
