@@ -15,6 +15,8 @@
 #include "clang/Frontend/CompilerInvocation.h"
 #include "clang/Frontend/TextDiagnosticPrinter.h"
 #include "llvm/Support/VirtualFileSystem.h"
+#include <mutex>
+#include <thread>
 
 namespace clang {
 class DiagnosticConsumer;
@@ -26,33 +28,6 @@ class DependencyScanningWorker;
 class DependencyConsumer;
 class DependencyActionController;
 class DependencyScanningWorkerFilesystem;
-
-class DependencyScanningAction {
-public:
-  DependencyScanningAction(
-      DependencyScanningService &Service, StringRef WorkingDirectory,
-      DependencyConsumer &Consumer, DependencyActionController &Controller,
-      IntrusiveRefCntPtr<DependencyScanningWorkerFilesystem> DepFS)
-      : Service(Service), WorkingDirectory(WorkingDirectory),
-        Consumer(Consumer), Controller(Controller), DepFS(std::move(DepFS)) {}
-  bool runInvocation(std::string Executable,
-                     std::unique_ptr<CompilerInvocation> Invocation,
-                     IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS,
-                     std::shared_ptr<PCHContainerOperations> PCHContainerOps,
-                     DiagnosticConsumer *DiagConsumer);
-
-  bool hasScanned() const { return Scanned; }
-
-private:
-  DependencyScanningService &Service;
-  StringRef WorkingDirectory;
-  DependencyConsumer &Consumer;
-  DependencyActionController &Controller;
-  IntrusiveRefCntPtr<DependencyScanningWorkerFilesystem> DepFS;
-  std::optional<CompilerInstance> ScanInstanceStorage;
-  std::shared_ptr<ModuleDepCollector> MDC;
-  bool Scanned = false;
-};
 
 // Helper functions and data types.
 std::unique_ptr<DiagnosticOptions>
@@ -110,6 +85,37 @@ std::shared_ptr<ModuleDepCollector> initializeScanInstanceDependencyCollector(
     DependencyActionController &Controller,
     PrebuiltModulesAttrsMap PrebuiltModulesASTMap,
     SmallVector<StringRef> &StableDirs);
+
+/// Manages (and terminates) the asynchronous compilation of modules.
+class AsyncModuleCompiles {
+  std::mutex Mutex;
+  bool Stop = false;
+  // FIXME: Have the service own a thread pool and use that instead.
+  std::vector<std::thread> Compiles;
+
+public:
+  /// Registers the module compilation, unless this instance is about to be
+  /// destroyed.
+  void add(llvm::unique_function<void()> Compile) {
+    std::lock_guard<std::mutex> Lock(Mutex);
+    if (!Stop)
+      Compiles.emplace_back(std::move(Compile));
+  }
+
+  ~AsyncModuleCompiles() {
+    {
+      std::lock_guard<std::mutex> Lock(Mutex);
+      Stop = true;
+    }
+    for (std::thread &Compile : Compiles)
+      Compile.join();
+  }
+};
+
+void runTUModulePrescan(CompilerInstance &PrescanCI,
+                        DependencyScanningService &Service,
+                        DependencyActionController &Controller,
+                        AsyncModuleCompiles &Compiles);
 } // namespace dependencies
 } // namespace clang
 
