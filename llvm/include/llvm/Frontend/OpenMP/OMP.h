@@ -48,6 +48,9 @@ static constexpr inline size_t findFirstSet(size_t Begin, size_t End,
 }
 
 template <typename Enum, size_t Size> struct EnumSetIterator {
+  using value_type = Enum;
+  static constexpr size_t enum_size = Size;
+
   constexpr EnumSetIterator(const EnumSet<Enum, Size> &Set, size_t At)
       : Set(Set), At(At) {}
 
