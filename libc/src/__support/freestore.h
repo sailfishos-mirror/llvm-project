@@ -130,11 +130,21 @@ protected:
     return block.outer_size() < MIN_OUTER_SIZE;
   }
 
-  union ListOrTrie {
-    FreeList list;
-    FreeTrie::Node *trie_root;
+  struct ListOrTrie {
+    uintptr_t payload = 0;
 
-    LIBC_INLINE constexpr ListOrTrie() : trie_root(nullptr) {}
+    LIBC_INLINE FreeList list() const {
+      return FreeList(cpp::bit_cast<FreeList::Node *>(payload));
+    }
+    LIBC_INLINE void set_list(FreeList l) {
+      payload = cpp::bit_cast<uintptr_t>(l.begin());
+    }
+    LIBC_INLINE FreeTrie::Node *trie_root() const {
+      return cpp::bit_cast<FreeTrie::Node *>(payload);
+    }
+    LIBC_INLINE void set_trie_root(FreeTrie::Node *r) {
+      payload = cpp::bit_cast<uintptr_t>(r);
+    }
   };
 
   cpp::array<uintptr_t, CONFIG::NUM_TABLE_ENTRIES> lookup_table{};
@@ -241,13 +251,13 @@ TLSFFreeStoreImpl<CONFIG>::set_range(FreeTrie::SizeRange range) {
 
 template <typename CONFIG>
 LIBC_INLINE FreeTrie TLSFFreeStoreImpl<CONFIG>::get_trie() {
-  return FreeTrie(trie_range, free_lists[TOTAL_BITS - 1].trie_root);
+  return FreeTrie(trie_range, free_lists[TOTAL_BITS - 1].trie_root());
 }
 
 template <typename CONFIG>
 LIBC_INLINE void
 TLSFFreeStoreImpl<CONFIG>::set_trie(const FreeTrie &trie) {
-  free_lists[TOTAL_BITS - 1].trie_root = trie.root();
+  free_lists[TOTAL_BITS - 1].set_trie_root(trie.root());
 }
 
 template <typename CONFIG>
@@ -280,7 +290,9 @@ LIBC_INLINE void TLSFFreeStoreImpl<CONFIG>::insert(BlockRef block) {
       return;
     }
 
-  free_lists[bit_index].list.push(block);
+  FreeList list = free_lists[bit_index].list();
+  list.push(block);
+  free_lists[bit_index].set_list(list);
   set_bit(bit_index);
 }
 
@@ -300,16 +312,19 @@ LIBC_INLINE void TLSFFreeStoreImpl<CONFIG>::remove(BlockRef block) {
       return;
     }
 
-  free_lists[bit_index].list.remove(
+  FreeList list = free_lists[bit_index].list();
+  list.remove(
       reinterpret_cast<FreeList::Node *>(block.usable_space()));
-  if (free_lists[bit_index].list.empty())
+  if (list.empty())
     clear_bit(bit_index);
+  free_lists[bit_index].set_list(list);
 }
 
 template <typename CONFIG>
 LIBC_INLINE BlockRef
 TLSFFreeStoreImpl<CONFIG>::remove_first_fit_in_list(size_t index, size_t size) {
-  FreeList::Node *begin_node = free_lists[index].list.begin();
+  FreeList list = free_lists[index].list();
+  FreeList::Node *begin_node = list.begin();
   if (begin_node == nullptr)
     return BlockRef();
 
@@ -317,9 +332,10 @@ TLSFFreeStoreImpl<CONFIG>::remove_first_fit_in_list(size_t index, size_t size) {
   size_t count = 0;
   do {
     if (cur->size() >= size) {
-      free_lists[index].list.remove(cur);
-      if (free_lists[index].list.empty())
+      list.remove(cur);
+      if (list.empty())
         clear_bit(index);
+      free_lists[index].set_list(list);
       return cur->block();
     }
     cur = cur->next();
@@ -349,10 +365,12 @@ TLSFFreeStoreImpl<CONFIG>::find_and_remove_fit(size_t size) {
         return find_and_remove_fit_in_trie(size);
     }
 
-    BlockRef block = free_lists[oversized_bit].list.front();
-    free_lists[oversized_bit].list.pop();
-    if (free_lists[oversized_bit].list.empty())
+    FreeList list = free_lists[oversized_bit].list();
+    BlockRef block = list.front();
+    list.pop();
+    if (list.empty())
       clear_bit(oversized_bit);
+    free_lists[oversized_bit].set_list(list);
     return block;
   }
 
