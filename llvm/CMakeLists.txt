@@ -270,14 +270,18 @@ if(LIBOMP_ENABLE_ARM64X)
   set(RUNTIMES_arm64ec-pc-windows-msvc_LIBOMP_ENABLE_ARM64X ON)
 endif()
 
+# The AMDGPU offload triple was renamed amdgcn-amd-amdhsa -> amdgpu-amd-amdhsa.
+# Accept both names so builds that still configure the libc runtime target under
+# the legacy triple continue to enable the GPU libc build.
 foreach(_name ${LLVM_RUNTIME_TARGETS})
   if("libc" IN_LIST RUNTIMES_${_name}_LLVM_ENABLE_RUNTIMES)
-    if("${_name}" STREQUAL "amdgpu-amd-amdhsa" OR "${_name}" STREQUAL "nvptx64-nvidia-cuda" OR "${_name}" STREQUAL "spirv64-intel-unknown")
+    if("${_name}" STREQUAL "amdgpu-amd-amdhsa" OR "${_name}" STREQUAL "amdgcn-amd-amdhsa" OR "${_name}" STREQUAL "nvptx64-nvidia-cuda" OR "${_name}" STREQUAL "spirv64-intel-unknown")
       set(LLVM_LIBC_GPU_BUILD ON)
     endif()
   endif()
 endforeach()
 if("${LIBC_TARGET_TRIPLE}" STREQUAL "amdgpu-amd-amdhsa" OR
+   "${LIBC_TARGET_TRIPLE}" STREQUAL "amdgcn-amd-amdhsa" OR
    "${LIBC_TARGET_TRIPLE}" STREQUAL "nvptx64-nvidia-cuda" OR
    "${LIBC_TARGET_TRIPLE}" STREQUAL "spirv64-intel-unknown")
   set(LLVM_LIBC_GPU_BUILD ON)
