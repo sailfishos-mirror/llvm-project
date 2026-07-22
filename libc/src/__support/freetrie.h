@@ -88,7 +88,8 @@ public:
   };
 
   LIBC_INLINE constexpr FreeTrie() : FreeTrie(SizeRange{0, 0}) {}
-  LIBC_INLINE constexpr FreeTrie(SizeRange range) : range(range) {}
+  LIBC_INLINE constexpr FreeTrie(SizeRange range, Node *root = nullptr)
+      : root(root), range(range) {}
 
   /// Sets the range of possible block sizes. This can only be called when the
   /// trie is empty.
@@ -99,6 +100,9 @@ public:
 
   /// @returns Whether the trie contains any blocks.
   LIBC_INLINE bool empty() const { return !root; }
+
+  /// @returns The root node of the trie.
+  LIBC_INLINE Node *get_root() const { return root; }
 
   /// Push a block to the trie.
   void push(BlockRef block);
