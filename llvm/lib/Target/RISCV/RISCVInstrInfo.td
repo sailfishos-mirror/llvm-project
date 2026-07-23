@@ -364,8 +364,7 @@ def uimm64 : RISCVUImmOp<64>;
 
 def simm12 : RISCVSImmLeafOp<12>;
 
-def simm12_lo : RISCVSImmLeafOp<12> {
-  let ParserMatchClass = SImmAsmOperand<12, "LO">;
+class Simm12LoOp : RISCVSImmLeafOp<12> {
   let MCOperandPredicate = [{
     int64_t Imm;
     if (MCOp.evaluateAsConstantImm(Imm))
@@ -375,12 +374,14 @@ def simm12_lo : RISCVSImmLeafOp<12> {
   let OperandType = "OPERAND_SIMM12_LO";
 }
 
+def simm12_lo : Simm12LoOp {
+  let ParserMatchClass = SImmAsmOperand<12, "LO">;
+}
+
 // Variant of simm12_lo for memory-operand offsets that may be omitted
 // entirely, e.g. "lb a0, (a1)". See OptionalMemOffsetAsmOperand.
-def simm12_lo_optional : RISCVSImmLeafOp<12> {
+def simm12_lo_optional : Simm12LoOp {
   let ParserMatchClass = OptionalMemOffsetAsmOperand<simm12_lo.ParserMatchClass>;
-  let MCOperandPredicate = simm12_lo.MCOperandPredicate;
-  let OperandType = simm12_lo.OperandType;
 }
 
 // A 12-bit signed immediate which cannot fit in 6-bit signed immediate,
@@ -1540,14 +1541,6 @@ def PseudoAddTPRel : Pseudo<(outs GPR:$rd),
                             "add", "$rd, $rs1, $rs2, $src">;
 
 /// FrameIndex calculations
-
-// Transforms frameindex -> tframeindex.
-def to_tframeindex : SDNodeXForm<frameindex, [{
-  return CurDAG->getTargetFrameIndex(N->getIndex(), N->getValueType(0));
-}]>;
-
-def : GICustomOperandRenderer<"renderFrameIndex">,
-      GISDNodeXFormEquiv<to_tframeindex>;
 
 def : Pat<(frameindex:$fi), (ADDI (iPTR (to_tframeindex $fi)), 0)>;
 

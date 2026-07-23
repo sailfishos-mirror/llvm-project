@@ -39,6 +39,7 @@
 #include "llvm/CodeGen/MachinePostDominators.h"
 #include "llvm/CodeGen/MachineRegisterInfo.h"
 #include "llvm/CodeGen/MachineSizeOpts.h"
+#include "llvm/CodeGen/RegisterClassInfo.h"
 #include "llvm/CodeGen/TargetInstrInfo.h"
 #include "llvm/CodeGen/TargetOpcodes.h"
 #include "llvm/CodeGen/TargetPassConfig.h"
@@ -126,6 +127,7 @@ public:
     AU.addRequired<MachineBranchProbabilityInfoWrapperPass>();
     AU.addRequired<ProfileSummaryInfoWrapperPass>();
     AU.addRequired<TargetPassConfig>();
+    AU.addPreserved<MachineRegisterClassInfoWrapperPass>();
     MachineFunctionPass::getAnalysisUsage(AU);
   }
 
@@ -1549,6 +1551,27 @@ ReoptimizeBlock:
         ++NumBranchOpts;
         goto ReoptimizeBlock;
       }
+    }
+
+    // If we have a block that consists of a single conditional branch
+    // instruction that is exactly identical to the terminator in the previous
+    // block, we can remove this block.
+    bool AreConditionalsEqual =
+        CurCond.size() > 0 &&
+        llvm::equal(CurCond, PriorCond,
+                    [](const MachineOperand &LHS, const MachineOperand &RHS) {
+                      return LHS.isIdenticalTo(RHS);
+                    });
+    if (MBB->size() == 1 && PrevBB.canFallThrough() && CurTBB == PriorTBB &&
+        AreConditionalsEqual) {
+      // We remove the branch from the previous basic block rather than this
+      // one in case there are other blocks that specifically branch to this
+      // one.
+      TII->removeBranch(PrevBB);
+      PrevBB.removeSuccessor(CurTBB);
+      MadeChange = true;
+      ++NumBranchOpts;
+      goto ReoptimizeBlock;
     }
 
     // If this block has no successors (e.g. it is a return block or ends with
