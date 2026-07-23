@@ -696,9 +696,10 @@ MlirOperation mlirOperationGetParentWithName(MlirOperation op,
                                              MlirStringRef opName) {
   StringRef name = unwrap(opName);
   for (Operation *parent = unwrap(op)->getParentOp(); parent;
-       parent = parent->getParentOp())
+       parent = parent->getParentOp()) {
     if (parent->getName().getStringRef() == name)
       return wrap(parent);
+  }
   return {nullptr};
 }
 
