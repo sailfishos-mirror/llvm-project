@@ -3744,8 +3744,12 @@ struct DynamicSubstringVisitor {
   explicit DynamicSubstringVisitor(semantics::SemanticsContext &ctx)
       : semaCtx(ctx) {}
 
-  template <typename T> bool Pre(const T &) { return true; }
-  template <typename T> void Post(const T &) {}
+  template <typename T>
+  bool Pre(const T &) {
+    return true;
+  }
+  template <typename T>
+  void Post(const T &) {}
 
   // Check each expression for substring access
   void Post(const parser::Expr &expr) {
