@@ -2461,7 +2461,7 @@ ExprResult Sema::BuildCXXNew(SourceRange Range, bool UseGlobal,
       !Expr::hasAnyTypeDependentArguments(PlacementArgs)) {
     auto FoundAllocation = FindAllocationFunctions(
         StartLoc, AllocationParameterRange, Scope, Scope, AllocType,
-        ArraySize.has_value(), IAP, PlacementArgs);
+        /*IsArray=*/ArraySize.has_value(), IAP, PlacementArgs);
     if (!FoundAllocation)
       return ExprError();
     IAP = FoundAllocation->IAP;
