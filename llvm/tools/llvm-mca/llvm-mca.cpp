@@ -15,7 +15,8 @@
 //      -o <file>
 //
 // The target defaults to the host target.
-// The cpu defaults to the 'native' host cpu.
+// The cpu is derived from the triple if not specified; pass -mcpu=native to
+// select the host cpu.
 // The output defaults to standard output.
 //
 //===----------------------------------------------------------------------===//
@@ -91,7 +92,7 @@ static cl::opt<std::string>
 static cl::opt<std::string>
     MCPU("mcpu",
          cl::desc("Target a specific cpu type (-mcpu=help for details)"),
-         cl::value_desc("cpu-name"), cl::cat(ToolOptions), cl::init("native"));
+         cl::value_desc("cpu-name"), cl::cat(ToolOptions), cl::init(""));
 
 static cl::list<std::string>
     MATTRS("mattr", cl::CommaSeparated,
