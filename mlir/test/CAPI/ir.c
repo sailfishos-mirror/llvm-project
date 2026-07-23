@@ -2949,16 +2949,27 @@ int testGetParentWithName(MlirContext ctx) {
 
   mlirContextGetOrLoadDialect(ctx, mlirStringRefCreateFromCString("arith"));
 
-  const char *moduleStr = "func.func @f() {\n"
-                          "  %c0 = arith.constant 0 : i32\n"
-                          "  return\n"
+  // A nested module puts two `builtin.module` ops in the ancestor chain so we
+  // can verify the walk returns the *nearest* match rather than the outermost.
+  // Chain from the constant: arith.constant -> func.func -> builtin.module
+  // (inner) -> builtin.module (outer).
+  const char *moduleStr = "module {\n"
+                          "  module {\n"
+                          "    func.func @f() {\n"
+                          "      %c0 = arith.constant 0 : i32\n"
+                          "      return\n"
+                          "    }\n"
+                          "  }\n"
                           "}\n";
   MlirModule module =
       mlirModuleCreateParse(ctx, mlirStringRefCreateFromCString(moduleStr));
 
-  MlirOperation moduleOp = mlirModuleGetOperation(module);
-  MlirBlock moduleBody = mlirModuleGetBody(module);
-  MlirOperation funcOp = mlirBlockGetFirstOperation(moduleBody);
+  MlirOperation outerModuleOp = mlirModuleGetOperation(module);
+  MlirBlock outerModuleBody = mlirModuleGetBody(module);
+  MlirOperation innerModuleOp = mlirBlockGetFirstOperation(outerModuleBody);
+  MlirRegion innerModuleRegion = mlirOperationGetRegion(innerModuleOp, 0);
+  MlirBlock innerModuleBody = mlirRegionGetFirstBlock(innerModuleRegion);
+  MlirOperation funcOp = mlirBlockGetFirstOperation(innerModuleBody);
   MlirRegion funcRegion = mlirOperationGetRegion(funcOp, 0);
   MlirBlock funcBody = mlirRegionGetFirstBlock(funcRegion);
   MlirOperation constOp = mlirBlockGetFirstOperation(funcBody);
@@ -2968,10 +2979,18 @@ int testGetParentWithName(MlirContext ctx) {
       constOp, mlirStringRefCreateFromCString("func.func"));
   assert(mlirOperationEqual(foundFunc, funcOp));
 
-  // Walks past func.func to find the enclosing builtin.module ancestor.
+  // Walks past func.func to find the enclosing builtin.module ancestor, and
+  // returns the *nearest* one (the inner module), not the outer module.
   MlirOperation foundModule = mlirOperationGetParentWithName(
       constOp, mlirStringRefCreateFromCString("builtin.module"));
-  assert(mlirOperationEqual(foundModule, moduleOp));
+  assert(mlirOperationEqual(foundModule, innerModuleOp));
+  assert(!mlirOperationEqual(foundModule, outerModuleOp));
+
+  // Starting the walk from the inner module skips it (the op itself is
+  // excluded) and finds the outer module instead.
+  MlirOperation foundOuterModule = mlirOperationGetParentWithName(
+      innerModuleOp, mlirStringRefCreateFromCString("builtin.module"));
+  assert(mlirOperationEqual(foundOuterModule, outerModuleOp));
 
   // A name that matches no ancestor returns null.
   MlirOperation notFound = mlirOperationGetParentWithName(
@@ -2983,6 +3002,12 @@ int testGetParentWithName(MlirContext ctx) {
   MlirOperation notSelf = mlirOperationGetParentWithName(
       constOp, mlirStringRefCreateFromCString("arith.constant"));
   assert(mlirOperationIsNull(notSelf));
+
+  // The top-level op has no parent, so any lookup returns null (exercises the
+  // loop's null-parent guard).
+  MlirOperation noParent = mlirOperationGetParentWithName(
+      outerModuleOp, mlirStringRefCreateFromCString("builtin.module"));
+  assert(mlirOperationIsNull(noParent));
 
   mlirModuleDestroy(module);
 
