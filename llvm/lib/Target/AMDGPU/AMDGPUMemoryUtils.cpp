@@ -364,7 +364,8 @@ void removeFnAttrFromReachable(CallGraph &CG, Function *KernelRoot,
   }
 }
 
-bool isReallyAClobber(const Value *Ptr, MemoryDef *Def, AAResults *AA) {
+bool isReallyAClobber(const MemoryLocation &Loc, MemoryDef *Def,
+                      AAResults *AA) {
   Instruction *DefInst = Def->getMemoryInst();
 
   if (isa<FenceInst>(DefInst))
@@ -394,16 +395,24 @@ bool isReallyAClobber(const Value *Ptr, MemoryDef *Def, AAResults *AA) {
   }
 
   // Ignore atomics not aliasing with the original load, any atomic is a
-  // universal MemoryDef from MSSA's point of view too, just like a fence.
-  const auto checkNoAlias = [AA, Ptr](auto I) -> bool {
-    return I && AA->isNoAlias(I->getPointerOperand(), Ptr);
+  // universal MemoryDef from MSSA's point of view too, just like a fence. Use a
+  // pointer-level no-alias check so a synchronizing atomic on unrelated memory
+  // is not treated as a clobber (getModRefInfo would conservatively report Mod
+  // for its ordering effects).
+  const auto checkNoAlias = [AA, &Loc](auto I) -> bool {
+    return I && AA->isNoAlias(I->getPointerOperand(), Loc.Ptr);
   };
 
   if (checkNoAlias(dyn_cast<AtomicCmpXchgInst>(DefInst)) ||
       checkNoAlias(dyn_cast<AtomicRMWInst>(DefInst)))
     return false;
 
-  return true;
+  // For any other memory-writing def (plain stores, memory intrinsics such as
+  // the TDM tensor_load_to_lds, calls), it is only a real clobber if alias
+  // analysis says it can modify the loaded location. This lets e.g. an
+  // LDS/addrspace(3) write not clobber a global/addrspace(1) load, instead of
+  // conservatively treating every such def as a clobber.
+  return isModSet(AA->getModRefInfo(DefInst, Loc));
 }
 
 bool isClobberedInFunction(const LoadInst *Load, MemorySSA *MSSA,
@@ -434,7 +443,7 @@ bool isClobberedInFunction(const LoadInst *Load, MemorySSA *MSSA,
     if (MemoryDef *Def = dyn_cast<MemoryDef>(MA)) {
       LLVM_DEBUG(dbgs() << "  Def: " << *Def->getMemoryInst() << '\n');
 
-      if (isReallyAClobber(Load->getPointerOperand(), Def, AA)) {
+      if (isReallyAClobber(Loc, Def, AA)) {
         LLVM_DEBUG(dbgs() << "      -> load is clobbered\n");
         return true;
       }

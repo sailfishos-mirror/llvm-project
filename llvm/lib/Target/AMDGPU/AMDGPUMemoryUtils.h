@@ -21,6 +21,7 @@ class DataLayout;
 class GlobalVariable;
 class LoadInst;
 class MemoryDef;
+class MemoryLocation;
 class MemorySSA;
 class Value;
 class Function;
@@ -93,10 +94,10 @@ GVUsesInfoTy getTransitiveUsesOfLDSForLowering(const CallGraph &CG, Module &M);
 void removeFnAttrFromReachable(CallGraph &CG, Function *KernelRoot,
                                ArrayRef<StringRef> FnAttrs);
 
-/// Given a \p Def clobbering a load from \p Ptr according to the MSSA check
-/// if this is actually a memory update or an artificial clobber to facilitate
-/// ordering constraints.
-bool isReallyAClobber(const Value *Ptr, MemoryDef *Def, AAResults *AA);
+/// Given a \p Def clobbering a load at \p Loc according to the MSSA, check if
+/// this is actually a memory update (as determined by alias analysis) or an
+/// artificial clobber to facilitate ordering constraints.
+bool isReallyAClobber(const MemoryLocation &Loc, MemoryDef *Def, AAResults *AA);
 
 /// Check is a \p Load is clobbered in its function.
 bool isClobberedInFunction(const LoadInst *Load, MemorySSA *MSSA,
