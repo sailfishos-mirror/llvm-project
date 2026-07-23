@@ -435,9 +435,6 @@ int main(int argc, char **argv) {
   if (WantsCPUHelp)
     return 0;
 
-  if (!STI->isCPUStringValid(MCPU))
-    return 1;
-
   if (!STI->getSchedModel().hasInstrSchedModel()) {
     WithColor::error()
         << "unable to find instruction-level scheduling information for"
