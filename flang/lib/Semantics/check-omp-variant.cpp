@@ -56,18 +56,6 @@ bool HasDefaultNone(const parser::OmpDirectiveSpecification &spec) {
   return dsa && *dsa == DataSharingAttribute::None;
 }
 
-bool HasStaticStorageDuration(const Symbol &symbol) {
-  const Symbol &ultimate{symbol.GetUltimate()};
-  return semantics::IsSaved(ultimate) ||
-      ultimate.test(Symbol::Flag::InCommonBlock);
-}
-
-bool IsLocalInsideScope(const Symbol &symbol, const Scope &scope) {
-  const Symbol &ultimate{symbol.GetUltimate()};
-  return ultimate.owner() != scope && scope.Contains(ultimate.owner()) &&
-      !HasStaticStorageDuration(ultimate);
-}
-
 bool HasNestedPrivateDSA(const Symbol &symbol, const Scope &scope) {
   if (symbol.owner() == scope || !scope.Contains(symbol.owner())) {
     return false;
@@ -127,11 +115,15 @@ public:
 
     const Symbol &symbol{*name.symbol};
     const Symbol &ultimate{symbol.GetUltimate()};
+    // Variables declared inside the associated loop without static storage are
+    // predetermined private.
+    bool isNonStaticLocal{ultimate.owner() != scope_ &&
+        scope_.Contains(ultimate.owner()) && !semantics::IsSaved(ultimate) &&
+        !ultimate.test(Symbol::Flag::InCommonBlock)};
     if (!omp::IsPrivatizable(ultimate) ||
         ultimate.test(Symbol::Flag::OmpThreadprivate) ||
         loopIndices_.count(ultimate) != 0 ||
-        HasNestedPrivateDSA(symbol, scope_) ||
-        IsLocalInsideScope(symbol, scope_)) {
+        HasNestedPrivateDSA(symbol, scope_) || isNonStaticLocal) {
       return true;
     }
 
