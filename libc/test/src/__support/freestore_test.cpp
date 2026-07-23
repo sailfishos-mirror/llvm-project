@@ -92,7 +92,8 @@ TEST(LlvmLibcFreeStore, RemoveFit) {
   ASSERT_GE(block3.inner_size(), smallest.inner_size() + 1);
   store.insert(block3);
 
-  // Requesting largest_small inner_size + 1 returns a valid block fitting the size.
+  // Requesting largest_small inner_size + 1 returns a valid block fitting the
+  // size.
   BlockRef block4 = store.remove_best_fit(largest_small.inner_size() + 1);
   ASSERT_NE(block4.addr(), BlockRef().addr());
   ASSERT_GE(block4.inner_size(), largest_small.inner_size() + 1);
