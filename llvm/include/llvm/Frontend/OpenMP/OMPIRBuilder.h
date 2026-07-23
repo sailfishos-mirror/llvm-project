@@ -3621,7 +3621,8 @@ public:
   ///   for (unsigned i = 0; i < size; i++) {
   ///     // For each component specified by this mapper:
   ///     for (auto c : begin[i]->all_components) {
-  ///       // Map-type-modifying bits (ALWAYS, DELETE, CLOSE) from the outer map
+  ///       // Map-type-modifying bits (ALWAYS, DELETE, CLOSE) from the outer
+  ///       map
   ///       // clause are propagated to each component, except ATTACH entries
   ///       // (ATTACH|ALWAYS is reserved for attach(always), and other modifier
   ///       // bits have no meaning for ATTACH).
@@ -3634,8 +3635,8 @@ public:
   ///                       effective_type, c.arg_name);
   ///       else
   ///         __tgt_push_mapper_component(rt_mapper_handle, c.arg_base,
-  ///                                     c.arg_begin, c.arg_size, effective_type,
-  ///                                     c.arg_name);
+  ///                                     c.arg_begin, c.arg_size,
+  ///                                     effective_type, c.arg_name);
   ///     }
   ///   }
   ///   // Delete the array section.
@@ -3651,13 +3652,17 @@ public:
   /// \param FuncName Optional param to specify mapper function name.
   /// \param CustomMapperCB Optional callback to generate code related to
   /// custom mappers.
+  /// \param PropagatePresentToPointee If true, the PRESENT map-type modifier
+  /// from the outer clause is propagated to pointee (attach-ptr) entries the
+  /// mapper inserts. Callers set this only for OpenMP >= 6.0; at earlier
+  /// versions the present modifier is treated as not applying to the pointee.
   LLVM_ABI Expected<Function *> emitUserDefinedMapper(
       function_ref<MapInfosOrErrorTy(
           InsertPointTy CodeGenIP, llvm::Value *PtrPHI, llvm::Value *BeginArg)>
           PrivAndGenMapInfoCB,
       llvm::Type *ElemTy, StringRef FuncName,
-      CustomMapperCallbackTy CustomMapperCB,
-      bool PreserveMemberOfFlags = false);
+      CustomMapperCallbackTy CustomMapperCB, bool PreserveMemberOfFlags = false,
+      bool PropagatePresentToPointee = false);
 
   /// Generator for '#omp target data'
   ///
