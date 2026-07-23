@@ -7538,6 +7538,7 @@ struct LOCKABLE Entry;
 void getLockedEntry(Entry **entry) EXCLUSIVE_LOCK_FUNCTION(*entry);
 void useLockedEntry(Entry *entry) EXCLUSIVE_LOCKS_REQUIRED(entry);
 void unlockEntry(Entry *entry) UNLOCK_FUNCTION(entry);
+void assertLockedEntry(Entry **entry)   ASSERT_EXCLUSIVE_LOCK(*entry);
 
 void testOutParamAcquireCap(Entry *in) {
   Entry *entry = in;
@@ -7561,13 +7562,57 @@ void testOutParamAcquireCap_invalidation(Entry *in) {
   unlockEntry(in); // expected-warning{{releasing mutex 'in' that was not held}}
 } // expected-warning{{mutex 'entry' is still held at the end of function}}
 
+void getLockedEntryRef(Entry *&entry) EXCLUSIVE_LOCK_FUNCTION(entry);
+
+void testAcquireCapability_outParamRef(Entry *in) {
+  Entry *entry = in;
+  getLockedEntryRef(entry);
+  // 'entry' has been invalidated. So it holds the lock after the call,
+  // but 'in' does not:
+  useLockedEntry(entry);
+  unlockEntry(entry);
+  useLockedEntry(in); // expected-warning{{calling function 'useLockedEntry' requires holding mutex 'in' exclusively}}
+  unlockEntry(in); // expected-warning{{releasing mutex 'in' that was not held}}
+}
+
+void testAssertCapability_outParam(Entry *in) {
+  Entry *entry = in;
+  assertLockedEntry(&entry);
+  // 'entry' has been invalidated. So it is assumed to hold the lock
+  // after the call, but 'in' does not:
+  useLockedEntry(entry);
+  unlockEntry(entry);
+  useLockedEntry(in); // expected-warning{{calling function 'useLockedEntry' requires holding mutex 'in' exclusively}}
+  unlockEntry(in); // expected-warning{{releasing mutex 'in' that was not held}}
+}
+
+  void getMultiLockedEntries(Entry **e1, Entry **e2, Entry *e3) EXCLUSIVE_LOCK_FUNCTION(*e1, *e2, e3);
+
+void testAcquireCapability_outParmMultiAttrArg(Entry *in1, Entry *in2, Entry *in3) {
+  Entry *entry1 = in1;
+  Entry *entry2 = in2;
+  Entry *entry3 = in3;
+  getMultiLockedEntries(&entry1, &entry2, entry3);
+  useLockedEntry(entry1);
+  useLockedEntry(entry2);
+  unlockEntry(entry1);
+  unlockEntry(entry2);
+
+  useLockedEntry(in1); // expected-warning{{calling function 'useLockedEntry' requires holding mutex 'in1' exclusively}}
+  useLockedEntry(in2); // expected-warning{{calling function 'useLockedEntry' requires holding mutex 'in2' exclusively}}
+  useLockedEntry(in3);
+  unlockEntry(in1); // expected-warning{{releasing mutex 'in1' that was not held}}
+  unlockEntry(in2); // expected-warning{{releasing mutex 'in2' that was not held}}
+  unlockEntry(in3);
+}  
+
 void allActions(Entry **e1, Entry **e2, Entry **e3, Entry **e4, Entry **e5)
   EXCLUSIVE_LOCK_FUNCTION(*e1) EXCLUSIVE_LOCKS_REQUIRED(*e2)
   UNLOCK_FUNCTION(*e3) ASSERT_EXCLUSIVE_LOCK(*e4) LOCKS_EXCLUDED(*e5);
 
 // Test pre- and post-state handling involving various kinds of
 // attributes at a single call-site.
-void testAllactions() {
+void testAllActions_outParms() {
   Entry *e1 = nullptr, *e2 = nullptr, *e3 = nullptr,
     *e4 = nullptr;
 
@@ -7580,7 +7625,7 @@ void testAllactions() {
   unlockEntry(e3);
 }
 
-void testAllActions_negative() {
+void testAllActions_outParms_negative() {
   Entry *e1 = nullptr, *e2 = nullptr, *e3 = nullptr,
     *e4 = nullptr;
 
@@ -7593,6 +7638,7 @@ void testAllActions_negative() {
   unlockEntry(e1);
   unlockEntry(e2); // expected-warning{{releasing mutex 'e2' that was not held}}
 } // expected-warning{{mutex 'e4' is still held at the end of function}}
+
 
 // A function that may do anything to the objects referred to by the inputs.
 void escapeAliasMultiple(void *, void *, void *);
