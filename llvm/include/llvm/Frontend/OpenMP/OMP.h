@@ -29,12 +29,12 @@ namespace detail {
 template <size_t Size>
 static constexpr inline size_t findFirstSet(size_t Begin, size_t End,
                                             const llvm::Bitset<Size> &Set) {
-  unsigned FirstWord = Begin / 64;
-  unsigned LastWord = End / 64;
+  unsigned BeginWord = Begin / 64;
+  unsigned EndWord = (End + 63) / 64;
 
-  for (unsigned I = FirstWord; I <= LastWord; ++I) {
+  for (unsigned I = BeginWord; I < EndWord; ++I) {
     uint64_t Word = Set.getWord64(I);
-    if (I == FirstWord && Begin % 64 != 0) {
+    if (I == BeginWord && Begin % 64 != 0) {
       Word &= ~uint64_t() << (Begin % 64);
     }
     auto Count = static_cast<unsigned>(llvm::countr_zero_constexpr(Word));
