@@ -2017,34 +2017,43 @@ bool GVNPass::performLoopLoadPRE(LoadInst *Load,
   if (LoadPtr->canBeFreed())
     return false;
 
-  // The reload is inserted at the end of the chosen in-loop block so its value
-  // reaches the header along the path back to the latch. If that block has
-  // multiple successors, inserting there would also run the load on paths that
-  // leave the loop. Split the critical edge to the unique in-loop successor so
-  // the reload only runs on the path that feeds the header.
+  // eliminatePartiallyRedundantLoad() inserts the reload at the end of the
+  // chosen in-loop block. When that block has a single successor there is no
+  // critical edge and the reload can go there directly. When it has several
+  // successors but stays in the loop on all of them, the reload still only
+  // runs inside the loop, so LoopBlock is fine. The only problematic case is a
+  // successor that leaves the loop: inserting in LoopBlock would then run the
+  // reload on the exit edge too. Redirect it onto the in-loop edge by splitting
+  // that critical edge so the reload only runs on the path back to the header.
   BasicBlock *InsertBlock = LoopBlock;
   if (LoopBlock->getTerminator()->getNumSuccessors() != 1) {
     BasicBlock *InLoopSucc = nullptr;
+    bool MultipleInLoopSucc = false;
+    bool ExitsLoop = false;
     for (BasicBlock *Succ : successors(LoopBlock)) {
-      if (!L->contains(Succ))
+      if (!L->contains(Succ)) {
+        ExitsLoop = true;
         continue;
-      // Bail if there is more than one in-loop successor: it is then unclear
-      // which edge carries the value back to the header.
+      }
       if (InLoopSucc)
-        return false;
-      InLoopSucc = Succ;
+        MultipleInLoopSucc = true;
+      else
+        InLoopSucc = Succ;
     }
-    if (!InLoopSucc)
-      return false;
 
-    // splitCriticalEdges() returns nullptr for edges it cannot split, e.g. an
-    // indirectbr terminator or an EH-pad successor; bail out in that case. The
-    // in-loop successor cannot be a backedge target here: LoopBlock does not
-    // dominate the latch, and a single-latch loop only has the latch->header
-    // backedge, so no critical loop backedge is split.
-    InsertBlock = splitCriticalEdges(LoopBlock, InLoopSucc);
-    if (!InsertBlock)
-      return false;
+    if (ExitsLoop) {
+      // A single edge split cannot keep the reload off the exit path when
+      // there is more than one in-loop successor, and there must be one to
+      // split.
+      if (MultipleInLoopSucc || !InLoopSucc)
+        return false;
+
+      // splitCriticalEdges() returns nullptr when the edge cannot be split
+      // (e.g. an indirectbr terminator or an EH-pad successor).
+      InsertBlock = splitCriticalEdges(LoopBlock, InLoopSucc);
+      if (!InsertBlock)
+        return false;
+    }
   }
 
   MapVector<BasicBlock *, Value *> AvailableLoads;
