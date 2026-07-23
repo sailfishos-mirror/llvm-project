@@ -1756,15 +1756,17 @@ class BuildLockset : public ConstStmtVisitor<BuildLockset> {
   public:
     enum Point : char { Pre = 0, Post = 1 };
 
-    struct [[nodiscard]] ContextSwitchScope {
+    struct ContextSwitchScope {
       DualLocalVarContext &DC;
-      enum Point LastPoint;
+      Point LastPoint;
+      ContextSwitchScope(const ContextSwitchScope &) = delete;
+      ContextSwitchScope &operator=(const ContextSwitchScope &) = delete;
       ~ContextSwitchScope() { DC.switchContextTo(LastPoint); }
     };
 
     /// Temporarily switch context to \p P as long as the returned object lives.
     [[nodiscard]] ContextSwitchScope switchToContextForScope(Point P) {
-      enum Point PriorPoint = CurrPoint;
+      Point PriorPoint = CurrPoint;
       switchContextTo(P);
       return ContextSwitchScope{*this, PriorPoint};
     }
@@ -1802,10 +1804,10 @@ class BuildLockset : public ConstStmtVisitor<BuildLockset> {
     // PrePost[0] points to the pre-context and
     // PrePost[1] points to the post-context:
     std::array<const LocalVariableMap::Context *, 2> PrePost;
-    enum Point CurrPoint;
+    Point CurrPoint;
     unsigned CtxIndex;
 
-    void switchContextTo(enum Point P) {
+    void switchContextTo(Point P) {
       if (!Analyzer.Handler.issueBetaWarnings())
         return;
       Analyzer.SxBuilder.setLookupLocalVarExpr(
