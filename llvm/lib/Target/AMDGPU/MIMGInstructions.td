@@ -1084,11 +1084,6 @@ class VIMAGE_Atomic_gfx13<mimgopc op, string opcode,
 class AMDGPUMnemonicAliasMIMG<string asm, string alias, Predicate Pred>
   : AMDGPUMnemonicAlias<asm, alias> {
   let AssemblerPredicate = Pred;
-  // These records are emitted inside the let IsAtomicRet/BaseOpcode/VDataDwords
-  // scopes of MIMG_Atomic_Base, so we must declare them here (fields unused)
-  bit IsAtomicRet; // Unused
-  MIMGBaseOpcode BaseOpcode; // Unused
-  int VDataDwords; // Unused
 }
 
 multiclass MIMG_Atomic_Addr_Helper_m <mimgopc op, string asm,
@@ -1200,11 +1195,6 @@ multiclass MIMG_Atomic_Addr_Helper_m <mimgopc op, string asm,
       }
     }
   }
-  if !and(op.HAS_GFX12, !not(!empty(renamed))) then
-    def : AMDGPUMnemonicAliasMIMG<asm, renamed, isGFX12Only>;
-
-  if !and(op.HAS_GFX13, !not(!empty(renamed))) then
-    def : AMDGPUMnemonicAliasMIMG<asm, renamed, isGFX13Only>;
 }
 
 multiclass MIMG_Atomic_Base <mimgopc op, string asm, bit isCmpSwap = 0, bit isFP = 0,
@@ -1240,6 +1230,11 @@ multiclass MIMG_Atomic_Base <mimgopc op, string asm, bit isCmpSwap = 0, bit isFP
       }
     }
   }
+
+  if !and(!not(noRtn), op.HAS_GFX12, !not(!empty(renamed))) then
+    def : AMDGPUMnemonicAliasMIMG<asm, renamed, isGFX12Only>;
+  if !and(!not(noRtn), op.HAS_GFX13, !not(!empty(renamed))) then
+    def : AMDGPUMnemonicAliasMIMG<asm, renamed, isGFX13Only>;
 }
 
 multiclass MIMG_Atomic <mimgopc op, string asm, bit isCmpSwap = 0, bit isFP = 0,
