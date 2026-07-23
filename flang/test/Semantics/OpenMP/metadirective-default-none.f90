@@ -86,6 +86,20 @@ subroutine dynamic_variant(n, a, x, flag)
   end do
 end subroutine
 
+! An invalid loop nest does not suppress an independent DEFAULT(NONE) error.
+subroutine invalid_depth_and_missing_dsa(n, a, x)
+  integer :: n, a(n), x, i
+  !$omp metadirective &
+  !$omp& when(implementation={vendor(llvm)}: &
+  !ERROR: This construct requires a nest of depth 2, but the associated nest is a nest of depth 1
+  !BECAUSE: COLLAPSE clause was specified with argument 2
+  !$omp& parallel do collapse(2) default(none) shared(n, a)) default(nothing)
+  do i = 1, n
+    !ERROR: The DEFAULT(NONE) clause requires that 'x' must be listed in a data-sharing attribute clause
+    a(i) = x
+  end do
+end subroutine
+
 ! Sequential loop indices and automatic variables declared in the region have
 ! predetermined data-sharing attributes.
 subroutine predetermined_dsa(n, a)
