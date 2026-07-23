@@ -9535,10 +9535,8 @@ bool llvm::matchSimpleRecurrence(const PHINode *P, BinaryOperator *&BO,
 bool llvm::matchSimpleRecurrence(const BinaryOperator *I, PHINode *&P,
                                  Value *&Start, Value *&Step) {
   BinaryOperator *BO = nullptr;
-  P = dyn_cast<PHINode>(I->getOperand(0));
-  if (!P)
-    P = dyn_cast<PHINode>(I->getOperand(1));
-  return P && matchSimpleRecurrence(P, BO, Start, Step) && BO == I;
+  return match(I, m_c_BinOp(m_Phi(P), m_Value())) &&
+         matchSimpleRecurrence(P, BO, Start, Step) && BO == I;
 }
 
 bool llvm::matchSimpleBinaryIntrinsicRecurrence(const IntrinsicInst *I,
@@ -10737,6 +10735,14 @@ void llvm::findValuesAffectedByCondition(
             InsertAffected(X);
         }
       }
+
+      auto AddNuwSquareOperand = [&AddAffected](Value *Op) {
+        Value *SquareOp = nullptr;
+        if (match(Op, m_NUWMul(m_Value(SquareOp), m_Deferred(SquareOp))))
+          AddAffected(SquareOp);
+      };
+      AddNuwSquareOperand(A);
+      AddNuwSquareOperand(B);
 
       if (HasRHSC && match(A, m_Ctpop(m_Value(X))))
         AddAffected(X);
