@@ -63,15 +63,9 @@ using namespace Fortran::semantics::omp;
 using namespace Fortran::parser::omp;
 
 template <>
-std::string ClauseSetToString(const OmpClauseSet &set,
-    std::function<llvm::StringRef(llvm::omp::Clause)> getName) {
-  std::string list;
-  set.IterateOverMembers([&](llvm::omp::Clause o) {
-    if (!list.empty())
-      list.append(", ");
-    list.append(parser::ToUpperCaseLetters(getName(o)));
-  });
-  return list;
+void IterateOverMembers(
+    const OmpClauseSet &set, std::function<void(llvm::omp::Clause)> visitor) {
+  set.IterateOverMembers(visitor);
 }
 
 OmpStructureChecker::OmpStructureChecker(SemanticsContext &context)
@@ -1071,8 +1065,7 @@ void OmpStructureChecker::CheckClauses(parser::OmpDirectiveName dirName,
   if (!requiredPresent && !requiredSet.empty()) {
     context_.Say(dirName.source,
         "At least one of %s %s must appear on %s directive"_err_en_US,
-        ClauseSetToString<llvm::omp::Clause>(requiredSet,
-            [this](llvm::omp::Clause c) { return getClauseName(c); }),
+        ClauseSetToString(requiredSet),
         requiredSet.count() == 1 ? "clause" : "clauses",
         GetUpperName(dirName.v, version));
   }

@@ -56,8 +56,8 @@ using OmpStructureCheckerBase = DirectiveStructureChecker<llvm::omp::Directive,
     llvm::omp::Clause, parser::OmpClause, OmpClauseSet>;
 
 template <>
-std::string ClauseSetToString(const OmpClauseSet &set,
-    std::function<llvm::StringRef(llvm::omp::Clause)> getName);
+void IterateOverMembers(
+    const OmpClauseSet &set, std::function<void(llvm::omp::Clause)> func);
 
 class OmpStructureChecker : public OmpStructureCheckerBase {
 public:

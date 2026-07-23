@@ -33,8 +33,8 @@ using AccClauseSet =
 namespace Fortran::semantics {
 
 template <>
-std::string ClauseSetToString(const AccClauseSet &set,
-    std::function<llvm::StringRef(llvm::acc::Clause)> getName);
+void IterateOverMembers(
+    const AccClauseSet &set, std::function<void(llvm::acc::Clause)> func);
 
 class AccStructureChecker
     : public DirectiveStructureChecker<llvm::acc::Directive, llvm::acc::Clause,

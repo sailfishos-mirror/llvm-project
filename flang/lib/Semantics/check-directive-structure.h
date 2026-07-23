@@ -31,8 +31,8 @@ template <typename ClauseSetTy> struct DirectiveClauses {
 };
 
 template <typename ClauseTy, typename ClauseSetTy>
-std::string ClauseSetToString(
-    const ClauseSetTy &set, std::function<llvm::StringRef(ClauseTy)> getName);
+void IterateOverMembers(
+    const ClauseSetTy &set, std::function<void(ClauseTy)> func);
 
 // Generic branching checker for invalid branching out of OpenMP/OpenACC
 // directive.
@@ -418,6 +418,8 @@ protected:
   SemanticsContext &context_;
   std::vector<DirectiveContext> dirContext_; // used as a stack
   std::unordered_map<D, DirectiveClauses<ClauseSetTy>> directiveClausesMap_;
+
+  std::string ClauseSetToString(const ClauseSetTy &set);
 };
 
 // Collect all labels defined in a block.
@@ -477,6 +479,19 @@ void DirectiveStructureChecker<D, C, PC, ClauseSetTy>::CheckAtLeastOneClause() {
   }
 }
 
+template <typename D, typename C, typename PC, typename ClauseSetTy>
+std::string DirectiveStructureChecker<D, C, PC, ClauseSetTy>::ClauseSetToString(
+    const ClauseSetTy &set) {
+  std::string list;
+  std::function<void(C)> visitor{[&](C o) {
+    if (!list.empty())
+      list.append(", ");
+    list.append(parser::ToUpperCaseLetters(getClauseName(o).str()));
+  }};
+  IterateOverMembers(set, visitor);
+  return list;
+}
+
 // Check that at least one clause in the required set is present on the
 // directive.
 template <typename D, typename C, typename PC, typename ClauseSetTy>
@@ -491,17 +506,16 @@ void DirectiveStructureChecker<D, C, PC, ClauseSetTy>::CheckRequireAtLeastOneOf(
     }
   }
   // No clause matched in the actual clauses list
-  auto getName{[this](C c) { return getClauseName(c); }};
   if (warnInsteadOfError) {
     context_.Warn(common::UsageWarning::Portability,
         GetContext().directiveSource,
         "At least one of %s clause should appear on the %s directive"_port_en_US,
-        ClauseSetToString<C>(GetContext().requiredClauses, getName),
+        ClauseSetToString(GetContext().requiredClauses),
         ContextDirectiveAsFortran());
   } else {
     context_.Say(GetContext().directiveSource,
         "At least one of %s clause must appear on the %s directive"_err_en_US,
-        ClauseSetToString<C>(GetContext().requiredClauses, getName),
+        ClauseSetToString(GetContext().requiredClauses),
         ContextDirectiveAsFortran());
   }
 }
@@ -546,11 +560,12 @@ bool DirectiveStructureChecker<D, C, PC, ClauseSetTy>::CheckAllowed(
   }
   if (GetContext().allowedExclusiveClauses.test(clause)) {
     std::vector<C> others;
-    GetContext().allowedExclusiveClauses.IterateOverMembers([&](C o) {
+    std::function<void(C)> visitor{[&](C o) {
       if (FindClause(o)) {
         others.emplace_back(o);
       }
-    });
+    }};
+    IterateOverMembers(GetContext().allowedExclusiveClauses, visitor);
     for (const auto &e : others) {
       context_.Say(GetContext().clauseSource,
           "%s and %s clauses are mutually exclusive and may not appear on the "
