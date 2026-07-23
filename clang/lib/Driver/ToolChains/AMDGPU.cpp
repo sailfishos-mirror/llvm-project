@@ -456,8 +456,13 @@ void RocmInstallationDetector::detectHIPRuntime() {
     llvm::sys::path::append(BinPath, "bin");
     IncludePath = InstallPath;
     llvm::sys::path::append(IncludePath, "include");
+
+    // Fallback to rocm/lib64 if rocm/lib doesn't exist.
     LibPath = InstallPath;
     llvm::sys::path::append(LibPath, "lib");
+    if (!D.getVFS().exists(LibPath) && D.getVFS().exists(LibPath + "64"))
+      LibPath.append("64");
+
     SharePath = InstallPath;
     llvm::sys::path::append(SharePath, "share");
 
