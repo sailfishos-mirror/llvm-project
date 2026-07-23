@@ -15,8 +15,9 @@
 
 namespace llvm::sandboxir {
 
-SmallVector<BundleTy> VecUtils::getNextUserBundles(ArrayRef<Value *> Bndl,
-                                                   const InstrMaps &IMaps) {
+SmallVector<BundleTy>
+VecUtils::getNextUserBundles(ArrayRef<Value *> Bndl, const InstrMaps &IMaps,
+                             SmallPtrSet<Instruction *, 4> &Claimed) {
   SmallVector<BundleTy> Bundles;
   if (Bndl.empty())
     return Bundles;
@@ -33,7 +34,6 @@ SmallVector<BundleTy> VecUtils::getNextUserBundles(ArrayRef<Value *> Bndl,
 
   Value *V0 = Bndl[0];
   DenseSet<User *> SeenUsers;
-  SmallPtrSet<Instruction *, 4> Claimed;
   // For each user U0 of lane 0, try to form a bundle of matching users across
   // all lanes.
   for (User *U0 : V0->users()) {

@@ -248,9 +248,9 @@ define void @user_operand_index_mismatch(ptr %ptr, ptr %ptr2, float %x) {
 }
 
 ; ld0/ld1 each have two fadd users: one adding %a and one adding %b. The two
-; user bundles must not fight over the same instruction: getNextUserBundles()
-; tracks claimed users across all bundles it forms, so once {fadd0b,fadd1b} is
-; claimed, the second bundle picks {fadd0,fadd1} rather than reusing fadd1b.
+; user bundles must not fight over the same instruction: BottomUpVec passes a
+; Claimed set into getNextUserBundles(), so once {fadd0b,fadd1b} is claimed,
+; the second bundle picks {fadd0,fadd1} rather than reusing fadd1b.
 ; Both bundles widen, producing two fadd <2 x float>.
 define void @user_already_vectorized(ptr %ptr, ptr %ptr2, float %a, float %b) {
 ; CHECK-LABEL: define void @user_already_vectorized(
@@ -571,6 +571,58 @@ define void @user_opcode_mismatch_3wide(ptr %ptr, ptr %ptr2) {
   ret void
 }
 
+; 3-wide Claimed rollback: each load has + %a and + %b fadd users, but ld2 has
+; no + %a user. BottomUpVec passes a Claimed set into getNextUserBundles(); a
+; failed {fadd0a,fadd1a,?} attempt tentatively claims fadd0a/fadd1a and must roll
+; them back so {fadd0b,fadd1b,fadd2b} can still form. Loads widen; the + %b
+; chain vectorizes while the + %a pair stays scalar.
+define void @claimed_rollback_partial_bundle(ptr %ptr, ptr %ptr2, float %a, float %b) {
+; CHECK-LABEL: define void @claimed_rollback_partial_bundle(
+; CHECK-SAME: ptr [[PTR:%.*]], ptr [[PTR2:%.*]], float [[A:%.*]], float [[B:%.*]]) {
+; CHECK-NEXT:    [[G0:%.*]] = getelementptr float, ptr [[PTR]], i32 0
+; CHECK-NEXT:    [[PACK:%.*]] = insertelement <3 x float> poison, float [[B]], i32 0, !sandboxvec [[META16:![0-9]+]]
+; CHECK-NEXT:    [[PACK2:%.*]] = insertelement <3 x float> [[PACK]], float [[B]], i32 1, !sandboxvec [[META16]]
+; CHECK-NEXT:    [[PACK3:%.*]] = insertelement <3 x float> [[PACK2]], float [[B]], i32 2, !sandboxvec [[META16]]
+; CHECK-NEXT:    [[VECL:%.*]] = load <3 x float>, ptr [[G0]], align 4, !sandboxvec [[META16]]
+; CHECK-NEXT:    [[UNPACK:%.*]] = extractelement <3 x float> [[VECL]], i32 0, !sandboxvec [[META16]]
+; CHECK-NEXT:    [[UNPACK1:%.*]] = extractelement <3 x float> [[VECL]], i32 1, !sandboxvec [[META16]]
+; CHECK-NEXT:    [[FADD0A:%.*]] = fadd float [[UNPACK]], [[A]]
+; CHECK-NEXT:    [[VEC:%.*]] = fadd <3 x float> [[VECL]], [[PACK3]], !sandboxvec [[META16]]
+; CHECK-NEXT:    [[FADD1A:%.*]] = fadd float [[UNPACK1]], [[A]]
+; CHECK-NEXT:    [[PTR2_0:%.*]] = getelementptr float, ptr [[PTR2]], i32 0
+; CHECK-NEXT:    [[PTR2_1:%.*]] = getelementptr float, ptr [[PTR2]], i32 1
+; CHECK-NEXT:    [[PTR2_2:%.*]] = getelementptr float, ptr [[PTR2]], i32 2
+; CHECK-NEXT:    store float [[FADD0A]], ptr [[PTR2_0]], align 4
+; CHECK-NEXT:    store float [[FADD1A]], ptr [[PTR2_1]], align 4
+; CHECK-NEXT:    store <3 x float> [[VEC]], ptr [[PTR2_2]], align 4, !sandboxvec [[META16]]
+; CHECK-NEXT:    ret void
+;
+  %g0 = getelementptr float, ptr %ptr, i32 0
+  %g1 = getelementptr float, ptr %ptr, i32 1
+  %g2 = getelementptr float, ptr %ptr, i32 2
+  %ld0 = load float, ptr %g0
+  %ld1 = load float, ptr %g1
+  %ld2 = load float, ptr %g2
+
+  %fadd0a = fadd float %ld0, %a
+  %fadd0b = fadd float %ld0, %b
+  %fadd1a = fadd float %ld1, %a
+  %fadd1b = fadd float %ld1, %b
+  %fadd2b = fadd float %ld2, %b
+
+  %ptr2_0 = getelementptr float, ptr %ptr2, i32 0
+  %ptr2_1 = getelementptr float, ptr %ptr2, i32 1
+  %ptr2_2 = getelementptr float, ptr %ptr2, i32 2
+  %ptr2_3 = getelementptr float, ptr %ptr2, i32 3
+  %ptr2_4 = getelementptr float, ptr %ptr2, i32 4
+  store float %fadd0a, ptr %ptr2_0
+  store float %fadd1a, ptr %ptr2_1
+  store float %fadd0b, ptr %ptr2_2
+  store float %fadd1b, ptr %ptr2_3
+  store float %fadd2b, ptr %ptr2_4
+  ret void
+}
+
 ; 3-wide non-consecutive rejection: lane 0 (fadd) and lane 2 (fadd) have
 ; matching users but the middle lane 1 uses fmul. getNextUserBundles() matches
 ; lanes consecutively, so it must NOT skip the gap at lane 1 and pair lane 0's
@@ -580,10 +632,10 @@ define void @user_middle_lane_mismatch_3wide(ptr %ptr, ptr %ptr2) {
 ; CHECK-LABEL: define void @user_middle_lane_mismatch_3wide(
 ; CHECK-SAME: ptr [[PTR:%.*]], ptr [[PTR2:%.*]]) {
 ; CHECK-NEXT:    [[G0:%.*]] = getelementptr float, ptr [[PTR]], i32 0
-; CHECK-NEXT:    [[VECL:%.*]] = load <3 x float>, ptr [[G0]], align 4, !sandboxvec [[META16:![0-9]+]]
-; CHECK-NEXT:    [[UNPACK:%.*]] = extractelement <3 x float> [[VECL]], i32 0, !sandboxvec [[META16]]
-; CHECK-NEXT:    [[UNPACK1:%.*]] = extractelement <3 x float> [[VECL]], i32 1, !sandboxvec [[META16]]
-; CHECK-NEXT:    [[UNPACK2:%.*]] = extractelement <3 x float> [[VECL]], i32 2, !sandboxvec [[META16]]
+; CHECK-NEXT:    [[VECL:%.*]] = load <3 x float>, ptr [[G0]], align 4, !sandboxvec [[META17:![0-9]+]]
+; CHECK-NEXT:    [[UNPACK:%.*]] = extractelement <3 x float> [[VECL]], i32 0, !sandboxvec [[META17]]
+; CHECK-NEXT:    [[UNPACK1:%.*]] = extractelement <3 x float> [[VECL]], i32 1, !sandboxvec [[META17]]
+; CHECK-NEXT:    [[UNPACK2:%.*]] = extractelement <3 x float> [[VECL]], i32 2, !sandboxvec [[META17]]
 ; CHECK-NEXT:    [[FADD0:%.*]] = fadd float [[UNPACK]], [[UNPACK]]
 ; CHECK-NEXT:    [[FMUL1:%.*]] = fmul float [[UNPACK1]], [[UNPACK1]]
 ; CHECK-NEXT:    [[FADD2:%.*]] = fadd float [[UNPACK2]], [[UNPACK2]]
@@ -633,4 +685,5 @@ define void @user_middle_lane_mismatch_3wide(ptr %ptr, ptr %ptr2) {
 ; CHECK: [[META14]] = distinct !{!"sandboxregion"}
 ; CHECK: [[META15]] = distinct !{!"sandboxregion"}
 ; CHECK: [[META16]] = distinct !{!"sandboxregion"}
+; CHECK: [[META17]] = distinct !{!"sandboxregion"}
 ;.

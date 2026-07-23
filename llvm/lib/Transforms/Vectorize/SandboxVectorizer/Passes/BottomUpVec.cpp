@@ -306,7 +306,9 @@ Action *BottomUpVec::vectorizeRec(ArrayRef<Value *> Bndl,
     // Walk down the def-use chain. Each lane in \p Bndl may feed several
     // users, so we form every compatible user bundle and recurse into each
     // one.
-    for (const auto &NextUserBndl : VecUtils::getNextUserBundles(Bndl, *IMaps))
+    SmallPtrSet<Instruction *, 4> Claimed;
+    for (const auto &NextUserBndl :
+         VecUtils::getNextUserBundles(Bndl, *IMaps, Claimed))
       vectorizeRec(NextUserBndl, Bndl, Depth + 1, Legality);
 
     return Action;

@@ -232,7 +232,8 @@ public:
   /// For each user of lane 0 in \p Bndl, try to form a bundle of matching
   /// users for all lanes. Returns all complete user bundles found.
   LLVM_ABI static SmallVector<BundleTy>
-  getNextUserBundles(ArrayRef<Value *> Bndl, const InstrMaps &IMaps);
+  getNextUserBundles(ArrayRef<Value *> Bndl, const InstrMaps &IMaps,
+                     SmallPtrSet<Instruction *, 4> &Claimed);
 
   /// Helper struct for `matchPack()`. Describes the instructions and operands
   /// of a pack pattern.
