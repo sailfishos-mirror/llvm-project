@@ -6,10 +6,13 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/Frontend/OpenMP/OMP.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+
+#include <type_traits>
 
 using namespace llvm;
 using namespace llvm::omp;
@@ -120,10 +123,19 @@ TEST(EnumSetTest, SquareBracket) {
   static_assert(!S[Clause::OMPC_shared]);
 }
 
+TEST(EnumSetTest, UnionUpdate) {
+  ClauseSet S{Clause::OMPC_private, OMPC_shared};
+  ClauseSet A{Clause::OMPC_nowait};
+  S |= A;
+  EXPECT_THAT(S, testing::ElementsAre(Clause::OMPC_nowait, Clause::OMPC_private,
+                                      OMPC_shared));
+}
+
 TEST(EnumSetTest, Union) {
   constexpr ClauseSet A{Clause::OMPC_private, OMPC_shared};
   constexpr ClauseSet B{Clause::OMPC_nowait};
-  constexpr ClauseSet S = A | B;
+  constexpr auto S = A | B;
+  static_assert(std::is_same_v<llvm::remove_cvref_t<decltype(S)>, ClauseSet>);
   EXPECT_THAT(S, testing::ElementsAre(Clause::OMPC_nowait, Clause::OMPC_private,
                                       OMPC_shared));
 
@@ -131,10 +143,18 @@ TEST(EnumSetTest, Union) {
                                     Clause::OMPC_private, OMPC_shared>(S));
 }
 
+TEST(EnumSetTest, IntersectionUpdate) {
+  ClauseSet S{Clause::OMPC_private, OMPC_shared};
+  ClauseSet A{Clause::OMPC_nowait, OMPC_shared};
+  S &= A;
+  EXPECT_THAT(S, testing::ElementsAre(OMPC_shared));
+}
+
 TEST(EnumSetTest, Intersection) {
   constexpr ClauseSet A{Clause::OMPC_private, OMPC_shared};
   constexpr ClauseSet B{Clause::OMPC_nowait, OMPC_shared};
-  constexpr ClauseSet S = A & B;
+  constexpr auto S = A & B;
+  static_assert(std::is_same_v<llvm::remove_cvref_t<decltype(S)>, ClauseSet>);
   EXPECT_THAT(S, testing::ElementsAre(OMPC_shared));
 
   static_assert(detail::ElementsAre<Clause, OMPC_shared>(S));

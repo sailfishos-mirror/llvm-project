@@ -109,6 +109,23 @@ struct EnumSet : public llvm::Bitset<Size> {
     return *this;
   }
 
+  constexpr EnumSet &operator|=(const EnumSet &S) {
+    Base::operator|=(S);
+    return *this;
+  }
+  constexpr EnumSet &operator&=(const EnumSet &S) {
+    Base::operator&=(S);
+    return *this;
+  }
+  constexpr EnumSet operator|(const EnumSet &S) const {
+    EnumSet T{*this};
+    return T |= S;
+  }
+  constexpr EnumSet operator&(const EnumSet &S) const {
+    EnumSet T{*this};
+    return T &= S;
+  }
+
   constexpr iterator begin() const {
     return iterator(*this, detail::findFirstSet<Size>(0, Size, *this));
   }
