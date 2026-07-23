@@ -17375,7 +17375,7 @@ bool clang::shouldEnforceArgLimit(bool PartialOverloading,
 void Sema::DiagnoseUseOfDeletedFunction(SourceLocation Loc, SourceRange Range,
                                         DeclarationName Name,
                                         OverloadCandidateSet &CandidateSet,
-                                        FunctionDecl *Fn, ArrayRef<Expr *> Args,
+                                        FunctionDecl *Fn, MultiExprArg Args,
                                         bool IsMember) {
   StringLiteral *Msg = Fn->getDeletedMessage();
   CandidateSet.NoteCandidates(

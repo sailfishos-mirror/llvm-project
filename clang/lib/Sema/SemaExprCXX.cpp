@@ -32,6 +32,7 @@
 #include "clang/Basic/TokenKinds.h"
 #include "clang/Lex/Preprocessor.h"
 #include "clang/Sema/DeclSpec.h"
+#include "clang/Sema/DynamicAllocationArgumentsCXX.h"
 #include "clang/Sema/EnterExpressionEvaluationContext.h"
 #include "clang/Sema/Initialization.h"
 #include "clang/Sema/Lookup.h"
@@ -2789,15 +2790,11 @@ static void diagnoseNoViableFunctionForAllocationOverloadResolution(
   Candidates.NoteCandidates(S, Args, Cands, "", R.getNameLoc());
 }
 
-using ImplicitAllocationArguments = Sema::ImplicitAllocationArguments;
-using AllocationArgumentSet = Sema::AllocationArgumentSet;
-
 enum class AllocatorResolveResult { Success, Retry, Error };
 static AllocatorResolveResult
 resolveAllocationOverload(Sema &S, LookupResult &R, SourceRange Range,
                           ImplicitAllocationArguments &AllocationArgs,
-                          ArrayRef<Expr *> TrialArguments,
-                          FunctionDecl *&Operator,
+                          MultiExprArg TrialArguments, FunctionDecl *&Operator,
                           OverloadCandidateSet &Candidates, bool Diagnose) {
   AllocationArgs.updateLookupForMSVCCompatibility(S, R);
 
@@ -3054,7 +3051,7 @@ Sema::resolveAllocationArguments(LookupResult &R,
   return FoundArguments;
 }
 
-std::optional<Sema::ResolvedAllocation>
+std::optional<ResolvedAllocation>
 Sema::FindAllocationFunctions(SourceLocation StartLoc, SourceRange Range,
                               AllocationFunctionScope NewScope,
                               AllocationFunctionScope DeleteScope,
