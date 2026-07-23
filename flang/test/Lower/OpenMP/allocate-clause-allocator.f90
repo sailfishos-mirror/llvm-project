@@ -169,3 +169,36 @@ end subroutine
 ! LLVM: call void @__kmpc_free({{.*}}, ptr %[[LOGICAL_ALLOC]], ptr null)
 ! LLVM: call void @__kmpc_free({{.*}}, ptr %[[COMPLEX_ALLOC]], ptr null)
 ! LLVM: call void @__kmpc_free({{.*}}, ptr %[[REAL_ALLOC]], ptr null)
+
+subroutine allocator_alignment(x, y, z, w)
+  use omp_lib
+  integer :: x, y, z, w
+  !$omp parallel private(x, y, z) firstprivate(w) &
+  !$omp& allocate(x) &
+  !$omp& allocate(align(64): y, z) &
+  !$omp& allocate(allocator(omp_default_mem_alloc), align(128): w)
+    x = 1
+    y = 2
+    z = 3
+    w = w + 1
+  !$omp end parallel
+end subroutine
+
+! HLFIR-LABEL: func.func @_QPallocator_alignment
+! HLFIR: omp.parallel allocate(
+! HLFIR-SAME: private(
+! HLFIR: } {allocate_alignments = array<i64: 0, 64, 64, 128>, allocate_private_indices = array<i64: 0, 1, 2, 3>}
+
+! LLVM-LABEL: define internal void @allocator_alignment_..omp_par
+! LLVM: %[[X_ALLOC:.*]] = call ptr @__kmpc_alloc({{.*}}, i64 4, ptr null)
+! LLVM: %[[Y_ALLOC:.*]] = call ptr @__kmpc_aligned_alloc({{.*}}, i64 64, i64 4, ptr null)
+! LLVM: %[[Z_ALLOC:.*]] = call ptr @__kmpc_aligned_alloc({{.*}}, i64 64, i64 4, ptr null)
+! LLVM: %[[W_ALLOC:.*]] = call ptr @__kmpc_aligned_alloc({{.*}}, i64 128, i64 4, ptr inttoptr (i64 1 to ptr))
+! LLVM: store i32 1, ptr %[[X_ALLOC]], align 4
+! LLVM: store i32 2, ptr %[[Y_ALLOC]], align 4
+! LLVM: store i32 3, ptr %[[Z_ALLOC]], align 4
+! LLVM: store i32 {{.*}}, ptr %[[W_ALLOC]], align 4
+! LLVM: call void @__kmpc_free({{.*}}, ptr %[[W_ALLOC]], ptr inttoptr (i64 1 to ptr))
+! LLVM: call void @__kmpc_free({{.*}}, ptr %[[Z_ALLOC]], ptr null)
+! LLVM: call void @__kmpc_free({{.*}}, ptr %[[Y_ALLOC]], ptr null)
+! LLVM: call void @__kmpc_free({{.*}}, ptr %[[X_ALLOC]], ptr null)
