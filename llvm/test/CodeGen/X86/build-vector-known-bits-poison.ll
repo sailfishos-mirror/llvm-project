@@ -12,20 +12,12 @@ define i32 @poison_build_vector_known_bits(<4 x i32> %v) {
 ; CHECK-NEXT:    pcmpgtd {{\.?LCPI[0-9]+_[0-9]+}}(%rip), %xmm0
 ; CHECK-NEXT:    packssdw %xmm0, %xmm0
 ; CHECK-NEXT:    packsswb %xmm0, %xmm0
-; CHECK-NEXT:    psllw $5, %xmm0
-; CHECK-NEXT:    pand {{\.?LCPI[0-9]+_[0-9]+}}(%rip), %xmm0
-; CHECK-NEXT:    paddb %xmm0, %xmm0
-; CHECK-NEXT:    paddb %xmm0, %xmm0
+; CHECK-NEXT:    psllw $7, %xmm0
 ; CHECK-NEXT:    pxor %xmm1, %xmm1
 ; CHECK-NEXT:    pxor %xmm2, %xmm2
 ; CHECK-NEXT:    pcmpgtb %xmm0, %xmm2
-; CHECK-NEXT:    movdqa {{.*#+}} xmm0 = [11,11,11,11,u,u,u,u,u,u,u,u,u,u,u,u]
-; CHECK-NEXT:    movdqa %xmm0, %xmm3
-; CHECK-NEXT:    paddb %xmm0, %xmm3
-; CHECK-NEXT:    pand %xmm2, %xmm3
-; CHECK-NEXT:    pandn %xmm0, %xmm2
-; CHECK-NEXT:    por %xmm3, %xmm2
-; CHECK-NEXT:    por %xmm0, %xmm2
+; CHECK-NEXT:    por {{\.?LCPI[0-9]+_[0-9]+}}(%rip), %xmm2
+; CHECK-NEXT:    pand {{\.?LCPI[0-9]+_[0-9]+}}(%rip), %xmm2
 ; CHECK-NEXT:    punpcklbw {{.*#+}} xmm2 = xmm2[0],xmm1[0],xmm2[1],xmm1[1],xmm2[2],xmm1[2],xmm2[3],xmm1[3],xmm2[4],xmm1[4],xmm2[5],xmm1[5],xmm2[6],xmm1[6],xmm2[7],xmm1[7]
 ; CHECK-NEXT:    punpcklwd {{.*#+}} xmm2 = xmm2[0],xmm1[0],xmm2[1],xmm1[1],xmm2[2],xmm1[2],xmm2[3],xmm1[3]
 ; CHECK-NEXT:    pshufd {{.*#+}} xmm0 = xmm2[2,3,2,3]
