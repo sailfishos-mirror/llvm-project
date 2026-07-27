@@ -5524,6 +5524,9 @@ def err_no_viable_destructor : Error<
 def err_ambiguous_destructor : Error<
   "destructor of class %0 is ambiguous">;
 
+def note_ovl_msvc_allocation_fallback_failed : Note<
+  "MSVC compatibility fall back to %0 failed">;
+
 def err_ovl_no_viable_object_call : Error<
   "no matching function for call to object of type %0">;
 def err_ovl_ambiguous_object_call : Error<

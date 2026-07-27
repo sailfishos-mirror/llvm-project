@@ -68,5 +68,7 @@ void failedTypeIdentitySpecialization() {
   // expected-error@-1 {{incomplete type 'std::type_identity<Bad>' where a complete type is required}}
   // expected-note@#incomplete_specialization {{forward declaration of 'std::type_identity<Bad>'}}
   Bad *b = new Bad;
+  // expected-error@-1 {{incomplete type 'std::type_identity<Bad>' where a complete type is required}}
+  // expected-note@#incomplete_specialization {{forward declaration of 'std::type_identity<Bad>'}}
 }
 #endif

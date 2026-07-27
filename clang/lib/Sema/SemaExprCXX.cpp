@@ -2726,9 +2726,10 @@ bool Sema::CheckAllocatedType(QualType AllocType, SourceLocation Loc,
 }
 
 static void diagnoseNoViableFunctionForAllocationOverloadResolution(
-    Sema &S, LookupResult &R, SourceRange Range, ArrayRef<Expr *> Args,
-    OverloadCandidateSet &Candidates, OverloadCandidateSet *AlignedCandidates,
-    Expr *AlignArg) {
+    Sema &S, const LookupResult &R,
+    const std::optional<LookupResult> &MSVCFallback, SourceRange Range,
+    ArrayRef<Expr *> Args, OverloadCandidateSet &Candidates,
+    OverloadCandidateSet *AlignedCandidates, Expr *AlignArg) {
   // If this is an allocation of the form 'new (p) X' for some object
   // pointer p (or an expression that will decay to such a pointer),
   // diagnose the reason for the error.
@@ -2788,19 +2789,27 @@ static void diagnoseNoViableFunctionForAllocationOverloadResolution(
     AlignedCandidates->NoteCandidates(S, AlignedArgs, AlignedCands, "",
                                       R.getNameLoc());
   Candidates.NoteCandidates(S, Args, Cands, "", R.getNameLoc());
+  if (MSVCFallback)
+    S.Diag(MSVCFallback->getNameLoc(),
+           diag::note_ovl_msvc_allocation_fallback_failed)
+        << MSVCFallback->getLookupName() << Range;
 }
 
 enum class AllocatorResolveResult { Success, Retry, Error };
-static AllocatorResolveResult
-resolveAllocationOverload(Sema &S, LookupResult &R, SourceRange Range,
-                          ImplicitAllocationArguments &AllocationArgs,
-                          MultiExprArg TrialArguments, FunctionDecl *&Operator,
-                          OverloadCandidateSet &Candidates, bool Diagnose) {
-  AllocationArgs.updateLookupForMSVCCompatibility(S, R);
+static AllocatorResolveResult resolveAllocationOverload(
+    Sema &S, const LookupResult &BaseLookup, SourceRange Range,
+    ImplicitAllocationArguments &AllocationArgs, MultiExprArg TrialArguments,
+    FunctionDecl *&Operator, OverloadCandidateSet &Candidates, bool Diagnose) {
+  std::optional<LookupResult> MSVCFallback;
+  const LookupResult &LocalLookup =
+      AllocationArgs.updateLookupForMSVCCompatibility(S, BaseLookup,
+                                                      MSVCFallback);
 
   bool ArgumentListIsTypeAware =
       isTypeAwareAllocation(AllocationArgs.PassTypeIdentity);
-  for (LookupResult::iterator Alloc = R.begin(), AllocEnd = R.end();
+
+  for (LookupResult::iterator Alloc = LocalLookup.begin(),
+                              AllocEnd = LocalLookup.end();
        Alloc != AllocEnd; ++Alloc) {
     // Even member operator new/delete are implicitly treated as
     // static, so don't use AddMemberCandidate.
@@ -2825,10 +2834,11 @@ resolveAllocationOverload(Sema &S, LookupResult &R, SourceRange Range,
 
   // Do the resolution.
   OverloadCandidateSet::iterator Best;
-  switch (Candidates.BestViableFunction(S, R.getNameLoc(), Best)) {
+  switch (Candidates.BestViableFunction(S, LocalLookup.getNameLoc(), Best)) {
   case OR_Success: {
     FunctionDecl *FnDecl = Best->Function;
-    if (S.CheckAllocationAccess(R.getNameLoc(), Range, R.getNamingClass(),
+    if (S.CheckAllocationAccess(LocalLookup.getNameLoc(), Range,
+                                LocalLookup.getNamingClass(),
                                 Best->FoundDecl) == Sema::AR_inaccessible)
       return AllocatorResolveResult::Error;
 
@@ -2842,18 +2852,18 @@ resolveAllocationOverload(Sema &S, LookupResult &R, SourceRange Range,
   case OR_Ambiguous:
     if (Diagnose) {
       Candidates.NoteCandidates(
-          PartialDiagnosticAt(R.getNameLoc(),
+          PartialDiagnosticAt(LocalLookup.getNameLoc(),
                               S.PDiag(diag::err_ovl_ambiguous_call)
-                                  << R.getLookupName() << Range),
+                                  << LocalLookup.getLookupName() << Range),
           S, OCD_AmbiguousCandidates, TrialArguments);
     }
     return AllocatorResolveResult::Error;
 
   case OR_Deleted: {
     if (Diagnose)
-      S.DiagnoseUseOfDeletedFunction(R.getNameLoc(), Range, R.getLookupName(),
-                                     Candidates, Best->Function,
-                                     TrialArguments);
+      S.DiagnoseUseOfDeletedFunction(LocalLookup.getNameLoc(), Range,
+                                     LocalLookup.getLookupName(), Candidates,
+                                     Best->Function, TrialArguments);
     return AllocatorResolveResult::Error;
   }
   }
@@ -2880,14 +2890,15 @@ static void LookupGlobalDeallocationFunctions(Sema &S, SourceLocation Loc,
   }
 }
 
-static void DiagnoseAllocationLookupFailure(
-    Sema &SemaRef, LookupResult &R, SourceRange Range,
-    std::optional<AllocationArgumentSet> &ArgumentCandidates,
-    ArrayRef<Expr *> PlacementArguments) {
+static void
+DiagnoseAllocationLookupFailure(Sema &SemaRef, const LookupResult &BaseLookup,
+                                SourceRange Range,
+                                AllocationArgumentSet &ArgumentCandidates,
+                                ArrayRef<Expr *> PlacementArguments) {
+  std::optional<LookupResult> MSVCFallback;
   ImplicitAllocationArguments *UnalignedArgumentList = nullptr;
   ImplicitAllocationArguments *AlignedArgumentList = nullptr;
-  for (ImplicitAllocationArguments &AllocationArguments :
-       ArgumentCandidates->Candidates) {
+  for (ImplicitAllocationArguments &AllocationArguments : ArgumentCandidates) {
     if (AllocationArguments.PassTypeIdentity == TypeAwareAllocationMode::Yes)
       continue;
     if (AllocationArguments.PassAlignment == AlignedAllocationMode::Yes)
@@ -2904,50 +2915,52 @@ static void DiagnoseAllocationLookupFailure(
   auto Rerun = [&](ImplicitAllocationArguments &ArgumentList,
                    OverloadCandidateSet &Candidates,
                    SmallVectorImpl<Expr *> &Args) {
+    const LookupResult &LocalLookup =
+        ArgumentList.updateLookupForMSVCCompatibility(SemaRef, BaseLookup,
+                                                      MSVCFallback);
     llvm::append_range(Args, ArgumentList.getImplicitArguments());
     llvm::append_range(Args, PlacementArguments);
     FunctionDecl *Unused = nullptr;
-    resolveAllocationOverload(SemaRef, R, Range, ArgumentList, Args, Unused,
-                              Candidates, /*Diagnose=*/false);
+    resolveAllocationOverload(SemaRef, LocalLookup, Range, ArgumentList, Args,
+                              Unused, Candidates, /*Diagnose=*/false);
   };
   std::optional<OverloadCandidateSet> AlignedCandidates;
   Expr *AlignArg = nullptr;
   if (AlignedArgumentList) {
-    AlignedCandidates.emplace(R.getNameLoc(), OverloadCandidateSet::CSK_Normal);
+    AlignedCandidates.emplace(BaseLookup.getNameLoc(),
+                              OverloadCandidateSet::CSK_Normal);
     SmallVector<Expr *, 4> AlignedArgs;
     Rerun(*AlignedArgumentList, *AlignedCandidates, AlignedArgs);
     AlignArg = AlignedArgumentList->getAlignmentArgument();
   }
-  OverloadCandidateSet UnalignedCandidates(R.getNameLoc(),
+  OverloadCandidateSet UnalignedCandidates(BaseLookup.getNameLoc(),
                                            OverloadCandidateSet::CSK_Normal);
   SmallVector<Expr *, 4> UnalignedArgs;
   Rerun(*UnalignedArgumentList, UnalignedCandidates, UnalignedArgs);
   diagnoseNoViableFunctionForAllocationOverloadResolution(
-      SemaRef, R, Range, UnalignedArgs, UnalignedCandidates,
-      AlignedCandidates ? &*AlignedCandidates : nullptr, AlignArg);
+      SemaRef, BaseLookup, MSVCFallback, Range, UnalignedArgs,
+      UnalignedCandidates, AlignedCandidates ? &*AlignedCandidates : nullptr,
+      AlignArg);
 }
 
-bool Sema::getTypeIdentityArgument(QualType Type, SourceLocation Loc,
-                                   Expr **FoundExpr) {
+std::optional<Expr *> Sema::getTypeIdentityArgument(QualType Type,
+                                                    SourceLocation Loc) {
   auto [Slot, Inserted] =
       AllocationTypeIdentityArguments.insert({Type, nullptr});
-  if (!Inserted) {
-    if (!Slot->second)
-      return true;
-    *FoundExpr = Slot->second;
-    return false;
-  }
-  QualType TypeIdentity = tryBuildStdTypeIdentity(Type, SourceLocation());
-  if (TypeIdentity.isNull())
-    return false;
 
-  if (RequireCompleteType(Loc, TypeIdentity, diag::err_incomplete_type))
-    return true;
+  if (!Inserted)
+    return Slot->second;
+
+  QualType TypeIdentity = tryBuildStdTypeIdentity(Type, SourceLocation());
+  if (TypeIdentity.isNull() ||
+      RequireCompleteType(Loc, TypeIdentity, diag::err_incomplete_type)) {
+    AllocationTypeIdentityArguments.erase(Slot);
+    return std::nullopt;
+  }
   Expr *TypeIdentityArgument =
       new (Context) CXXScalarValueInitExpr(TypeIdentity, nullptr, Loc);
   Slot->second = TypeIdentityArgument;
-  *FoundExpr = TypeIdentityArgument;
-  return false;
+  return TypeIdentityArgument;
 }
 
 ImplicitAllocationArguments::ImplicitAllocationArguments(
@@ -2971,20 +2984,23 @@ ImplicitAllocationArguments::ImplicitAllocationArguments(
   }
 }
 
-void ImplicitAllocationArguments::updateLookupForMSVCCompatibility(
-    Sema &S, LookupResult &R) {
+const LookupResult &
+ImplicitAllocationArguments::updateLookupForMSVCCompatibility(
+    Sema &S, const LookupResult &BaseLookup,
+    std::optional<LookupResult> &Buffer) const {
   if (!IsMSVCCompatibilityFallback)
-    return;
+    return BaseLookup;
   // MSVC will fall back on trying to find a matching global operator new
   // if operator new[] cannot be found.  Also, MSVC will leak by not
   // generating a call to operator delete or operator delete[], but we
   // will not replicate that bug.
   // FIXME: Find out how this interacts with the std::align_val_t fallback
   // once MSVC implements it.
-  R.clear();
-  R.setLookupName(S.Context.DeclarationNames.getCXXOperatorName(OO_New));
+  LookupResult &Fallback = Buffer.emplace(LookupResult::Temporary, BaseLookup);
+  Fallback.setLookupName(S.Context.DeclarationNames.getCXXOperatorName(OO_New));
   // FIXME: This will give bad diagnostics pointing at the wrong functions.
-  S.LookupQualifiedName(R, S.Context.getTranslationUnitDecl());
+  S.LookupQualifiedName(Fallback, S.Context.getTranslationUnitDecl());
+  return Fallback;
 }
 
 std::optional<AllocationArgumentSet>
@@ -3008,23 +3024,21 @@ Sema::resolveAllocationArguments(LookupResult &R,
     }
   }
 
-  AllocationArgumentSet FoundArguments = {
-      isTypeAwareAllocation(IAP.PassTypeIdentity), {}};
+  AllocationArgumentSet FoundArguments;
   if (isTypeAwareAllocation(IAP.PassTypeIdentity)) {
-    Expr *TypeIdentityArgument = nullptr;
-    if (getTypeIdentityArgument(IAP.Type, R.getNameLoc(),
-                                &TypeIdentityArgument))
+    std::optional<Expr *> TypeIdentityArgument =
+        getTypeIdentityArgument(IAP.Type, R.getNameLoc());
+    if (!TypeIdentityArgument)
       return std::nullopt;
-    if (TypeIdentityArgument) {
-      Expr *AlignmentExpr = AllocationAlignmentExpr;
-      if (!PlacementArguments.empty() &&
-          PlacementArguments.front()->getType()->isAlignValT())
-        AlignmentExpr = nullptr;
-      FoundArguments.Candidates.push_back(ImplicitAllocationArguments(
-          *this, TypeIdentityArgument, AllocationSizeExpr, AlignmentExpr,
-          /*IsMSVCCompatibilityFallback=*/false));
-    } else
-      FoundArguments.TypeAwareViable = false;
+
+    assert(*TypeIdentityArgument);
+    Expr *AlignmentExpr = AllocationAlignmentExpr;
+    if (!PlacementArguments.empty() &&
+        PlacementArguments.front()->getType()->isAlignValT())
+      AlignmentExpr = nullptr;
+    FoundArguments.push_back(ImplicitAllocationArguments(
+        *this, *TypeIdentityArgument, AllocationSizeExpr, AlignmentExpr,
+        /*IsMSVCCompatibilityFallback=*/false));
   }
 
   ImplicitAllocationArguments UnalignedArguments(
@@ -3039,13 +3053,13 @@ Sema::resolveAllocationArguments(LookupResult &R,
   //   new-extended alignment, the alignment argument is removed from the
   //   argument list, and overload resolution is performed again.
   if (IAP.PassAlignment == AlignedAllocationMode::Yes)
-    FoundArguments.Candidates.push_back(AlignedArguments);
-  FoundArguments.Candidates.push_back(UnalignedArguments);
+    FoundArguments.push_back(AlignedArguments);
+  FoundArguments.push_back(UnalignedArguments);
 
   // The MSVC global fallback path
   if (getLangOpts().MSVCCompat &&
       R.getLookupName().getCXXOverloadedOperator() == OO_Array_New)
-    FoundArguments.Candidates.push_back(ImplicitAllocationArguments(
+    FoundArguments.push_back(ImplicitAllocationArguments(
         *this, /*TypeIdentityArg=*/nullptr, AllocationSizeExpr,
         /*AlignArg=*/nullptr, /*IsMSVCCompatibilityFallback=*/true));
   return FoundArguments;
@@ -3081,7 +3095,6 @@ Sema::FindAllocationFunctions(SourceLocation StartLoc, SourceRange Range,
 
   QualType AllocElemType = Context.getBaseElementType(AllocType);
 
-  bool ConsideredTypeAwareAllocation = false;
   ResolvedAllocation Result = {/*OperatorNew=*/nullptr,
                                /*OperatorDelete=*/nullptr,
                                RequestedIAP,
@@ -3130,13 +3143,12 @@ Sema::FindAllocationFunctions(SourceLocation StartLoc, SourceRange Range,
     // We do our own custom access checks below.
     R.suppressDiagnostics();
 
-    std::optional<AllocationArgumentSet> Candidates =
+    std::optional<AllocationArgumentSet> ArgumentListCandidates =
         resolveAllocationArguments(R, RequestedIAP, PlaceArgs);
-    if (!Candidates)
+    if (!ArgumentListCandidates)
       return std::nullopt;
-    ConsideredTypeAwareAllocation = Candidates->TypeAwareViable;
 
-    for (ImplicitAllocationArguments &ArgumentList : Candidates->Candidates) {
+    for (ImplicitAllocationArguments &ArgumentList : *ArgumentListCandidates) {
       SmallVector<Expr *, 4> TrialArguments(
           ArgumentList.getImplicitArguments());
       llvm::append_range(TrialArguments, PlaceArgs);
@@ -3159,7 +3171,8 @@ Sema::FindAllocationFunctions(SourceLocation StartLoc, SourceRange Range,
       }
     }
     if (Diagnose)
-      DiagnoseAllocationLookupFailure(*this, R, Range, Candidates, PlaceArgs);
+      DiagnoseAllocationLookupFailure(*this, R, Range, *ArgumentListCandidates,
+                                      PlaceArgs);
     return std::nullopt;
   }
 foundCandidate:
@@ -3239,9 +3252,10 @@ foundCandidate:
       return std::nullopt;
 
     DeclareGlobalNewDelete();
-    DeallocLookupMode LookupMode = ConsideredTypeAwareAllocation
-                                       ? DeallocLookupMode::OptionallyTyped
-                                       : DeallocLookupMode::Untyped;
+    DeallocLookupMode LookupMode =
+        isTypeAwareAllocation(RequestedIAP.PassTypeIdentity)
+            ? DeallocLookupMode::OptionallyTyped
+            : DeallocLookupMode::Untyped;
     LookupGlobalDeallocationFunctions(*this, StartLoc, FoundDelete, LookupMode,
                                       DeleteName);
   }
@@ -3346,8 +3360,7 @@ foundCandidate:
     // with a size_t where possible (which it always is in this case).
     llvm::SmallVector<UsualDeallocFnInfo, 4> BestDeallocFns;
     ImplicitDeallocationParameters IDP = {
-        AllocElemType,
-        typeAwareAllocationModeFromBool(ConsideredTypeAwareAllocation),
+        AllocElemType, RequestedIAP.PassTypeIdentity,
         alignedAllocationModeFromBool(
             hasNewExtendedAlignment(*this, AllocElemType)),
         sizedDeallocationModeFromBool(FoundGlobalDelete)};

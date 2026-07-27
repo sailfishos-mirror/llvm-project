@@ -116,7 +116,6 @@ struct InlineAsmIdentifierInfo;
 
 namespace clang {
 class ADLResult;
-struct AllocationArgumentSet;
 class APValue;
 struct ASTConstraintSatisfaction;
 class ASTConsumer;
@@ -138,6 +137,7 @@ struct DeductionFailureInfo;
 class DependentDiagnostic;
 class Designation;
 class IdentifierInfo;
+struct ImplicitAllocationArguments;
 class ImplicitConversionSequence;
 typedef MutableArrayRef<ImplicitConversionSequence> ConversionSequenceList;
 class InitializationKind;
@@ -225,6 +225,10 @@ enum class AssignmentAction {
   Casting,
   Passing_CFAudited
 };
+
+// Inline capacity for type-aware, aligned, and unaligned allocation argument
+// list candidates.
+using AllocationArgumentSet = SmallVector<ImplicitAllocationArguments, 3>;
 
 namespace threadSafety {
 class BeforeSet;
@@ -8967,7 +8971,11 @@ private:
   resolveAllocationArguments(LookupResult &R,
                              const ImplicitAllocationParameters &,
                              ArrayRef<Expr *> PlacementArguments);
-  bool getTypeIdentityArgument(QualType Type, SourceLocation, Expr **FoundExpr);
+
+  // Attempts to construct the type identity argument for the call to a
+  // type aware operator new. In the event of an error this returns
+  // std::nullopt.
+  std::optional<Expr *> getTypeIdentityArgument(QualType Type, SourceLocation);
 
   Expr *AllocationSizeExpr = nullptr;
   Expr *AllocationAlignmentExpr = nullptr;

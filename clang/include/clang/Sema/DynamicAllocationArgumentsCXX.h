@@ -36,9 +36,12 @@ struct ImplicitAllocationArguments {
     return nullptr;
   }
 
-  void updateLookupForMSVCCompatibility(Sema &, LookupResult &);
+  const LookupResult &
+  updateLookupForMSVCCompatibility(Sema &, const LookupResult &,
+                                   std::optional<LookupResult> &) const;
   TypeAwareAllocationMode PassTypeIdentity;
   AlignedAllocationMode PassAlignment;
+  bool IsMSVCCompatibilityFallback;
 
 private:
   ImplicitAllocationArguments(Sema &SemaRef, Expr *TypeIdentityArg,
@@ -47,15 +50,8 @@ private:
 
   // Type-identity, size, and alignment
   static constexpr unsigned MaxImplicitArguments = 3;
-  bool IsMSVCCompatibilityFallback;
-
   unsigned ArgumentCount;
   Expr *ImplicitArguments[MaxImplicitArguments];
-};
-
-struct AllocationArgumentSet {
-  bool TypeAwareViable;
-  SmallVector<ImplicitAllocationArguments, 3> Candidates;
 };
 
 struct ResolvedAllocation {
