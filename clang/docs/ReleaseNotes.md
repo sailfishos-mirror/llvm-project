@@ -444,6 +444,9 @@ features cannot lower the translation-unit ABI level;
   affect C++26 constexpr structured bindings and expansion statements, but
   also affects some uses of plain structured bindings. (#GH211930)
 
+- Fixed missing destructor cleanups for lambda init-captures in default member
+  initializers used during aggregate initialization. (#GH196469)
+
 #### Bug Fixes to AST Handling
 
 - Fixed a non-deterministic ordering of unused local typedefs that made
