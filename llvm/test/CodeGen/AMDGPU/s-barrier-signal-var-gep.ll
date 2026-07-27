@@ -56,7 +56,7 @@ define amdgpu_kernel void @signal_var_bar0() {
 define amdgpu_kernel void @signal_var_bar1() {
 ; CHECK-SDAG-LABEL: signal_var_bar1:
 ; CHECK-SDAG:       ; %bb.0:
-; CHECK-SDAG-NEXT:    global_wb
+; CHECK-SDAG-NEXT:    global_prefetch_b8 v0, s[0:1] scope:SCOPE_SE
 ; CHECK-SDAG-NEXT:    v_nop
 ; CHECK-SDAG-NEXT:    s_setreg_imm32_b32 hwreg(HW_REG_WAVE_MODE, 25, 1), 1 ; msbs: dst=0 src0=0 src1=0 src2=0
 ; CHECK-SDAG-NEXT:    s_mov_b32 m0, 0x100000
@@ -68,7 +68,7 @@ define amdgpu_kernel void @signal_var_bar1() {
 ;
 ; CHECK-GISEL-LABEL: signal_var_bar1:
 ; CHECK-GISEL:       ; %bb.0:
-; CHECK-GISEL-NEXT:    global_wb
+; CHECK-GISEL-NEXT:    global_prefetch_b8 v0, s[0:1] scope:SCOPE_SE
 ; CHECK-GISEL-NEXT:    v_nop
 ; CHECK-GISEL-NEXT:    s_setreg_imm32_b32 hwreg(HW_REG_WAVE_MODE, 25, 1), 1 ; msbs: dst=0 src0=0 src1=0 src2=0
 ; CHECK-GISEL-NEXT:    s_mov_b32 m0, 0x10000f
@@ -116,7 +116,7 @@ define amdgpu_kernel void @signal_var_bar1() {
 define amdgpu_kernel void @signal_var_misaligned() {
 ; CHECK-SDAG-LABEL: signal_var_misaligned:
 ; CHECK-SDAG:       ; %bb.0:
-; CHECK-SDAG-NEXT:    global_wb
+; CHECK-SDAG-NEXT:    global_prefetch_b8 v0, s[0:1] scope:SCOPE_SE
 ; CHECK-SDAG-NEXT:    v_nop
 ; CHECK-SDAG-NEXT:    s_setreg_imm32_b32 hwreg(HW_REG_WAVE_MODE, 25, 1), 1 ; msbs: dst=0 src0=0 src1=0 src2=0
 ; CHECK-SDAG-NEXT:    s_mov_b32 m0, 0x100000
@@ -128,7 +128,7 @@ define amdgpu_kernel void @signal_var_misaligned() {
 ;
 ; CHECK-GISEL-LABEL: signal_var_misaligned:
 ; CHECK-GISEL:       ; %bb.0:
-; CHECK-GISEL-NEXT:    global_wb
+; CHECK-GISEL-NEXT:    global_prefetch_b8 v0, s[0:1] scope:SCOPE_SE
 ; CHECK-GISEL-NEXT:    v_nop
 ; CHECK-GISEL-NEXT:    s_setreg_imm32_b32 hwreg(HW_REG_WAVE_MODE, 25, 1), 1 ; msbs: dst=0 src0=0 src1=0 src2=0
 ; CHECK-GISEL-NEXT:    s_mov_b32 m0, 0x100000
