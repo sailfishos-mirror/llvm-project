@@ -2726,10 +2726,9 @@ bool Sema::CheckAllocatedType(QualType AllocType, SourceLocation Loc,
 }
 
 static void diagnoseNoViableFunctionForAllocationOverloadResolution(
-    Sema &S, const LookupResult &R,
-    const std::optional<LookupResult> &MSVCFallback, SourceRange Range,
-    ArrayRef<Expr *> Args, OverloadCandidateSet &Candidates,
-    OverloadCandidateSet *AlignedCandidates, Expr *AlignArg) {
+    Sema &S, const LookupResult &R, SourceRange Range, ArrayRef<Expr *> Args,
+    OverloadCandidateSet &Candidates, OverloadCandidateSet *AlignedCandidates,
+    Expr *AlignArg, bool IncludedMSVCFallback) {
   // If this is an allocation of the form 'new (p) X' for some object
   // pointer p (or an expression that will decay to such a pointer),
   // diagnose the reason for the error.
@@ -2789,10 +2788,9 @@ static void diagnoseNoViableFunctionForAllocationOverloadResolution(
     AlignedCandidates->NoteCandidates(S, AlignedArgs, AlignedCands, "",
                                       R.getNameLoc());
   Candidates.NoteCandidates(S, Args, Cands, "", R.getNameLoc());
-  if (MSVCFallback)
-    S.Diag(MSVCFallback->getNameLoc(),
-           diag::note_ovl_msvc_allocation_fallback_failed)
-        << MSVCFallback->getLookupName() << Range;
+  if (IncludedMSVCFallback)
+    S.Diag(R.getNameLoc(), diag::note_ovl_ms_allocation_fallback_failed)
+        << Range;
 }
 
 enum class AllocatorResolveResult { Success, Retry, Error };
@@ -2891,14 +2889,18 @@ static void LookupGlobalDeallocationFunctions(Sema &S, SourceLocation Loc,
 }
 
 static void
-DiagnoseAllocationLookupFailure(Sema &SemaRef, const LookupResult &BaseLookup,
+DiagnoseAllocationLookupFailure(Sema &SemaRef, const LookupResult &R,
                                 SourceRange Range,
                                 AllocationArgumentSet &ArgumentCandidates,
                                 ArrayRef<Expr *> PlacementArguments) {
-  std::optional<LookupResult> MSVCFallback;
   ImplicitAllocationArguments *UnalignedArgumentList = nullptr;
   ImplicitAllocationArguments *AlignedArgumentList = nullptr;
+  bool IncludedMSVCFallback = false;
   for (ImplicitAllocationArguments &AllocationArguments : ArgumentCandidates) {
+    if (AllocationArguments.IsMSVCCompatibilityFallback) {
+      IncludedMSVCFallback = true;
+      continue;
+    }
     if (AllocationArguments.PassTypeIdentity == TypeAwareAllocationMode::Yes)
       continue;
     if (AllocationArguments.PassAlignment == AlignedAllocationMode::Yes)
@@ -2915,9 +2917,9 @@ DiagnoseAllocationLookupFailure(Sema &SemaRef, const LookupResult &BaseLookup,
   auto Rerun = [&](ImplicitAllocationArguments &ArgumentList,
                    OverloadCandidateSet &Candidates,
                    SmallVectorImpl<Expr *> &Args) {
+    std::optional<LookupResult> MSVCFallback;
     const LookupResult &LocalLookup =
-        ArgumentList.updateLookupForMSVCCompatibility(SemaRef, BaseLookup,
-                                                      MSVCFallback);
+        ArgumentList.updateLookupForMSVCCompatibility(SemaRef, R, MSVCFallback);
     llvm::append_range(Args, ArgumentList.getImplicitArguments());
     llvm::append_range(Args, PlacementArguments);
     FunctionDecl *Unused = nullptr;
@@ -2927,39 +2929,35 @@ DiagnoseAllocationLookupFailure(Sema &SemaRef, const LookupResult &BaseLookup,
   std::optional<OverloadCandidateSet> AlignedCandidates;
   Expr *AlignArg = nullptr;
   if (AlignedArgumentList) {
-    AlignedCandidates.emplace(BaseLookup.getNameLoc(),
-                              OverloadCandidateSet::CSK_Normal);
+    AlignedCandidates.emplace(R.getNameLoc(), OverloadCandidateSet::CSK_Normal);
     SmallVector<Expr *, 4> AlignedArgs;
     Rerun(*AlignedArgumentList, *AlignedCandidates, AlignedArgs);
     AlignArg = AlignedArgumentList->getAlignmentArgument();
   }
-  OverloadCandidateSet UnalignedCandidates(BaseLookup.getNameLoc(),
+  OverloadCandidateSet UnalignedCandidates(R.getNameLoc(),
                                            OverloadCandidateSet::CSK_Normal);
   SmallVector<Expr *, 4> UnalignedArgs;
   Rerun(*UnalignedArgumentList, UnalignedCandidates, UnalignedArgs);
   diagnoseNoViableFunctionForAllocationOverloadResolution(
-      SemaRef, BaseLookup, MSVCFallback, Range, UnalignedArgs,
-      UnalignedCandidates, AlignedCandidates ? &*AlignedCandidates : nullptr,
-      AlignArg);
+      SemaRef, R, Range, UnalignedArgs, UnalignedCandidates,
+      AlignedCandidates ? &*AlignedCandidates : nullptr, AlignArg,
+      IncludedMSVCFallback);
 }
 
 std::optional<Expr *> Sema::getTypeIdentityArgument(QualType Type,
                                                     SourceLocation Loc) {
-  auto [Slot, Inserted] =
-      AllocationTypeIdentityArguments.insert({Type, nullptr});
+  if (auto Found = AllocationTypeIdentityArguments.find(Type); Found != AllocationTypeIdentityArguments.end())
+    return Found->second;
 
-  if (!Inserted)
-    return Slot->second;
-
-  QualType TypeIdentity = tryBuildStdTypeIdentity(Type, SourceLocation());
+  QualType TypeIdentity = tryBuildStdTypeIdentity(Type, Loc);
   if (TypeIdentity.isNull() ||
       RequireCompleteType(Loc, TypeIdentity, diag::err_incomplete_type)) {
-    AllocationTypeIdentityArguments.erase(Slot);
     return std::nullopt;
   }
+
   Expr *TypeIdentityArgument =
       new (Context) CXXScalarValueInitExpr(TypeIdentity, nullptr, Loc);
-  Slot->second = TypeIdentityArgument;
+  AllocationTypeIdentityArguments.insert({Type, TypeIdentityArgument});
   return TypeIdentityArgument;
 }
 
@@ -3017,6 +3015,9 @@ Sema::resolveAllocationArguments(LookupResult &R,
     unsigned SizeTyWidth = Context.getTypeSize(SizeTy);
     AllocationSizeExpr = IntegerLiteral::Create(
         Context, llvm::APInt::getZero(SizeTyWidth), SizeTy, SourceLocation());
+  }
+  if (!AllocationAlignmentExpr) {
+    DeclareGlobalNewDelete();
     if (EnumDecl *StdAlignValT = getStdAlignValT()) {
       QualType AlignValT = Context.getCanonicalTagType(StdAlignValT);
       AllocationAlignmentExpr = new (Context)
