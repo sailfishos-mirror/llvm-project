@@ -463,10 +463,11 @@ void BinaryFunction::updateEHRanges() {
 const uint8_t DWARF_CFI_PRIMARY_OPCODE_MASK = 0xc0;
 
 CFIReaderWriter::CFIReaderWriter(BinaryContext &BC,
-                                 const DWARFDebugFrame &EHFrame)
-    : BC(BC) {
+                                 std::unique_ptr<DWARFDebugFrame> Frame,
+                                 DWARFDataExtractor Data)
+    : BC(BC), EHFrame(std::move(Frame)), EHFrameData(std::move(Data)) {
   // Prepare FDEs for fast lookup
-  for (const dwarf::FrameEntry &Entry : EHFrame.entries()) {
+  for (const dwarf::FrameEntry &Entry : EHFrame->entries()) {
     const auto *CurFDE = dyn_cast<dwarf::FDE>(&Entry);
     // Skip CIEs.
     if (!CurFDE)
@@ -682,13 +683,30 @@ bool CFIReaderWriter::fillCFIInfoFor(BinaryFunction &Function) const {
     return true;
   };
 
-  for (const CFIProgram::Instruction &Instr : CurFDE.getLinkedCIE()->cfis())
-    if (!decodeFrameInstruction(Instr))
+  // The CFI instruction programs were not decoded during the initial
+  // (index-only) parse of .eh_frame. Parse the CIE's and this FDE's programs on
+  // demand now, so that only the functions we actually process pay the cost and
+  // the decoded instructions are discarded as soon as they are consumed.
+  const Triple::ArchType Arch = BC.TheTriple->getArch();
+  auto decodeProgram = [&](const dwarf::FrameEntry &Entry) -> bool {
+    DWARFDataExtractor Data = EHFrameData;
+    CFIProgram Program(CodeAlignment, DataAlignment, Arch);
+    uint64_t CFIOffset = Entry.getCFIStartOffset();
+    if (Error E = Program.parse(Data, &CFIOffset, Entry.getEndOffset())) {
+      consumeError(std::move(E));
       return false;
+    }
+    for (const CFIProgram::Instruction &Instr : Program)
+      if (!decodeFrameInstruction(Instr))
+        return false;
+    return true;
+  };
 
-  for (const CFIProgram::Instruction &Instr : CurFDE.cfis())
-    if (!decodeFrameInstruction(Instr))
-      return false;
+  if (!decodeProgram(*CurFDE.getLinkedCIE()))
+    return false;
+
+  if (!decodeProgram(CurFDE))
+    return false;
 
   return true;
 }
