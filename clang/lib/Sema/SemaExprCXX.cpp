@@ -2946,7 +2946,8 @@ DiagnoseAllocationLookupFailure(Sema &SemaRef, const LookupResult &R,
 
 std::optional<Expr *> Sema::getTypeIdentityArgument(QualType Type,
                                                     SourceLocation Loc) {
-  if (auto Found = AllocationTypeIdentityArguments.find(Type); Found != AllocationTypeIdentityArguments.end())
+  if (auto Found = AllocationTypeIdentityArguments.find(Type);
+      Found != AllocationTypeIdentityArguments.end())
     return Found->second;
 
   QualType TypeIdentity = tryBuildStdTypeIdentity(Type, Loc);
