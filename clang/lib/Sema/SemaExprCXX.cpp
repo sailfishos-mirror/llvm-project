@@ -2944,17 +2944,15 @@ DiagnoseAllocationLookupFailure(Sema &SemaRef, const LookupResult &R,
       IncludedMSVCFallback);
 }
 
-std::optional<Expr *> Sema::getTypeIdentityArgument(QualType Type,
-                                                    SourceLocation Loc) {
+Expr *Sema::tryGetTypeIdentityArgument(QualType Type, SourceLocation Loc) {
   if (auto Found = AllocationTypeIdentityArguments.find(Type);
       Found != AllocationTypeIdentityArguments.end())
     return Found->second;
 
   QualType TypeIdentity = tryBuildStdTypeIdentity(Type, Loc);
   if (TypeIdentity.isNull() ||
-      RequireCompleteType(Loc, TypeIdentity, diag::err_incomplete_type)) {
-    return std::nullopt;
-  }
+      RequireCompleteType(Loc, TypeIdentity, diag::err_incomplete_type))
+    return nullptr;
 
   Expr *TypeIdentityArgument =
       new (Context) CXXScalarValueInitExpr(TypeIdentity, nullptr, Loc);
@@ -3028,18 +3026,17 @@ Sema::resolveAllocationArguments(LookupResult &R,
 
   AllocationArgumentSet FoundArguments;
   if (isTypeAwareAllocation(IAP.PassTypeIdentity)) {
-    std::optional<Expr *> TypeIdentityArgument =
-        getTypeIdentityArgument(IAP.Type, R.getNameLoc());
+    Expr *TypeIdentityArgument =
+        tryGetTypeIdentityArgument(IAP.Type, R.getNameLoc());
     if (!TypeIdentityArgument)
       return std::nullopt;
 
-    assert(*TypeIdentityArgument);
     Expr *AlignmentExpr = AllocationAlignmentExpr;
     if (!PlacementArguments.empty() &&
         PlacementArguments.front()->getType()->isAlignValT())
       AlignmentExpr = nullptr;
     FoundArguments.push_back(ImplicitAllocationArguments(
-        *this, *TypeIdentityArgument, AllocationSizeExpr, AlignmentExpr,
+        *this, TypeIdentityArgument, AllocationSizeExpr, AlignmentExpr,
         /*IsMSVCCompatibilityFallback=*/false));
   }
 

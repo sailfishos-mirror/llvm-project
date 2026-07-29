@@ -8973,9 +8973,8 @@ private:
                              ArrayRef<Expr *> PlacementArguments);
 
   // Attempts to construct the type identity argument for the call to a
-  // type aware operator new. In the event of an error this returns
-  // std::nullopt.
-  std::optional<Expr *> getTypeIdentityArgument(QualType Type, SourceLocation);
+  // type aware operator new. Returns null on failure.
+  Expr *tryGetTypeIdentityArgument(QualType Type, SourceLocation);
 
   Expr *AllocationSizeExpr = nullptr;
   Expr *AllocationAlignmentExpr = nullptr;
