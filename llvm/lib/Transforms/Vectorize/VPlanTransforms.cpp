@@ -1394,6 +1394,7 @@ static VPValue *simplifyRecipe(VPSingleDefRecipe *Def) {
         return Def;
       }
     }
+    return Def;
   }
 
   // Fold any-of (fcmp uno %A, %A), (fcmp uno %B, %B), ... ->
