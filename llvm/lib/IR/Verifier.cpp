@@ -2102,12 +2102,18 @@ Verifier::visitModuleFlag(const MDNode *Op,
     if (Value)
       Check(FloatABI::parseABIType(Value->getString()).has_value(),
             "invalid float-abi metadata value", Op);
-  }
-
-  if (ID->getString() == "target-abi") {
+  } else if (ID->getString() == "target-abi") {
     const MDString *Value = dyn_cast_or_null<MDString>(Op->getOperand(2));
     Check(Value && !Value->getString().empty(),
           "target-abi metadata requires a non-empty string argument", Op);
+  } else if (ID->getString() == "exception-model") {
+    Check(MFB == Module::Error,
+          "exception-model module flag must use 'error' merge behavior", Op);
+    const MDString *Value = dyn_cast_or_null<MDString>(Op->getOperand(2));
+    Check(Value, "exception-model metadata requires a string argument");
+    if (Value)
+      Check(parseExceptionModel(Value->getString()).has_value(),
+            "invalid exception-model metadata value", Op);
   }
 
   if (ID->getString() == "Linker Options") {
