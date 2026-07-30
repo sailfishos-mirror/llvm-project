@@ -4326,8 +4326,7 @@ bool CodeGenModule::MustBeEmitted(const ValueDecl *Global) {
         (VD->getStorageDuration() == SD_Static ||
          VD->getStorageDuration() == SD_Thread)) ||
        (CodeGenOpts.KeepStaticConsts && VD->getStorageDuration() == SD_Static &&
-        VD->getType().isConstQualified()) ||
-       VD->hasAttr<LoadTimeCommentVarAttr>()))
+        VD->getType().isConstQualified())))
     return true;
 
   return getContext().DeclMustBeEmitted(Global);
