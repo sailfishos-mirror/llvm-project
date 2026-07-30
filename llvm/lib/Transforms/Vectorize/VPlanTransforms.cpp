@@ -1274,7 +1274,7 @@ static VPValue *simplifyRecipe(VPSingleDefRecipe *Def) {
     Type *TruncTy = Def->getScalarType();
     Type *ATy = A->getScalarType();
     if (TruncTy == ATy) {
-      Def->replaceAllUsesWith(A);
+      return A;
     } else {
       // Don't replace a non-widened cast recipe with a widened cast.
       if (!isa<VPWidenCastRecipe>(Def))
@@ -1289,10 +1289,10 @@ static VPValue *simplifyRecipe(VPSingleDefRecipe *Def) {
           // UnderlyingExt has distinct return type, used to retain legacy cost.
           Ext->setUnderlyingValue(UnderlyingExt);
         }
-        Def->replaceAllUsesWith(Ext);
+        return Ext;
       } else if (ATy->getScalarSizeInBits() > TruncTy->getScalarSizeInBits()) {
         auto *Trunc = Builder.createWidenCast(Instruction::Trunc, A, TruncTy);
-        Def->replaceAllUsesWith(Trunc);
+        return Trunc;
       }
     }
   }
@@ -1387,9 +1387,9 @@ static VPValue *simplifyRecipe(VPSingleDefRecipe *Def) {
         // to preserve the location.
         if (!Cmp->getDebugLoc() && Def->getDebugLoc())
           Cmp->setDebugLoc(Def->getDebugLoc());
+        return Def;
       }
     }
-    return Def;
   }
 
   // Fold any-of (fcmp uno %A, %A), (fcmp uno %B, %B), ... ->
