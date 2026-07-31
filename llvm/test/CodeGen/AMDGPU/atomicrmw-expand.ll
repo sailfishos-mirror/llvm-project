@@ -16,6 +16,7 @@ define float @syncscope_system(ptr %addr, float %val) #0 {
 ; GFX908-NEXT:    s_waitcnt vmcnt(0) lgkmcnt(0)
 ; GFX908-NEXT:    v_mov_b32_e32 v4, v3
 ; GFX908-NEXT:    v_add_f32_e32 v3, v4, v2
+; GFX908-NEXT:    s_waitcnt vmcnt(0) lgkmcnt(0)
 ; GFX908-NEXT:    flat_atomic_cmpswap v3, v[0:1], v[3:4] glc
 ; GFX908-NEXT:    s_waitcnt vmcnt(0) lgkmcnt(0)
 ; GFX908-NEXT:    buffer_wbinvl1_vol
@@ -129,6 +130,7 @@ define float @syncscope_workgroup_rtn(ptr %addr, float %val) #0 {
 ; GFX908-NEXT:    s_waitcnt vmcnt(0) lgkmcnt(0)
 ; GFX908-NEXT:    v_mov_b32_e32 v4, v3
 ; GFX908-NEXT:    v_add_f32_e32 v3, v4, v2
+; GFX908-NEXT:    s_waitcnt lgkmcnt(0)
 ; GFX908-NEXT:    flat_atomic_cmpswap v3, v[0:1], v[3:4] glc
 ; GFX908-NEXT:    s_waitcnt vmcnt(0) lgkmcnt(0)
 ; GFX908-NEXT:    v_cmp_eq_u32_e32 vcc, v3, v4
@@ -366,6 +368,7 @@ define float @no_unsafe(ptr %addr, float %val) {
 ; GFX908-NEXT:    s_waitcnt vmcnt(0) lgkmcnt(0)
 ; GFX908-NEXT:    v_mov_b32_e32 v4, v3
 ; GFX908-NEXT:    v_add_f32_e32 v3, v4, v2
+; GFX908-NEXT:    s_waitcnt lgkmcnt(0)
 ; GFX908-NEXT:    flat_atomic_cmpswap v3, v[0:1], v[3:4] glc
 ; GFX908-NEXT:    s_waitcnt vmcnt(0) lgkmcnt(0)
 ; GFX908-NEXT:    v_cmp_eq_u32_e32 vcc, v3, v4
@@ -386,6 +389,7 @@ define float @no_unsafe(ptr %addr, float %val) {
 ; GFX90A-NEXT:    ; =>This Inner Loop Header: Depth=1
 ; GFX90A-NEXT:    s_waitcnt vmcnt(0) lgkmcnt(0)
 ; GFX90A-NEXT:    v_add_f32_e32 v4, v5, v2
+; GFX90A-NEXT:    s_waitcnt lgkmcnt(0)
 ; GFX90A-NEXT:    flat_atomic_cmpswap v3, v[0:1], v[4:5] glc
 ; GFX90A-NEXT:    s_waitcnt vmcnt(0) lgkmcnt(0)
 ; GFX90A-NEXT:    v_cmp_eq_u32_e32 vcc, v3, v5
@@ -416,6 +420,7 @@ define float @no_unsafe(ptr %addr, float %val) {
 ; GFX1100-NEXT:    v_mov_b32_e32 v4, v3
 ; GFX1100-NEXT:    s_delay_alu instid0(VALU_DEP_1)
 ; GFX1100-NEXT:    v_add_f32_e32 v3, v4, v2
+; GFX1100-NEXT:    s_waitcnt vmcnt(0) lgkmcnt(0)
 ; GFX1100-NEXT:    s_waitcnt_vscnt null, 0x0
 ; GFX1100-NEXT:    flat_atomic_cmpswap_b32 v3, v[0:1], v[3:4] glc
 ; GFX1100-NEXT:    s_waitcnt vmcnt(0) lgkmcnt(0)

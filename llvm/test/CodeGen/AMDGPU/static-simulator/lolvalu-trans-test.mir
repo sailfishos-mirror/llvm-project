@@ -1,0 +1,134 @@
+# Copyright(C) 2026 Advanced Micro Devices, Inc. All rights reserved.
+#
+# This file contains confidential and proprietary information of Advanced Micro
+# Devices, Inc. ("AMD") and is protected under U.S. and international copyright
+# and other intellectual property laws.
+#
+# DISCLAIMER This disclaimer is not a license and does not grant any rights to
+# the materials distributed herewith. Except as otherwise provided in a valid
+# license issued to you by AMD, and to the maximum extent permitted by
+# applicable law: (1) THESE MATERIALS ARE MADE AVAILABLE "AS IS" AND WITH ALL
+# FAULTS, AND AMD HEREBY DISCLAIMS ALL WARRANTIES AND CONDITIONS, EXPRESS,
+# IMPLIED, OR STATUTORY, INCLUDING BUT NOT LIMITED TO WARRANTIES OF
+# MERCHANTABILITY, NON-INFRINGEMENT, OR FITNESS FOR ANY PARTICULAR PURPOSE; and
+# (2) AMD shall not be liable (whether in contract or tort, including
+# negligence, or under any other theory of liability) for any loss or damage of
+# any kind or nature related to, arising under or in connection with these
+# materials, including for any direct, or any indirect, special, incidental, or
+# consequential loss or damage (including loss of data, profits, goodwill, or
+# any type of loss or damage suffered as a result of any action brought by a
+# third party) even if such damage or loss was reasonably foreseeable or AMD
+# had been advised of the possibility of the same.
+#
+# THIS COPYRIGHT NOTICE AND DISCLAIMER MUST BE RETAINED AS PART OF THIS FILE AT
+# ALL TIMES.
+
+# RUN: llc -mtriple=amdgcn -mcpu=gfx1250 -amdgpu-enable-static-simulator -amdgpu-static-sim-verbose -debug-only=amdgpu-static-simulator -run-pass amdgpu-static-simulator %s -o /dev/null 2>&1 | FileCheck %s
+# REQUIRES: asserts
+
+# ============================================================================
+# LOLVALU <-> TRANS 1-cycle mutual exclusion hazard tests
+# ============================================================================
+# LOLVALU = Long-latency VALU (RepeatRate > 1): V_CVT_SCALE_PK8_*, V_PERMLANE*, etc.
+# TRANS = Transcendental instructions: V_EXP_F32, V_LOG_F32, V_RCP_F32, etc.
+#
+# Rules:
+#   - LOLVALU -> TRANS: 1-cycle stall
+#   - TRANS -> LOLVALU: 1-cycle stall
+#   - TRANS -> normal VALU (outside WMMA): no stall
+#   - normal VALU -> TRANS (outside WMMA): no stall
+# ============================================================================
+
+---
+# CHECK-LABEL: lolvalu_then_trans
+# CHECK: [Cycle 0] {{.*}}V_CVT_SCALEF32_PK8_FP8_F32_e64
+# CHECK: Stalls: (none)
+# CHECK: [Cycle 1] {{.*}}V_EXP_F32_e32
+# CHECK: Stalls: LOLVALUxTRANS=1
+# CHECK: End BB#0: {{[0-9]+}} insts, {{[0-9]+}} cycles, 1 stalls
+# CHECK: LOLVALUxTRANS:1
+name: lolvalu_then_trans
+tracksRegLiveness: true
+body: |
+  bb.0:
+    liveins: $vgpr0_vgpr1_vgpr2_vgpr3_vgpr4_vgpr5_vgpr6_vgpr7, $vgpr10
+
+    early-clobber $vgpr32_vgpr33 = V_CVT_SCALEF32_PK8_FP8_F32_e64 $vgpr0_vgpr1_vgpr2_vgpr3_vgpr4_vgpr5_vgpr6_vgpr7, 1065353216, implicit $mode, implicit $exec
+    ; Stall 1 cycle here
+    $vgpr40 = V_EXP_F32_e32 $vgpr10, implicit $exec, implicit $mode
+    S_ENDPGM 0
+
+---
+# CHECK-LABEL: trans_then_lolvalu
+# CHECK: [Cycle 0] {{.*}}V_EXP_F32_e32
+# CHECK: Stalls: (none)
+# CHECK: [Cycle 1] {{.*}}V_CVT_SCALEF32_PK8_FP8_F32_e64
+# CHECK: Stalls: LOLVALUxTRANS=1
+# CHECK: End BB#0: {{[0-9]+}} insts, {{[0-9]+}} cycles, 1 stalls
+name: trans_then_lolvalu
+tracksRegLiveness: true
+body: |
+  bb.0:
+    liveins: $vgpr0_vgpr1_vgpr2_vgpr3_vgpr4_vgpr5_vgpr6_vgpr7, $vgpr10
+
+    $vgpr40 = V_EXP_F32_e32 $vgpr10, implicit $exec, implicit $mode
+    ; LOLVALU - should stall 1 cycle
+    early-clobber $vgpr32_vgpr33 = V_CVT_SCALEF32_PK8_FP8_F32_e64 $vgpr0_vgpr1_vgpr2_vgpr3_vgpr4_vgpr5_vgpr6_vgpr7, 1065353216, implicit $mode, implicit $exec
+    S_ENDPGM 0
+
+---
+# CHECK-LABEL: trans_then_normal_valu_no_stall
+# CHECK: [Cycle 0] {{.*}}V_EXP_F32_e32
+# CHECK: Stalls: (none)
+# CHECK: [Cycle 1] {{.*}}V_ADD_F32_e32
+# CHECK: Stalls: (none)
+# CHECK: End BB#0: {{[0-9]+}} insts, {{[0-9]+}} cycles, 0 stalls
+name: trans_then_normal_valu_no_stall
+tracksRegLiveness: true
+body: |
+  bb.0:
+    liveins: $vgpr0, $vgpr1, $vgpr2
+
+    $vgpr10 = V_EXP_F32_e32 $vgpr0, implicit $exec, implicit $mode
+    ; No stall
+    $vgpr11 = V_ADD_F32_e32 $vgpr1, $vgpr2, implicit $mode, implicit $exec
+    S_ENDPGM 0
+
+---
+# CHECK-LABEL: normal_valu_then_trans_no_stall
+# CHECK: [Cycle 0] {{.*}}V_ADD_F32_e32
+# CHECK: Stalls: (none)
+# CHECK: [Cycle 1] {{.*}}V_EXP_F32_e32
+# CHECK: Stalls: (none)
+# CHECK: End BB#0: {{[0-9]+}} insts, {{[0-9]+}} cycles, 0 stalls
+name: normal_valu_then_trans_no_stall
+tracksRegLiveness: true
+body: |
+  bb.0:
+    liveins: $vgpr0, $vgpr1, $vgpr2
+
+    $vgpr10 = V_ADD_F32_e32 $vgpr0, $vgpr1, implicit $mode, implicit $exec
+    $vgpr11 = V_EXP_F32_e32 $vgpr2, implicit $exec, implicit $mode
+    S_ENDPGM 0
+
+---
+# CHECK-LABEL: lolvalu_then_lolvalu_fu_stall
+# CHECK: [Cycle 0] {{.*}}V_CVT_SCALEF32_PK8_FP8_F32_e64
+# CHECK: Stalls: (none)
+# CHECK: [Cycle 1] {{.*}}V_CVT_SCALEF32_PK8_FP8_F32_e64
+# CHECK: Stalls: FU=3
+# CHECK: End BB#0: {{[0-9]+}} insts, {{[0-9]+}} cycles, 3 stalls
+name: lolvalu_then_lolvalu_fu_stall
+tracksRegLiveness: true
+body: |
+  bb.0:
+    liveins: $vgpr0_vgpr1_vgpr2_vgpr3_vgpr4_vgpr5_vgpr6_vgpr7, $vgpr8_vgpr9_vgpr10_vgpr11_vgpr12_vgpr13_vgpr14_vgpr15
+
+    ; First V_CVT_PK8 (RepeatRate=4, holds VALU for 4 cycles)
+    early-clobber $vgpr32_vgpr33 = V_CVT_SCALEF32_PK8_FP8_F32_e64 $vgpr0_vgpr1_vgpr2_vgpr3_vgpr4_vgpr5_vgpr6_vgpr7, 1065353216, implicit $mode, implicit $exec
+    ; Second V_CVT_PK8 - should stall 3 cycles for FU (VALU busy until cycle 4)
+    early-clobber $vgpr34_vgpr35 = V_CVT_SCALEF32_PK8_FP8_F32_e64 $vgpr8_vgpr9_vgpr10_vgpr11_vgpr12_vgpr13_vgpr14_vgpr15, 1065353216, implicit $mode, implicit $exec
+    S_ENDPGM 0
+
+...
+

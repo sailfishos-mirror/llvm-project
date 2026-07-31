@@ -6191,7 +6191,8 @@ define amdgpu_ps <2 x float> @flat_max_saddr_i64_rtn(ptr inreg %sbase, i32 %voff
 ; GFX1250-SDAG-NEXT:    v_cndmask_b32_e32 v4, -1, v0, vcc_lo
 ; GFX1250-SDAG-NEXT:    scratch_load_b64 v[0:1], v4, off
 ; GFX1250-SDAG-NEXT:    s_wait_loadcnt 0x0
-; GFX1250-SDAG-NEXT:    v_max_i64 v[2:3], v[0:1], v[2:3]
+; GFX1250-SDAG-NEXT:    v_cmp_gt_i64_e32 vcc_lo, v[0:1], v[2:3]
+; GFX1250-SDAG-NEXT:    v_dual_cndmask_b32 v3, v3, v1 :: v_dual_cndmask_b32 v2, v2, v0
 ; GFX1250-SDAG-NEXT:    scratch_store_b64 v4, v[2:3], off
 ; GFX1250-SDAG-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-SDAG-NEXT:    s_or_b32 exec_lo, exec_lo, s0
@@ -6375,7 +6376,8 @@ define amdgpu_ps <2 x float> @flat_max_saddr_i64_rtn_neg128(ptr inreg %sbase, i3
 ; GFX1250-SDAG-NEXT:    v_cndmask_b32_e32 v4, -1, v0, vcc_lo
 ; GFX1250-SDAG-NEXT:    scratch_load_b64 v[0:1], v4, off
 ; GFX1250-SDAG-NEXT:    s_wait_loadcnt 0x0
-; GFX1250-SDAG-NEXT:    v_max_i64 v[2:3], v[0:1], v[2:3]
+; GFX1250-SDAG-NEXT:    v_cmp_gt_i64_e32 vcc_lo, v[0:1], v[2:3]
+; GFX1250-SDAG-NEXT:    v_dual_cndmask_b32 v3, v3, v1 :: v_dual_cndmask_b32 v2, v2, v0
 ; GFX1250-SDAG-NEXT:    scratch_store_b64 v4, v[2:3], off
 ; GFX1250-SDAG-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-SDAG-NEXT:    s_or_b32 exec_lo, exec_lo, s0
@@ -6565,7 +6567,8 @@ define amdgpu_ps void @flat_max_saddr_i64_nortn(ptr inreg %sbase, i32 %voffset, 
 ; GFX1250-SDAG-NEXT:    v_cndmask_b32_e32 v4, -1, v4, vcc_lo
 ; GFX1250-SDAG-NEXT:    scratch_load_b64 v[0:1], v4, off
 ; GFX1250-SDAG-NEXT:    s_wait_loadcnt 0x0
-; GFX1250-SDAG-NEXT:    v_max_i64 v[0:1], v[0:1], v[2:3]
+; GFX1250-SDAG-NEXT:    v_cmp_gt_i64_e32 vcc_lo, v[0:1], v[2:3]
+; GFX1250-SDAG-NEXT:    v_dual_cndmask_b32 v1, v3, v1 :: v_dual_cndmask_b32 v0, v2, v0
 ; GFX1250-SDAG-NEXT:    scratch_store_b64 v4, v[0:1], off
 ; GFX1250-SDAG-NEXT:    s_endpgm
 ;
@@ -6725,7 +6728,8 @@ define amdgpu_ps void @flat_max_saddr_i64_nortn_neg128(ptr inreg %sbase, i32 %vo
 ; GFX1250-SDAG-NEXT:    v_cndmask_b32_e32 v4, -1, v4, vcc_lo
 ; GFX1250-SDAG-NEXT:    scratch_load_b64 v[0:1], v4, off
 ; GFX1250-SDAG-NEXT:    s_wait_loadcnt 0x0
-; GFX1250-SDAG-NEXT:    v_max_i64 v[0:1], v[0:1], v[2:3]
+; GFX1250-SDAG-NEXT:    v_cmp_gt_i64_e32 vcc_lo, v[0:1], v[2:3]
+; GFX1250-SDAG-NEXT:    v_dual_cndmask_b32 v1, v3, v1 :: v_dual_cndmask_b32 v0, v2, v0
 ; GFX1250-SDAG-NEXT:    scratch_store_b64 v4, v[0:1], off
 ; GFX1250-SDAG-NEXT:    s_endpgm
 ;
@@ -7051,7 +7055,8 @@ define amdgpu_ps <2 x float> @flat_min_saddr_i64_rtn(ptr inreg %sbase, i32 %voff
 ; GFX1250-SDAG-NEXT:    v_cndmask_b32_e32 v4, -1, v0, vcc_lo
 ; GFX1250-SDAG-NEXT:    scratch_load_b64 v[0:1], v4, off
 ; GFX1250-SDAG-NEXT:    s_wait_loadcnt 0x0
-; GFX1250-SDAG-NEXT:    v_min_i64 v[2:3], v[0:1], v[2:3]
+; GFX1250-SDAG-NEXT:    v_cmp_le_i64_e32 vcc_lo, v[0:1], v[2:3]
+; GFX1250-SDAG-NEXT:    v_dual_cndmask_b32 v3, v3, v1 :: v_dual_cndmask_b32 v2, v2, v0
 ; GFX1250-SDAG-NEXT:    scratch_store_b64 v4, v[2:3], off
 ; GFX1250-SDAG-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-SDAG-NEXT:    s_or_b32 exec_lo, exec_lo, s0
@@ -7235,7 +7240,8 @@ define amdgpu_ps <2 x float> @flat_min_saddr_i64_rtn_neg128(ptr inreg %sbase, i3
 ; GFX1250-SDAG-NEXT:    v_cndmask_b32_e32 v4, -1, v0, vcc_lo
 ; GFX1250-SDAG-NEXT:    scratch_load_b64 v[0:1], v4, off
 ; GFX1250-SDAG-NEXT:    s_wait_loadcnt 0x0
-; GFX1250-SDAG-NEXT:    v_min_i64 v[2:3], v[0:1], v[2:3]
+; GFX1250-SDAG-NEXT:    v_cmp_le_i64_e32 vcc_lo, v[0:1], v[2:3]
+; GFX1250-SDAG-NEXT:    v_dual_cndmask_b32 v3, v3, v1 :: v_dual_cndmask_b32 v2, v2, v0
 ; GFX1250-SDAG-NEXT:    scratch_store_b64 v4, v[2:3], off
 ; GFX1250-SDAG-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-SDAG-NEXT:    s_or_b32 exec_lo, exec_lo, s0
@@ -7425,7 +7431,8 @@ define amdgpu_ps void @flat_min_saddr_i64_nortn(ptr inreg %sbase, i32 %voffset, 
 ; GFX1250-SDAG-NEXT:    v_cndmask_b32_e32 v4, -1, v4, vcc_lo
 ; GFX1250-SDAG-NEXT:    scratch_load_b64 v[0:1], v4, off
 ; GFX1250-SDAG-NEXT:    s_wait_loadcnt 0x0
-; GFX1250-SDAG-NEXT:    v_min_i64 v[0:1], v[0:1], v[2:3]
+; GFX1250-SDAG-NEXT:    v_cmp_le_i64_e32 vcc_lo, v[0:1], v[2:3]
+; GFX1250-SDAG-NEXT:    v_dual_cndmask_b32 v1, v3, v1 :: v_dual_cndmask_b32 v0, v2, v0
 ; GFX1250-SDAG-NEXT:    scratch_store_b64 v4, v[0:1], off
 ; GFX1250-SDAG-NEXT:    s_endpgm
 ;
@@ -7585,7 +7592,8 @@ define amdgpu_ps void @flat_min_saddr_i64_nortn_neg128(ptr inreg %sbase, i32 %vo
 ; GFX1250-SDAG-NEXT:    v_cndmask_b32_e32 v4, -1, v4, vcc_lo
 ; GFX1250-SDAG-NEXT:    scratch_load_b64 v[0:1], v4, off
 ; GFX1250-SDAG-NEXT:    s_wait_loadcnt 0x0
-; GFX1250-SDAG-NEXT:    v_min_i64 v[0:1], v[0:1], v[2:3]
+; GFX1250-SDAG-NEXT:    v_cmp_le_i64_e32 vcc_lo, v[0:1], v[2:3]
+; GFX1250-SDAG-NEXT:    v_dual_cndmask_b32 v1, v3, v1 :: v_dual_cndmask_b32 v0, v2, v0
 ; GFX1250-SDAG-NEXT:    scratch_store_b64 v4, v[0:1], off
 ; GFX1250-SDAG-NEXT:    s_endpgm
 ;
@@ -7911,7 +7919,8 @@ define amdgpu_ps <2 x float> @flat_umax_saddr_i64_rtn(ptr inreg %sbase, i32 %vof
 ; GFX1250-SDAG-NEXT:    v_cndmask_b32_e32 v4, -1, v0, vcc_lo
 ; GFX1250-SDAG-NEXT:    scratch_load_b64 v[0:1], v4, off
 ; GFX1250-SDAG-NEXT:    s_wait_loadcnt 0x0
-; GFX1250-SDAG-NEXT:    v_max_u64 v[2:3], v[0:1], v[2:3]
+; GFX1250-SDAG-NEXT:    v_cmp_gt_u64_e32 vcc_lo, v[0:1], v[2:3]
+; GFX1250-SDAG-NEXT:    v_dual_cndmask_b32 v3, v3, v1 :: v_dual_cndmask_b32 v2, v2, v0
 ; GFX1250-SDAG-NEXT:    scratch_store_b64 v4, v[2:3], off
 ; GFX1250-SDAG-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-SDAG-NEXT:    s_or_b32 exec_lo, exec_lo, s0
@@ -8095,7 +8104,8 @@ define amdgpu_ps <2 x float> @flat_umax_saddr_i64_rtn_neg128(ptr inreg %sbase, i
 ; GFX1250-SDAG-NEXT:    v_cndmask_b32_e32 v4, -1, v0, vcc_lo
 ; GFX1250-SDAG-NEXT:    scratch_load_b64 v[0:1], v4, off
 ; GFX1250-SDAG-NEXT:    s_wait_loadcnt 0x0
-; GFX1250-SDAG-NEXT:    v_max_u64 v[2:3], v[0:1], v[2:3]
+; GFX1250-SDAG-NEXT:    v_cmp_gt_u64_e32 vcc_lo, v[0:1], v[2:3]
+; GFX1250-SDAG-NEXT:    v_dual_cndmask_b32 v3, v3, v1 :: v_dual_cndmask_b32 v2, v2, v0
 ; GFX1250-SDAG-NEXT:    scratch_store_b64 v4, v[2:3], off
 ; GFX1250-SDAG-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-SDAG-NEXT:    s_or_b32 exec_lo, exec_lo, s0
@@ -8285,7 +8295,8 @@ define amdgpu_ps void @flat_umax_saddr_i64_nortn(ptr inreg %sbase, i32 %voffset,
 ; GFX1250-SDAG-NEXT:    v_cndmask_b32_e32 v4, -1, v4, vcc_lo
 ; GFX1250-SDAG-NEXT:    scratch_load_b64 v[0:1], v4, off
 ; GFX1250-SDAG-NEXT:    s_wait_loadcnt 0x0
-; GFX1250-SDAG-NEXT:    v_max_u64 v[0:1], v[0:1], v[2:3]
+; GFX1250-SDAG-NEXT:    v_cmp_gt_u64_e32 vcc_lo, v[0:1], v[2:3]
+; GFX1250-SDAG-NEXT:    v_dual_cndmask_b32 v1, v3, v1 :: v_dual_cndmask_b32 v0, v2, v0
 ; GFX1250-SDAG-NEXT:    scratch_store_b64 v4, v[0:1], off
 ; GFX1250-SDAG-NEXT:    s_endpgm
 ;
@@ -8445,7 +8456,8 @@ define amdgpu_ps void @flat_umax_saddr_i64_nortn_neg128(ptr inreg %sbase, i32 %v
 ; GFX1250-SDAG-NEXT:    v_cndmask_b32_e32 v4, -1, v4, vcc_lo
 ; GFX1250-SDAG-NEXT:    scratch_load_b64 v[0:1], v4, off
 ; GFX1250-SDAG-NEXT:    s_wait_loadcnt 0x0
-; GFX1250-SDAG-NEXT:    v_max_u64 v[0:1], v[0:1], v[2:3]
+; GFX1250-SDAG-NEXT:    v_cmp_gt_u64_e32 vcc_lo, v[0:1], v[2:3]
+; GFX1250-SDAG-NEXT:    v_dual_cndmask_b32 v1, v3, v1 :: v_dual_cndmask_b32 v0, v2, v0
 ; GFX1250-SDAG-NEXT:    scratch_store_b64 v4, v[0:1], off
 ; GFX1250-SDAG-NEXT:    s_endpgm
 ;
@@ -8771,7 +8783,8 @@ define amdgpu_ps <2 x float> @flat_umin_saddr_i64_rtn(ptr inreg %sbase, i32 %vof
 ; GFX1250-SDAG-NEXT:    v_cndmask_b32_e32 v4, -1, v0, vcc_lo
 ; GFX1250-SDAG-NEXT:    scratch_load_b64 v[0:1], v4, off
 ; GFX1250-SDAG-NEXT:    s_wait_loadcnt 0x0
-; GFX1250-SDAG-NEXT:    v_min_u64 v[2:3], v[0:1], v[2:3]
+; GFX1250-SDAG-NEXT:    v_cmp_le_u64_e32 vcc_lo, v[0:1], v[2:3]
+; GFX1250-SDAG-NEXT:    v_dual_cndmask_b32 v3, v3, v1 :: v_dual_cndmask_b32 v2, v2, v0
 ; GFX1250-SDAG-NEXT:    scratch_store_b64 v4, v[2:3], off
 ; GFX1250-SDAG-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-SDAG-NEXT:    s_or_b32 exec_lo, exec_lo, s0
@@ -8955,7 +8968,8 @@ define amdgpu_ps <2 x float> @flat_umin_saddr_i64_rtn_neg128(ptr inreg %sbase, i
 ; GFX1250-SDAG-NEXT:    v_cndmask_b32_e32 v4, -1, v0, vcc_lo
 ; GFX1250-SDAG-NEXT:    scratch_load_b64 v[0:1], v4, off
 ; GFX1250-SDAG-NEXT:    s_wait_loadcnt 0x0
-; GFX1250-SDAG-NEXT:    v_min_u64 v[2:3], v[0:1], v[2:3]
+; GFX1250-SDAG-NEXT:    v_cmp_le_u64_e32 vcc_lo, v[0:1], v[2:3]
+; GFX1250-SDAG-NEXT:    v_dual_cndmask_b32 v3, v3, v1 :: v_dual_cndmask_b32 v2, v2, v0
 ; GFX1250-SDAG-NEXT:    scratch_store_b64 v4, v[2:3], off
 ; GFX1250-SDAG-NEXT:    s_wait_xcnt 0x0
 ; GFX1250-SDAG-NEXT:    s_or_b32 exec_lo, exec_lo, s0
@@ -9145,7 +9159,8 @@ define amdgpu_ps void @flat_umin_saddr_i64_nortn(ptr inreg %sbase, i32 %voffset,
 ; GFX1250-SDAG-NEXT:    v_cndmask_b32_e32 v4, -1, v4, vcc_lo
 ; GFX1250-SDAG-NEXT:    scratch_load_b64 v[0:1], v4, off
 ; GFX1250-SDAG-NEXT:    s_wait_loadcnt 0x0
-; GFX1250-SDAG-NEXT:    v_min_u64 v[0:1], v[0:1], v[2:3]
+; GFX1250-SDAG-NEXT:    v_cmp_le_u64_e32 vcc_lo, v[0:1], v[2:3]
+; GFX1250-SDAG-NEXT:    v_dual_cndmask_b32 v1, v3, v1 :: v_dual_cndmask_b32 v0, v2, v0
 ; GFX1250-SDAG-NEXT:    scratch_store_b64 v4, v[0:1], off
 ; GFX1250-SDAG-NEXT:    s_endpgm
 ;
@@ -9305,7 +9320,8 @@ define amdgpu_ps void @flat_umin_saddr_i64_nortn_neg128(ptr inreg %sbase, i32 %v
 ; GFX1250-SDAG-NEXT:    v_cndmask_b32_e32 v4, -1, v4, vcc_lo
 ; GFX1250-SDAG-NEXT:    scratch_load_b64 v[0:1], v4, off
 ; GFX1250-SDAG-NEXT:    s_wait_loadcnt 0x0
-; GFX1250-SDAG-NEXT:    v_min_u64 v[0:1], v[0:1], v[2:3]
+; GFX1250-SDAG-NEXT:    v_cmp_le_u64_e32 vcc_lo, v[0:1], v[2:3]
+; GFX1250-SDAG-NEXT:    v_dual_cndmask_b32 v1, v3, v1 :: v_dual_cndmask_b32 v0, v2, v0
 ; GFX1250-SDAG-NEXT:    scratch_store_b64 v4, v[0:1], off
 ; GFX1250-SDAG-NEXT:    s_endpgm
 ;
@@ -12252,14 +12268,20 @@ define double @flat_atomic_fadd_f64_saddr_rtn(ptr inreg %ptr, double %data) {
 ; GFX1250-SDAG-NEXT:    s_add_nc_u64 s[0:1], s[0:1], 0x50
 ; GFX1250-SDAG-NEXT:    s_delay_alu instid0(SALU_CYCLE_1) | instskip(SKIP_1) | instid1(SALU_CYCLE_1)
 ; GFX1250-SDAG-NEXT:    s_cmp_eq_u32 s1, s3
+; GFX1250-SDAG-NEXT:    s_cselect_b32 s2, -1, 0
+; GFX1250-SDAG-NEXT:    s_and_b32 s2, s2, exec_lo
 ; GFX1250-SDAG-NEXT:    s_cselect_b32 s2, 1, 0
+; GFX1250-SDAG-NEXT:    s_delay_alu instid0(SALU_CYCLE_1)
 ; GFX1250-SDAG-NEXT:    s_cmp_lg_u32 s2, 1
 ; GFX1250-SDAG-NEXT:    s_cbranch_scc0 .LBB110_3
 ; GFX1250-SDAG-NEXT:  ; %bb.1: ; %atomicrmw.check.private
 ; GFX1250-SDAG-NEXT:    s_xor_b32 s2, s1, src_flat_scratch_base_hi
 ; GFX1250-SDAG-NEXT:    s_delay_alu instid0(SALU_CYCLE_1) | instskip(SKIP_1) | instid1(SALU_CYCLE_1)
 ; GFX1250-SDAG-NEXT:    s_cmp_lt_u32 s2, 0x4000000
+; GFX1250-SDAG-NEXT:    s_cselect_b32 s2, -1, 0
+; GFX1250-SDAG-NEXT:    s_and_b32 s2, s2, exec_lo
 ; GFX1250-SDAG-NEXT:    s_cselect_b32 s2, 1, 0
+; GFX1250-SDAG-NEXT:    s_delay_alu instid0(SALU_CYCLE_1)
 ; GFX1250-SDAG-NEXT:    s_cmp_lg_u32 s2, 1
 ; GFX1250-SDAG-NEXT:    s_cbranch_scc0 .LBB110_4
 ; GFX1250-SDAG-NEXT:  ; %bb.2: ; %atomicrmw.global
@@ -12375,12 +12397,16 @@ define double @flat_atomic_fadd_f64_saddr_rtn(ptr inreg %ptr, double %data) {
 ; GFX950-SDAG-NEXT:    s_mov_b64 s[2:3], src_shared_base
 ; GFX950-SDAG-NEXT:    s_addc_u32 s1, s1, 0
 ; GFX950-SDAG-NEXT:    s_cmp_eq_u32 s1, s3
+; GFX950-SDAG-NEXT:    s_cselect_b64 s[2:3], -1, 0
+; GFX950-SDAG-NEXT:    s_and_b64 s[2:3], s[2:3], exec
 ; GFX950-SDAG-NEXT:    s_cselect_b32 s2, 1, 0
 ; GFX950-SDAG-NEXT:    s_cmp_lg_u32 s2, 1
 ; GFX950-SDAG-NEXT:    s_cbranch_scc0 .LBB110_3
 ; GFX950-SDAG-NEXT:  ; %bb.1: ; %atomicrmw.check.private
 ; GFX950-SDAG-NEXT:    s_mov_b64 s[2:3], src_private_base
 ; GFX950-SDAG-NEXT:    s_cmp_eq_u32 s1, s3
+; GFX950-SDAG-NEXT:    s_cselect_b64 s[2:3], -1, 0
+; GFX950-SDAG-NEXT:    s_and_b64 s[2:3], s[2:3], exec
 ; GFX950-SDAG-NEXT:    s_cselect_b32 s2, 1, 0
 ; GFX950-SDAG-NEXT:    s_cmp_lg_u32 s2, 1
 ; GFX950-SDAG-NEXT:    s_cbranch_scc0 .LBB110_4
@@ -12491,7 +12517,10 @@ define void @flat_atomic_fadd_f64_saddr_nortn(ptr inreg %ptr, double %data) {
 ; GFX1250-SDAG-NEXT:    s_add_nc_u64 s[0:1], s[0:1], 0x50
 ; GFX1250-SDAG-NEXT:    s_delay_alu instid0(SALU_CYCLE_1) | instskip(SKIP_1) | instid1(SALU_CYCLE_1)
 ; GFX1250-SDAG-NEXT:    s_cmp_eq_u32 s1, s3
+; GFX1250-SDAG-NEXT:    s_cselect_b32 s2, -1, 0
+; GFX1250-SDAG-NEXT:    s_and_b32 s2, s2, exec_lo
 ; GFX1250-SDAG-NEXT:    s_cselect_b32 s2, 1, 0
+; GFX1250-SDAG-NEXT:    s_delay_alu instid0(SALU_CYCLE_1)
 ; GFX1250-SDAG-NEXT:    s_cmp_lg_u32 s2, 1
 ; GFX1250-SDAG-NEXT:    s_mov_b32 s2, -1
 ; GFX1250-SDAG-NEXT:    s_cbranch_scc0 .LBB111_6
@@ -12499,7 +12528,10 @@ define void @flat_atomic_fadd_f64_saddr_nortn(ptr inreg %ptr, double %data) {
 ; GFX1250-SDAG-NEXT:    s_xor_b32 s2, s1, src_flat_scratch_base_hi
 ; GFX1250-SDAG-NEXT:    s_delay_alu instid0(SALU_CYCLE_1) | instskip(SKIP_1) | instid1(SALU_CYCLE_1)
 ; GFX1250-SDAG-NEXT:    s_cmp_lt_u32 s2, 0x4000000
+; GFX1250-SDAG-NEXT:    s_cselect_b32 s2, -1, 0
+; GFX1250-SDAG-NEXT:    s_and_b32 s2, s2, exec_lo
 ; GFX1250-SDAG-NEXT:    s_cselect_b32 s2, 1, 0
+; GFX1250-SDAG-NEXT:    s_delay_alu instid0(SALU_CYCLE_1)
 ; GFX1250-SDAG-NEXT:    s_cmp_lg_u32 s2, 1
 ; GFX1250-SDAG-NEXT:    s_mov_b32 s2, -1
 ; GFX1250-SDAG-NEXT:    s_cbranch_scc0 .LBB111_3
@@ -12604,6 +12636,8 @@ define void @flat_atomic_fadd_f64_saddr_nortn(ptr inreg %ptr, double %data) {
 ; GFX950-SDAG-NEXT:    s_mov_b64 s[2:3], src_shared_base
 ; GFX950-SDAG-NEXT:    s_addc_u32 s1, s1, 0
 ; GFX950-SDAG-NEXT:    s_cmp_eq_u32 s1, s3
+; GFX950-SDAG-NEXT:    s_cselect_b64 s[2:3], -1, 0
+; GFX950-SDAG-NEXT:    s_and_b64 s[2:3], s[2:3], exec
 ; GFX950-SDAG-NEXT:    s_cselect_b32 s2, 1, 0
 ; GFX950-SDAG-NEXT:    s_cmp_lg_u32 s2, 1
 ; GFX950-SDAG-NEXT:    s_mov_b64 s[2:3], -1
@@ -12611,6 +12645,8 @@ define void @flat_atomic_fadd_f64_saddr_nortn(ptr inreg %ptr, double %data) {
 ; GFX950-SDAG-NEXT:  ; %bb.1: ; %atomicrmw.check.private
 ; GFX950-SDAG-NEXT:    s_mov_b64 s[2:3], src_private_base
 ; GFX950-SDAG-NEXT:    s_cmp_eq_u32 s1, s3
+; GFX950-SDAG-NEXT:    s_cselect_b64 s[2:3], -1, 0
+; GFX950-SDAG-NEXT:    s_and_b64 s[2:3], s[2:3], exec
 ; GFX950-SDAG-NEXT:    s_cselect_b32 s2, 1, 0
 ; GFX950-SDAG-NEXT:    s_cmp_lg_u32 s2, 1
 ; GFX950-SDAG-NEXT:    s_mov_b64 s[2:3], -1
@@ -12706,8 +12742,10 @@ define double @flat_atomic_fmax_f64_saddr_rtn(ptr inreg %ptr, double %data) {
 ; GFX1250-SDAG-NEXT:    s_delay_alu instid0(SALU_CYCLE_1) | instskip(NEXT) | instid1(SALU_CYCLE_1)
 ; GFX1250-SDAG-NEXT:    s_xor_b32 s2, s1, src_flat_scratch_base_hi
 ; GFX1250-SDAG-NEXT:    s_cmp_lt_u32 s2, 0x4000000
+; GFX1250-SDAG-NEXT:    s_cselect_b32 s2, -1, 0
+; GFX1250-SDAG-NEXT:    s_delay_alu instid0(SALU_CYCLE_1) | instskip(SKIP_1) | instid1(SALU_CYCLE_1)
+; GFX1250-SDAG-NEXT:    s_and_b32 s2, s2, exec_lo
 ; GFX1250-SDAG-NEXT:    s_cselect_b32 s2, 1, 0
-; GFX1250-SDAG-NEXT:    s_delay_alu instid0(SALU_CYCLE_1)
 ; GFX1250-SDAG-NEXT:    s_cmp_lg_u32 s2, 1
 ; GFX1250-SDAG-NEXT:    s_cbranch_scc0 .LBB112_2
 ; GFX1250-SDAG-NEXT:  ; %bb.1: ; %atomicrmw.global
@@ -12788,6 +12826,8 @@ define double @flat_atomic_fmax_f64_saddr_rtn(ptr inreg %ptr, double %data) {
 ; GFX950-SDAG-NEXT:    s_mov_b64 s[2:3], src_private_base
 ; GFX950-SDAG-NEXT:    s_addc_u32 s1, s1, 0
 ; GFX950-SDAG-NEXT:    s_cmp_eq_u32 s1, s3
+; GFX950-SDAG-NEXT:    s_cselect_b64 s[2:3], -1, 0
+; GFX950-SDAG-NEXT:    s_and_b64 s[2:3], s[2:3], exec
 ; GFX950-SDAG-NEXT:    s_cselect_b32 s2, 1, 0
 ; GFX950-SDAG-NEXT:    s_cmp_lg_u32 s2, 1
 ; GFX950-SDAG-NEXT:    s_cbranch_scc0 .LBB112_2
@@ -12867,8 +12907,10 @@ define void @flat_atomic_fmax_f64_saddr_nortn(ptr inreg %ptr, double %data) {
 ; GFX1250-SDAG-NEXT:    s_delay_alu instid0(SALU_CYCLE_1) | instskip(NEXT) | instid1(SALU_CYCLE_1)
 ; GFX1250-SDAG-NEXT:    s_xor_b32 s2, s1, src_flat_scratch_base_hi
 ; GFX1250-SDAG-NEXT:    s_cmp_lt_u32 s2, 0x4000000
+; GFX1250-SDAG-NEXT:    s_cselect_b32 s2, -1, 0
+; GFX1250-SDAG-NEXT:    s_delay_alu instid0(SALU_CYCLE_1) | instskip(SKIP_1) | instid1(SALU_CYCLE_1)
+; GFX1250-SDAG-NEXT:    s_and_b32 s2, s2, exec_lo
 ; GFX1250-SDAG-NEXT:    s_cselect_b32 s2, 1, 0
-; GFX1250-SDAG-NEXT:    s_delay_alu instid0(SALU_CYCLE_1)
 ; GFX1250-SDAG-NEXT:    s_cmp_lg_u32 s2, 1
 ; GFX1250-SDAG-NEXT:    s_mov_b32 s2, -1
 ; GFX1250-SDAG-NEXT:    s_cbranch_scc0 .LBB113_2
@@ -12942,6 +12984,8 @@ define void @flat_atomic_fmax_f64_saddr_nortn(ptr inreg %ptr, double %data) {
 ; GFX950-SDAG-NEXT:    s_mov_b64 s[2:3], src_private_base
 ; GFX950-SDAG-NEXT:    s_addc_u32 s1, s1, 0
 ; GFX950-SDAG-NEXT:    s_cmp_eq_u32 s1, s3
+; GFX950-SDAG-NEXT:    s_cselect_b64 s[2:3], -1, 0
+; GFX950-SDAG-NEXT:    s_and_b64 s[2:3], s[2:3], exec
 ; GFX950-SDAG-NEXT:    s_cselect_b32 s2, 1, 0
 ; GFX950-SDAG-NEXT:    s_cmp_lg_u32 s2, 1
 ; GFX950-SDAG-NEXT:    s_mov_b64 s[2:3], -1
@@ -13013,8 +13057,10 @@ define double @flat_atomic_fmin_f64_saddr_rtn(ptr inreg %ptr, double %data) {
 ; GFX1250-SDAG-NEXT:    s_delay_alu instid0(SALU_CYCLE_1) | instskip(NEXT) | instid1(SALU_CYCLE_1)
 ; GFX1250-SDAG-NEXT:    s_xor_b32 s2, s1, src_flat_scratch_base_hi
 ; GFX1250-SDAG-NEXT:    s_cmp_lt_u32 s2, 0x4000000
+; GFX1250-SDAG-NEXT:    s_cselect_b32 s2, -1, 0
+; GFX1250-SDAG-NEXT:    s_delay_alu instid0(SALU_CYCLE_1) | instskip(SKIP_1) | instid1(SALU_CYCLE_1)
+; GFX1250-SDAG-NEXT:    s_and_b32 s2, s2, exec_lo
 ; GFX1250-SDAG-NEXT:    s_cselect_b32 s2, 1, 0
-; GFX1250-SDAG-NEXT:    s_delay_alu instid0(SALU_CYCLE_1)
 ; GFX1250-SDAG-NEXT:    s_cmp_lg_u32 s2, 1
 ; GFX1250-SDAG-NEXT:    s_cbranch_scc0 .LBB114_2
 ; GFX1250-SDAG-NEXT:  ; %bb.1: ; %atomicrmw.global
@@ -13095,6 +13141,8 @@ define double @flat_atomic_fmin_f64_saddr_rtn(ptr inreg %ptr, double %data) {
 ; GFX950-SDAG-NEXT:    s_mov_b64 s[2:3], src_private_base
 ; GFX950-SDAG-NEXT:    s_addc_u32 s1, s1, 0
 ; GFX950-SDAG-NEXT:    s_cmp_eq_u32 s1, s3
+; GFX950-SDAG-NEXT:    s_cselect_b64 s[2:3], -1, 0
+; GFX950-SDAG-NEXT:    s_and_b64 s[2:3], s[2:3], exec
 ; GFX950-SDAG-NEXT:    s_cselect_b32 s2, 1, 0
 ; GFX950-SDAG-NEXT:    s_cmp_lg_u32 s2, 1
 ; GFX950-SDAG-NEXT:    s_cbranch_scc0 .LBB114_2
@@ -13174,8 +13222,10 @@ define void @flat_atomic_fmin_f64_saddr_nortn(ptr inreg %ptr, double %data) {
 ; GFX1250-SDAG-NEXT:    s_delay_alu instid0(SALU_CYCLE_1) | instskip(NEXT) | instid1(SALU_CYCLE_1)
 ; GFX1250-SDAG-NEXT:    s_xor_b32 s2, s1, src_flat_scratch_base_hi
 ; GFX1250-SDAG-NEXT:    s_cmp_lt_u32 s2, 0x4000000
+; GFX1250-SDAG-NEXT:    s_cselect_b32 s2, -1, 0
+; GFX1250-SDAG-NEXT:    s_delay_alu instid0(SALU_CYCLE_1) | instskip(SKIP_1) | instid1(SALU_CYCLE_1)
+; GFX1250-SDAG-NEXT:    s_and_b32 s2, s2, exec_lo
 ; GFX1250-SDAG-NEXT:    s_cselect_b32 s2, 1, 0
-; GFX1250-SDAG-NEXT:    s_delay_alu instid0(SALU_CYCLE_1)
 ; GFX1250-SDAG-NEXT:    s_cmp_lg_u32 s2, 1
 ; GFX1250-SDAG-NEXT:    s_mov_b32 s2, -1
 ; GFX1250-SDAG-NEXT:    s_cbranch_scc0 .LBB115_2
@@ -13249,6 +13299,8 @@ define void @flat_atomic_fmin_f64_saddr_nortn(ptr inreg %ptr, double %data) {
 ; GFX950-SDAG-NEXT:    s_mov_b64 s[2:3], src_private_base
 ; GFX950-SDAG-NEXT:    s_addc_u32 s1, s1, 0
 ; GFX950-SDAG-NEXT:    s_cmp_eq_u32 s1, s3
+; GFX950-SDAG-NEXT:    s_cselect_b64 s[2:3], -1, 0
+; GFX950-SDAG-NEXT:    s_and_b64 s[2:3], s[2:3], exec
 ; GFX950-SDAG-NEXT:    s_cselect_b32 s2, 1, 0
 ; GFX950-SDAG-NEXT:    s_cmp_lg_u32 s2, 1
 ; GFX950-SDAG-NEXT:    s_mov_b64 s[2:3], -1
@@ -13398,6 +13450,7 @@ define float @flat_atomic_fmax_f32_saddr_rtn(ptr inreg %ptr, float %data) {
 ; GFX950-NEXT:    s_waitcnt vmcnt(0) lgkmcnt(0)
 ; GFX950-NEXT:    v_max_f32_e32 v0, v1, v1
 ; GFX950-NEXT:    v_max_f32_e32 v0, v0, v4
+; GFX950-NEXT:    s_waitcnt lgkmcnt(0)
 ; GFX950-NEXT:    flat_atomic_cmpswap v0, v[2:3], v[0:1] offset:40 sc0
 ; GFX950-NEXT:    s_waitcnt vmcnt(0) lgkmcnt(0)
 ; GFX950-NEXT:    v_cmp_eq_u32_e32 vcc, v0, v1
@@ -13436,6 +13489,7 @@ define void @flat_atomic_fmax_f32_saddr_nortn(ptr inreg %ptr, float %data) {
 ; GFX950-NEXT:    s_waitcnt vmcnt(0) lgkmcnt(0)
 ; GFX950-NEXT:    v_max_f32_e32 v0, v1, v1
 ; GFX950-NEXT:    v_max_f32_e32 v0, v0, v4
+; GFX950-NEXT:    s_waitcnt lgkmcnt(0)
 ; GFX950-NEXT:    flat_atomic_cmpswap v0, v[2:3], v[0:1] offset:40 sc0
 ; GFX950-NEXT:    s_waitcnt vmcnt(0) lgkmcnt(0)
 ; GFX950-NEXT:    v_cmp_eq_u32_e32 vcc, v0, v1
@@ -13474,6 +13528,7 @@ define float @flat_atomic_fmin_f32_saddr_rtn(ptr inreg %ptr, float %data) {
 ; GFX950-NEXT:    s_waitcnt vmcnt(0) lgkmcnt(0)
 ; GFX950-NEXT:    v_max_f32_e32 v0, v1, v1
 ; GFX950-NEXT:    v_min_f32_e32 v0, v0, v4
+; GFX950-NEXT:    s_waitcnt lgkmcnt(0)
 ; GFX950-NEXT:    flat_atomic_cmpswap v0, v[2:3], v[0:1] offset:40 sc0
 ; GFX950-NEXT:    s_waitcnt vmcnt(0) lgkmcnt(0)
 ; GFX950-NEXT:    v_cmp_eq_u32_e32 vcc, v0, v1
@@ -13512,6 +13567,7 @@ define void @flat_atomic_fmin_f32_saddr_nortn(ptr inreg %ptr, float %data) {
 ; GFX950-NEXT:    s_waitcnt vmcnt(0) lgkmcnt(0)
 ; GFX950-NEXT:    v_max_f32_e32 v0, v1, v1
 ; GFX950-NEXT:    v_min_f32_e32 v0, v0, v4
+; GFX950-NEXT:    s_waitcnt lgkmcnt(0)
 ; GFX950-NEXT:    flat_atomic_cmpswap v0, v[2:3], v[0:1] offset:40 sc0
 ; GFX950-NEXT:    s_waitcnt vmcnt(0) lgkmcnt(0)
 ; GFX950-NEXT:    v_cmp_eq_u32_e32 vcc, v0, v1
@@ -13610,6 +13666,7 @@ define <2 x half> @flat_atomic_fmax_v2f16_saddr_rtn(ptr inreg %ptr, <2 x half> %
 ; GFX1250-NEXT:    v_pk_max_num_f16 v4, v0, v1
 ; GFX1250-NEXT:    s_wait_storecnt 0x0
 ; GFX1250-NEXT:    s_wait_xcnt 0x0
+; GFX1250-NEXT:    s_wait_loadcnt_dscnt 0x0
 ; GFX1250-NEXT:    flat_atomic_cmpswap_b32 v0, v2, v[4:5], s[0:1] offset:40 th:TH_ATOMIC_RETURN
 ; GFX1250-NEXT:    s_wait_loadcnt_dscnt 0x0
 ; GFX1250-NEXT:    v_cmp_eq_u32_e32 vcc_lo, v0, v5
@@ -13635,6 +13692,7 @@ define <2 x half> @flat_atomic_fmax_v2f16_saddr_rtn(ptr inreg %ptr, <2 x half> %
 ; GFX950-NEXT:    v_pk_max_f16 v0, v1, v1
 ; GFX950-NEXT:    s_nop 0
 ; GFX950-NEXT:    v_pk_max_f16 v0, v0, v4
+; GFX950-NEXT:    s_waitcnt lgkmcnt(0)
 ; GFX950-NEXT:    flat_atomic_cmpswap v0, v[2:3], v[0:1] offset:40 sc0
 ; GFX950-NEXT:    s_waitcnt vmcnt(0) lgkmcnt(0)
 ; GFX950-NEXT:    v_cmp_eq_u32_e32 vcc, v0, v1
@@ -13667,6 +13725,7 @@ define void @flat_atomic_fmax_v2f16_saddr_nortn(ptr inreg %ptr, <2 x half> %data
 ; GFX1250-NEXT:    v_pk_max_num_f16 v0, v0, v3
 ; GFX1250-NEXT:    s_wait_storecnt 0x0
 ; GFX1250-NEXT:    s_wait_xcnt 0x0
+; GFX1250-NEXT:    s_wait_loadcnt_dscnt 0x0
 ; GFX1250-NEXT:    flat_atomic_cmpswap_b32 v0, v2, v[0:1], s[0:1] offset:40 th:TH_ATOMIC_RETURN
 ; GFX1250-NEXT:    s_wait_loadcnt_dscnt 0x0
 ; GFX1250-NEXT:    v_cmp_eq_u32_e32 vcc_lo, v0, v1
@@ -13693,6 +13752,7 @@ define void @flat_atomic_fmax_v2f16_saddr_nortn(ptr inreg %ptr, <2 x half> %data
 ; GFX950-NEXT:    v_pk_max_f16 v0, v1, v1
 ; GFX950-NEXT:    s_nop 0
 ; GFX950-NEXT:    v_pk_max_f16 v0, v0, v4
+; GFX950-NEXT:    s_waitcnt lgkmcnt(0)
 ; GFX950-NEXT:    flat_atomic_cmpswap v0, v[2:3], v[0:1] offset:40 sc0
 ; GFX950-NEXT:    s_waitcnt vmcnt(0) lgkmcnt(0)
 ; GFX950-NEXT:    v_cmp_eq_u32_e32 vcc, v0, v1
@@ -13727,6 +13787,7 @@ define <2 x half> @flat_atomic_fmin_v2f16_saddr_rtn(ptr inreg %ptr, <2 x half> %
 ; GFX1250-NEXT:    v_pk_min_num_f16 v4, v0, v1
 ; GFX1250-NEXT:    s_wait_storecnt 0x0
 ; GFX1250-NEXT:    s_wait_xcnt 0x0
+; GFX1250-NEXT:    s_wait_loadcnt_dscnt 0x0
 ; GFX1250-NEXT:    flat_atomic_cmpswap_b32 v0, v2, v[4:5], s[0:1] offset:40 th:TH_ATOMIC_RETURN
 ; GFX1250-NEXT:    s_wait_loadcnt_dscnt 0x0
 ; GFX1250-NEXT:    v_cmp_eq_u32_e32 vcc_lo, v0, v5
@@ -13752,6 +13813,7 @@ define <2 x half> @flat_atomic_fmin_v2f16_saddr_rtn(ptr inreg %ptr, <2 x half> %
 ; GFX950-NEXT:    v_pk_max_f16 v0, v1, v1
 ; GFX950-NEXT:    s_nop 0
 ; GFX950-NEXT:    v_pk_min_f16 v0, v0, v4
+; GFX950-NEXT:    s_waitcnt lgkmcnt(0)
 ; GFX950-NEXT:    flat_atomic_cmpswap v0, v[2:3], v[0:1] offset:40 sc0
 ; GFX950-NEXT:    s_waitcnt vmcnt(0) lgkmcnt(0)
 ; GFX950-NEXT:    v_cmp_eq_u32_e32 vcc, v0, v1
@@ -13784,6 +13846,7 @@ define void @flat_atomic_fmin_v2f16_saddr_nortn(ptr inreg %ptr, <2 x half> %data
 ; GFX1250-NEXT:    v_pk_min_num_f16 v0, v0, v3
 ; GFX1250-NEXT:    s_wait_storecnt 0x0
 ; GFX1250-NEXT:    s_wait_xcnt 0x0
+; GFX1250-NEXT:    s_wait_loadcnt_dscnt 0x0
 ; GFX1250-NEXT:    flat_atomic_cmpswap_b32 v0, v2, v[0:1], s[0:1] offset:40 th:TH_ATOMIC_RETURN
 ; GFX1250-NEXT:    s_wait_loadcnt_dscnt 0x0
 ; GFX1250-NEXT:    v_cmp_eq_u32_e32 vcc_lo, v0, v1
@@ -13810,6 +13873,7 @@ define void @flat_atomic_fmin_v2f16_saddr_nortn(ptr inreg %ptr, <2 x half> %data
 ; GFX950-NEXT:    v_pk_max_f16 v0, v1, v1
 ; GFX950-NEXT:    s_nop 0
 ; GFX950-NEXT:    v_pk_min_f16 v0, v0, v4
+; GFX950-NEXT:    s_waitcnt lgkmcnt(0)
 ; GFX950-NEXT:    flat_atomic_cmpswap v0, v[2:3], v[0:1] offset:40 sc0
 ; GFX950-NEXT:    s_waitcnt vmcnt(0) lgkmcnt(0)
 ; GFX950-NEXT:    v_cmp_eq_u32_e32 vcc, v0, v1
@@ -13925,6 +13989,7 @@ define <2 x bfloat> @flat_atomic_fmax_v2bf16_saddr_rtn(ptr inreg %ptr, <2 x bflo
 ; GFX1250-NEXT:    v_pk_max_num_bf16 v4, v5, v0
 ; GFX1250-NEXT:    s_wait_storecnt 0x0
 ; GFX1250-NEXT:    s_wait_xcnt 0x0
+; GFX1250-NEXT:    s_wait_loadcnt_dscnt 0x0
 ; GFX1250-NEXT:    flat_atomic_cmpswap_b32 v1, v2, v[4:5], s[0:1] offset:40 th:TH_ATOMIC_RETURN
 ; GFX1250-NEXT:    s_wait_loadcnt_dscnt 0x0
 ; GFX1250-NEXT:    v_cmp_eq_u32_e32 vcc_lo, v1, v5
@@ -13954,6 +14019,7 @@ define <2 x bfloat> @flat_atomic_fmax_v2bf16_saddr_rtn(ptr inreg %ptr, <2 x bflo
 ; GFX950-NEXT:    v_max_f32_e32 v0, v0, v4
 ; GFX950-NEXT:    v_max_f32_e32 v6, v6, v5
 ; GFX950-NEXT:    v_cvt_pk_bf16_f32 v0, v6, v0
+; GFX950-NEXT:    s_waitcnt lgkmcnt(0)
 ; GFX950-NEXT:    flat_atomic_cmpswap v0, v[2:3], v[0:1] offset:40 sc0
 ; GFX950-NEXT:    s_waitcnt vmcnt(0) lgkmcnt(0)
 ; GFX950-NEXT:    v_cmp_eq_u32_e32 vcc, v0, v1
@@ -13983,6 +14049,7 @@ define void @flat_atomic_fmax_v2bf16_saddr_nortn(ptr inreg %ptr, <2 x bfloat> %d
 ; GFX1250-NEXT:    v_pk_max_num_bf16 v2, v3, v0
 ; GFX1250-NEXT:    s_wait_storecnt 0x0
 ; GFX1250-NEXT:    s_wait_xcnt 0x0
+; GFX1250-NEXT:    s_wait_loadcnt_dscnt 0x0
 ; GFX1250-NEXT:    flat_atomic_cmpswap_b32 v2, v1, v[2:3], s[0:1] offset:40 th:TH_ATOMIC_RETURN
 ; GFX1250-NEXT:    s_wait_loadcnt_dscnt 0x0
 ; GFX1250-NEXT:    v_cmp_eq_u32_e32 vcc_lo, v2, v3
@@ -14012,6 +14079,7 @@ define void @flat_atomic_fmax_v2bf16_saddr_nortn(ptr inreg %ptr, <2 x bfloat> %d
 ; GFX950-NEXT:    v_max_f32_e32 v0, v0, v4
 ; GFX950-NEXT:    v_max_f32_e32 v6, v6, v5
 ; GFX950-NEXT:    v_cvt_pk_bf16_f32 v0, v6, v0
+; GFX950-NEXT:    s_waitcnt lgkmcnt(0)
 ; GFX950-NEXT:    flat_atomic_cmpswap v0, v[2:3], v[0:1] offset:40 sc0
 ; GFX950-NEXT:    s_waitcnt vmcnt(0) lgkmcnt(0)
 ; GFX950-NEXT:    v_cmp_eq_u32_e32 vcc, v0, v1
@@ -14043,6 +14111,7 @@ define <2 x bfloat> @flat_atomic_fmin_v2bf16_saddr_rtn(ptr inreg %ptr, <2 x bflo
 ; GFX1250-NEXT:    v_pk_min_num_bf16 v4, v5, v0
 ; GFX1250-NEXT:    s_wait_storecnt 0x0
 ; GFX1250-NEXT:    s_wait_xcnt 0x0
+; GFX1250-NEXT:    s_wait_loadcnt_dscnt 0x0
 ; GFX1250-NEXT:    flat_atomic_cmpswap_b32 v1, v2, v[4:5], s[0:1] offset:40 th:TH_ATOMIC_RETURN
 ; GFX1250-NEXT:    s_wait_loadcnt_dscnt 0x0
 ; GFX1250-NEXT:    v_cmp_eq_u32_e32 vcc_lo, v1, v5
@@ -14072,6 +14141,7 @@ define <2 x bfloat> @flat_atomic_fmin_v2bf16_saddr_rtn(ptr inreg %ptr, <2 x bflo
 ; GFX950-NEXT:    v_min_f32_e32 v0, v0, v4
 ; GFX950-NEXT:    v_min_f32_e32 v6, v6, v5
 ; GFX950-NEXT:    v_cvt_pk_bf16_f32 v0, v6, v0
+; GFX950-NEXT:    s_waitcnt lgkmcnt(0)
 ; GFX950-NEXT:    flat_atomic_cmpswap v0, v[2:3], v[0:1] offset:40 sc0
 ; GFX950-NEXT:    s_waitcnt vmcnt(0) lgkmcnt(0)
 ; GFX950-NEXT:    v_cmp_eq_u32_e32 vcc, v0, v1
@@ -14101,6 +14171,7 @@ define void @flat_atomic_fmin_v2bf16_saddr_nortn(ptr inreg %ptr, <2 x bfloat> %d
 ; GFX1250-NEXT:    v_pk_min_num_bf16 v2, v3, v0
 ; GFX1250-NEXT:    s_wait_storecnt 0x0
 ; GFX1250-NEXT:    s_wait_xcnt 0x0
+; GFX1250-NEXT:    s_wait_loadcnt_dscnt 0x0
 ; GFX1250-NEXT:    flat_atomic_cmpswap_b32 v2, v1, v[2:3], s[0:1] offset:40 th:TH_ATOMIC_RETURN
 ; GFX1250-NEXT:    s_wait_loadcnt_dscnt 0x0
 ; GFX1250-NEXT:    v_cmp_eq_u32_e32 vcc_lo, v2, v3
@@ -14130,6 +14201,7 @@ define void @flat_atomic_fmin_v2bf16_saddr_nortn(ptr inreg %ptr, <2 x bfloat> %d
 ; GFX950-NEXT:    v_min_f32_e32 v0, v0, v4
 ; GFX950-NEXT:    v_min_f32_e32 v6, v6, v5
 ; GFX950-NEXT:    v_cvt_pk_bf16_f32 v0, v6, v0
+; GFX950-NEXT:    s_waitcnt lgkmcnt(0)
 ; GFX950-NEXT:    flat_atomic_cmpswap v0, v[2:3], v[0:1] offset:40 sc0
 ; GFX950-NEXT:    s_waitcnt vmcnt(0) lgkmcnt(0)
 ; GFX950-NEXT:    v_cmp_eq_u32_e32 vcc, v0, v1

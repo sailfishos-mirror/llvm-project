@@ -4,6 +4,31 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
+// Copyright(C) 2026 Advanced Micro Devices, Inc. All rights reserved.
+//
+// This file contains confidential and proprietary information of Advanced Micro
+// Devices, Inc. ("AMD") and is protected under U.S. and international copyright
+// and other intellectual property laws.
+//
+// DISCLAIMER This disclaimer is not a license and does not grant any rights to
+// the materials distributed herewith. Except as otherwise provided in a valid
+// license issued to you by AMD, and to the maximum extent permitted by
+// applicable law: (1) THESE MATERIALS ARE MADE AVAILABLE "AS IS" AND WITH ALL
+// FAULTS, AND AMD HEREBY DISCLAIMS ALL WARRANTIES AND CONDITIONS, EXPRESS,
+// IMPLIED, OR STATUTORY, INCLUDING BUT NOT LIMITED TO WARRANTIES OF
+// MERCHANTABILITY, NON-INFRINGEMENT, OR FITNESS FOR ANY PARTICULAR PURPOSE; and
+// (2) AMD shall not be liable (whether in contract or tort, including
+// negligence, or under any other theory of liability) for any loss or damage of
+// any kind or nature related to, arising under or in connection with these
+// materials, including for any direct, or any indirect, special, incidental, or
+// consequential loss or damage (including loss of data, profits, goodwill, or
+// any type of loss or damage suffered as a result of any action brought by a
+// third party) even if such damage or loss was reasonably foreseeable or AMD
+// had been advised of the possibility of the same.
+//
+// THIS COPYRIGHT NOTICE AND DISCLAIMER MUST BE RETAINED AS PART OF THIS FILE AT
+// ALL TIMES.
+//
 //===----------------------------------------------------------------------===//
 //
 /// \file
@@ -482,11 +507,23 @@ public:
     return SIInstrFlags::isSALU(get(Opcode));
   }
 
+  /// Get next real instruction, skipping debug/meta/implicit-def instructions.
+  static MachineInstr *getNextRealInstr(MachineInstr *MI);
+
+  /// LDSDMA instructions act as both VALU and memory instructions, thus
+  /// we also tag them as VALU. By setting \p AllowLDSDMA to false, this will
+  /// return false for LDSDMA instructions.
   static bool isVALU(const MachineInstr &MI, bool AllowLDSDMA) {
     if (!AllowLDSDMA && isLDSDMA(MI))
       return false;
 
     return SIInstrFlags::isVALU(MI);
+  }
+
+  // Downstream convenience overload preserving the pre-refactor behavior
+  // (LDSDMA counted as VALU). Forwards with AllowLDSDMA=true.
+  static bool isVALU(const MachineInstr &MI) {
+    return isVALU(MI, /*AllowLDSDMA=*/true);
   }
 
   /// LDSDMA instructions act as both VALU and memory instructions, thus
@@ -1198,6 +1235,33 @@ public:
     return Opcode == AMDGPU::SCHED_GROUP_BARRIER || Opcode == AMDGPU::IGLP_OPT;
   }
 
+  /// DS latency modes. The latency of an individual DS load/store instruction
+  /// is variable. Some of the major sources that cause this variation are hard
+  /// to model at compile time. For example, if we have multiple LDS
+  /// instructions in flight, one of these may take longer than the other due to
+  /// a bank conflict. Given that these bank conflicts can occur across waves,
+  /// it is hard to accurately model this. This is compounded given the presence
+  /// of the LDS FIFO -- if an earlier LDS instruction has, for example, a bank
+  /// conflict, this will impact the latency of the current LDS instruction.
+  ///
+  /// Given these complexities, we offer different DSLatencyModes for kernels to
+  /// express the average latency for LDS instructions in the kernel. We expect
+  /// that for kernels with many closely packed LDS isntructions, the average
+  /// latency for LDS instructions will be relatively high. Thus we should use
+  /// DSLatencyMode::Loaded or DSLatencyMode::Overloaded.
+  enum class DSLatencyMode {
+    Fast,      // Use default/pinged latency (no contention)
+    Loaded,    // Use loaded latency (moderate contention, 3x latency)
+    Overloaded // Use overloaded latency (high contention, 5x latency)
+  };
+
+  /// \p returns the DS instruction latency multiplier based on the selected
+  /// DSLatencyMode. \p returns 1 if the default
+  /// scheduling model latency should be used (pinged mode).
+  /// Checks the function attribute first, then if using coexec scheduler
+  /// defaults to "loaded", then falls back to the global command line option.
+  static unsigned getDSLatencyMultiplier(const MachineFunction &MF);
+
   static unsigned getNonSoftWaitcntOpcode(unsigned Opcode) {
     switch (Opcode) {
     case AMDGPU::S_WAITCNT_soft:
@@ -1739,9 +1803,19 @@ public:
                                       LiveIntervals *LIS = nullptr,
                                       VirtRegMap *VRM = nullptr) const override;
 
+  // Silence a hidden overloaded virtual function warning.
+  using TargetInstrInfo::getInstrLatency;
+
   unsigned getInstrLatency(const InstrItineraryData *ItinData,
                            const MachineInstr &MI,
                            unsigned *PredCost = nullptr) const override;
+
+  /// \returns the latency of a given instruction \p MI. This implements custom
+  /// overrides for certain cases (e.g. when using dfifferent DSLatencyModes to
+  /// express increased LDS resource contention).
+  unsigned getInstrLatency(const MachineInstr &MI) const;
+
+  unsigned getSchedCyclesForCopy(const MachineInstr &MI) const override;
 
   const MachineOperand &getCalleeOperand(const MachineInstr &MI) const override;
 
@@ -1770,6 +1844,10 @@ public:
   // This is used if an operand is a 32 bit register but needs to be aligned
   // regardless.
   void enforceOperandRCAlignment(MachineInstr &MI, AMDGPU::OpName OpName) const;
+
+  /// Get the repeat rate for a VALU instruction from the scheduling model.
+  /// Returns 1 for regular VALU, >1 for long-latency VALU (packed, F64, etc.)
+  unsigned getRepeatRate(const MachineInstr &MI) const;
 };
 
 /// \brief Returns true if a reg:subreg pair P has a TRC class
