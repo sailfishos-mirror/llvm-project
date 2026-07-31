@@ -271,8 +271,8 @@ define amdgpu_kernel void @nearbyint_v2f64(ptr addrspace(1) %out, <2 x double> %
 ; SI-NEXT:    s_mov_b32 s2, -1
 ; SI-NEXT:    s_brev_b32 s10, -2
 ; SI-NEXT:    v_mov_b32_e32 v6, 0x43300000
-; SI-NEXT:    s_mov_b32 s9, 0x432fffff
 ; SI-NEXT:    v_mov_b32_e32 v0, 0
+; SI-NEXT:    s_mov_b32 s9, 0x432fffff
 ; SI-NEXT:    s_mov_b32 s8, s2
 ; SI-NEXT:    v_mov_b32_e32 v4, s8
 ; SI-NEXT:    v_mov_b32_e32 v5, s9
@@ -348,8 +348,8 @@ define amdgpu_kernel void @nearbyint_v4f64(ptr addrspace(1) %out, <4 x double> %
 ; SI-NEXT:    s_mov_b32 s10, -1
 ; SI-NEXT:    s_brev_b32 s14, -2
 ; SI-NEXT:    v_mov_b32_e32 v10, 0x43300000
-; SI-NEXT:    s_mov_b32 s13, 0x432fffff
 ; SI-NEXT:    v_mov_b32_e32 v4, 0
+; SI-NEXT:    s_mov_b32 s13, 0x432fffff
 ; SI-NEXT:    s_mov_b32 s12, s10
 ; SI-NEXT:    v_mov_b32_e32 v8, s12
 ; SI-NEXT:    v_mov_b32_e32 v9, s13

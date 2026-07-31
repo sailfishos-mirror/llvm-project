@@ -24,15 +24,15 @@ define amdgpu_kernel void @rotl_i32(ptr addrspace(1) %in, i32 %x, i32 %y) {
 ; SI:       ; %bb.0: ; %entry
 ; SI-NEXT:    s_load_dwordx4 s[0:3], s[4:5], 0x9
 ; SI-NEXT:    s_mov_b32 s7, 0xf000
-; SI-NEXT:    s_waitcnt lgkmcnt(0)
-; SI-NEXT:    s_sub_i32 s4, 32, s3
-; SI-NEXT:    s_mov_b32 s3, s2
-; SI-NEXT:    s_and_b32 s4, s4, 31
-; SI-NEXT:    s_lshr_b64 s[2:3], s[2:3], s4
 ; SI-NEXT:    s_mov_b32 s6, -1
+; SI-NEXT:    s_waitcnt lgkmcnt(0)
 ; SI-NEXT:    s_mov_b32 s4, s0
 ; SI-NEXT:    s_mov_b32 s5, s1
-; SI-NEXT:    v_mov_b32_e32 v0, s2
+; SI-NEXT:    s_sub_i32 s0, 32, s3
+; SI-NEXT:    s_mov_b32 s3, s2
+; SI-NEXT:    s_and_b32 s0, s0, 31
+; SI-NEXT:    s_lshr_b64 s[0:1], s[2:3], s0
+; SI-NEXT:    v_mov_b32_e32 v0, s0
 ; SI-NEXT:    buffer_store_dword v0, off, s[4:7], 0
 ; SI-NEXT:    s_endpgm
 ;
@@ -107,17 +107,17 @@ define amdgpu_kernel void @rotl_v2i32(ptr addrspace(1) %in, <2 x i32> %x, <2 x i
 ; SI-NEXT:    s_load_dwordx4 s[0:3], s[4:5], 0xb
 ; SI-NEXT:    s_load_dwordx2 s[4:5], s[4:5], 0x9
 ; SI-NEXT:    s_mov_b32 s7, 0xf000
+; SI-NEXT:    s_mov_b32 s6, -1
 ; SI-NEXT:    s_waitcnt lgkmcnt(0)
-; SI-NEXT:    s_sub_i32 s6, 32, s2
-; SI-NEXT:    s_sub_i32 s8, 32, s3
+; SI-NEXT:    s_sub_i32 s8, 32, s2
+; SI-NEXT:    s_sub_i32 s9, 32, s3
 ; SI-NEXT:    s_mov_b32 s2, s1
 ; SI-NEXT:    s_mov_b32 s3, s1
 ; SI-NEXT:    s_mov_b32 s1, s0
+; SI-NEXT:    s_and_b32 s9, s9, 31
 ; SI-NEXT:    s_and_b32 s8, s8, 31
-; SI-NEXT:    s_and_b32 s6, s6, 31
-; SI-NEXT:    s_lshr_b64 s[2:3], s[2:3], s8
-; SI-NEXT:    s_lshr_b64 s[0:1], s[0:1], s6
-; SI-NEXT:    s_mov_b32 s6, -1
+; SI-NEXT:    s_lshr_b64 s[2:3], s[2:3], s9
+; SI-NEXT:    s_lshr_b64 s[0:1], s[0:1], s8
 ; SI-NEXT:    v_mov_b32_e32 v0, s0
 ; SI-NEXT:    v_mov_b32_e32 v1, s2
 ; SI-NEXT:    buffer_store_dwordx2 v[0:1], off, s[4:7], 0
@@ -222,26 +222,26 @@ define amdgpu_kernel void @rotl_v4i32(ptr addrspace(1) %in, <4 x i32> %x, <4 x i
 ; SI-NEXT:    s_load_dwordx8 s[8:15], s[4:5], 0xd
 ; SI-NEXT:    s_load_dwordx2 s[0:1], s[4:5], 0x9
 ; SI-NEXT:    s_mov_b32 s3, 0xf000
+; SI-NEXT:    s_mov_b32 s2, -1
 ; SI-NEXT:    s_waitcnt lgkmcnt(0)
-; SI-NEXT:    s_sub_i32 s2, 32, s12
-; SI-NEXT:    s_sub_i32 s12, 32, s13
-; SI-NEXT:    s_sub_i32 s13, 32, s14
-; SI-NEXT:    s_sub_i32 s14, 32, s15
+; SI-NEXT:    s_sub_i32 s12, 32, s12
+; SI-NEXT:    s_sub_i32 s13, 32, s13
+; SI-NEXT:    s_sub_i32 s14, 32, s14
+; SI-NEXT:    s_sub_i32 s15, 32, s15
 ; SI-NEXT:    s_mov_b32 s4, s11
 ; SI-NEXT:    s_mov_b32 s5, s11
 ; SI-NEXT:    s_mov_b32 s11, s10
 ; SI-NEXT:    s_mov_b32 s6, s9
 ; SI-NEXT:    s_mov_b32 s7, s9
 ; SI-NEXT:    s_mov_b32 s9, s8
+; SI-NEXT:    s_and_b32 s15, s15, 31
 ; SI-NEXT:    s_and_b32 s14, s14, 31
 ; SI-NEXT:    s_and_b32 s13, s13, 31
 ; SI-NEXT:    s_and_b32 s12, s12, 31
-; SI-NEXT:    s_and_b32 s2, s2, 31
-; SI-NEXT:    s_lshr_b64 s[4:5], s[4:5], s14
-; SI-NEXT:    s_lshr_b64 s[10:11], s[10:11], s13
-; SI-NEXT:    s_lshr_b64 s[6:7], s[6:7], s12
-; SI-NEXT:    s_lshr_b64 s[8:9], s[8:9], s2
-; SI-NEXT:    s_mov_b32 s2, -1
+; SI-NEXT:    s_lshr_b64 s[4:5], s[4:5], s15
+; SI-NEXT:    s_lshr_b64 s[10:11], s[10:11], s14
+; SI-NEXT:    s_lshr_b64 s[6:7], s[6:7], s13
+; SI-NEXT:    s_lshr_b64 s[8:9], s[8:9], s12
 ; SI-NEXT:    v_mov_b32_e32 v0, s8
 ; SI-NEXT:    v_mov_b32_e32 v1, s6
 ; SI-NEXT:    v_mov_b32_e32 v2, s10
@@ -400,8 +400,8 @@ define void @test_rotl_i16(ptr addrspace(1) nocapture readonly %sourceA, ptr add
 ; SI-LABEL: test_rotl_i16:
 ; SI:       ; %bb.0: ; %entry
 ; SI-NEXT:    s_waitcnt vmcnt(0) expcnt(0) lgkmcnt(0)
-; SI-NEXT:    s_mov_b32 s6, 0
 ; SI-NEXT:    s_mov_b32 s7, 0xf000
+; SI-NEXT:    s_mov_b32 s6, 0
 ; SI-NEXT:    s_mov_b32 s4, s6
 ; SI-NEXT:    s_mov_b32 s5, s6
 ; SI-NEXT:    buffer_load_ushort v2, v[2:3], s[4:7], 0 addr64 offset:48

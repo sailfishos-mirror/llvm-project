@@ -51,8 +51,8 @@ define amdgpu_kernel void @test_if(i32 %b, ptr addrspace(1) %src, ptr addrspace(
 ; SI-NEXT:    s_ashr_i32 s9, s8, 31
 ; SI-NEXT:    s_mov_b32 s3, 0xf000
 ; SI-NEXT:    s_mov_b32 s2, 0
-; SI-NEXT:    s_lshl_b64 s[4:5], s[8:9], 2
 ; SI-NEXT:    v_mov_b32_e32 v2, 13
+; SI-NEXT:    s_lshl_b64 s[4:5], s[8:9], 2
 ; SI-NEXT:    s_waitcnt expcnt(0)
 ; SI-NEXT:    v_mov_b32_e32 v0, s4
 ; SI-NEXT:    v_mov_b32_e32 v1, s5
@@ -64,8 +64,8 @@ define amdgpu_kernel void @test_if(i32 %b, ptr addrspace(1) %src, ptr addrspace(
 ; SI-NEXT:    s_ashr_i32 s9, s8, 31
 ; SI-NEXT:    s_mov_b32 s3, 0xf000
 ; SI-NEXT:    s_mov_b32 s2, 0
-; SI-NEXT:    s_lshl_b64 s[12:13], s[8:9], 2
 ; SI-NEXT:    v_mov_b32_e32 v3, 17
+; SI-NEXT:    s_lshl_b64 s[12:13], s[8:9], 2
 ; SI-NEXT:    v_mov_b32_e32 v1, s12
 ; SI-NEXT:    v_mov_b32_e32 v2, s13
 ; SI-NEXT:    buffer_store_dword v3, v[1:2], s[0:3], 0 addr64
@@ -251,15 +251,15 @@ define amdgpu_kernel void @simple_test_v_loop(ptr addrspace(1) %dst, ptr addrspa
 ; SI-NEXT:    v_lshlrev_b32_e32 v0, 2, v0
 ; SI-NEXT:    s_mov_b32 s8, 64
 ; SI-NEXT:    s_mov_b32 s7, 0xf000
+; SI-NEXT:    s_mov_b32 s6, -1
+; SI-NEXT:    s_mov_b32 s0, s2
+; SI-NEXT:    s_mov_b32 s3, s7
 ; SI-NEXT:    s_waitcnt lgkmcnt(0)
 ; SI-NEXT:    v_mov_b32_e32 v1, s13
 ; SI-NEXT:    v_add_i32_e32 v0, vcc, s12, v0
 ; SI-NEXT:    v_addc_u32_e32 v1, vcc, 0, v1, vcc
-; SI-NEXT:    s_mov_b32 s6, -1
 ; SI-NEXT:    s_mov_b32 s4, s14
 ; SI-NEXT:    s_mov_b32 s5, s15
-; SI-NEXT:    s_mov_b32 s3, s7
-; SI-NEXT:    s_mov_b32 s0, s2
 ; SI-NEXT:    s_mov_b32 s1, s2
 ; SI-NEXT:  .LBB4_2: ; %loop
 ; SI-NEXT:    ; =>This Inner Loop Header: Depth=1

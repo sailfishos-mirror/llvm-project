@@ -44,8 +44,8 @@ define void @nested_inf_loop(i1 %0, i1 %1) {
 ; ISA-NEXT:  ; %bb.4: ; %loop.exit.guard
 ; ISA-NEXT:    ; in Loop: Header=BB0_1 Depth=1
 ; ISA-NEXT:    s_or_b64 exec, exec, s[8:9]
-; ISA-NEXT:    s_mov_b64 vcc, 0
 ; ISA-NEXT:    s_mov_b64 s[8:9], 0
+; ISA-NEXT:    s_mov_b64 vcc, 0
 ; ISA-NEXT:    s_branch .LBB0_1
 ; ISA-NEXT:  ; %bb.5: ; %DummyReturnBlock
 ; ISA-NEXT:    s_setpc_b64 s[30:31]
@@ -116,17 +116,17 @@ define void @nested_inf_loop_callbr(i32 %0, i32 %1) {
 ; ISA-NEXT:    ; Label of block must be emitted
 ; ISA-NEXT:    ;;#ASMSTART
 ; ISA-NEXT:    ;;#ASMEND
-; ISA-NEXT:    s_mov_b64 s[6:7], -1
-; ISA-NEXT:    s_and_saveexec_b64 s[8:9], s[4:5]
+; ISA-NEXT:    s_mov_b64 s[8:9], -1
+; ISA-NEXT:    s_and_saveexec_b64 s[6:7], s[4:5]
 ; ISA-NEXT:    s_cbranch_execz .LBB1_5
 ; ISA-NEXT:  ; %bb.4: ; %TransitionBlock.target.BB3
 ; ISA-NEXT:    ; in Loop: Header=BB1_1 Depth=1
-; ISA-NEXT:    s_xor_b64 s[6:7], exec, -1
+; ISA-NEXT:    s_xor_b64 s[8:9], exec, -1
 ; ISA-NEXT:  .LBB1_5: ; %loop.exit.guard
 ; ISA-NEXT:    ; in Loop: Header=BB1_1 Depth=1
-; ISA-NEXT:    s_or_b64 exec, exec, s[8:9]
-; ISA-NEXT:    s_and_b64 vcc, exec, s[6:7]
+; ISA-NEXT:    s_or_b64 exec, exec, s[6:7]
 ; ISA-NEXT:    s_mov_b64 s[6:7], 0
+; ISA-NEXT:    s_and_b64 vcc, exec, s[8:9]
 ; ISA-NEXT:    s_cbranch_vccz .LBB1_2
 ; ISA-NEXT:  ; %bb.6: ; %DummyReturnBlock
 ; ISA-NEXT:    s_setpc_b64 s[30:31]

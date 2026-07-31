@@ -57,7 +57,7 @@ hw_events(HWEvent MaxEvent = HWEvent::NUM_WAIT_EVENTS) {
 }
 
 class HWEventSet {
-  unsigned Mask = 0;
+  uint64_t Mask = 0;
 
 public:
   HWEventSet() = default;
@@ -65,22 +65,22 @@ public:
     static_assert(static_cast<unsigned>(HWEvent::NUM_WAIT_EVENTS) <=
                       sizeof(Mask) * 8,
                   "Not enough bits in Mask for all the events");
-    Mask |= 1 << static_cast<unsigned>(Event);
+    Mask |= 1ULL << static_cast<unsigned>(Event);
   }
   constexpr HWEventSet(std::initializer_list<HWEvent> Events) {
     for (auto &E : Events) {
-      Mask |= 1 << static_cast<unsigned>(E);
+      Mask |= 1ULL << static_cast<unsigned>(E);
     }
   }
   void insert(const HWEvent &Event) {
-    Mask |= 1 << static_cast<unsigned>(Event);
+    Mask |= 1ULL << static_cast<unsigned>(Event);
   }
   void remove(const HWEvent &Event) {
-    Mask &= ~(1 << static_cast<unsigned>(Event));
+    Mask &= ~(1ULL << static_cast<unsigned>(Event));
   }
   void remove(const HWEventSet &Other) { Mask &= ~Other.Mask; }
   bool contains(const HWEvent &Event) const {
-    return Mask & (1 << static_cast<unsigned>(Event));
+    return Mask & (1ULL << static_cast<unsigned>(Event));
   }
   /// \returns true if this set contains all elements of \p Other.
   bool contains(const HWEventSet &Other) const {

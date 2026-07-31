@@ -22,10 +22,10 @@ define amdgpu_kernel void @test_loop(ptr addrspace(3) %ptr, i32 %n) nounwind {
 ; GCN-NEXT:    s_addk_i32 s2, 0x80
 ; GCN-NEXT:    v_mov_b32_e32 v0, s2
 ; GCN-NEXT:    ds_read_b32 v1, v0
+; GCN-NEXT:    s_add_i32 s1, s1, 1
 ; GCN-NEXT:    s_waitcnt lgkmcnt(0)
 ; GCN-NEXT:    v_add_f32_e32 v1, 1.0, v1
 ; GCN-NEXT:    ds_write_b32 v0, v1
-; GCN-NEXT:    s_add_i32 s1, s1, 1
 ; GCN-NEXT:    s_mov_b64 vcc, vcc
 ; GCN-NEXT:    s_cbranch_vccnz .LBB0_2
 ; GCN-NEXT:  .LBB0_3: ; %for.exit
@@ -127,10 +127,10 @@ define amdgpu_kernel void @loop_const_true(ptr addrspace(3) %ptr, i32 %n) nounwi
 ; GCN-NEXT:    s_addk_i32 s2, 0x80
 ; GCN-NEXT:    v_mov_b32_e32 v0, s2
 ; GCN-NEXT:    ds_read_b32 v1, v0
+; GCN-NEXT:    s_add_i32 s1, s1, 1
 ; GCN-NEXT:    s_waitcnt lgkmcnt(0)
 ; GCN-NEXT:    v_add_f32_e32 v1, 1.0, v1
 ; GCN-NEXT:    ds_write_b32 v0, v1
-; GCN-NEXT:    s_add_i32 s1, s1, 1
 ; GCN-NEXT:    s_mov_b64 vcc, vcc
 ; GCN-NEXT:    s_cbranch_vccnz .LBB1_1
 ; GCN-NEXT:  ; %bb.2: ; %DummyReturnBlock
@@ -396,10 +396,10 @@ define amdgpu_kernel void @loop_arg_0(ptr addrspace(3) %ptr, i32 %n) nounwind {
 ; GCN-NEXT:    s_addk_i32 s2, 0x80
 ; GCN-NEXT:    v_mov_b32_e32 v0, s2
 ; GCN-NEXT:    ds_read_b32 v1, v0
+; GCN-NEXT:    s_add_i32 s1, s1, 1
 ; GCN-NEXT:    s_waitcnt lgkmcnt(0)
 ; GCN-NEXT:    v_add_f32_e32 v1, 1.0, v1
 ; GCN-NEXT:    ds_write_b32 v0, v1
-; GCN-NEXT:    s_add_i32 s1, s1, 1
 ; GCN-NEXT:    s_mov_b64 vcc, vcc
 ; GCN-NEXT:    s_cbranch_vccz .LBB4_1
 ; GCN-NEXT:  ; %bb.2: ; %for.exit

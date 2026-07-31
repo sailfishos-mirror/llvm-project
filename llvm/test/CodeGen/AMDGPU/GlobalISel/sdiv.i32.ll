@@ -84,6 +84,7 @@ define amdgpu_ps i32 @s_sdiv_i32(i32 inreg %num, i32 inreg %den) {
 ; GISEL-NEXT:    s_ashr_i32 s3, s1, 31
 ; GISEL-NEXT:    s_add_i32 s0, s0, s2
 ; GISEL-NEXT:    s_add_i32 s1, s1, s3
+; GISEL-NEXT:    s_xor_b32 s0, s0, s2
 ; GISEL-NEXT:    s_xor_b32 s1, s1, s3
 ; GISEL-NEXT:    v_cvt_f32_u32_e32 v0, s1
 ; GISEL-NEXT:    s_sub_i32 s4, 0, s1
@@ -95,7 +96,6 @@ define amdgpu_ps i32 @s_sdiv_i32(i32 inreg %num, i32 inreg %den) {
 ; GISEL-NEXT:    v_mul_hi_u32 v0, v0, s4
 ; GISEL-NEXT:    v_readfirstlane_b32 s4, v0
 ; GISEL-NEXT:    s_add_i32 s4, s5, s4
-; GISEL-NEXT:    s_xor_b32 s0, s0, s2
 ; GISEL-NEXT:    v_mov_b32_e32 v0, s4
 ; GISEL-NEXT:    v_mul_hi_u32 v0, s0, v0
 ; GISEL-NEXT:    v_readfirstlane_b32 s4, v0
@@ -126,19 +126,19 @@ define amdgpu_ps i32 @s_sdiv_i32(i32 inreg %num, i32 inreg %den) {
 ; CGP-NEXT:    s_xor_b32 s4, s2, s3
 ; CGP-NEXT:    s_add_i32 s0, s0, s2
 ; CGP-NEXT:    s_add_i32 s1, s1, s3
+; CGP-NEXT:    s_xor_b32 s0, s0, s2
 ; CGP-NEXT:    s_xor_b32 s1, s1, s3
 ; CGP-NEXT:    v_cvt_f32_u32_e32 v0, s1
-; CGP-NEXT:    s_sub_i32 s3, 0, s1
+; CGP-NEXT:    s_sub_i32 s2, 0, s1
 ; CGP-NEXT:    v_rcp_f32_e32 v0, v0
 ; CGP-NEXT:    v_mul_f32_e32 v0, 0x4f7ffffe, v0
 ; CGP-NEXT:    v_cvt_u32_f32_e32 v0, v0
-; CGP-NEXT:    v_readfirstlane_b32 s5, v0
-; CGP-NEXT:    s_mul_i32 s3, s3, s5
-; CGP-NEXT:    v_mul_hi_u32 v0, v0, s3
 ; CGP-NEXT:    v_readfirstlane_b32 s3, v0
-; CGP-NEXT:    s_add_i32 s3, s5, s3
-; CGP-NEXT:    s_xor_b32 s0, s0, s2
-; CGP-NEXT:    v_mov_b32_e32 v0, s3
+; CGP-NEXT:    s_mul_i32 s2, s2, s3
+; CGP-NEXT:    v_mul_hi_u32 v0, v0, s2
+; CGP-NEXT:    v_readfirstlane_b32 s2, v0
+; CGP-NEXT:    s_add_i32 s2, s3, s2
+; CGP-NEXT:    v_mov_b32_e32 v0, s2
 ; CGP-NEXT:    v_mul_hi_u32 v0, s0, v0
 ; CGP-NEXT:    v_readfirstlane_b32 s2, v0
 ; CGP-NEXT:    s_mul_i32 s3, s2, s1

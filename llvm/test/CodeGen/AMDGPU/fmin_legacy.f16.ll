@@ -250,8 +250,8 @@ define <3 x half> @test_fmin_legacy_ule_v3f16(<3 x half> %a, <3 x half> %b) #0 {
 ; SI-NEXT:    v_cmp_ngt_f32_e32 vcc, v11, v10
 ; SI-NEXT:    v_cndmask_b32_e32 v2, v5, v4, vcc
 ; SI-NEXT:    v_and_b32_e32 v1, 0xffff, v1
-; SI-NEXT:    v_lshlrev_b32_e32 v2, 16, v2
 ; SI-NEXT:    v_and_b32_e32 v0, 0xffff, v0
+; SI-NEXT:    v_lshlrev_b32_e32 v2, 16, v2
 ; SI-NEXT:    v_or_b32_e32 v0, v0, v2
 ; SI-NEXT:    s_setpc_b64 s[30:31]
 ;
@@ -318,9 +318,9 @@ define <3 x half> @test_fmin_legacy_ule_v3f16_fast(<3 x half> %a, <3 x half> %b)
 ; SI-NEXT:    v_min_f32_e32 v0, v0, v2
 ; SI-NEXT:    v_min_f32_e32 v2, v4, v5
 ; SI-NEXT:    v_cvt_f16_f32_e32 v1, v1
+; SI-NEXT:    v_cvt_f16_f32_e32 v0, v0
 ; SI-NEXT:    v_cvt_f16_f32_e32 v2, v2
 ; SI-NEXT:    v_lshlrev_b32_e32 v2, 16, v2
-; SI-NEXT:    v_cvt_f16_f32_e32 v0, v0
 ; SI-NEXT:    v_or_b32_e32 v0, v0, v2
 ; SI-NEXT:    s_setpc_b64 s[30:31]
 ;

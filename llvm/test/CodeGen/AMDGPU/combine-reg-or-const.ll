@@ -27,10 +27,10 @@ define protected amdgpu_kernel void @_Z11test_kernelPii(ptr addrspace(1) nocaptu
 ; CHECK-NEXT:    s_addc_u32 s1, s3, s5
 ; CHECK-NEXT:    s_bfe_u32 s2, s6, 0xd0003
 ; CHECK-NEXT:    s_add_i32 s2, s2, s7
-; CHECK-NEXT:    s_addk_i32 s2, 0xc0
 ; CHECK-NEXT:    v_mov_b32_e32 v0, s0
 ; CHECK-NEXT:    v_mov_b32_e32 v1, s1
-; CHECK-NEXT:    v_mov_b32_e32 v2, s2
+; CHECK-NEXT:    s_or_b32 s0, s2, 0xc0
+; CHECK-NEXT:    v_mov_b32_e32 v2, s0
 ; CHECK-NEXT:    flat_store_dword v[0:1], v2
 ; CHECK-NEXT:  .LBB0_2: ; %if.end
 ; CHECK-NEXT:    s_endpgm

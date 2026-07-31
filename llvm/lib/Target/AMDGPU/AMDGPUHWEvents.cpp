@@ -33,18 +33,25 @@ static HWEventSet getExpertSchedulingEventType(const MachineInstr &Inst,
   if (TII.isVALU(Inst, /*AllowLDSDMA=*/true) && !SIInstrInfo::isLDSDMA(Inst)) {
     // Core/Side-, DP-, XDL- and TRANS-MACC VALU instructions complete
     // out-of-order with respect to each other, so each of these classes
-    // has its own event.
+    // has its own event. Each class also reads its VGPR sources out-of-order,
+    // tracked with a separate READ event (VA_VDST_RD) to handle WAR hazards,
+    // in addition to the WRITE event (VA_VDST_WR) for RAW/WAW hazards.
 
-    if (TII.isXDL(Inst))
-      return HWEvent::VGPR_XDL_WRITE;
+    if (TII.isXDL(Inst)) {
+      if (AMDGPU::getWMMAIsVAVDSTOrderedXDL(Inst.getOpcode()))
+        return HWEventSet({HWEvent::VGPR_XDL_ORDERED_READ,
+                           HWEvent::VGPR_XDL_ORDERED_WRITE});
+      return HWEventSet({HWEvent::VGPR_XDL_READ, HWEvent::VGPR_XDL_WRITE});
+    }
 
     if (TII.isTRANS(Inst))
-      return HWEvent::VGPR_TRANS_WRITE;
+      return HWEventSet({HWEvent::VGPR_TRANS_READ, HWEvent::VGPR_TRANS_WRITE});
 
     if (AMDGPU::isDPMACCInstruction(Inst.getOpcode()))
-      return HWEvent::VGPR_DPMACC_WRITE;
+      return HWEventSet(
+          {HWEvent::VGPR_DPMACC_READ, HWEvent::VGPR_DPMACC_WRITE});
 
-    return HWEvent::VGPR_CSMACC_WRITE;
+    return HWEventSet({HWEvent::VGPR_CSMACC_READ, HWEvent::VGPR_CSMACC_WRITE});
   }
 
   // FLAT and LDS instructions may read their VGPR sources out-of-order

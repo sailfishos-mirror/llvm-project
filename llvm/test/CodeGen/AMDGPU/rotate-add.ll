@@ -198,14 +198,14 @@ define i64 @test_rotl_udiv_special_case(i64 %i) {
 ; SI-NEXT:    v_add_i32_e32 v0, vcc, v3, v0
 ; SI-NEXT:    v_addc_u32_e32 v0, vcc, 0, v2, vcc
 ; SI-NEXT:    v_add_i32_e32 v0, vcc, v4, v0
-; SI-NEXT:    v_addc_u32_e64 v3, s[4:5], 0, 0, vcc
-; SI-NEXT:    v_add_i32_e32 v2, vcc, v1, v0
-; SI-NEXT:    v_addc_u32_e32 v3, vcc, v6, v3, vcc
-; SI-NEXT:    v_lshr_b64 v[0:1], v[2:3], 5
-; SI-NEXT:    v_lshlrev_b32_e32 v0, 27, v2
-; SI-NEXT:    v_and_b32_e32 v0, 0xf0000000, v0
-; SI-NEXT:    v_or_b32_e32 v1, v0, v1
-; SI-NEXT:    v_alignbit_b32 v0, v3, v2, 5
+; SI-NEXT:    v_addc_u32_e64 v2, s[4:5], 0, 0, vcc
+; SI-NEXT:    v_add_i32_e32 v0, vcc, v1, v0
+; SI-NEXT:    v_addc_u32_e32 v1, vcc, v6, v2, vcc
+; SI-NEXT:    v_lshr_b64 v[2:3], v[0:1], 5
+; SI-NEXT:    v_lshlrev_b32_e32 v2, 27, v0
+; SI-NEXT:    v_alignbit_b32 v0, v1, v0, 5
+; SI-NEXT:    v_and_b32_e32 v1, 0xf0000000, v2
+; SI-NEXT:    v_or_b32_e32 v1, v1, v3
 ; SI-NEXT:    s_setpc_b64 s[30:31]
 ;
 ; VI-LABEL: test_rotl_udiv_special_case:

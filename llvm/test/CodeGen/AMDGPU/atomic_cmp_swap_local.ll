@@ -201,23 +201,23 @@ define amdgpu_kernel void @lds_atomic_cmpxchg_ret_i32_bad_si_offset(ptr addrspac
 ; CHECK-LABEL: lds_atomic_cmpxchg_ret_i32_bad_si_offset:
 ; CHECK:       ; %bb.0:
 ; CHECK-NEXT:    s_load_dwordx4 s[0:3], s[4:5], 0xc
+; CHECK-NEXT:    s_load_dwordx2 s[8:9], s[4:5], 0x9
 ; CHECK-NEXT:    s_waitcnt lgkmcnt(0)
 ; CHECK-NEXT:    s_load_dword s3, s[4:5], 0xb
-; CHECK-NEXT:    s_load_dwordx2 s[4:5], s[4:5], 0x9
-; CHECK-NEXT:    s_sub_i32 s1, s1, s2
-; CHECK-NEXT:    s_lshl_b32 s1, s1, 2
-; CHECK-NEXT:    s_waitcnt lgkmcnt(0)
-; CHECK-NEXT:    s_add_i32 s1, s3, s1
-; CHECK-NEXT:    s_add_i32 s1, s1, 16
 ; CHECK-NEXT:    v_mov_b32_e32 v0, 7
+; CHECK-NEXT:    s_sub_i32 s1, s1, s2
 ; CHECK-NEXT:    v_mov_b32_e32 v1, s0
-; CHECK-NEXT:    v_mov_b32_e32 v2, s1
+; CHECK-NEXT:    s_lshl_b32 s0, s1, 2
+; CHECK-NEXT:    s_waitcnt lgkmcnt(0)
+; CHECK-NEXT:    s_add_i32 s0, s3, s0
+; CHECK-NEXT:    s_add_i32 s0, s0, 16
+; CHECK-NEXT:    v_mov_b32_e32 v2, s0
 ; CHECK-NEXT:    s_mov_b32 m0, -1
 ; CHECK-NEXT:    ds_cmpst_rtn_b32 v0, v2, v0, v1
 ; CHECK-NEXT:    s_waitcnt lgkmcnt(0)
-; CHECK-NEXT:    s_mov_b32 s7, 0xf000
-; CHECK-NEXT:    s_mov_b32 s6, -1
-; CHECK-NEXT:    buffer_store_dword v0, off, s[4:7], 0
+; CHECK-NEXT:    s_mov_b32 s11, 0xf000
+; CHECK-NEXT:    s_mov_b32 s10, -1
+; CHECK-NEXT:    buffer_store_dword v0, off, s[8:11], 0
 ; CHECK-NEXT:    s_endpgm
 ;
 ; GFX7-LABEL: lds_atomic_cmpxchg_ret_i32_bad_si_offset:

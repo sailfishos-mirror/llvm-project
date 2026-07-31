@@ -8,9 +8,9 @@ define amdgpu_kernel void @uniform_sext_in_reg_i8_to_i32(ptr addrspace(1) %out, 
 ; GCN-NEXT:    s_waitcnt lgkmcnt(0)
 ; GCN-NEXT:    s_mov_b64 s[4:5], s[2:3]
 ; GCN-NEXT:    s_mov_b32 s3, 0xf000
-; GCN-NEXT:    s_add_i32 s2, s4, s5
-; GCN-NEXT:    s_sext_i32_i8 s4, s2
 ; GCN-NEXT:    s_mov_b32 s2, -1
+; GCN-NEXT:    s_add_i32 s4, s4, s5
+; GCN-NEXT:    s_sext_i32_i8 s4, s4
 ; GCN-NEXT:    v_mov_b32_e32 v0, s4
 ; GCN-NEXT:    buffer_store_dword v0, off, s[0:3], 0
 ; GCN-NEXT:    s_endpgm
@@ -50,9 +50,9 @@ define amdgpu_kernel void @uniform_sext_in_reg_i16_to_i32(ptr addrspace(1) %out,
 ; GCN-NEXT:    s_waitcnt lgkmcnt(0)
 ; GCN-NEXT:    s_mov_b64 s[4:5], s[2:3]
 ; GCN-NEXT:    s_mov_b32 s3, 0xf000
-; GCN-NEXT:    s_add_i32 s2, s4, s5
-; GCN-NEXT:    s_sext_i32_i16 s4, s2
 ; GCN-NEXT:    s_mov_b32 s2, -1
+; GCN-NEXT:    s_add_i32 s4, s4, s5
+; GCN-NEXT:    s_sext_i32_i16 s4, s4
 ; GCN-NEXT:    v_mov_b32_e32 v0, s4
 ; GCN-NEXT:    buffer_store_dword v0, off, s[0:3], 0
 ; GCN-NEXT:    s_endpgm

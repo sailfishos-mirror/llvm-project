@@ -13,8 +13,8 @@ define <2 x i16> @extract_2xi16(ptr addrspace(1) %p0, ptr addrspace(1) %p1, i1 %
 ; GCN-NEXT:    s_xor_b64 s[4:5], exec, s[4:5]
 ; GCN-NEXT:    s_cbranch_execz .LBB0_2
 ; GCN-NEXT:  ; %bb.1: ; %F
-; GCN-NEXT:    s_mov_b32 s10, 0
 ; GCN-NEXT:    s_mov_b32 s11, 0xf000
+; GCN-NEXT:    s_mov_b32 s10, 0
 ; GCN-NEXT:    s_mov_b32 s8, s10
 ; GCN-NEXT:    s_mov_b32 s9, s10
 ; GCN-NEXT:    buffer_load_ushort v0, v[2:3], s[8:11], 0 addr64 glc
@@ -40,8 +40,8 @@ define <2 x i16> @extract_2xi16(ptr addrspace(1) %p0, ptr addrspace(1) %p1, i1 %
 ; GCN-NEXT:    s_andn2_saveexec_b64 s[4:5], s[4:5]
 ; GCN-NEXT:    s_cbranch_execz .LBB0_4
 ; GCN-NEXT:  ; %bb.3: ; %T
-; GCN-NEXT:    s_mov_b32 s10, 0
 ; GCN-NEXT:    s_mov_b32 s11, 0xf000
+; GCN-NEXT:    s_mov_b32 s10, 0
 ; GCN-NEXT:    s_mov_b32 s8, s10
 ; GCN-NEXT:    s_mov_b32 s9, s10
 ; GCN-NEXT:    buffer_load_ushort v2, v[0:1], s[8:11], 0 addr64 glc
@@ -105,8 +105,8 @@ define <2 x i64> @extract_2xi64(ptr addrspace(1) %p0, ptr addrspace(1) %p1, i1 %
 ; GCN-NEXT:    s_xor_b64 s[4:5], exec, s[4:5]
 ; GCN-NEXT:    s_cbranch_execz .LBB1_2
 ; GCN-NEXT:  ; %bb.1: ; %F
-; GCN-NEXT:    s_mov_b32 s10, 0
 ; GCN-NEXT:    s_mov_b32 s11, 0xf000
+; GCN-NEXT:    s_mov_b32 s10, 0
 ; GCN-NEXT:    s_mov_b32 s8, s10
 ; GCN-NEXT:    s_mov_b32 s9, s10
 ; GCN-NEXT:    buffer_load_dwordx4 v[4:7], v[2:3], s[8:11], 0 addr64 glc
@@ -122,8 +122,8 @@ define <2 x i64> @extract_2xi64(ptr addrspace(1) %p0, ptr addrspace(1) %p1, i1 %
 ; GCN-NEXT:    s_andn2_saveexec_b64 s[4:5], s[4:5]
 ; GCN-NEXT:    s_cbranch_execz .LBB1_4
 ; GCN-NEXT:  ; %bb.3: ; %T
-; GCN-NEXT:    s_mov_b32 s10, 0
 ; GCN-NEXT:    s_mov_b32 s11, 0xf000
+; GCN-NEXT:    s_mov_b32 s10, 0
 ; GCN-NEXT:    s_mov_b32 s8, s10
 ; GCN-NEXT:    s_mov_b32 s9, s10
 ; GCN-NEXT:    buffer_load_dwordx4 v[4:7], v[0:1], s[8:11], 0 addr64 glc
@@ -173,8 +173,8 @@ define <4 x i64> @extract_4xi64(ptr addrspace(1) %p0, ptr addrspace(1) %p1, i1 %
 ; GCN-NEXT:    s_xor_b64 s[4:5], exec, s[4:5]
 ; GCN-NEXT:    s_cbranch_execz .LBB2_2
 ; GCN-NEXT:  ; %bb.1: ; %F
-; GCN-NEXT:    s_mov_b32 s10, 0
 ; GCN-NEXT:    s_mov_b32 s11, 0xf000
+; GCN-NEXT:    s_mov_b32 s10, 0
 ; GCN-NEXT:    s_mov_b32 s8, s10
 ; GCN-NEXT:    s_mov_b32 s9, s10
 ; GCN-NEXT:    buffer_load_dwordx4 v[4:7], v[2:3], s[8:11], 0 addr64 glc
@@ -190,8 +190,8 @@ define <4 x i64> @extract_4xi64(ptr addrspace(1) %p0, ptr addrspace(1) %p1, i1 %
 ; GCN-NEXT:    s_andn2_saveexec_b64 s[4:5], s[4:5]
 ; GCN-NEXT:    s_cbranch_execz .LBB2_4
 ; GCN-NEXT:  ; %bb.3: ; %T
-; GCN-NEXT:    s_mov_b32 s10, 0
 ; GCN-NEXT:    s_mov_b32 s11, 0xf000
+; GCN-NEXT:    s_mov_b32 s10, 0
 ; GCN-NEXT:    s_mov_b32 s8, s10
 ; GCN-NEXT:    s_mov_b32 s9, s10
 ; GCN-NEXT:    buffer_load_dwordx4 v[4:7], v[0:1], s[8:11], 0 addr64 glc
@@ -247,8 +247,8 @@ define <8 x i64> @extract_8xi64(ptr addrspace(1) %p0, ptr addrspace(1) %p1, i1 %
 ; GCN-NEXT:    s_xor_b64 s[4:5], exec, s[4:5]
 ; GCN-NEXT:    s_cbranch_execz .LBB3_2
 ; GCN-NEXT:  ; %bb.1: ; %F
-; GCN-NEXT:    s_mov_b32 s10, 0
 ; GCN-NEXT:    s_mov_b32 s11, 0xf000
+; GCN-NEXT:    s_mov_b32 s10, 0
 ; GCN-NEXT:    s_mov_b32 s8, s10
 ; GCN-NEXT:    s_mov_b32 s9, s10
 ; GCN-NEXT:    buffer_load_dwordx4 v[4:7], v[2:3], s[8:11], 0 addr64 offset:112 glc
@@ -272,8 +272,8 @@ define <8 x i64> @extract_8xi64(ptr addrspace(1) %p0, ptr addrspace(1) %p1, i1 %
 ; GCN-NEXT:    s_andn2_saveexec_b64 s[4:5], s[4:5]
 ; GCN-NEXT:    s_cbranch_execz .LBB3_4
 ; GCN-NEXT:  ; %bb.3: ; %T
-; GCN-NEXT:    s_mov_b32 s10, 0
 ; GCN-NEXT:    s_mov_b32 s11, 0xf000
+; GCN-NEXT:    s_mov_b32 s10, 0
 ; GCN-NEXT:    s_mov_b32 s8, s10
 ; GCN-NEXT:    s_mov_b32 s9, s10
 ; GCN-NEXT:    buffer_load_dwordx4 v[2:5], v[0:1], s[8:11], 0 addr64 offset:112 glc
@@ -349,8 +349,8 @@ define <2 x double> @extract_2xf64(ptr addrspace(1) %p0, ptr addrspace(1) %p1, i
 ; GCN-NEXT:    s_xor_b64 s[4:5], exec, s[4:5]
 ; GCN-NEXT:    s_cbranch_execz .LBB4_2
 ; GCN-NEXT:  ; %bb.1: ; %F
-; GCN-NEXT:    s_mov_b32 s10, 0
 ; GCN-NEXT:    s_mov_b32 s11, 0xf000
+; GCN-NEXT:    s_mov_b32 s10, 0
 ; GCN-NEXT:    s_mov_b32 s8, s10
 ; GCN-NEXT:    s_mov_b32 s9, s10
 ; GCN-NEXT:    buffer_load_dwordx4 v[4:7], v[2:3], s[8:11], 0 addr64 glc
@@ -366,8 +366,8 @@ define <2 x double> @extract_2xf64(ptr addrspace(1) %p0, ptr addrspace(1) %p1, i
 ; GCN-NEXT:    s_andn2_saveexec_b64 s[4:5], s[4:5]
 ; GCN-NEXT:    s_cbranch_execz .LBB4_4
 ; GCN-NEXT:  ; %bb.3: ; %T
-; GCN-NEXT:    s_mov_b32 s10, 0
 ; GCN-NEXT:    s_mov_b32 s11, 0xf000
+; GCN-NEXT:    s_mov_b32 s10, 0
 ; GCN-NEXT:    s_mov_b32 s8, s10
 ; GCN-NEXT:    s_mov_b32 s9, s10
 ; GCN-NEXT:    buffer_load_dwordx4 v[4:7], v[0:1], s[8:11], 0 addr64 glc
@@ -417,8 +417,8 @@ define <4 x double> @extract_4xf64(ptr addrspace(1) %p0, ptr addrspace(1) %p1, i
 ; GCN-NEXT:    s_xor_b64 s[4:5], exec, s[4:5]
 ; GCN-NEXT:    s_cbranch_execz .LBB5_2
 ; GCN-NEXT:  ; %bb.1: ; %F
-; GCN-NEXT:    s_mov_b32 s10, 0
 ; GCN-NEXT:    s_mov_b32 s11, 0xf000
+; GCN-NEXT:    s_mov_b32 s10, 0
 ; GCN-NEXT:    s_mov_b32 s8, s10
 ; GCN-NEXT:    s_mov_b32 s9, s10
 ; GCN-NEXT:    buffer_load_dwordx4 v[4:7], v[2:3], s[8:11], 0 addr64 glc
@@ -434,8 +434,8 @@ define <4 x double> @extract_4xf64(ptr addrspace(1) %p0, ptr addrspace(1) %p1, i
 ; GCN-NEXT:    s_andn2_saveexec_b64 s[4:5], s[4:5]
 ; GCN-NEXT:    s_cbranch_execz .LBB5_4
 ; GCN-NEXT:  ; %bb.3: ; %T
-; GCN-NEXT:    s_mov_b32 s10, 0
 ; GCN-NEXT:    s_mov_b32 s11, 0xf000
+; GCN-NEXT:    s_mov_b32 s10, 0
 ; GCN-NEXT:    s_mov_b32 s8, s10
 ; GCN-NEXT:    s_mov_b32 s9, s10
 ; GCN-NEXT:    buffer_load_dwordx4 v[4:7], v[0:1], s[8:11], 0 addr64 glc
@@ -491,8 +491,8 @@ define <8 x double> @extract_8xf64(ptr addrspace(1) %p0, ptr addrspace(1) %p1, i
 ; GCN-NEXT:    s_xor_b64 s[4:5], exec, s[4:5]
 ; GCN-NEXT:    s_cbranch_execz .LBB6_2
 ; GCN-NEXT:  ; %bb.1: ; %F
-; GCN-NEXT:    s_mov_b32 s10, 0
 ; GCN-NEXT:    s_mov_b32 s11, 0xf000
+; GCN-NEXT:    s_mov_b32 s10, 0
 ; GCN-NEXT:    s_mov_b32 s8, s10
 ; GCN-NEXT:    s_mov_b32 s9, s10
 ; GCN-NEXT:    buffer_load_dwordx4 v[4:7], v[2:3], s[8:11], 0 addr64 offset:112 glc
@@ -516,8 +516,8 @@ define <8 x double> @extract_8xf64(ptr addrspace(1) %p0, ptr addrspace(1) %p1, i
 ; GCN-NEXT:    s_andn2_saveexec_b64 s[4:5], s[4:5]
 ; GCN-NEXT:    s_cbranch_execz .LBB6_4
 ; GCN-NEXT:  ; %bb.3: ; %T
-; GCN-NEXT:    s_mov_b32 s10, 0
 ; GCN-NEXT:    s_mov_b32 s11, 0xf000
+; GCN-NEXT:    s_mov_b32 s10, 0
 ; GCN-NEXT:    s_mov_b32 s8, s10
 ; GCN-NEXT:    s_mov_b32 s9, s10
 ; GCN-NEXT:    buffer_load_dwordx4 v[2:5], v[0:1], s[8:11], 0 addr64 offset:112 glc

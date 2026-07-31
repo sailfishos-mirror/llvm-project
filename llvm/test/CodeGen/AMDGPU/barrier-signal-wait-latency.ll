@@ -10,13 +10,13 @@ define amdgpu_kernel void @test_barrier_independent_valu(ptr addrspace(1) %out, 
 ; OPT-LABEL: test_barrier_independent_valu:
 ; OPT:       ; %bb.0: ; %entry
 ; OPT-NEXT:    s_load_b96 s[0:2], s[4:5], 0x24
-; OPT-NEXT:    v_and_b32_e32 v1, 0x3ff, v0
-; OPT-NEXT:    s_delay_alu instid0(VALU_DEP_1)
-; OPT-NEXT:    v_lshlrev_b32_e32 v2, 2, v1
+; OPT-NEXT:    v_and_b32_e32 v0, 0x3ff, v0
+; OPT-NEXT:    s_delay_alu instid0(VALU_DEP_1) | instskip(SKIP_4) | instid1(VALU_DEP_1)
+; OPT-NEXT:    v_lshlrev_b32_e32 v2, 2, v0
 ; OPT-NEXT:    s_wait_kmcnt 0x0
-; OPT-NEXT:    v_xad_u32 v0, v1, -1, s2
-; OPT-NEXT:    global_store_b32 v2, v1, s[0:1]
+; OPT-NEXT:    global_store_b32 v2, v0, s[0:1]
 ; OPT-NEXT:    s_barrier_signal -1
+; OPT-NEXT:    v_xad_u32 v0, v0, -1, s2
 ; OPT-NEXT:    v_ashrrev_i32_e32 v1, 31, v0
 ; OPT-NEXT:    s_delay_alu instid0(VALU_DEP_1) | instskip(NEXT) | instid1(VALU_DEP_1)
 ; OPT-NEXT:    v_lshlrev_b64_e32 v[0:1], 2, v[0:1]
@@ -113,13 +113,13 @@ define amdgpu_kernel void @test_barrier_multiple(ptr addrspace(1) %out, i32 %siz
 ; OPT-LABEL: test_barrier_multiple:
 ; OPT:       ; %bb.0: ; %entry
 ; OPT-NEXT:    s_load_b96 s[0:2], s[4:5], 0x24
-; OPT-NEXT:    v_and_b32_e32 v1, 0x3ff, v0
-; OPT-NEXT:    s_delay_alu instid0(VALU_DEP_1)
-; OPT-NEXT:    v_lshlrev_b32_e32 v2, 2, v1
+; OPT-NEXT:    v_and_b32_e32 v0, 0x3ff, v0
+; OPT-NEXT:    s_delay_alu instid0(VALU_DEP_1) | instskip(SKIP_4) | instid1(VALU_DEP_1)
+; OPT-NEXT:    v_lshlrev_b32_e32 v2, 2, v0
 ; OPT-NEXT:    s_wait_kmcnt 0x0
-; OPT-NEXT:    v_xad_u32 v0, v1, -1, s2
-; OPT-NEXT:    global_store_b32 v2, v1, s[0:1]
+; OPT-NEXT:    global_store_b32 v2, v0, s[0:1]
 ; OPT-NEXT:    s_barrier_signal -1
+; OPT-NEXT:    v_xad_u32 v0, v0, -1, s2
 ; OPT-NEXT:    v_ashrrev_i32_e32 v1, 31, v0
 ; OPT-NEXT:    s_delay_alu instid0(VALU_DEP_1) | instskip(NEXT) | instid1(VALU_DEP_1)
 ; OPT-NEXT:    v_lshlrev_b64_e32 v[0:1], 2, v[0:1]

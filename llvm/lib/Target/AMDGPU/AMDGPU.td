@@ -549,6 +549,12 @@ defm GFX1250Insts : AMDGPUSubtargetFeature<"gfx1250-insts",
   /*GenPredicate=*/0
 >;
 
+defm CoExecFriendlyISelMode : AMDGPUSubtargetFeature<"coexec-friendly-isel",
+  "Avoid selecting multi-rate (repeat-rate-32) 64-bit VALU instructions during "
+  "SelectionDAG ISel; expand them to cheaper sequences for the CoExec scheduler",
+  /*GenPredicate=*/0
+>;
+
 defm GFX13Insts : AMDGPUSubtargetFeature<"gfx13-insts",
   "Additional instructions for GFX13+",
   /*GenPredicate=*/0,
@@ -618,6 +624,10 @@ defm VOP3PInsts : AMDGPUSubtargetFeature<"vop3p",
 
 defm Movrel : AMDGPUSubtargetFeature<"movrel",
   "Has v_movrel*_b32 instructions"
+>;
+
+defm BF16InlineConstFromUpperFP32 : AMDGPUSubtargetFeature<"bf16-from-upper-fp32",
+  "bf16 inline constants are actually selected from upper 16-bits of a fp32"
 >;
 
 defm VGPRIndexMode : AMDGPUSubtargetFeature<"vgpr-index-mode",
@@ -1205,6 +1215,11 @@ defm SWakeupBarrier : AMDGPUSubtargetFeature<"s-wakeup-barrier-inst",
 
 defm FlatSignedOffset : AMDGPUSubtargetFeature<"flat-signed-offset",
   "Immediate offset of FLAT instructions are always signed"
+>;
+
+defm RequiresInitialUnclausedVmem : AMDGPUSubtargetFeature<"requires-initial-unclause-vmem",
+  "Hardware entrypoints require first VMEM instruction to be unclaused",
+  GenPredicate=false
 >;
 
 //===------------------------------------------------------------===//
@@ -2175,6 +2190,7 @@ def FeatureISAVersion12_50_Common : FeatureSet<
    FeatureBF16TransInsts,
    FeatureBF16ConversionInsts,
    FeatureBF16PackedInsts,
+   FeatureBF16InlineConstFromUpperFP32,
    FeatureCvtPkF16F32Inst,
    FeatureFmaMixBF16Insts,
    FeatureMin3Max3PKF16,
@@ -2214,6 +2230,7 @@ def FeatureISAVersion12_50_Common : FeatureSet<
    FeatureRealTrue16Insts,
    FeatureVMovB64Inst,
    FeatureVMulU64Inst,
+   FeatureRequiresInitialUnclausedVmem,
 ]>;
 
 def FeatureISAVersion12_50 : FeatureSet<
@@ -2316,6 +2333,7 @@ def FeatureISAVersion13 : FeatureSet<
    FeatureBF16TransInsts,
    FeatureBF16ConversionInsts,
    FeatureBF16PackedInsts,
+   FeatureBF16InlineConstFromUpperFP32,
    FeaturePrngInst,
    FeaturePermlane16Swap,
    FeatureAshrPkInsts,

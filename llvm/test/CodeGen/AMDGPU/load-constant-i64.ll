@@ -9,14 +9,16 @@ define amdgpu_kernel void @constant_load_i64(ptr addrspace(1) %out, ptr addrspac
 ; GFX6-LABEL: constant_load_i64:
 ; GFX6:       ; %bb.0:
 ; GFX6-NEXT:    s_load_dwordx4 s[0:3], s[4:5], 0x9
+; GFX6-NEXT:    s_mov_b32 s7, 0xf000
 ; GFX6-NEXT:    s_waitcnt lgkmcnt(0)
-; GFX6-NEXT:    s_load_dwordx2 s[4:5], s[2:3], 0x0
-; GFX6-NEXT:    s_mov_b32 s3, 0xf000
-; GFX6-NEXT:    s_mov_b32 s2, -1
+; GFX6-NEXT:    s_load_dwordx2 s[2:3], s[2:3], 0x0
+; GFX6-NEXT:    s_mov_b32 s6, -1
+; GFX6-NEXT:    s_mov_b32 s4, s0
+; GFX6-NEXT:    s_mov_b32 s5, s1
 ; GFX6-NEXT:    s_waitcnt lgkmcnt(0)
-; GFX6-NEXT:    v_mov_b32_e32 v0, s4
-; GFX6-NEXT:    v_mov_b32_e32 v1, s5
-; GFX6-NEXT:    buffer_store_dwordx2 v[0:1], off, s[0:3], 0
+; GFX6-NEXT:    v_mov_b32_e32 v0, s2
+; GFX6-NEXT:    v_mov_b32_e32 v1, s3
+; GFX6-NEXT:    buffer_store_dwordx2 v[0:1], off, s[4:7], 0
 ; GFX6-NEXT:    s_endpgm
 ;
 ; GFX7-LABEL: constant_load_i64:
@@ -83,16 +85,18 @@ define amdgpu_kernel void @constant_load_v2i64(ptr addrspace(1) %out, ptr addrsp
 ; GFX6-LABEL: constant_load_v2i64:
 ; GFX6:       ; %bb.0: ; %entry
 ; GFX6-NEXT:    s_load_dwordx4 s[0:3], s[4:5], 0x9
+; GFX6-NEXT:    s_mov_b32 s7, 0xf000
+; GFX6-NEXT:    s_mov_b32 s6, -1
 ; GFX6-NEXT:    s_waitcnt lgkmcnt(0)
-; GFX6-NEXT:    s_load_dwordx4 s[4:7], s[2:3], 0x0
-; GFX6-NEXT:    s_mov_b32 s3, 0xf000
-; GFX6-NEXT:    s_mov_b32 s2, -1
+; GFX6-NEXT:    s_load_dwordx4 s[8:11], s[2:3], 0x0
+; GFX6-NEXT:    s_mov_b32 s4, s0
+; GFX6-NEXT:    s_mov_b32 s5, s1
 ; GFX6-NEXT:    s_waitcnt lgkmcnt(0)
-; GFX6-NEXT:    v_mov_b32_e32 v0, s4
-; GFX6-NEXT:    v_mov_b32_e32 v1, s5
-; GFX6-NEXT:    v_mov_b32_e32 v2, s6
-; GFX6-NEXT:    v_mov_b32_e32 v3, s7
-; GFX6-NEXT:    buffer_store_dwordx4 v[0:3], off, s[0:3], 0
+; GFX6-NEXT:    v_mov_b32_e32 v0, s8
+; GFX6-NEXT:    v_mov_b32_e32 v1, s9
+; GFX6-NEXT:    v_mov_b32_e32 v2, s10
+; GFX6-NEXT:    v_mov_b32_e32 v3, s11
+; GFX6-NEXT:    buffer_store_dwordx4 v[0:3], off, s[4:7], 0
 ; GFX6-NEXT:    s_endpgm
 ;
 ; GFX7-LABEL: constant_load_v2i64:
@@ -165,21 +169,23 @@ define amdgpu_kernel void @constant_load_v3i64(ptr addrspace(1) %out, ptr addrsp
 ; GFX6-LABEL: constant_load_v3i64:
 ; GFX6:       ; %bb.0: ; %entry
 ; GFX6-NEXT:    s_load_dwordx4 s[0:3], s[4:5], 0x9
+; GFX6-NEXT:    s_mov_b32 s7, 0xf000
 ; GFX6-NEXT:    s_waitcnt lgkmcnt(0)
-; GFX6-NEXT:    s_load_dwordx2 s[8:9], s[2:3], 0x4
-; GFX6-NEXT:    s_load_dwordx4 s[4:7], s[2:3], 0x0
-; GFX6-NEXT:    s_mov_b32 s3, 0xf000
-; GFX6-NEXT:    s_mov_b32 s2, -1
+; GFX6-NEXT:    s_load_dwordx4 s[8:11], s[2:3], 0x0
+; GFX6-NEXT:    s_load_dwordx2 s[2:3], s[2:3], 0x4
+; GFX6-NEXT:    s_mov_b32 s6, -1
+; GFX6-NEXT:    s_mov_b32 s4, s0
+; GFX6-NEXT:    s_mov_b32 s5, s1
 ; GFX6-NEXT:    s_waitcnt lgkmcnt(0)
+; GFX6-NEXT:    v_mov_b32_e32 v0, s2
+; GFX6-NEXT:    v_mov_b32_e32 v1, s3
+; GFX6-NEXT:    buffer_store_dwordx2 v[0:1], off, s[4:7], 0 offset:16
+; GFX6-NEXT:    s_waitcnt expcnt(0)
 ; GFX6-NEXT:    v_mov_b32_e32 v0, s8
 ; GFX6-NEXT:    v_mov_b32_e32 v1, s9
-; GFX6-NEXT:    buffer_store_dwordx2 v[0:1], off, s[0:3], 0 offset:16
-; GFX6-NEXT:    s_waitcnt expcnt(0)
-; GFX6-NEXT:    v_mov_b32_e32 v0, s4
-; GFX6-NEXT:    v_mov_b32_e32 v1, s5
-; GFX6-NEXT:    v_mov_b32_e32 v2, s6
-; GFX6-NEXT:    v_mov_b32_e32 v3, s7
-; GFX6-NEXT:    buffer_store_dwordx4 v[0:3], off, s[0:3], 0
+; GFX6-NEXT:    v_mov_b32_e32 v2, s10
+; GFX6-NEXT:    v_mov_b32_e32 v3, s11
+; GFX6-NEXT:    buffer_store_dwordx4 v[0:3], off, s[4:7], 0
 ; GFX6-NEXT:    s_endpgm
 ;
 ; GFX7-LABEL: constant_load_v3i64:
@@ -276,22 +282,24 @@ define amdgpu_kernel void @constant_load_v4i64(ptr addrspace(1) %out, ptr addrsp
 ; GFX6-LABEL: constant_load_v4i64:
 ; GFX6:       ; %bb.0: ; %entry
 ; GFX6-NEXT:    s_load_dwordx4 s[8:11], s[4:5], 0x9
+; GFX6-NEXT:    s_mov_b32 s15, 0xf000
 ; GFX6-NEXT:    s_waitcnt lgkmcnt(0)
 ; GFX6-NEXT:    s_load_dwordx8 s[0:7], s[10:11], 0x0
-; GFX6-NEXT:    s_mov_b32 s11, 0xf000
-; GFX6-NEXT:    s_mov_b32 s10, -1
+; GFX6-NEXT:    s_mov_b32 s14, -1
+; GFX6-NEXT:    s_mov_b32 s12, s8
+; GFX6-NEXT:    s_mov_b32 s13, s9
 ; GFX6-NEXT:    s_waitcnt lgkmcnt(0)
 ; GFX6-NEXT:    v_mov_b32_e32 v0, s4
 ; GFX6-NEXT:    v_mov_b32_e32 v1, s5
 ; GFX6-NEXT:    v_mov_b32_e32 v2, s6
 ; GFX6-NEXT:    v_mov_b32_e32 v3, s7
-; GFX6-NEXT:    buffer_store_dwordx4 v[0:3], off, s[8:11], 0 offset:16
+; GFX6-NEXT:    buffer_store_dwordx4 v[0:3], off, s[12:15], 0 offset:16
 ; GFX6-NEXT:    s_waitcnt expcnt(0)
 ; GFX6-NEXT:    v_mov_b32_e32 v0, s0
 ; GFX6-NEXT:    v_mov_b32_e32 v1, s1
 ; GFX6-NEXT:    v_mov_b32_e32 v2, s2
 ; GFX6-NEXT:    v_mov_b32_e32 v3, s3
-; GFX6-NEXT:    buffer_store_dwordx4 v[0:3], off, s[8:11], 0
+; GFX6-NEXT:    buffer_store_dwordx4 v[0:3], off, s[12:15], 0
 ; GFX6-NEXT:    s_endpgm
 ;
 ; GFX7-LABEL: constant_load_v4i64:
@@ -388,11 +396,13 @@ entry:
 define amdgpu_kernel void @constant_load_v8i64(ptr addrspace(1) %out, ptr addrspace(4) %in) #0 {
 ; GFX6-LABEL: constant_load_v8i64:
 ; GFX6:       ; %bb.0: ; %entry
-; GFX6-NEXT:    s_load_dwordx4 s[16:19], s[4:5], 0x9
-; GFX6-NEXT:    s_waitcnt lgkmcnt(0)
-; GFX6-NEXT:    s_load_dwordx16 s[0:15], s[18:19], 0x0
+; GFX6-NEXT:    s_load_dwordx4 s[20:23], s[4:5], 0x9
 ; GFX6-NEXT:    s_mov_b32 s19, 0xf000
+; GFX6-NEXT:    s_waitcnt lgkmcnt(0)
+; GFX6-NEXT:    s_load_dwordx16 s[0:15], s[22:23], 0x0
 ; GFX6-NEXT:    s_mov_b32 s18, -1
+; GFX6-NEXT:    s_mov_b32 s16, s20
+; GFX6-NEXT:    s_mov_b32 s17, s21
 ; GFX6-NEXT:    s_waitcnt lgkmcnt(0)
 ; GFX6-NEXT:    v_mov_b32_e32 v0, s12
 ; GFX6-NEXT:    v_mov_b32_e32 v1, s13
@@ -563,10 +573,10 @@ define amdgpu_kernel void @constant_load_v16i64(ptr addrspace(1) %out, ptr addrs
 ; GFX6-LABEL: constant_load_v16i64:
 ; GFX6:       ; %bb.0: ; %entry
 ; GFX6-NEXT:    s_load_dwordx4 s[0:3], s[4:5], 0x9
-; GFX6-NEXT:    s_waitcnt lgkmcnt(0)
-; GFX6-NEXT:    s_load_dwordx16 s[16:31], s[2:3], 0x10
 ; GFX6-NEXT:    s_mov_b32 s39, 0xf000
 ; GFX6-NEXT:    s_mov_b32 s38, -1
+; GFX6-NEXT:    s_waitcnt lgkmcnt(0)
+; GFX6-NEXT:    s_load_dwordx16 s[16:31], s[2:3], 0x10
 ; GFX6-NEXT:    s_mov_b32 s36, s0
 ; GFX6-NEXT:    s_mov_b32 s37, s1
 ; GFX6-NEXT:    s_load_dwordx16 s[0:15], s[2:3], 0x0

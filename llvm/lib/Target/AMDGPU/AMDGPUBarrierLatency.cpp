@@ -33,13 +33,15 @@ static cl::opt<unsigned> BarrierSignalWaitLatencyOpt(
     "amdgpu-barrier-signal-wait-latency",
     cl::desc("Synthetic latency between S_BARRIER_SIGNAL and S_BARRIER_WAIT "
              "to encourage scheduling independent work between them"),
-    cl::init(16), cl::Hidden);
+    cl::init(35), cl::Hidden);
 
 namespace {
 
 class BarrierLatency : public ScheduleDAGMutation {
 private:
   SmallSet<SyncScope::ID, 4> IgnoredScopes;
+  SmallVector<SUnit *, 8> OutstandingTDM;
+  SmallVector<SUnit *, 8> OutstandingAsync;
 
 public:
   BarrierLatency(MachineFunction *MF) {
@@ -92,9 +94,8 @@ void BarrierLatency::apply(ScheduleDAGInstrs *DAG) {
   const SIInstrInfo *TII = static_cast<const SIInstrInfo *>(DAG->TII);
   constexpr unsigned FenceLatency = 2000;
   const unsigned BarrierSignalWaitLatency = BarrierSignalWaitLatencyOpt;
-  SmallVector<SUnit *, 8> RegionTDM;
-  SmallVector<SUnit *, 8> RegionAsync;
-  const TargetSchedModel *SchedModel = DAG->getSchedModel();
+  OutstandingTDM.clear();
+  OutstandingAsync.clear();
 
   for (SUnit &SU : DAG->SUnits) {
     const MachineInstr *MI = SU.getInstr();
@@ -117,9 +118,9 @@ void BarrierLatency::apply(ScheduleDAGInstrs *DAG) {
         if (!MI->mayLoad() || MI->mayStore())
           continue;
 
-        addLatencyToEdge(PredDep, SU,
-                         SchedModel ? SchedModel->computeInstrLatency(MI, false)
-                                    : FenceLatency);
+        unsigned InstrLatency = TII->getInstrLatency(*MI);
+        setLatencyForEdge(PredDep, SU,
+                          InstrLatency ? InstrLatency : FenceLatency);
       }
     } else if (Op == AMDGPU::S_BARRIER_WAIT) {
       for (SDep &PredDep : SU.Preds) {
@@ -131,19 +132,17 @@ void BarrierLatency::apply(ScheduleDAGInstrs *DAG) {
       }
     } else if (TII->isLDSDMA(*MI)) {
       if (MI->getDesc().TSFlags & SIInstrFlags::TENSOR_CNT)
-        RegionTDM.push_back(&SU);
-      else if (MI->getDesc().TSFlags & SIInstrFlags::ASYNC_CNT)
-        RegionAsync.push_back(&SU);
-    } else if (Op == AMDGPU::S_WAIT_TENSORCNT ||
-               Op == AMDGPU::S_WAIT_ASYNCCNT) {
-      auto needWaitFor = [&](SmallVectorImpl<SUnit *> &RegionLDSDMA, SUnit *SU,
-                             int64_t Count) {
-        if (RegionLDSDMA.size() <= static_cast<uint64_t>(Count)) {
+        OutstandingTDM.push_back(&SU);
+      if (MI->getDesc().TSFlags & SIInstrFlags::ASYNC_CNT)
+        OutstandingAsync.clear();
+
+    } else if (Op == AMDGPU::S_WAIT_TENSORCNT) {
+      auto needWaitFor = [this](SUnit *SU, int64_t Count) {
+        if (OutstandingTDM.size() <= static_cast<uint64_t>(Count))
           return false;
-        }
 
         int64_t Counter = 0;
-        auto I = RegionLDSDMA.rbegin(), E = RegionLDSDMA.rend();
+        auto I = OutstandingTDM.rbegin(), E = OutstandingTDM.rend();
         for (; I != E; I++) {
           if (Counter >= Count)
             return true;
@@ -153,7 +152,7 @@ void BarrierLatency::apply(ScheduleDAGInstrs *DAG) {
 
           ++Counter;
         }
-        llvm_unreachable("Malformed RegionLDSDMA");
+        llvm_unreachable("Malformed Outstanding TDM");
       };
 
       int64_t WaitVal = MI->getOperand(0).getImm();
@@ -162,27 +161,62 @@ void BarrierLatency::apply(ScheduleDAGInstrs *DAG) {
           continue;
 
         Register DepReg = PredDep.getReg();
-        Register LDSDMACnt = AMDGPU::TENSORcnt;
-        uint64_t LDSDMAFlags = SIInstrFlags::TENSOR_CNT;
-        if (Op == AMDGPU::S_WAIT_ASYNCCNT) {
-          LDSDMACnt = AMDGPU::ASYNCcnt;
-          LDSDMAFlags = SIInstrFlags::ASYNC_CNT;
-        }
-
-        if (DepReg != LDSDMACnt)
+        if (DepReg != AMDGPU::TENSORcnt)
           continue;
 
         SUnit *PredSU = PredDep.getSUnit();
 
-        // The data dep can be carried by a non-LDSDMA SU
+        // The TENSORcnt data dep can be carried by a non-TENSOR_CNT SU
         // (e.g. an intervening COPY or pseudo). Such predecessors are not
-        // tracked, so needWaitFor cannot reason about them.
-        if (!(PredSU->getInstr()->getDesc().TSFlags & LDSDMAFlags))
+        // tracked in OutstandingTDM, so needWaitFor cannot reason about
+        // them; skip rather than asserting.
+        if (!(PredSU->getInstr()->getDesc().TSFlags &
+              SIInstrFlags::TENSOR_CNT))
           continue;
 
-        if (!needWaitFor(Op == AMDGPU::S_WAIT_ASYNCCNT ? RegionAsync
-                                                       : RegionTDM,
-                         PredSU, WaitVal)) {
+        if (!needWaitFor(PredSU, WaitVal)) {
+          setLatencyForEdge(PredDep, SU, 1);
+        }
+      }
+    } else if (Op == AMDGPU::S_WAIT_ASYNCCNT) {
+      auto needWaitFor = [this](SUnit *SU, int64_t Count) {
+        if (OutstandingAsync.size() <= static_cast<uint64_t>(Count))
+          return false;
+
+        int64_t Counter = 0;
+        auto I = OutstandingAsync.rbegin(), E = OutstandingAsync.rend();
+        for (; I != E; I++) {
+          if (Counter >= Count)
+            return true;
+
+          if (SU->NodeNum == (*I)->NodeNum)
+            return false;
+
+          ++Counter;
+        }
+        llvm_unreachable("Malformed Outstanding TDM");
+      };
+
+      int64_t WaitVal = MI->getOperand(0).getImm();
+      for (SDep &PredDep : SU.Preds) {
+        if (PredDep.getKind() != SDep::Kind::Data)
+          continue;
+
+        Register DepReg = PredDep.getReg();
+        if (DepReg != AMDGPU::ASYNCcnt)
+          continue;
+
+        SUnit *PredSU = PredDep.getSUnit();
+
+        // The TENSORcnt data dep can be carried by a non-TENSOR_CNT SU
+        // (e.g. an intervening COPY or pseudo). Such predecessors are not
+        // tracked in OutstandingAsync, so needWaitFor cannot reason about
+        // them; skip rather than asserting.
+        if (!(PredSU->getInstr()->getDesc().TSFlags &
+              SIInstrFlags::ASYNC_CNT))
+          continue;
+
+        if (!needWaitFor(PredSU, WaitVal)) {
           setLatencyForEdge(PredDep, SU, 1);
         }
       }

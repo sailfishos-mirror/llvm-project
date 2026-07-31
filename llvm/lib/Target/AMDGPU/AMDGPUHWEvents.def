@@ -44,10 +44,16 @@ AMDGPU_HW_EVENT(EXP_POS_ACCESS)           /* write to export position */
 AMDGPU_HW_EVENT(EXP_PARAM_ACCESS)         /* write to export parameter */
 AMDGPU_HW_EVENT(VMW_GPR_LOCK)             /* vmem write holding on its data src */
 AMDGPU_HW_EVENT(EXP_LDS_ACCESS)           /* read by ldsdir counting as export */
+AMDGPU_HW_EVENT(VGPR_CSMACC_READ)         /* read VGPR source in Core/Side-MACC VALU */
+AMDGPU_HW_EVENT(VGPR_DPMACC_READ)         /* read VGPR source in DPMACC VALU */
+AMDGPU_HW_EVENT(VGPR_TRANS_READ)          /* read VGPR source in TRANS VALU */
+AMDGPU_HW_EVENT(VGPR_XDL_READ)            /* read VGPR source in XDL VALU */
+AMDGPU_HW_EVENT(VGPR_XDL_ORDERED_READ)    /* read VGPR source in XDL ordered w/ Core/Side-MACC for VaVdst */
 AMDGPU_HW_EVENT(VGPR_CSMACC_WRITE)        /* write VGPR dest in Core/Side-MACC VALU */
 AMDGPU_HW_EVENT(VGPR_DPMACC_WRITE)        /* write VGPR dest in DPMACC VALU */
 AMDGPU_HW_EVENT(VGPR_TRANS_WRITE)         /* write VGPR dest in TRANS VALU */
 AMDGPU_HW_EVENT(VGPR_XDL_WRITE)           /* write VGPR dest in XDL VALU */
+AMDGPU_HW_EVENT(VGPR_XDL_ORDERED_WRITE)   /* XDL ordered w/ Core/Side-MACC for VaVdst */
 AMDGPU_HW_EVENT(VGPR_LDS_READ)            /* read VGPR source in LDS */
 AMDGPU_HW_EVENT(VGPR_FLAT_READ)           /* read VGPR source in FLAT */
 AMDGPU_HW_EVENT(VGPR_VMEM_READ)           /* read VGPR source in other VMEM */

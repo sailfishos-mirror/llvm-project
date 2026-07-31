@@ -8,11 +8,11 @@ define amdgpu_kernel void @constant_load_v8f32(ptr addrspace(4) noalias nocaptur
 ; GFX6-LABEL: constant_load_v8f32:
 ; GFX6:       ; %bb.0: ; %entry
 ; GFX6-NEXT:    s_load_dwordx4 s[8:11], s[4:5], 0x9
+; GFX6-NEXT:    s_mov_b32 s15, 0xf000
+; GFX6-NEXT:    s_mov_b32 s14, -1
 ; GFX6-NEXT:    s_waitcnt lgkmcnt(0)
 ; GFX6-NEXT:    s_load_dword s16, s[10:11], 0x0
 ; GFX6-NEXT:    s_load_dwordx8 s[0:7], s[8:9], 0x0
-; GFX6-NEXT:    s_mov_b32 s15, 0xf000
-; GFX6-NEXT:    s_mov_b32 s14, -1
 ; GFX6-NEXT:    s_mov_b32 s12, s10
 ; GFX6-NEXT:    s_mov_b32 s13, s11
 ; GFX6-NEXT:    s_waitcnt lgkmcnt(0)

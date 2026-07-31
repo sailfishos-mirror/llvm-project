@@ -13,10 +13,10 @@ define amdgpu_kernel void @test_umul24_i32(ptr addrspace(1) %out, i32 %a, i32 %b
 ; SI-NEXT:    s_waitcnt lgkmcnt(0)
 ; SI-NEXT:    s_mov_b64 s[4:5], s[2:3]
 ; SI-NEXT:    s_mov_b32 s3, 0xf000
-; SI-NEXT:    s_and_b32 s2, s4, 0xffffff
-; SI-NEXT:    s_and_b32 s4, s5, 0xffffff
-; SI-NEXT:    s_mul_i32 s4, s2, s4
 ; SI-NEXT:    s_mov_b32 s2, -1
+; SI-NEXT:    s_and_b32 s4, s4, 0xffffff
+; SI-NEXT:    s_and_b32 s5, s5, 0xffffff
+; SI-NEXT:    s_mul_i32 s4, s4, s5
 ; SI-NEXT:    v_mov_b32_e32 v0, s4
 ; SI-NEXT:    buffer_store_dword v0, off, s[0:3], 0
 ; SI-NEXT:    s_endpgm
@@ -61,14 +61,14 @@ entry:
 define amdgpu_kernel void @test_umul24_i16_sext(ptr addrspace(1) %out, i16 %a, i16 %b) {
 ; SI-LABEL: test_umul24_i16_sext:
 ; SI:       ; %bb.0: ; %entry
-; SI-NEXT:    s_load_dword s2, s[4:5], 0xb
+; SI-NEXT:    s_load_dword s6, s[4:5], 0xb
 ; SI-NEXT:    s_load_dwordx2 s[0:1], s[4:5], 0x9
 ; SI-NEXT:    s_mov_b32 s3, 0xf000
-; SI-NEXT:    s_waitcnt lgkmcnt(0)
-; SI-NEXT:    s_lshr_b32 s4, s2, 16
-; SI-NEXT:    s_mul_i32 s2, s2, s4
-; SI-NEXT:    s_sext_i32_i16 s4, s2
 ; SI-NEXT:    s_mov_b32 s2, -1
+; SI-NEXT:    s_waitcnt lgkmcnt(0)
+; SI-NEXT:    s_lshr_b32 s4, s6, 16
+; SI-NEXT:    s_mul_i32 s6, s6, s4
+; SI-NEXT:    s_sext_i32_i16 s4, s6
 ; SI-NEXT:    v_mov_b32_e32 v0, s4
 ; SI-NEXT:    buffer_store_dword v0, off, s[0:3], 0
 ; SI-NEXT:    s_endpgm
@@ -183,14 +183,14 @@ define amdgpu_kernel void @test_umul24_i16_vgpr_sext(ptr addrspace(1) %out, ptr 
 define amdgpu_kernel void @test_umul24_i16(ptr addrspace(1) %out, i16 %a, i16 %b) {
 ; SI-LABEL: test_umul24_i16:
 ; SI:       ; %bb.0: ; %entry
-; SI-NEXT:    s_load_dword s2, s[4:5], 0xb
+; SI-NEXT:    s_load_dword s6, s[4:5], 0xb
 ; SI-NEXT:    s_load_dwordx2 s[0:1], s[4:5], 0x9
 ; SI-NEXT:    s_mov_b32 s3, 0xf000
-; SI-NEXT:    s_waitcnt lgkmcnt(0)
-; SI-NEXT:    s_lshr_b32 s4, s2, 16
-; SI-NEXT:    s_mul_i32 s2, s2, s4
-; SI-NEXT:    s_and_b32 s4, s2, 0xffff
 ; SI-NEXT:    s_mov_b32 s2, -1
+; SI-NEXT:    s_waitcnt lgkmcnt(0)
+; SI-NEXT:    s_lshr_b32 s4, s6, 16
+; SI-NEXT:    s_mul_i32 s6, s6, s4
+; SI-NEXT:    s_and_b32 s4, s6, 0xffff
 ; SI-NEXT:    v_mov_b32_e32 v0, s4
 ; SI-NEXT:    buffer_store_dword v0, off, s[0:3], 0
 ; SI-NEXT:    s_endpgm
@@ -497,8 +497,8 @@ define amdgpu_kernel void @test_umul24_i64(ptr addrspace(1) %out, i64 %a, i64 %b
 ; SI-NEXT:    s_waitcnt lgkmcnt(0)
 ; SI-NEXT:    s_and_b32 s1, s3, 0xffffff
 ; SI-NEXT:    v_mov_b32_e32 v0, s3
-; SI-NEXT:    s_mul_i32 s0, s0, s1
 ; SI-NEXT:    v_mul_hi_u32_u24_e32 v1, s2, v0
+; SI-NEXT:    s_mul_i32 s0, s0, s1
 ; SI-NEXT:    v_mov_b32_e32 v0, s0
 ; SI-NEXT:    buffer_store_dwordx2 v[0:1], off, s[4:7], 0
 ; SI-NEXT:    s_endpgm
@@ -584,8 +584,8 @@ define amdgpu_kernel void @test_umul24_i64_square(ptr addrspace(1) %out, [8 x i3
 ; SI-NEXT:    s_mov_b32 s2, -1
 ; SI-NEXT:    s_waitcnt lgkmcnt(0)
 ; SI-NEXT:    s_and_b32 s4, s6, 0xffffff
-; SI-NEXT:    s_mul_i32 s4, s4, s4
 ; SI-NEXT:    v_mul_hi_u32_u24_e64 v1, s6, s6
+; SI-NEXT:    s_mul_i32 s4, s4, s4
 ; SI-NEXT:    v_mov_b32_e32 v0, s4
 ; SI-NEXT:    buffer_store_dwordx2 v[0:1], off, s[0:3], 0
 ; SI-NEXT:    s_endpgm
@@ -631,11 +631,11 @@ define amdgpu_kernel void @test_umulhi16_i32(ptr addrspace(1) %out, i32 %a, i32 
 ; SI-NEXT:    s_waitcnt lgkmcnt(0)
 ; SI-NEXT:    s_mov_b64 s[4:5], s[2:3]
 ; SI-NEXT:    s_mov_b32 s3, 0xf000
-; SI-NEXT:    s_and_b32 s2, s4, 0xffff
-; SI-NEXT:    s_and_b32 s4, s5, 0xffff
-; SI-NEXT:    s_mul_i32 s2, s2, s4
-; SI-NEXT:    s_lshr_b32 s4, s2, 16
 ; SI-NEXT:    s_mov_b32 s2, -1
+; SI-NEXT:    s_and_b32 s4, s4, 0xffff
+; SI-NEXT:    s_and_b32 s5, s5, 0xffff
+; SI-NEXT:    s_mul_i32 s4, s4, s5
+; SI-NEXT:    s_lshr_b32 s4, s4, 16
 ; SI-NEXT:    v_mov_b32_e32 v0, s4
 ; SI-NEXT:    buffer_store_short v0, off, s[0:3], 0
 ; SI-NEXT:    s_endpgm
@@ -741,14 +741,14 @@ entry:
 define amdgpu_kernel void @test_umulhi24_i33(ptr addrspace(1) %out, i33 %a, i33 %b) {
 ; SI-LABEL: test_umulhi24_i33:
 ; SI:       ; %bb.0: ; %entry
-; SI-NEXT:    s_load_dword s6, s[4:5], 0xd
-; SI-NEXT:    s_load_dword s7, s[4:5], 0xb
 ; SI-NEXT:    s_load_dwordx2 s[0:1], s[4:5], 0x9
+; SI-NEXT:    s_load_dword s6, s[4:5], 0xd
+; SI-NEXT:    s_load_dword s4, s[4:5], 0xb
 ; SI-NEXT:    s_mov_b32 s3, 0xf000
 ; SI-NEXT:    s_mov_b32 s2, -1
 ; SI-NEXT:    s_waitcnt lgkmcnt(0)
 ; SI-NEXT:    v_mov_b32_e32 v0, s6
-; SI-NEXT:    v_mul_hi_u32_u24_e32 v0, s7, v0
+; SI-NEXT:    v_mul_hi_u32_u24_e32 v0, s4, v0
 ; SI-NEXT:    v_and_b32_e32 v0, 1, v0
 ; SI-NEXT:    buffer_store_dword v0, off, s[0:3], 0
 ; SI-NEXT:    s_endpgm

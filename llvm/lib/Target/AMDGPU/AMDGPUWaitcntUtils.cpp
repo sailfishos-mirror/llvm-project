@@ -38,8 +38,10 @@ StringLiteral getInstCounterName(InstCounterType T) {
     return "ASYNC_CNT";
   case TENSOR_CNT:
     return "TENSOR_CNT";
-  case VA_VDST:
-    return "VA_VDST";
+  case VA_VDST_RD:
+    return "VA_VDST_RD";
+  case VA_VDST_WR:
+    return "VA_VDST_WR";
   case VM_VSRC:
     return "VM_VSRC";
   case NUM_INST_CNTS:
@@ -64,7 +66,8 @@ HardwareLimits::HardwareLimits(const IsaVersion &IV) {
   KmcntMax = getKmcntBitMask(IV);
   XcntMax = getXcntBitMask(IV);
   AsyncMax = getAsynccntBitMask(IV);
-  VaVdstMax = DepCtr::getVaVdstBitMask();
+  VaVdstRdMax = DepCtr::getVaVdstBitMask();
+  VaVdstWrMax = DepCtr::getVaVdstBitMask();
   VmVsrcMax = DepCtr::getVmVsrcBitMask();
 }
 
@@ -86,8 +89,10 @@ unsigned HardwareLimits::get(InstCounterType T) const {
     return KmcntMax;
   case AMDGPU::X_CNT:
     return XcntMax;
-  case AMDGPU::VA_VDST:
-    return VaVdstMax;
+  case AMDGPU::VA_VDST_RD:
+    return VaVdstRdMax;
+  case AMDGPU::VA_VDST_WR:
+    return VaVdstWrMax;
   case AMDGPU::VM_VSRC:
     return VmVsrcMax;
   default:

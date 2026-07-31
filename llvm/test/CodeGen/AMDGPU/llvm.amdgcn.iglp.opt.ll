@@ -550,7 +550,6 @@ define amdgpu_kernel void @test_iglp_opt_rev_mfma_gemm(ptr addrspace(3) noalias 
 ; GISEL-NEXT:    ds_read_b128 a[52:55], v0 offset:8272
 ; GISEL-NEXT:    ds_read_b128 a[56:59], v0 offset:8288
 ; GISEL-NEXT:    ds_read_b128 a[60:63], v0 offset:8304
-; GISEL-NEXT:    v_add_u32_e32 v1, 0xc000, v0
 ; GISEL-NEXT:    v_add_u32_e32 v32, s1, v32
 ; GISEL-NEXT:    ; iglp_opt mask(0x00000001)
 ; GISEL-NEXT:    s_waitcnt lgkmcnt(0)
@@ -573,16 +572,17 @@ define amdgpu_kernel void @test_iglp_opt_rev_mfma_gemm(ptr addrspace(3) noalias 
 ; GISEL-NEXT:    ds_read_b128 a[116:119], v0 offset:49232
 ; GISEL-NEXT:    ds_read_b128 a[120:123], v0 offset:49248
 ; GISEL-NEXT:    ds_read_b128 a[124:127], v0 offset:49264
+; GISEL-NEXT:    v_add_u32_e32 v0, 0xc000, v0
 ; GISEL-NEXT:    s_waitcnt lgkmcnt(0)
 ; GISEL-NEXT:    v_mfma_f32_32x32x1f32 a[96:127], v33, v34, a[96:127]
-; GISEL-NEXT:    ds_read_b128 a[128:131], v1 offset:32768
-; GISEL-NEXT:    ds_read_b128 a[132:135], v1 offset:32784
-; GISEL-NEXT:    ds_read_b128 a[136:139], v1 offset:32800
-; GISEL-NEXT:    ds_read_b128 a[140:143], v1 offset:32816
-; GISEL-NEXT:    ds_read_b128 a[144:147], v1 offset:32832
-; GISEL-NEXT:    ds_read_b128 a[148:151], v1 offset:32848
-; GISEL-NEXT:    ds_read_b128 a[152:155], v1 offset:32864
-; GISEL-NEXT:    ds_read_b128 a[156:159], v1 offset:32880
+; GISEL-NEXT:    ds_read_b128 a[128:131], v0 offset:32768
+; GISEL-NEXT:    ds_read_b128 a[132:135], v0 offset:32784
+; GISEL-NEXT:    ds_read_b128 a[136:139], v0 offset:32800
+; GISEL-NEXT:    ds_read_b128 a[140:143], v0 offset:32816
+; GISEL-NEXT:    ds_read_b128 a[144:147], v0 offset:32832
+; GISEL-NEXT:    ds_read_b128 a[148:151], v0 offset:32848
+; GISEL-NEXT:    ds_read_b128 a[152:155], v0 offset:32864
+; GISEL-NEXT:    ds_read_b128 a[156:159], v0 offset:32880
 ; GISEL-NEXT:    v_accvgpr_read_b32 v0, a0
 ; GISEL-NEXT:    v_accvgpr_read_b32 v1, a1
 ; GISEL-NEXT:    v_accvgpr_read_b32 v2, a2

@@ -11,12 +11,12 @@ define amdgpu_kernel void @i32_mad24(ptr addrspace(1) %out, i32 %a, i32 %b, i32 
 ; GCN-NEXT:    s_load_dwordx4 s[0:3], s[4:5], 0xb
 ; GCN-NEXT:    s_load_dwordx2 s[4:5], s[4:5], 0x9
 ; GCN-NEXT:    s_mov_b32 s7, 0xf000
+; GCN-NEXT:    s_mov_b32 s6, -1
 ; GCN-NEXT:    s_waitcnt lgkmcnt(0)
 ; GCN-NEXT:    s_bfe_i32 s0, s0, 0x180000
 ; GCN-NEXT:    s_bfe_i32 s1, s1, 0x180000
 ; GCN-NEXT:    s_mul_i32 s0, s0, s1
 ; GCN-NEXT:    s_add_i32 s0, s0, s2
-; GCN-NEXT:    s_mov_b32 s6, -1
 ; GCN-NEXT:    v_mov_b32_e32 v0, s0
 ; GCN-NEXT:    buffer_store_dword v0, off, s[4:7], 0
 ; GCN-NEXT:    s_endpgm
@@ -180,8 +180,8 @@ define void @mad24_destroyed_knownbits_2(i32 %arg, i32 %arg1, i32 %arg2, ptr add
 ; GCN-NEXT:    s_cbranch_execnz .LBB3_1
 ; GCN-NEXT:  ; %bb.2: ; %bb5
 ; GCN-NEXT:    s_or_b64 exec, exec, s[4:5]
-; GCN-NEXT:    s_mov_b32 s6, 0
 ; GCN-NEXT:    s_mov_b32 s7, 0xf000
+; GCN-NEXT:    s_mov_b32 s6, 0
 ; GCN-NEXT:    s_mov_b32 s4, s6
 ; GCN-NEXT:    s_mov_b32 s5, s6
 ; GCN-NEXT:    buffer_store_dword v0, v[3:4], s[4:7], 0 addr64

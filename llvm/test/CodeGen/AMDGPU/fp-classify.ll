@@ -537,15 +537,15 @@ define amdgpu_kernel void @test_not_isfinite_pattern_4_wrong_ord_test(ptr addrsp
 ; SI-LABEL: test_not_isfinite_pattern_4_wrong_ord_test:
 ; SI:       ; %bb.0:
 ; SI-NEXT:    s_load_dwordx2 s[8:9], s[4:5], 0x9
-; SI-NEXT:    s_load_dword s0, s[4:5], 0x14
-; SI-NEXT:    s_load_dword s1, s[4:5], 0xb
+; SI-NEXT:    s_load_dword s0, s[4:5], 0xb
+; SI-NEXT:    s_load_dword s1, s[4:5], 0x14
 ; SI-NEXT:    s_mov_b32 s11, 0xf000
 ; SI-NEXT:    s_mov_b32 s10, -1
 ; SI-NEXT:    v_mov_b32_e32 v0, 0x1f8
 ; SI-NEXT:    s_waitcnt lgkmcnt(0)
-; SI-NEXT:    v_mov_b32_e32 v1, s0
-; SI-NEXT:    v_cmp_o_f32_e32 vcc, s1, v1
-; SI-NEXT:    v_cmp_class_f32_e64 s[0:1], s1, v0
+; SI-NEXT:    v_mov_b32_e32 v1, s1
+; SI-NEXT:    v_cmp_o_f32_e32 vcc, s0, v1
+; SI-NEXT:    v_cmp_class_f32_e64 s[0:1], s0, v0
 ; SI-NEXT:    s_and_b64 s[0:1], vcc, s[0:1]
 ; SI-NEXT:    v_cndmask_b32_e64 v0, 0, 1, s[0:1]
 ; SI-NEXT:    buffer_store_dword v0, off, s[8:11], 0

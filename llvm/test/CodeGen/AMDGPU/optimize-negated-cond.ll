@@ -55,8 +55,8 @@ define amdgpu_kernel void @negated_cond(ptr addrspace(1) %arg1) {
 ; GCN-NEXT:  ; %bb.8: ; %bb4
 ; GCN-NEXT:    ; in Loop: Header=BB0_4 Depth=2
 ; GCN-NEXT:    s_ashr_i32 s13, s12, 31
-; GCN-NEXT:    s_lshl_b64 s[16:17], s[12:13], 2
 ; GCN-NEXT:    s_mov_b64 s[14:15], 0
+; GCN-NEXT:    s_lshl_b64 s[16:17], s[12:13], 2
 ; GCN-NEXT:    v_mov_b32_e32 v1, s16
 ; GCN-NEXT:    v_mov_b32_e32 v2, s17
 ; GCN-NEXT:    buffer_store_dword v0, v[1:2], s[4:7], 0 addr64
@@ -98,11 +98,11 @@ define amdgpu_kernel void @negated_cond_dominated_blocks(ptr addrspace(1) %arg1)
 ; GCN-NEXT:    s_load_dword s0, s[4:5], 0x0
 ; GCN-NEXT:    s_mov_b32 s6, 0
 ; GCN-NEXT:    s_mov_b32 s7, 0xf000
+; GCN-NEXT:    v_mov_b32_e32 v0, 0
 ; GCN-NEXT:    s_waitcnt lgkmcnt(0)
 ; GCN-NEXT:    s_cmp_lg_u32 s0, 0
 ; GCN-NEXT:    s_cselect_b64 s[0:1], -1, 0
 ; GCN-NEXT:    s_and_b64 s[0:1], exec, s[0:1]
-; GCN-NEXT:    v_mov_b32_e32 v0, 0
 ; GCN-NEXT:    s_mov_b32 s3, s6
 ; GCN-NEXT:    s_branch .LBB1_2
 ; GCN-NEXT:  .LBB1_1: ; %bb7
@@ -111,8 +111,8 @@ define amdgpu_kernel void @negated_cond_dominated_blocks(ptr addrspace(1) %arg1)
 ; GCN-NEXT:    s_lshl_b64 s[8:9], s[2:3], 2
 ; GCN-NEXT:    v_mov_b32_e32 v1, s8
 ; GCN-NEXT:    v_mov_b32_e32 v2, s9
-; GCN-NEXT:    s_cmp_eq_u32 s2, 32
 ; GCN-NEXT:    buffer_store_dword v0, v[1:2], s[4:7], 0 addr64
+; GCN-NEXT:    s_cmp_eq_u32 s2, 32
 ; GCN-NEXT:    s_mov_b32 s3, s2
 ; GCN-NEXT:    s_cbranch_scc1 .LBB1_6
 ; GCN-NEXT:  .LBB1_2: ; %bb4

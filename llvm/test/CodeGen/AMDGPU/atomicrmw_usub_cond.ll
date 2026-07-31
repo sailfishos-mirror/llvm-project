@@ -22,6 +22,7 @@ define amdgpu_kernel void @flat_atomic_usub_cond_no_rtn_u32(ptr %addr, i32 %in) 
 ; GFX9-SDAG-NEXT:    v_subrev_u32_e32 v2, s2, v3
 ; GFX9-SDAG-NEXT:    v_cmp_le_u32_e32 vcc, s2, v3
 ; GFX9-SDAG-NEXT:    v_cndmask_b32_e32 v2, v3, v2, vcc
+; GFX9-SDAG-NEXT:    s_waitcnt vmcnt(0) lgkmcnt(0)
 ; GFX9-SDAG-NEXT:    flat_atomic_cmpswap v2, v[0:1], v[2:3] glc
 ; GFX9-SDAG-NEXT:    s_waitcnt vmcnt(0) lgkmcnt(0)
 ; GFX9-SDAG-NEXT:    buffer_wbinvl1_vol
@@ -64,6 +65,7 @@ define amdgpu_kernel void @flat_atomic_usub_cond_no_rtn_u32(ptr %addr, i32 %in) 
 ; GFX9-GISEL-NEXT:    v_subrev_u32_e32 v2, s2, v3
 ; GFX9-GISEL-NEXT:    v_cmp_le_u32_e32 vcc, s2, v3
 ; GFX9-GISEL-NEXT:    v_cndmask_b32_e32 v2, v3, v2, vcc
+; GFX9-GISEL-NEXT:    s_waitcnt vmcnt(0) lgkmcnt(0)
 ; GFX9-GISEL-NEXT:    flat_atomic_cmpswap v2, v[0:1], v[2:3] glc
 ; GFX9-GISEL-NEXT:    s_waitcnt vmcnt(0) lgkmcnt(0)
 ; GFX9-GISEL-NEXT:    buffer_wbinvl1_vol
@@ -119,6 +121,7 @@ define amdgpu_kernel void @flat_atomic_usub_cond_rtn_u32(ptr %addr, i32 %in, ptr
 ; GFX9-SDAG-NEXT:    v_mov_b32_e32 v2, s8
 ; GFX9-SDAG-NEXT:    v_cndmask_b32_e32 v0, v1, v0, vcc
 ; GFX9-SDAG-NEXT:    v_mov_b32_e32 v3, s9
+; GFX9-SDAG-NEXT:    s_waitcnt vmcnt(0) lgkmcnt(0)
 ; GFX9-SDAG-NEXT:    flat_atomic_cmpswap v0, v[2:3], v[0:1] glc
 ; GFX9-SDAG-NEXT:    s_waitcnt vmcnt(0) lgkmcnt(0)
 ; GFX9-SDAG-NEXT:    buffer_wbinvl1_vol
@@ -175,6 +178,7 @@ define amdgpu_kernel void @flat_atomic_usub_cond_rtn_u32(ptr %addr, i32 %in, ptr
 ; GFX9-GISEL-NEXT:    v_mov_b32_e32 v2, s8
 ; GFX9-GISEL-NEXT:    v_cndmask_b32_e32 v0, v1, v0, vcc
 ; GFX9-GISEL-NEXT:    v_mov_b32_e32 v3, s9
+; GFX9-GISEL-NEXT:    s_waitcnt vmcnt(0) lgkmcnt(0)
 ; GFX9-GISEL-NEXT:    flat_atomic_cmpswap v0, v[2:3], v[0:1] glc
 ; GFX9-GISEL-NEXT:    s_waitcnt vmcnt(0) lgkmcnt(0)
 ; GFX9-GISEL-NEXT:    buffer_wbinvl1_vol
@@ -235,6 +239,7 @@ define amdgpu_kernel void @global_atomic_usub_cond_no_rtn_u32(ptr addrspace(1) %
 ; GFX9-SDAG-NEXT:    v_subrev_u32_e32 v0, s6, v1
 ; GFX9-SDAG-NEXT:    v_cmp_le_u32_e32 vcc, s6, v1
 ; GFX9-SDAG-NEXT:    v_cndmask_b32_e32 v0, v1, v0, vcc
+; GFX9-SDAG-NEXT:    s_waitcnt vmcnt(0) lgkmcnt(0)
 ; GFX9-SDAG-NEXT:    global_atomic_cmpswap v0, v2, v[0:1], s[0:1] offset:-16 glc
 ; GFX9-SDAG-NEXT:    s_waitcnt vmcnt(0)
 ; GFX9-SDAG-NEXT:    buffer_wbinvl1_vol
@@ -275,6 +280,7 @@ define amdgpu_kernel void @global_atomic_usub_cond_no_rtn_u32(ptr addrspace(1) %
 ; GFX9-GISEL-NEXT:    v_subrev_u32_e32 v0, s6, v1
 ; GFX9-GISEL-NEXT:    v_cmp_le_u32_e32 vcc, s6, v1
 ; GFX9-GISEL-NEXT:    v_cndmask_b32_e32 v0, v1, v0, vcc
+; GFX9-GISEL-NEXT:    s_waitcnt vmcnt(0) lgkmcnt(0)
 ; GFX9-GISEL-NEXT:    global_atomic_cmpswap v0, v2, v[0:1], s[0:1] offset:-16 glc
 ; GFX9-GISEL-NEXT:    s_waitcnt vmcnt(0)
 ; GFX9-GISEL-NEXT:    buffer_wbinvl1_vol
@@ -320,6 +326,7 @@ define amdgpu_kernel void @global_atomic_usub_cond_rtn_u32(ptr addrspace(1) %add
 ; GFX9-SDAG-NEXT:    v_subrev_u32_e32 v1, s6, v2
 ; GFX9-SDAG-NEXT:    v_cmp_le_u32_e32 vcc, s6, v2
 ; GFX9-SDAG-NEXT:    v_cndmask_b32_e32 v1, v2, v1, vcc
+; GFX9-SDAG-NEXT:    s_waitcnt vmcnt(0) lgkmcnt(0)
 ; GFX9-SDAG-NEXT:    global_atomic_cmpswap v1, v0, v[1:2], s[0:1] offset:16 glc
 ; GFX9-SDAG-NEXT:    s_waitcnt vmcnt(0)
 ; GFX9-SDAG-NEXT:    buffer_wbinvl1_vol
@@ -366,6 +373,7 @@ define amdgpu_kernel void @global_atomic_usub_cond_rtn_u32(ptr addrspace(1) %add
 ; GFX9-GISEL-NEXT:    v_subrev_u32_e32 v1, s6, v2
 ; GFX9-GISEL-NEXT:    v_cmp_le_u32_e32 vcc, s6, v2
 ; GFX9-GISEL-NEXT:    v_cndmask_b32_e32 v1, v2, v1, vcc
+; GFX9-GISEL-NEXT:    s_waitcnt vmcnt(0) lgkmcnt(0)
 ; GFX9-GISEL-NEXT:    global_atomic_cmpswap v1, v0, v[1:2], s[0:1] offset:16 glc
 ; GFX9-GISEL-NEXT:    s_waitcnt vmcnt(0)
 ; GFX9-GISEL-NEXT:    buffer_wbinvl1_vol
@@ -417,6 +425,7 @@ define amdgpu_kernel void @ds_usub_cond_no_rtn_u32(ptr addrspace(3) %addr, i32 %
 ; GFX9-SDAG-NEXT:    v_subrev_u32_e32 v2, s1, v1
 ; GFX9-SDAG-NEXT:    v_cmp_le_u32_e32 vcc, s1, v1
 ; GFX9-SDAG-NEXT:    v_cndmask_b32_e32 v2, v1, v2, vcc
+; GFX9-SDAG-NEXT:    s_waitcnt lgkmcnt(0)
 ; GFX9-SDAG-NEXT:    ds_cmpst_rtn_b32 v2, v0, v1, v2
 ; GFX9-SDAG-NEXT:    s_waitcnt lgkmcnt(0)
 ; GFX9-SDAG-NEXT:    v_cmp_eq_u32_e32 vcc, v2, v1
@@ -455,6 +464,7 @@ define amdgpu_kernel void @ds_usub_cond_no_rtn_u32(ptr addrspace(3) %addr, i32 %
 ; GFX9-GISEL-NEXT:    v_subrev_u32_e32 v2, s1, v1
 ; GFX9-GISEL-NEXT:    v_cmp_le_u32_e32 vcc, s1, v1
 ; GFX9-GISEL-NEXT:    v_cndmask_b32_e32 v2, v1, v2, vcc
+; GFX9-GISEL-NEXT:    s_waitcnt lgkmcnt(0)
 ; GFX9-GISEL-NEXT:    ds_cmpst_rtn_b32 v2, v0, v1, v2
 ; GFX9-GISEL-NEXT:    s_waitcnt lgkmcnt(0)
 ; GFX9-GISEL-NEXT:    v_cmp_eq_u32_e32 vcc, v2, v1
@@ -497,6 +507,7 @@ define amdgpu_kernel void @ds_usub_cond_rtn_u32(ptr addrspace(3) %addr, i32 %in,
 ; GFX9-SDAG-NEXT:    v_subrev_u32_e32 v1, s1, v2
 ; GFX9-SDAG-NEXT:    v_cmp_le_u32_e32 vcc, s1, v2
 ; GFX9-SDAG-NEXT:    v_cndmask_b32_e32 v1, v2, v1, vcc
+; GFX9-SDAG-NEXT:    s_waitcnt lgkmcnt(0)
 ; GFX9-SDAG-NEXT:    ds_cmpst_rtn_b32 v1, v0, v2, v1 offset:16
 ; GFX9-SDAG-NEXT:    s_waitcnt lgkmcnt(0)
 ; GFX9-SDAG-NEXT:    v_cmp_eq_u32_e32 vcc, v1, v2
@@ -538,6 +549,7 @@ define amdgpu_kernel void @ds_usub_cond_rtn_u32(ptr addrspace(3) %addr, i32 %in,
 ; GFX9-GISEL-NEXT:    v_subrev_u32_e32 v1, s1, v2
 ; GFX9-GISEL-NEXT:    v_cmp_le_u32_e32 vcc, s1, v2
 ; GFX9-GISEL-NEXT:    v_cndmask_b32_e32 v1, v2, v1, vcc
+; GFX9-GISEL-NEXT:    s_waitcnt lgkmcnt(0)
 ; GFX9-GISEL-NEXT:    ds_cmpst_rtn_b32 v1, v0, v2, v1 offset:16
 ; GFX9-GISEL-NEXT:    s_waitcnt lgkmcnt(0)
 ; GFX9-GISEL-NEXT:    v_cmp_eq_u32_e32 vcc, v1, v2
@@ -581,6 +593,7 @@ define i32 @global_atomic_usub_cond(ptr addrspace(1) %ptr, i32 %data) {
 ; GFX9-SDAG-NEXT:    v_sub_u32_e32 v3, v4, v2
 ; GFX9-SDAG-NEXT:    v_cmp_ge_u32_e32 vcc, v4, v2
 ; GFX9-SDAG-NEXT:    v_cndmask_b32_e32 v3, v4, v3, vcc
+; GFX9-SDAG-NEXT:    s_waitcnt vmcnt(0) lgkmcnt(0)
 ; GFX9-SDAG-NEXT:    global_atomic_cmpswap v3, v[0:1], v[3:4], off glc
 ; GFX9-SDAG-NEXT:    s_waitcnt vmcnt(0)
 ; GFX9-SDAG-NEXT:    buffer_wbinvl1_vol
@@ -618,6 +631,7 @@ define i32 @global_atomic_usub_cond(ptr addrspace(1) %ptr, i32 %data) {
 ; GFX9-GISEL-NEXT:    v_sub_u32_e32 v3, v4, v2
 ; GFX9-GISEL-NEXT:    v_cmp_ge_u32_e32 vcc, v4, v2
 ; GFX9-GISEL-NEXT:    v_cndmask_b32_e32 v3, v4, v3, vcc
+; GFX9-GISEL-NEXT:    s_waitcnt vmcnt(0) lgkmcnt(0)
 ; GFX9-GISEL-NEXT:    global_atomic_cmpswap v3, v[0:1], v[3:4], off glc
 ; GFX9-GISEL-NEXT:    s_waitcnt vmcnt(0)
 ; GFX9-GISEL-NEXT:    buffer_wbinvl1_vol
@@ -664,6 +678,7 @@ define i32 @global_atomic_usub_cond_offset(ptr addrspace(1) %ptr, i32 %data) {
 ; GFX9-SDAG-NEXT:    v_sub_u32_e32 v0, v1, v2
 ; GFX9-SDAG-NEXT:    v_cmp_ge_u32_e32 vcc, v1, v2
 ; GFX9-SDAG-NEXT:    v_cndmask_b32_e32 v0, v1, v0, vcc
+; GFX9-SDAG-NEXT:    s_waitcnt vmcnt(0) lgkmcnt(0)
 ; GFX9-SDAG-NEXT:    global_atomic_cmpswap v0, v[3:4], v[0:1], off glc
 ; GFX9-SDAG-NEXT:    s_waitcnt vmcnt(0)
 ; GFX9-SDAG-NEXT:    buffer_wbinvl1_vol
@@ -702,6 +717,7 @@ define i32 @global_atomic_usub_cond_offset(ptr addrspace(1) %ptr, i32 %data) {
 ; GFX9-GISEL-NEXT:    v_sub_u32_e32 v0, v1, v2
 ; GFX9-GISEL-NEXT:    v_cmp_ge_u32_e32 vcc, v1, v2
 ; GFX9-GISEL-NEXT:    v_cndmask_b32_e32 v0, v1, v0, vcc
+; GFX9-GISEL-NEXT:    s_waitcnt vmcnt(0) lgkmcnt(0)
 ; GFX9-GISEL-NEXT:    global_atomic_cmpswap v0, v[3:4], v[0:1], off glc
 ; GFX9-GISEL-NEXT:    s_waitcnt vmcnt(0)
 ; GFX9-GISEL-NEXT:    buffer_wbinvl1_vol
@@ -742,6 +758,7 @@ define void @global_atomic_usub_cond_nortn(ptr addrspace(1) %ptr, i32 %data) {
 ; GFX9-SDAG-NEXT:    v_sub_u32_e32 v3, v4, v2
 ; GFX9-SDAG-NEXT:    v_cmp_ge_u32_e32 vcc, v4, v2
 ; GFX9-SDAG-NEXT:    v_cndmask_b32_e32 v3, v4, v3, vcc
+; GFX9-SDAG-NEXT:    s_waitcnt vmcnt(0) lgkmcnt(0)
 ; GFX9-SDAG-NEXT:    global_atomic_cmpswap v3, v[0:1], v[3:4], off glc
 ; GFX9-SDAG-NEXT:    s_waitcnt vmcnt(0)
 ; GFX9-SDAG-NEXT:    buffer_wbinvl1_vol
@@ -778,6 +795,7 @@ define void @global_atomic_usub_cond_nortn(ptr addrspace(1) %ptr, i32 %data) {
 ; GFX9-GISEL-NEXT:    v_sub_u32_e32 v3, v4, v2
 ; GFX9-GISEL-NEXT:    v_cmp_ge_u32_e32 vcc, v4, v2
 ; GFX9-GISEL-NEXT:    v_cndmask_b32_e32 v3, v4, v3, vcc
+; GFX9-GISEL-NEXT:    s_waitcnt vmcnt(0) lgkmcnt(0)
 ; GFX9-GISEL-NEXT:    global_atomic_cmpswap v3, v[0:1], v[3:4], off glc
 ; GFX9-GISEL-NEXT:    s_waitcnt vmcnt(0)
 ; GFX9-GISEL-NEXT:    buffer_wbinvl1_vol
@@ -823,6 +841,7 @@ define void @global_atomic_usub_cond_offset_nortn(ptr addrspace(1) %ptr, i32 %da
 ; GFX9-SDAG-NEXT:    v_sub_u32_e32 v0, v1, v2
 ; GFX9-SDAG-NEXT:    v_cmp_ge_u32_e32 vcc, v1, v2
 ; GFX9-SDAG-NEXT:    v_cndmask_b32_e32 v0, v1, v0, vcc
+; GFX9-SDAG-NEXT:    s_waitcnt vmcnt(0) lgkmcnt(0)
 ; GFX9-SDAG-NEXT:    global_atomic_cmpswap v0, v[3:4], v[0:1], off glc
 ; GFX9-SDAG-NEXT:    s_waitcnt vmcnt(0)
 ; GFX9-SDAG-NEXT:    buffer_wbinvl1_vol
@@ -861,6 +880,7 @@ define void @global_atomic_usub_cond_offset_nortn(ptr addrspace(1) %ptr, i32 %da
 ; GFX9-GISEL-NEXT:    v_sub_u32_e32 v3, v4, v2
 ; GFX9-GISEL-NEXT:    v_cmp_ge_u32_e32 vcc, v4, v2
 ; GFX9-GISEL-NEXT:    v_cndmask_b32_e32 v3, v4, v3, vcc
+; GFX9-GISEL-NEXT:    s_waitcnt vmcnt(0) lgkmcnt(0)
 ; GFX9-GISEL-NEXT:    global_atomic_cmpswap v3, v[0:1], v[3:4], off glc
 ; GFX9-GISEL-NEXT:    s_waitcnt vmcnt(0)
 ; GFX9-GISEL-NEXT:    buffer_wbinvl1_vol
@@ -909,6 +929,7 @@ define amdgpu_kernel void @global_atomic_usub_cond_sgpr_base_offset(ptr addrspac
 ; GFX9-SDAG-NEXT:    v_subrev_u32_e32 v1, s6, v2
 ; GFX9-SDAG-NEXT:    v_cmp_le_u32_e32 vcc, s6, v2
 ; GFX9-SDAG-NEXT:    v_cndmask_b32_e32 v1, v2, v1, vcc
+; GFX9-SDAG-NEXT:    s_waitcnt vmcnt(0) lgkmcnt(0)
 ; GFX9-SDAG-NEXT:    global_atomic_cmpswap v1, v0, v[1:2], s[2:3] glc
 ; GFX9-SDAG-NEXT:    s_waitcnt vmcnt(0)
 ; GFX9-SDAG-NEXT:    buffer_wbinvl1_vol
@@ -953,6 +974,7 @@ define amdgpu_kernel void @global_atomic_usub_cond_sgpr_base_offset(ptr addrspac
 ; GFX9-GISEL-NEXT:    v_subrev_u32_e32 v1, s6, v2
 ; GFX9-GISEL-NEXT:    v_cmp_le_u32_e32 vcc, s6, v2
 ; GFX9-GISEL-NEXT:    v_cndmask_b32_e32 v1, v2, v1, vcc
+; GFX9-GISEL-NEXT:    s_waitcnt vmcnt(0) lgkmcnt(0)
 ; GFX9-GISEL-NEXT:    global_atomic_cmpswap v1, v0, v[1:2], s[0:1] glc
 ; GFX9-GISEL-NEXT:    s_waitcnt vmcnt(0)
 ; GFX9-GISEL-NEXT:    buffer_wbinvl1_vol
@@ -1004,6 +1026,7 @@ define amdgpu_kernel void @global_atomic_usub_cond_sgpr_base_offset_nortn(ptr ad
 ; GFX9-SDAG-NEXT:    v_subrev_u32_e32 v0, s6, v1
 ; GFX9-SDAG-NEXT:    v_cmp_le_u32_e32 vcc, s6, v1
 ; GFX9-SDAG-NEXT:    v_cndmask_b32_e32 v0, v1, v0, vcc
+; GFX9-SDAG-NEXT:    s_waitcnt vmcnt(0) lgkmcnt(0)
 ; GFX9-SDAG-NEXT:    global_atomic_cmpswap v0, v2, v[0:1], s[2:3] glc
 ; GFX9-SDAG-NEXT:    s_waitcnt vmcnt(0)
 ; GFX9-SDAG-NEXT:    buffer_wbinvl1_vol
@@ -1040,6 +1063,7 @@ define amdgpu_kernel void @global_atomic_usub_cond_sgpr_base_offset_nortn(ptr ad
 ; GFX9-GISEL-NEXT:    v_subrev_u32_e32 v0, s6, v1
 ; GFX9-GISEL-NEXT:    v_cmp_le_u32_e32 vcc, s6, v1
 ; GFX9-GISEL-NEXT:    v_cndmask_b32_e32 v0, v1, v0, vcc
+; GFX9-GISEL-NEXT:    s_waitcnt vmcnt(0) lgkmcnt(0)
 ; GFX9-GISEL-NEXT:    global_atomic_cmpswap v0, v2, v[0:1], s[0:1] glc
 ; GFX9-GISEL-NEXT:    s_waitcnt vmcnt(0)
 ; GFX9-GISEL-NEXT:    buffer_wbinvl1_vol
@@ -1078,6 +1102,7 @@ define i32 @global_atomic_usub_cond__amdgpu_no_remote_memory(ptr addrspace(1) %p
 ; GFX9-SDAG-NEXT:    v_sub_u32_e32 v3, v4, v2
 ; GFX9-SDAG-NEXT:    v_cmp_ge_u32_e32 vcc, v4, v2
 ; GFX9-SDAG-NEXT:    v_cndmask_b32_e32 v3, v4, v3, vcc
+; GFX9-SDAG-NEXT:    s_waitcnt vmcnt(0) lgkmcnt(0)
 ; GFX9-SDAG-NEXT:    global_atomic_cmpswap v3, v[0:1], v[3:4], off glc
 ; GFX9-SDAG-NEXT:    s_waitcnt vmcnt(0)
 ; GFX9-SDAG-NEXT:    buffer_wbinvl1_vol
@@ -1115,6 +1140,7 @@ define i32 @global_atomic_usub_cond__amdgpu_no_remote_memory(ptr addrspace(1) %p
 ; GFX9-GISEL-NEXT:    v_sub_u32_e32 v3, v4, v2
 ; GFX9-GISEL-NEXT:    v_cmp_ge_u32_e32 vcc, v4, v2
 ; GFX9-GISEL-NEXT:    v_cndmask_b32_e32 v3, v4, v3, vcc
+; GFX9-GISEL-NEXT:    s_waitcnt vmcnt(0) lgkmcnt(0)
 ; GFX9-GISEL-NEXT:    global_atomic_cmpswap v3, v[0:1], v[3:4], off glc
 ; GFX9-GISEL-NEXT:    s_waitcnt vmcnt(0)
 ; GFX9-GISEL-NEXT:    buffer_wbinvl1_vol
@@ -1156,6 +1182,7 @@ define i32 @global_atomic_usub_cond__amdgpu_no_fine_grained_memory(ptr addrspace
 ; GFX9-SDAG-NEXT:    v_sub_u32_e32 v3, v4, v2
 ; GFX9-SDAG-NEXT:    v_cmp_ge_u32_e32 vcc, v4, v2
 ; GFX9-SDAG-NEXT:    v_cndmask_b32_e32 v3, v4, v3, vcc
+; GFX9-SDAG-NEXT:    s_waitcnt vmcnt(0) lgkmcnt(0)
 ; GFX9-SDAG-NEXT:    global_atomic_cmpswap v3, v[0:1], v[3:4], off glc
 ; GFX9-SDAG-NEXT:    s_waitcnt vmcnt(0)
 ; GFX9-SDAG-NEXT:    buffer_wbinvl1_vol
@@ -1193,6 +1220,7 @@ define i32 @global_atomic_usub_cond__amdgpu_no_fine_grained_memory(ptr addrspace
 ; GFX9-GISEL-NEXT:    v_sub_u32_e32 v3, v4, v2
 ; GFX9-GISEL-NEXT:    v_cmp_ge_u32_e32 vcc, v4, v2
 ; GFX9-GISEL-NEXT:    v_cndmask_b32_e32 v3, v4, v3, vcc
+; GFX9-GISEL-NEXT:    s_waitcnt vmcnt(0) lgkmcnt(0)
 ; GFX9-GISEL-NEXT:    global_atomic_cmpswap v3, v[0:1], v[3:4], off glc
 ; GFX9-GISEL-NEXT:    s_waitcnt vmcnt(0)
 ; GFX9-GISEL-NEXT:    buffer_wbinvl1_vol
@@ -1234,6 +1262,7 @@ define i32 @global_atomic_usub_cond__amdgpu_no_fine_grained_memory__amdgpu_no_re
 ; GFX9-SDAG-NEXT:    v_sub_u32_e32 v3, v4, v2
 ; GFX9-SDAG-NEXT:    v_cmp_ge_u32_e32 vcc, v4, v2
 ; GFX9-SDAG-NEXT:    v_cndmask_b32_e32 v3, v4, v3, vcc
+; GFX9-SDAG-NEXT:    s_waitcnt vmcnt(0) lgkmcnt(0)
 ; GFX9-SDAG-NEXT:    global_atomic_cmpswap v3, v[0:1], v[3:4], off glc
 ; GFX9-SDAG-NEXT:    s_waitcnt vmcnt(0)
 ; GFX9-SDAG-NEXT:    buffer_wbinvl1_vol
@@ -1271,6 +1300,7 @@ define i32 @global_atomic_usub_cond__amdgpu_no_fine_grained_memory__amdgpu_no_re
 ; GFX9-GISEL-NEXT:    v_sub_u32_e32 v3, v4, v2
 ; GFX9-GISEL-NEXT:    v_cmp_ge_u32_e32 vcc, v4, v2
 ; GFX9-GISEL-NEXT:    v_cndmask_b32_e32 v3, v4, v3, vcc
+; GFX9-GISEL-NEXT:    s_waitcnt vmcnt(0) lgkmcnt(0)
 ; GFX9-GISEL-NEXT:    global_atomic_cmpswap v3, v[0:1], v[3:4], off glc
 ; GFX9-GISEL-NEXT:    s_waitcnt vmcnt(0)
 ; GFX9-GISEL-NEXT:    buffer_wbinvl1_vol

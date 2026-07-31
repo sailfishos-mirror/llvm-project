@@ -24,9 +24,11 @@
 #include "llvm/CodeGen/StackMaps.h"
 #include "llvm/CodeGen/TargetInstrInfo.h"
 #include "llvm/CodeGen/TargetLowering.h"
+#include "llvm/CodeGen/TargetRegisterInfo.h"
 #include "llvm/CodeGen/TargetSubtargetInfo.h"
 #include "llvm/IR/DebugInfoMetadata.h"
 #include "llvm/IR/PseudoProbe.h"
+#include "llvm/MC/MCInstrDesc.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Target/TargetMachine.h"
 using namespace llvm;
@@ -104,10 +106,7 @@ void InstrEmitter::EmitCopyFromReg(SDValue Op, bool IsClone, Register SrcReg,
 
   MVT VT = Op.getSimpleValueType();
 
-  // FIXME: The Untyped check is a workaround for SystemZ i128 inline assembly
-  // using i128, when it should probably be using v2i64.
-  const TargetRegisterClass *UseRC =
-      VT == MVT::Untyped ? nullptr : TLI->getRegClassFor(VT, Op->isDivergent());
+  const TargetRegisterClass *UseRC = nullptr;
 
   for (SDNode *User : Op->users()) {
     bool Match = true;
@@ -148,6 +147,19 @@ void InstrEmitter::EmitCopyFromReg(SDValue Op, bool IsClone, Register SrcReg,
     MatchReg &= Match;
     if (VRBase)
       break;
+
+    // FIXME: The Untyped check is a workaround for SystemZ i128 inline assembly
+    // using i128, when it should probably be using v2i64.
+    const TargetRegisterClass *RegClassForVT =
+        VT == MVT::Untyped ? nullptr
+                           : TLI->getRegClassFor(VT, Op->isDivergent());
+
+    if (!UseRC || !UseRC->isAllocatable()) {
+      UseRC = RegClassForVT;
+    } else if (const TargetRegisterClass *CommonSubClass =
+                   TRI->getCommonSubClass(UseRC, RegClassForVT)) {
+      UseRC = CommonSubClass;
+    }
   }
 
   const TargetRegisterClass *SrcRC = nullptr, *DstRC = nullptr;
