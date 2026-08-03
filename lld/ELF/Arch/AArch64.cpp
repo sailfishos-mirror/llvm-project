@@ -856,7 +856,7 @@ void AArch64::relaxAuthTlsDescForNonPreemptibleUndefWeak(
   //   adrp x0, :tlsdesc_auth:v             [R_AARCH64_AUTH_TLSDESC_ADR_PAGE21]
   //   ldr  x16, [x0, :tlsdesc_auth_lo12:v] [R_AARCH64_AUTH_TLSDESC_LD64_LO12]
   //   add  x0, x0, :tlsdesc_auth_lo12:v    [R_AARCH64_AUTH_TLSDESC_ADD_LO12]
-  //   .tlsdescauthcall v                   [R_AARCH64_AUTH_TLSDESC_CALL]
+  //   .tlsauthdesccall v                   [R_AARCH64_AUTH_TLSDESC_CALL]
   //   blraa x16, x0
   // And it can optimized to:
   //   mrs  x0, tpidr_el0
