@@ -1357,6 +1357,18 @@ enum {
 };
 
 } // namespace Barrier
+
+namespace SyntheticAperture {
+enum SyntheticAperture {
+  None = 0,
+
+  NAMED_BARRIER = 1,
+  SEMAPHORES = 2,
+  VGPR = 3,
+  // The addition of new apertures must be coordinated with the architecture
+  // team
+};
+} // namespace SyntheticAperture
 } // namespace AMDGPU
 
 // clang-format off
