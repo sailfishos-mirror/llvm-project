@@ -1209,6 +1209,7 @@ InstructionCost VPRecipeWithIRFlags::getCostForRecipeWithOpcode(
         return ReplicateRecipe->isPredicated() ? TTI::CastContextHint::Masked
                                                : TTI::CastContextHint::Normal;
       }
+
       const auto *WidenMemoryRecipe = dyn_cast<VPWidenMemoryRecipe>(R);
       if (WidenMemoryRecipe == nullptr)
         return TTI::CastContextHint::None;
@@ -1444,6 +1445,12 @@ InstructionCost VPInstruction::computeCost(ElementCount VF,
     return Ctx.TTI.getShuffleCost(TargetTransformInfo::SK_Reverse, VectorTy,
                                   VectorTy, /*Mask=*/{}, Ctx.CostKind,
                                   /*Index=*/0);
+  }
+  case VPInstruction::NumActiveLanes: {
+    Type *ElementTy = getOperand(0)->getScalarType();
+    auto *VectorTy = cast<VectorType>(toVectorTy(ElementTy, VF));
+    return Ctx.TTI.getArithmeticReductionCost(Instruction::Add, VectorTy,
+                                              std::nullopt, Ctx.CostKind);
   }
   case VPInstruction::ExtractLastLane: {
     // Add on the cost of extracting the element.
@@ -2379,9 +2386,31 @@ void VPWidenIntrinsicRecipe::printRecipe(raw_ostream &O, const Twine &Indent,
 
 void VPWidenMemIntrinsicRecipe::execute(VPTransformState &State) {
   CallInst *MemI = createVectorCall(State);
+
+  bool IsLoad;
+  unsigned PointerOpIdx;
+  switch (getVectorIntrinsicID()) {
+  case Intrinsic::experimental_vp_strided_load:
+    IsLoad = true;
+    PointerOpIdx = 0;
+    break;
+  case Intrinsic::masked_compressstore:
+    IsLoad = false;
+    PointerOpIdx = 1;
+    break;
+  case Intrinsic::masked_expandload:
+    IsLoad = true;
+    PointerOpIdx = 0;
+    break;
+  default:
+    llvm_unreachable("Unexpected IID");
+  }
+
   MemI->addParamAttr(
-      0, Attribute::getWithAlignment(MemI->getContext(), Alignment));
-  State.set(this, MemI);
+      PointerOpIdx, Attribute::getWithAlignment(MemI->getContext(), Alignment));
+
+  if (IsLoad)
+    State.set(this, MemI);
 }
 
 InstructionCost VPWidenMemIntrinsicRecipe::computeMemIntrinsicCost(
@@ -2395,10 +2424,23 @@ InstructionCost VPWidenMemIntrinsicRecipe::computeMemIntrinsicCost(
 InstructionCost
 VPWidenMemIntrinsicRecipe::computeCost(ElementCount VF,
                                        VPCostContext &Ctx) const {
+  unsigned MaskOpIdx;
+  switch (getVectorIntrinsicID()) {
+  case Intrinsic::masked_compressstore:
+  case Intrinsic::experimental_vp_strided_load:
+    MaskOpIdx = 2;
+    break;
+  case Intrinsic::masked_expandload:
+    MaskOpIdx = 1;
+    break;
+  default:
+    llvm_unreachable("Unexpected IID");
+  }
+
   Type *Ty = toVectorTy(getScalarType(), VF);
   return computeMemIntrinsicCost(getVectorIntrinsicID(), Ty,
-                                 !match(getOperand(2), m_True()), Alignment,
-                                 Ctx);
+                                 !match(getOperand(MaskOpIdx), m_True()),
+                                 Alignment, Ctx);
 }
 
 void VPHistogramRecipe::execute(VPTransformState &State) {
@@ -4967,6 +5009,30 @@ void VPReductionPHIRecipe::printRecipe(raw_ostream &O, const Twine &Indent,
 bool VPBlendRecipe::usesFirstLaneOnly(const VPValue *Op) const {
   assert(is_contained(operands(), Op) && "Op must be an operand of the recipe");
   return vputils::onlyFirstLaneUsed(this);
+}
+
+void VPMonotonicPHIRecipe::execute(VPTransformState &State) {
+  executePhiRecipe(this, *this, State, /*IsScalar=*/true, "monotonic.iv");
+}
+
+#if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
+void VPMonotonicPHIRecipe::printRecipe(raw_ostream &O, const Twine &Indent,
+                                       VPSlotTracker &SlotTracker) const {
+  O << Indent << "MONOTONIC-PHI ";
+
+  printAsOperand(O, SlotTracker);
+  O << " = phi ";
+  printOperands(O, SlotTracker);
+}
+#endif
+
+InstructionCost VPMonotonicPHIRecipe::computeCost(ElementCount VF,
+                                                  VPCostContext &Ctx) const {
+  auto *Phi = cast<PHINode>(getUnderlyingValue());
+  // The value of a monotonic phi must be uniform across the VF.
+  if (!Ctx.isUniformAfterVectorization(Phi, VF))
+    return InstructionCost::getInvalid();
+  return VPHeaderPHIRecipe::computeCost(VF, Ctx);
 }
 
 void VPWidenPHIRecipe::execute(VPTransformState &State) {

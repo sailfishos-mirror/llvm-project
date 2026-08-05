@@ -93,6 +93,7 @@ protected:
       VPlanTransforms::createHeaderPhiRecipes(
           *Plan, PSE, *L, VPDT, Inductions,
           MapVector<PHINode *, RecurrenceDescriptor>(),
+          MapVector<PHINode *, MonotonicDescriptor>(),
           SmallPtrSet<const PHINode *, 1>(), SmallPtrSet<PHINode *, 1>(),
           /*AllowReordering=*/false);
     }

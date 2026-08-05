@@ -48,6 +48,10 @@ AllowStridedPointerIVs("lv-strided-pointer-ivs", cl::init(false), cl::Hidden,
                        cl::desc("Enable recognition of non-constant strided "
                                 "pointer induction variables."));
 
+static cl::opt<bool> EnableMonotonicPatterns(
+    "lv-monotonic-patterns", cl::init(false), cl::Hidden,
+    cl::desc("Enable recognition of monotonic patterns."));
+
 static cl::opt<bool>
     HintsAllowReordering("hints-allow-reordering", cl::init(true), cl::Hidden,
                          cl::desc("Allow enabling loop hints to reorder "
@@ -470,6 +474,29 @@ int LoopVectorizationLegality::isConsecutivePtr(Type *AccessTy,
   return 0;
 }
 
+bool LoopVectorizationLegality::isCompressedPtr(Type *AccessTy, Value *Ptr,
+                                                BasicBlock *BB) const {
+  if (!EnableMonotonicPatterns)
+    return false;
+
+  MonotonicDescriptor Desc;
+  if (!MonotonicDescriptor::isMonotonicVal(Ptr, TheLoop, Desc, *PSE.getSE()))
+    return false;
+
+  // Check that the memory operation has the same predicate as the step.
+  // TODO: Relax these restrictions.
+  if (Desc.getPredicateEdge() !=
+      MonotonicDescriptor::Edge(BB, BB->getUniqueSuccessor()))
+    return false;
+
+  // Check if pointer step equals access size.
+  auto *Step =
+      dyn_cast<SCEVConstant>(Desc.getExpr()->getStepRecurrence(*PSE.getSE()));
+  if (!Step)
+    return false;
+  return Step->getAPInt() == BB->getDataLayout().getTypeAllocSize(AccessTy);
+}
+
 bool LoopVectorizationLegality::isInvariant(Value *V) const {
   return LAI->isInvariant(V);
 }
@@ -881,6 +908,13 @@ bool LoopVectorizationLegality::canVectorizeInstr(Instruction &I) {
         !IsDisallowedStridedPointerInduction(ID)) {
       addInductionPhi(Phi, ID);
       Requirements->addExactFPMathInst(ID.getExactFPMathInst());
+      return true;
+    }
+
+    MonotonicDescriptor MD;
+    if (EnableMonotonicPatterns &&
+        MonotonicDescriptor::isMonotonicPHI(Phi, TheLoop, MD, *PSE.getSE())) {
+      MonotonicPHIs[Phi] = MD;
       return true;
     }
 

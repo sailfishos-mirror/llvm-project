@@ -159,6 +159,7 @@ bool llvm::isVectorIntrinsicWithScalarOpAtArg(Intrinsic::ID ID,
   case Intrinsic::vp_is_fpclass:
   case Intrinsic::powi:
   case Intrinsic::vector_extract:
+  case Intrinsic::masked_compressstore:
     return (ScalarOpdIdx == 1);
   case Intrinsic::smul_fix:
   case Intrinsic::smul_fix_sat:
@@ -171,6 +172,8 @@ bool llvm::isVectorIntrinsicWithScalarOpAtArg(Intrinsic::ID ID,
     return ScalarOpdIdx == 2 || ScalarOpdIdx == 4;
   case Intrinsic::experimental_vp_strided_load:
     return ScalarOpdIdx == 0 || ScalarOpdIdx == 1;
+  case Intrinsic::masked_expandload:
+    return ScalarOpdIdx == 0;
   case Intrinsic::loop_dependence_war_mask:
     return true;
   default:
@@ -201,6 +204,7 @@ bool llvm::isVectorIntrinsicWithOverloadTypeAtArg(
   case Intrinsic::scmp:
   case Intrinsic::vector_extract:
   case Intrinsic::loop_dependence_war_mask:
+  case Intrinsic::masked_expandload:
     return OpdIdx == -1 || OpdIdx == 0;
   case Intrinsic::modf:
   case Intrinsic::sincos:
@@ -213,6 +217,8 @@ bool llvm::isVectorIntrinsicWithOverloadTypeAtArg(
     return OpdIdx == -1 || OpdIdx == 1;
   case Intrinsic::experimental_vp_strided_load:
     return OpdIdx == -1 || OpdIdx == 0 || OpdIdx == 1;
+  case Intrinsic::masked_compressstore:
+    return OpdIdx == 0 || OpdIdx == 1;
   default:
     return OpdIdx == -1;
   }
