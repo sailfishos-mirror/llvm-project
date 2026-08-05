@@ -1022,30 +1022,40 @@ AMDGPULegalizerInfo::AMDGPULegalizerInfo(const GCNSubtarget &ST_,
     MinNumMaxNumIeee.legalFor(FPTypesBase).scalarize(0);
   }
 
-  auto &MinNumMaxNum = getActionDefinitionsBuilder(
-      {G_FMINNUM, G_FMAXNUM, G_FMINIMUMNUM, G_FMAXIMUMNUM});
-
-  if (ST.hasAnyPackedFP64Ops()) {
-    MinNumMaxNum.customFor(FPTypesPK16_64)
-        .moreElementsIf(isSmallOddVector(0), oneMoreElement(0))
-        .clampMaxNumElements(0, F16, 2)
-        .clampMaxNumElements(0, F64, 2)
-        .scalarize(0);
-  } else if (ST.hasVOP3PInsts()) {
-    MinNumMaxNum.customFor(FPTypesPK16)
-        .moreElementsIf(isSmallOddVector(0), oneMoreElement(0))
-        .clampMaxNumElements(0, F16, 2)
-        .scalarize(0);
-  } else if (ST.has16BitInsts()) {
-    MinNumMaxNum.customFor(FPTypes16).scalarize(0);
-  } else {
-    MinNumMaxNum.customFor(FPTypesBase).scalarize(0);
-  }
-
-  if (!ST.has16BitInsts()) {
+  if (!ST.has16BitInsts())
     MinNumMaxNumIeee.minScalar(0, F32);
-    MinNumMaxNum.minScalar(0, F32);
-  }
+
+  // Only minimumNumber/maximumNumber get BF16 custom legalization.
+  LegalizeRuleSet &MinNumMaxNum =
+      getActionDefinitionsBuilder({G_FMINNUM, G_FMAXNUM});
+  LegalizeRuleSet &MinimumNumMaximumNum =
+      getActionDefinitionsBuilder({G_FMINIMUMNUM, G_FMAXIMUMNUM});
+  MinimumNumMaximumNum.customFor({BF16});
+
+  auto AddMinMaxRules = [&](LegalizeRuleSet &Builder) {
+    if (ST.hasAnyPackedFP64Ops()) {
+      Builder.customFor(FPTypesPK16_64)
+          .moreElementsIf(isSmallOddVector(0), oneMoreElement(0))
+          .clampMaxNumElements(0, F16, 2)
+          .clampMaxNumElements(0, F64, 2)
+          .scalarize(0);
+    } else if (ST.hasVOP3PInsts()) {
+      Builder.customFor(FPTypesPK16)
+          .moreElementsIf(isSmallOddVector(0), oneMoreElement(0))
+          .clampMaxNumElements(0, F16, 2)
+          .scalarize(0);
+    } else if (ST.has16BitInsts()) {
+      Builder.customFor(FPTypes16).scalarize(0);
+    } else {
+      Builder.customFor(FPTypesBase).scalarize(0);
+    }
+
+    if (!ST.has16BitInsts())
+      Builder.minScalar(0, F32);
+  };
+
+  AddMinMaxRules(MinNumMaxNum);
+  AddMinMaxRules(MinimumNumMaximumNum);
 
   if (ST.hasVOP3PInsts())
     FPOpActions.clampMaxNumElementsStrict(0, F16, 2);
@@ -2951,6 +2961,90 @@ bool AMDGPULegalizerInfo::legalizeFPTOI(MachineInstr &MI,
 
 bool AMDGPULegalizerInfo::legalizeMinNumMaxNum(LegalizerHelper &Helper,
                                                MachineInstr &MI) const {
+  MachineIRBuilder &B = Helper.MIRBuilder;
+  MachineRegisterInfo &MRI = *B.getMRI();
+  Register Dst = MI.getOperand(0).getReg();
+  LLT Ty = MRI.getType(Dst);
+  unsigned Flags = MI.getFlags();
+
+  if (Ty.isBFloat16()) {
+    assert((MI.getOpcode() == TargetOpcode::G_FMINIMUMNUM ||
+            MI.getOpcode() == TargetOpcode::G_FMAXIMUMNUM) &&
+           "bf16 is only custom for minimumnum/maximumnum");
+
+    const LLT I1 = LLT::integer(1);
+    const LLT I16 = LLT::integer(16);
+    const LLT I32 = LLT::integer(32);
+    Register Src0 = MI.getOperand(1).getReg();
+    Register Src1 = MI.getOperand(2).getReg();
+
+    // minimumNumber/maximumNumber return an operand or quiet NaN, so bf16 can
+    // be computed in f32 and truncated without rounding. bf16 subnormals
+    // extend to f32 subnormals, so this is only valid while f32 denormals are
+    // fully preserved on both input and output; flushing either would produce
+    // a result that is neither operand.
+    DenormalMode Mode = B.getMF().getDenormalMode(APFloat::IEEEsingle());
+    if (Mode == DenormalMode::getIEEE()) {
+      MachineInstrBuilder Src0F32 = B.buildFPExt(F32, Src0);
+      MachineInstrBuilder Src1F32 = B.buildFPExt(F32, Src1);
+      MachineInstrBuilder ResF32 =
+          B.buildInstr(MI.getOpcode(), {F32}, {Src0F32, Src1F32}, Flags);
+      MachineInstrBuilder ResI32 = B.buildBitcast(I32, ResF32);
+      MachineInstrBuilder ResHi16 =
+          B.buildLShr(I32, ResI32, B.buildConstant(I32, 16));
+      MachineInstrBuilder ResI16 = B.buildTrunc(I16, ResHi16);
+      B.buildBitcast(Dst, ResI16);
+      MI.eraseFromParent();
+      return true;
+    }
+
+    // Otherwise select one of the original bf16 operands with integer
+    // operations only, which the denormal mode cannot affect.
+    MachineInstrBuilder Bits0 = B.buildZExt(I32, B.buildBitcast(I16, Src0));
+    MachineInstrBuilder Bits1 = B.buildZExt(I32, B.buildBitcast(I16, Src1));
+    MachineInstrBuilder Zero = B.buildConstant(I32, 0);
+    MachineInstrBuilder SignBit = B.buildConstant(I32, 0x8000);
+    MachineInstrBuilder AbsMask = B.buildConstant(I32, 0x7fff);
+    MachineInstrBuilder AllBits = B.buildConstant(I32, 0xffff);
+    MachineInstrBuilder Inf = B.buildConstant(I32, 0x7f80);
+
+    // NaN has an all-ones exponent and a non-zero mantissa.
+    MachineInstrBuilder Abs0 = B.buildAnd(I32, Bits0, AbsMask);
+    MachineInstrBuilder Abs1 = B.buildAnd(I32, Bits1, AbsMask);
+    MachineInstrBuilder IsNaN0 = B.buildICmp(CmpInst::ICMP_UGT, I1, Abs0, Inf);
+    MachineInstrBuilder IsNaN1 = B.buildICmp(CmpInst::ICMP_UGT, I1, Abs1, Inf);
+
+    // Unsigned key reproducing the floating-point order of non-NaN values,
+    // including -0.0 below +0.0.
+    auto TotalOrderKey = [&](MachineInstrBuilder Bits) {
+      MachineInstrBuilder Sign = B.buildAnd(I32, Bits, SignBit);
+      MachineInstrBuilder IsNeg = B.buildICmp(CmpInst::ICMP_NE, I1, Sign, Zero);
+      MachineInstrBuilder NegKey = B.buildXor(I32, Bits, AllBits);
+      MachineInstrBuilder PosKey = B.buildXor(I32, Bits, SignBit);
+      return B.buildSelect(I32, IsNeg, NegKey, PosKey);
+    };
+
+    CmpInst::Predicate Pred = MI.getOpcode() == TargetOpcode::G_FMAXIMUMNUM
+                                  ? CmpInst::ICMP_UGT
+                                  : CmpInst::ICMP_ULT;
+    MachineInstrBuilder Key0 = TotalOrderKey(Bits0);
+    MachineInstrBuilder Key1 = TotalOrderKey(Bits1);
+    MachineInstrBuilder TakeSrc0 = B.buildICmp(Pred, I1, Key0, Key1);
+    MachineInstrBuilder Res = B.buildSelect(I32, TakeSrc0, Bits0, Bits1);
+
+    // A NaN operand loses to a number; two NaN operands give a quiet NaN.
+    Res = B.buildSelect(I32, IsNaN1, Bits0, Res);
+    Res = B.buildSelect(I32, IsNaN0, Bits1, Res);
+    MachineInstrBuilder BothNaN = B.buildAnd(I1, IsNaN0, IsNaN1);
+    MachineInstrBuilder QuietBit = B.buildConstant(I32, 0x0040);
+    MachineInstrBuilder QuietBits = B.buildOr(I32, Bits0, QuietBit);
+    Res = B.buildSelect(I32, BothNaN, QuietBits, Res);
+
+    B.buildBitcast(Dst, B.buildTrunc(I16, Res));
+    MI.eraseFromParent();
+    return true;
+  }
+
   MachineFunction &MF = Helper.MIRBuilder.getMF();
   const SIMachineFunctionInfo *MFI = MF.getInfo<SIMachineFunctionInfo>();
 
