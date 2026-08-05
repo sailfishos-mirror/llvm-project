@@ -229,3 +229,183 @@ define amdgpu_ps void @zextload_P1_i16_align4_gfx11(ptr addrspace(1) inreg %ptra
   store i32 %res, ptr addrspace(1) %out
   ret void
 }
+
+; i8 -> i16 uniform extending loads (UniS16)
+
+define amdgpu_ps void @sextload_P1_i8_to_i16(ptr addrspace(1) inreg %ptra, ptr addrspace(1) %out) {
+; GFX11-LABEL: sextload_P1_i8_to_i16:
+; GFX11:       ; %bb.0:
+; GFX11-NEXT:    v_mov_b32_e32 v2, 0
+; GFX11-NEXT:    global_load_d16_i8 v2, v2, s[0:1]
+; GFX11-NEXT:    s_waitcnt vmcnt(0)
+; GFX11-NEXT:    v_readfirstlane_b32 s0, v2
+; GFX11-NEXT:    s_add_i32 s0, s0, s0
+; GFX11-NEXT:    s_delay_alu instid0(SALU_CYCLE_1)
+; GFX11-NEXT:    v_mov_b16_e32 v2.l, s0
+; GFX11-NEXT:    global_store_b16 v[0:1], v2, off
+; GFX11-NEXT:    s_endpgm
+;
+; GFX12-LABEL: sextload_P1_i8_to_i16:
+; GFX12:       ; %bb.0:
+; GFX12-NEXT:    s_load_i8 s0, s[0:1], 0x0
+; GFX12-NEXT:    s_wait_kmcnt 0x0
+; GFX12-NEXT:    s_add_co_i32 s0, s0, s0
+; GFX12-NEXT:    s_delay_alu instid0(SALU_CYCLE_1)
+; GFX12-NEXT:    v_mov_b16_e32 v2.l, s0
+; GFX12-NEXT:    global_store_b16 v[0:1], v2, off
+; GFX12-NEXT:    s_endpgm
+  %a = load i8, ptr addrspace(1) %ptra
+  %a16 = sext i8 %a to i16
+  %res = add i16 %a16, %a16
+  store i16 %res, ptr addrspace(1) %out
+  ret void
+}
+
+define amdgpu_ps void @sextload_P3_i8_to_i16(ptr addrspace(3) inreg %ptra, ptr addrspace(1) %out) {
+; GFX11-LABEL: sextload_P3_i8_to_i16:
+; GFX11:       ; %bb.0:
+; GFX11-NEXT:    v_mov_b32_e32 v2, s0
+; GFX11-NEXT:    ds_load_i8_d16 v2, v2
+; GFX11-NEXT:    s_waitcnt lgkmcnt(0)
+; GFX11-NEXT:    v_readfirstlane_b32 s0, v2
+; GFX11-NEXT:    s_add_i32 s0, s0, s0
+; GFX11-NEXT:    s_delay_alu instid0(SALU_CYCLE_1)
+; GFX11-NEXT:    v_mov_b16_e32 v2.l, s0
+; GFX11-NEXT:    global_store_b16 v[0:1], v2, off
+; GFX11-NEXT:    s_endpgm
+;
+; GFX12-LABEL: sextload_P3_i8_to_i16:
+; GFX12:       ; %bb.0:
+; GFX12-NEXT:    v_mov_b32_e32 v2, s0
+; GFX12-NEXT:    ds_load_i8_d16 v2, v2
+; GFX12-NEXT:    s_wait_dscnt 0x0
+; GFX12-NEXT:    v_readfirstlane_b32 s0, v2
+; GFX12-NEXT:    s_add_co_i32 s0, s0, s0
+; GFX12-NEXT:    s_wait_alu depctr_sa_sdst(0)
+; GFX12-NEXT:    v_mov_b16_e32 v2.l, s0
+; GFX12-NEXT:    global_store_b16 v[0:1], v2, off
+; GFX12-NEXT:    s_endpgm
+  %a = load i8, ptr addrspace(3) %ptra
+  %a16 = sext i8 %a to i16
+  %res = add i16 %a16, %a16
+  store i16 %res, ptr addrspace(1) %out
+  ret void
+}
+
+define amdgpu_ps void @sextload_P4_i8_to_i16(ptr addrspace(4) inreg %ptra, ptr addrspace(1) %out) {
+; GFX11-LABEL: sextload_P4_i8_to_i16:
+; GFX11:       ; %bb.0:
+; GFX11-NEXT:    v_mov_b32_e32 v2, 0
+; GFX11-NEXT:    global_load_d16_i8 v2, v2, s[0:1]
+; GFX11-NEXT:    s_waitcnt vmcnt(0)
+; GFX11-NEXT:    v_readfirstlane_b32 s0, v2
+; GFX11-NEXT:    s_add_i32 s0, s0, s0
+; GFX11-NEXT:    s_delay_alu instid0(SALU_CYCLE_1)
+; GFX11-NEXT:    v_mov_b16_e32 v2.l, s0
+; GFX11-NEXT:    global_store_b16 v[0:1], v2, off
+; GFX11-NEXT:    s_endpgm
+;
+; GFX12-LABEL: sextload_P4_i8_to_i16:
+; GFX12:       ; %bb.0:
+; GFX12-NEXT:    s_load_i8 s0, s[0:1], 0x0
+; GFX12-NEXT:    s_wait_kmcnt 0x0
+; GFX12-NEXT:    s_add_co_i32 s0, s0, s0
+; GFX12-NEXT:    s_delay_alu instid0(SALU_CYCLE_1)
+; GFX12-NEXT:    v_mov_b16_e32 v2.l, s0
+; GFX12-NEXT:    global_store_b16 v[0:1], v2, off
+; GFX12-NEXT:    s_endpgm
+  %a = load i8, ptr addrspace(4) %ptra
+  %a16 = sext i8 %a to i16
+  %res = add i16 %a16, %a16
+  store i16 %res, ptr addrspace(1) %out
+  ret void
+}
+
+define amdgpu_ps void @zextload_P1_i8_to_i16(ptr addrspace(1) inreg %ptra, ptr addrspace(1) %out) {
+; GFX11-LABEL: zextload_P1_i8_to_i16:
+; GFX11:       ; %bb.0:
+; GFX11-NEXT:    v_mov_b32_e32 v2, 0
+; GFX11-NEXT:    global_load_d16_u8 v2, v2, s[0:1]
+; GFX11-NEXT:    s_waitcnt vmcnt(0)
+; GFX11-NEXT:    v_readfirstlane_b32 s0, v2
+; GFX11-NEXT:    s_add_i32 s0, s0, s0
+; GFX11-NEXT:    s_delay_alu instid0(SALU_CYCLE_1)
+; GFX11-NEXT:    v_mov_b16_e32 v2.l, s0
+; GFX11-NEXT:    global_store_b16 v[0:1], v2, off
+; GFX11-NEXT:    s_endpgm
+;
+; GFX12-LABEL: zextload_P1_i8_to_i16:
+; GFX12:       ; %bb.0:
+; GFX12-NEXT:    s_load_u8 s0, s[0:1], 0x0
+; GFX12-NEXT:    s_wait_kmcnt 0x0
+; GFX12-NEXT:    s_add_co_i32 s0, s0, s0
+; GFX12-NEXT:    s_delay_alu instid0(SALU_CYCLE_1)
+; GFX12-NEXT:    v_mov_b16_e32 v2.l, s0
+; GFX12-NEXT:    global_store_b16 v[0:1], v2, off
+; GFX12-NEXT:    s_endpgm
+  %a = load i8, ptr addrspace(1) %ptra
+  %a16 = zext i8 %a to i16
+  %res = add i16 %a16, %a16
+  store i16 %res, ptr addrspace(1) %out
+  ret void
+}
+
+define amdgpu_ps void @zextload_P3_i8_to_i16(ptr addrspace(3) inreg %ptra, ptr addrspace(1) %out) {
+; GFX11-LABEL: zextload_P3_i8_to_i16:
+; GFX11:       ; %bb.0:
+; GFX11-NEXT:    v_mov_b32_e32 v2, s0
+; GFX11-NEXT:    ds_load_u8_d16 v2, v2
+; GFX11-NEXT:    s_waitcnt lgkmcnt(0)
+; GFX11-NEXT:    v_readfirstlane_b32 s0, v2
+; GFX11-NEXT:    s_add_i32 s0, s0, s0
+; GFX11-NEXT:    s_delay_alu instid0(SALU_CYCLE_1)
+; GFX11-NEXT:    v_mov_b16_e32 v2.l, s0
+; GFX11-NEXT:    global_store_b16 v[0:1], v2, off
+; GFX11-NEXT:    s_endpgm
+;
+; GFX12-LABEL: zextload_P3_i8_to_i16:
+; GFX12:       ; %bb.0:
+; GFX12-NEXT:    v_mov_b32_e32 v2, s0
+; GFX12-NEXT:    ds_load_u8_d16 v2, v2
+; GFX12-NEXT:    s_wait_dscnt 0x0
+; GFX12-NEXT:    v_readfirstlane_b32 s0, v2
+; GFX12-NEXT:    s_add_co_i32 s0, s0, s0
+; GFX12-NEXT:    s_wait_alu depctr_sa_sdst(0)
+; GFX12-NEXT:    v_mov_b16_e32 v2.l, s0
+; GFX12-NEXT:    global_store_b16 v[0:1], v2, off
+; GFX12-NEXT:    s_endpgm
+  %a = load i8, ptr addrspace(3) %ptra
+  %a16 = zext i8 %a to i16
+  %res = add i16 %a16, %a16
+  store i16 %res, ptr addrspace(1) %out
+  ret void
+}
+
+define amdgpu_ps void @zextload_P4_i8_to_i16(ptr addrspace(4) inreg %ptra, ptr addrspace(1) %out) {
+; GFX11-LABEL: zextload_P4_i8_to_i16:
+; GFX11:       ; %bb.0:
+; GFX11-NEXT:    v_mov_b32_e32 v2, 0
+; GFX11-NEXT:    global_load_d16_u8 v2, v2, s[0:1]
+; GFX11-NEXT:    s_waitcnt vmcnt(0)
+; GFX11-NEXT:    v_readfirstlane_b32 s0, v2
+; GFX11-NEXT:    s_add_i32 s0, s0, s0
+; GFX11-NEXT:    s_delay_alu instid0(SALU_CYCLE_1)
+; GFX11-NEXT:    v_mov_b16_e32 v2.l, s0
+; GFX11-NEXT:    global_store_b16 v[0:1], v2, off
+; GFX11-NEXT:    s_endpgm
+;
+; GFX12-LABEL: zextload_P4_i8_to_i16:
+; GFX12:       ; %bb.0:
+; GFX12-NEXT:    s_load_u8 s0, s[0:1], 0x0
+; GFX12-NEXT:    s_wait_kmcnt 0x0
+; GFX12-NEXT:    s_add_co_i32 s0, s0, s0
+; GFX12-NEXT:    s_delay_alu instid0(SALU_CYCLE_1)
+; GFX12-NEXT:    v_mov_b16_e32 v2.l, s0
+; GFX12-NEXT:    global_store_b16 v[0:1], v2, off
+; GFX12-NEXT:    s_endpgm
+  %a = load i8, ptr addrspace(4) %ptra
+  %a16 = zext i8 %a to i16
+  %res = add i16 %a16, %a16
+  store i16 %res, ptr addrspace(1) %out
+  ret void
+}
