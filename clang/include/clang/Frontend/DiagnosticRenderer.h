@@ -35,6 +35,16 @@ using DiagOrStoredDiag =
 
 /// Maps both endpoints of \p Range to their macro expansion, so that the range
 /// can be shown to a user.
+/// \returns nullopt if \p Range is invalid, if an endpoint lies outside \p FID,
+/// or if the beginning of the range is after the end.
+///
+/// Unlike \c Lexer::makeFileCharRange(), which gives up when an endpoint is
+/// strictly inside an expansion, this points at the expansion; prefer
+/// \c makeFileCharRange() when a faithful file range matters, e.g. for
+/// rewriting.
+///
+/// The result may still be a token range, but \c Lexer::getAsCharRange() cannot
+/// fail on it: both endpoints are file locations.
 std::optional<CharSourceRange> getExpansionRangeInFile(CharSourceRange Range,
                                                        FileID FID,
                                                        const SourceManager &SM);
