@@ -1809,7 +1809,7 @@ bool MonotonicDescriptor::isMonotonicVal(Value *Val, const Loop *L,
     CurInst = find_singleton<Instruction>(CurInst->operands(), LoopVariantVal);
     if (!CurInst)
       return false;
-  };
+  }
 
   if (!isMonotonicPHI(cast<PHINode>(CurInst), L, Desc, SE))
     return false;
