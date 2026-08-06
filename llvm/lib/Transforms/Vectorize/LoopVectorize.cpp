@@ -7810,7 +7810,8 @@ static SmallVector<Instruction *> preparePlanForEpilogueVectorLoop(
       }
     } else {
       // Retrieve the induction resume value via ResumeForEpilogue.
-      PHINode *IndPhi = cast<VPWidenInductionRecipe>(&R)->getPHINode();
+      assert(isa<VPWidenInductionRecipe>(&R) || isa<VPMonotonicPHIRecipe>(&R));
+      PHINode *IndPhi = cast<VPHeaderPHIRecipe>(&R)->getPHINode();
       ResumeV = IRPhiToResumeForEpi.at(IndPhi)->getUnderlyingValue();
     }
     assert(ResumeV && "Must have a resume value");
