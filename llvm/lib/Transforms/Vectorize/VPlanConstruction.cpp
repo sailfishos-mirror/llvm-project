@@ -954,7 +954,7 @@ bool VPlanTransforms::createHeaderPhiRecipes(
 
     auto MonotonicIt = MonotonicPHIs.find(Phi);
     if (MonotonicIt != MonotonicPHIs.end())
-      return new VPMonotonicPHIRecipe(Phi, MonotonicIt->second, *Start,
+      return new VPMonotonicPHIRecipe(*Phi, MonotonicIt->second, *Start,
                                       *BackedgeValue);
 
     assert(Reductions.contains(Phi) && "only reductions are expected now");
