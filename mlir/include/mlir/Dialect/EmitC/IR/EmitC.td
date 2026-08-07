@@ -789,6 +789,11 @@ def EmitC_CallOp : EmitC_Op<"call",
       return getOperandsMutable();
     }
 
+    /// The operand and result types must match the callee exactly.
+    bool areTypesCompatible(::mlir::Type lhs, ::mlir::Type rhs) {
+      return lhs == rhs;
+    }
+
     operand_iterator arg_operand_begin() { return operand_begin(); }
     operand_iterator arg_operand_end() { return operand_end(); }
 

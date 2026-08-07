@@ -767,6 +767,11 @@ def LLVM_InvokeOp
   let extraClassDeclaration = [{
     /// Returns the callee function type.
     LLVMFunctionType getCalleeFunctionType();
+
+    /// The argument and result types must match the callee exactly.
+    bool areTypesCompatible(::mlir::Type lhs, ::mlir::Type rhs) {
+      return lhs == rhs;
+    }
   }];
 }
 
@@ -902,6 +907,11 @@ def LLVM_CallOp
   let extraClassDeclaration = [{
     /// Returns the callee function type.
     LLVMFunctionType getCalleeFunctionType();
+
+    /// The argument and result types must match the callee exactly.
+    bool areTypesCompatible(::mlir::Type lhs, ::mlir::Type rhs) {
+      return lhs == rhs;
+    }
   }];
 }
 
