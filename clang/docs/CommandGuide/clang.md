@@ -63,7 +63,7 @@ Linker
 
 The Clang Static Analyzer is a tool that scans source code to try to find bugs
 through code analysis. This tool uses many parts of Clang and is built into
-the same driver. Please see \<<https://clang-analyzer.llvm.org>> for more details
+the same driver. Please see <https://clang-analyzer.llvm.org> for more details
 on how to use the static analyzer.
 
 ## OPTIONS
@@ -103,172 +103,56 @@ Specify the language standard to compile for.
 
 Supported values for the C language are:
 
-> `c89`
->
-> `c90`
->
-> `iso9899:1990`
->
-> > ISO C 1990
->
-> `iso9899:199409`
->
-> > ISO C 1990 with amendment 1
->
-> `gnu89`
->
-> `gnu90`
->
-> > ISO C 1990 with GNU extensions
->
-> `c99`
->
-> `iso9899:1999`
->
-> > ISO C 1999
->
-> `gnu99`
->
-> > ISO C 1999 with GNU extensions
->
-> `c11`
->
-> `iso9899:2011`
->
-> > ISO C 2011
->
-> `gnu11`
->
-> > ISO C 2011 with GNU extensions
->
-> `c17`
->
-> `iso9899:2017`
->
-> > ISO C 2017
->
-> `gnu17`
->
-> > ISO C 2017 with GNU extensions
->
-> `c23`
->
-> `iso9899:2024`
->
-> > ISO C 2023
->
-> `gnu23`
->
-> > ISO C 2023 with GNU extensions
->
-> `c2y`
->
-> > ISO C 202y
->
-> `gnu2y`
->
-> > ISO C 202y with GNU extensions
+- `c89`, `c90`, `iso9899:1990`: ISO C 1990
+- `iso9899:199409`: ISO C 1990 with amendment 1
+- `gnu89`, `gnu90`: ISO C 1990 with GNU extensions
+- `c99`, `iso9899:1999`: ISO C 1999
+- `gnu99`: ISO C 1999 with GNU extensions
+- `c11`, `iso9899:2011`: ISO C 2011
+- `gnu11`: ISO C 2011 with GNU extensions
+- `c17`, `iso9899:2017`: ISO C 2017
+- `gnu17`: ISO C 2017 with GNU extensions
+- `c23`, `iso9899:2024`: ISO C 2023
+- `gnu23`: ISO C 2023 with GNU extensions
+- `c2y`: ISO C 202y
+- `gnu2y`: ISO C 202y with GNU extensions
 
 The default C language standard is `gnu17`, except on PS4, where it is
 `gnu99`.
 
 Supported values for the C++ language are:
 
-> `c++98`
->
-> `c++03`
->
-> > ISO C++ 1998 with amendments
->
-> `gnu++98`
->
-> `gnu++03`
->
-> > ISO C++ 1998 with amendments and GNU extensions
->
-> `c++11`
->
-> > ISO C++ 2011 with amendments
->
-> `gnu++11`
->
-> > ISO C++ 2011 with amendments and GNU extensions
->
-> `c++14`
->
-> > ISO C++ 2014 with amendments
->
-> `gnu++14`
->
-> > ISO C++ 2014 with amendments and GNU extensions
->
-> `c++17`
->
-> > ISO C++ 2017 with amendments
->
-> `gnu++17`
->
-> > ISO C++ 2017 with amendments and GNU extensions
->
-> `c++20`
->
-> > ISO C++ 2020 with amendments
->
-> `gnu++20`
->
-> > ISO C++ 2020 with amendments and GNU extensions
->
-> `c++23`
->
-> > ISO C++ 2023 with amendments
->
-> `gnu++23`
->
-> > ISO C++ 2023 with amendments and GNU extensions
->
-> `c++2c`
->
-> > Working draft for C++2c
->
-> `gnu++2c`
->
-> > Working draft for C++2c with GNU extensions
->
-> `c++2d`
->
-> > Working draft for C++2d
->
-> `gnu++2d`
->
-> > Working draft for C++2d with GNU extensions
+- `c++98`, `c++03`: ISO C++ 1998 with amendments
+- `gnu++98`, `gnu++03`: ISO C++ 1998 with amendments and GNU extensions
+- `c++11`: ISO C++ 2011 with amendments
+- `gnu++11`: ISO C++ 2011 with amendments and GNU extensions
+- `c++14`: ISO C++ 2014 with amendments
+- `gnu++14`: ISO C++ 2014 with amendments and GNU extensions
+- `c++17`: ISO C++ 2017 with amendments
+- `gnu++17`: ISO C++ 2017 with amendments and GNU extensions
+- `c++20`: ISO C++ 2020 with amendments
+- `gnu++20`: ISO C++ 2020 with amendments and GNU extensions
+- `c++23`: ISO C++ 2023 with amendments
+- `gnu++23`: ISO C++ 2023 with amendments and GNU extensions
+- `c++2c`: Working draft for C++2c
+- `gnu++2c`: Working draft for C++2c with GNU extensions
+- `c++2d`: Working draft for C++2d
+- `gnu++2d`: Working draft for C++2d with GNU extensions
 
 The default C++ language standard is `gnu++17`.
 
 Supported values for the OpenCL language are:
 
-> `cl1.0`
->
-> > OpenCL 1.0
->
-> `cl1.1`
->
-> > OpenCL 1.1
->
-> `cl1.2`
->
-> > OpenCL 1.2
->
-> `cl2.0`
->
-> > OpenCL 2.0
+- `cl1.0`: OpenCL 1.0
+- `cl1.1`: OpenCL 1.1
+- `cl1.2`: OpenCL 1.2
+- `cl2.0`: OpenCL 2.0
 
 The default OpenCL language standard is `cl1.0`.
 
 Supported values for the CUDA language are:
 
-> `cuda`
->
-> > NVIDIA CUDA(tm)
+- `cuda`: NVIDIA CUDA(tm)
 :::
 
 :::{option} -stdlib=<library>
@@ -319,7 +203,7 @@ library function in namespace `std`. For example,
 {cpp:func}`std::move_if_noexcept` library function.
 
 For C standard library functions that the C++ standard library also provides
-in namespace `std`, use {option}`-fno-builtin-\<function\>` instead.
+in namespace `std`, use `-fno-builtin-<function>` instead.
 :::
 
 :::{option} -fmath-errno
@@ -350,7 +234,7 @@ strings and other optimizations.
 
 :::{option} -flax-vector-conversions, -flax-vector-conversions=<kind>, -fno-lax-vector-conversions
 Allow loose type checking rules for implicit vector conversions.
-Possible values of \<kind>:
+Possible values of `<kind>`:
 
 - `none`: allow no implicit conversions between vectors
 - `integer`: allow implicit bitcasts between integer vectors of the same
@@ -358,7 +242,7 @@ Possible values of \<kind>:
 - `all`: allow implicit bitcasts between any vectors of the same
   overall bit-width
 
-\<kind> defaults to `integer` if unspecified.
+`<kind>` defaults to `integer` if unspecified.
 :::
 
 :::{option} -fblocks
@@ -447,49 +331,39 @@ AArch64 and RISC-V.
 :::{option} -O0, -O1, -O2, -O3, -Ofast, -Os, -Oz, -Og, -O, -O4
 Specify which optimization level to use:
 
-> {option}`-O0` Means "no optimization": this level compiles the fastest and
-> generates the most debuggable code.
->
-> {option}`-O1` Somewhere between {option}`-O0` and {option}`-O2`.
->
-> {option}`-O2` Moderate level of optimization which enables most
-> optimizations.
->
-> {option}`-O3` Like {option}`-O2`, except that it enables optimizations that
-> take longer to perform or that may generate larger code (in an attempt to
-> make the program run faster).
->
-> {option}`-Ofast` Enables all the optimizations from {option}`-O3` along with
-> other aggressive optimizations that may violate strict compliance with
-> language standards. This has been deprecated since Clang 19. There is no
-> timeline yet for removal; the aim is to discourage use of {option}`-Ofast`
-> due to the surprising behavior of an optimization flag changing the
-> observable behavior of correct code.
->
-> If {option}`-Ofast` has been specified and is the effective optimization
-> level (i.e. there is no later `-O` option specified), then the option can be
-> replaced in the option string with `-O3 -ffast-math -fstrict-aliasing`.
-> ({option}`-fstrict-aliasing` is the default on non-Windows, non-UEFI
-> platforms). If {option}`-Ofast` has been specified but is not the effective
-> optimization level, then it can be removed or replaced with {option}`-O3`.
->
-> {option}`-Os` Like {option}`-O2` with extra optimizations to reduce code
-> size.
->
-> {option}`-Oz` Like {option}`-Os` (and thus {option}`-O2`), but reduces code
-> size further.
->
-> {option}`-Og` Similar to {option}`-O1`, but with slightly reduced
-> optimization and better variable visibility. The same optimizations are run
-> as at {option}`-O1`, but the `-fextend-variable-liveness` flag is
-> also set, which tries to prevent optimizations from reducing the liveness of
-> user variables, improving their availability when debugging.
->
-> {option}`-O` Equivalent to {option}`-O1`.
->
-> {option}`-O4` and higher
->
-> > Currently equivalent to {option}`-O3`
+- {option}`-O0` means "no optimization": this level compiles the fastest and
+  generates the most debuggable code.
+- {option}`-O1` is somewhere between {option}`-O0` and {option}`-O2`.
+- {option}`-O2` is a moderate level of optimization which enables most
+  optimizations.
+- {option}`-O3` is like {option}`-O2`, except that it enables optimizations
+  that take longer to perform or that may generate larger code (in an attempt
+  to make the program run faster).
+- {option}`-Ofast` enables all the optimizations from {option}`-O3` along with
+  other aggressive optimizations that may violate strict compliance with
+  language standards. This has been deprecated since Clang 19. There is no
+  timeline yet for removal; the aim is to discourage use of {option}`-Ofast`
+  due to the surprising behavior of an optimization flag changing the
+  observable behavior of correct code.
+
+  If {option}`-Ofast` has been specified and is the effective optimization
+  level (i.e. there is no later `-O` option specified), then the option can be
+  replaced in the option string with `-O3 -ffast-math -fstrict-aliasing`.
+  ({option}`-fstrict-aliasing` is the default on non-Windows, non-UEFI
+  platforms). If {option}`-Ofast` has been specified but is not the effective
+  optimization level, then it can be removed or replaced with {option}`-O3`.
+
+- {option}`-Os` is like {option}`-O2` with extra optimizations to reduce code
+  size.
+- {option}`-Oz` is like {option}`-Os` (and thus {option}`-O2`), but reduces code
+  size further.
+- {option}`-Og` is similar to {option}`-O1`, but with slightly reduced
+  optimization and better variable visibility. The same optimizations are run
+  as at {option}`-O1`, but the `-fextend-variable-liveness` flag is also set,
+  which tries to prevent optimizations from reducing the liveness of user
+  variables, improving their availability when debugging.
+- {option}`-O` is equivalent to {option}`-O1`.
+- {option}`-O4` and higher are currently equivalent to {option}`-O3`.
 :::
 
 :::{option} -g, -gline-tables-only, -gmodules
@@ -497,25 +371,23 @@ Control debug information output. Note that Clang debug information works
 best at {option}`-O0`. When more than one option starting with `-g` is
 specified, the last one wins:
 
-> {option}`-g` Generate debug information.
->
-> {option}`-gline-tables-only` Generate only line table debug information. This
-> allows for symbolicated backtraces with inlining information, but does not
-> include any information about variables, their locations or types.
->
-> {option}`-gmodules` Generate debug information that contains external
-> references to types defined in Clang modules or precompiled headers instead
-> of emitting redundant debug type information into every object file. This
-> option transparently switches the Clang module format to object file
-> containers that hold the Clang module together with the debug information.
-> When compiling a program that uses Clang modules or precompiled headers,
-> this option produces complete debug information with faster compile
-> times and much smaller object files.
->
-> This option should not be used when building static libraries for
-> distribution to other machines because the debug info will contain
-> references to the module cache on the machine the object files in the
-> library were built on.
+- {option}`-g` generates debug information.
+- {option}`-gline-tables-only` generates only line table debug information.
+  This allows for symbolicated backtraces with inlining information, but does
+  not include any information about variables, their locations or types.
+- {option}`-gmodules` generates debug information that contains external
+  references to types defined in Clang modules or precompiled headers instead
+  of emitting redundant debug type information into every object file. This
+  option transparently switches the Clang module format to object file
+  containers that hold the Clang module together with the debug information.
+  When compiling a program that uses Clang modules or precompiled headers, this
+  option produces complete debug information with faster compile times and much
+  smaller object files.
+
+  This option should not be used when building static libraries for
+  distribution to other machines because the debug info will contain references
+  to the module cache on the machine the object files in the library were built
+  on.
 :::
 
 :::{option} -fstandalone-debug -fno-standalone-debug
@@ -761,48 +633,39 @@ the preprocessed file by compiling it separately.
 
 ## ENVIRONMENT
 
-```{eval-rst}
-.. envvar:: TMPDIR, TEMP, TMP
+:::{envvar} TMPDIR, TEMP, TMP
+These environment variables are checked, in order, for the location to write
+temporary files used during the compilation process.
+:::
 
-  These environment variables are checked, in order, for the location to write
-  temporary files used during the compilation process.
-```
+:::{envvar} CPATH
+This environment variable specifies additional (non-system) header search
+paths to be used to find included header files. These paths are searched after
+paths specified with the `-I<directory>` option, but before any
+system header search paths. Paths are delimited by the platform dependent
+delimiter as used in the `PATH` environment variable. Empty entries in the
+delimited path list, including those at the beginning or end of the list, are
+treated as specifying the compiler's current working directory.
+:::
 
-```{eval-rst}
-.. envvar:: CPATH
+:::{envvar} C_INCLUDE_PATH, OBJC_INCLUDE_PATH, CPLUS_INCLUDE_PATH, OBJCPLUS_INCLUDE_PATH
+These environment variables specify additional system header file search
+paths to be used when processing the corresponding language. Search paths are
+delimited as for the {envvar}`CPATH` environment variable.
+:::
 
-  This environment variable specifies additional (non-system) header search
-  paths to be used to find included header files. These paths are searched after
-  paths specified with the :option:`-I\<directory\>` option, but before any
-  system header search paths. Paths are delimited by the platform dependent
-  delimiter as used in the ``PATH`` environment variable. Empty entries in the
-  delimited path list, including those at the beginning or end of the list, are
-  treated as specifying the compiler's current working directory.
-```
-
-```{eval-rst}
-.. envvar:: C_INCLUDE_PATH, OBJC_INCLUDE_PATH, CPLUS_INCLUDE_PATH, OBJCPLUS_INCLUDE_PATH
-
-  These environment variables specify additional system header file search
-  paths to be used when processing the corresponding language. Search paths are
-  delimited as for the :envvar:`CPATH` environment variable.
-```
-
-```{eval-rst}
-.. envvar:: MACOSX_DEPLOYMENT_TARGET
-
-  If :option:`-mmacos-version-min` is unspecified, the default deployment
-  target is read from this environment variable. This option only affects
-  Darwin targets.
-```
+:::{envvar} MACOSX_DEPLOYMENT_TARGET
+If {option}`-mmacos-version-min` is unspecified, the default deployment
+target is read from this environment variable. This option only affects
+Darwin targets.
+:::
 
 ## BUGS
 
-To report bugs, please visit \<<https://github.com/llvm/llvm-project/issues/>>. Most bug reports should
+To report bugs, please visit <https://github.com/llvm/llvm-project/issues/>. Most bug reports should
 include preprocessed source files (use the {option}`-E` option) and the full
 output of the compiler, along with information to reproduce.
 
 ## SEE ALSO
 
 {manpage}`as(1)`, {manpage}`ld(1)`
-
