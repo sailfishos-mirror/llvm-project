@@ -495,9 +495,19 @@ public:
 
   MonotonicDescriptor() = default;
 
+  /// Returns the PHIs that feed into the backedge of the monotonic PHI.
   const SmallPtrSetImpl<PHINode *> &getChain() const { return Chain; }
+
+  /// Returns the instruction that updates the value of the monotonic PHI.
   Instruction *getStepInst() const { return StepInst; }
+
+  /// Returns the edge where the monotonic value/PHI is updated when taken.
   Edge getPredicateEdge() const { return PredEdge; }
+
+  /// Returns the expression that represents the monotonic PHI (match with
+  /// isMonotonicPHI) or monotonic value (match with isMonotonicVal). Note: The
+  /// conditional update is represented with a plain SCEVAddRec within the
+  /// expression, this only holds along the predicated edge.
   const SCEVAddRecExpr *getExpr() const { return Expr; }
 
   /// Returns true if \p PN is a monotonic variable in the loop \p L. If \p PN
@@ -507,17 +517,30 @@ public:
                              MonotonicDescriptor &Desc, ScalarEvolution &SE);
 
   /// Returns true if \p Val is a monotonic variable in the loop \p L (in this
-  /// case, the value should transitively contain monotonic phi as part of its
+  /// case, the value should transitively contain monotonic PHI as part of its
   /// calculation).
   static bool isMonotonicVal(Value *Val, const Loop *L,
                              MonotonicDescriptor &Desc, ScalarEvolution &SE);
 
 private:
+  /// The PHIs that feed into the backedge update of the monotonic PHI.
   SmallPtrSet<PHINode *, 1> Chain;
-  Instruction *StepInst;
-  Edge PredEdge;
-  const SCEVAddRecExpr *Expr;
 
+  /// The instruction that updates the value of the monotonic PHI.
+  Instruction *StepInst = nullptr;
+
+  /// The predicated edge where the monotonic value/PHI is updated.
+  /// The common case is {StepInstBlock, StepInstBlock->getSingleSuccessor()}.
+  /// Note: StepInstBlock = StepInst->getParent().
+  Edge PredEdge = {};
+
+  /// Expression that represents the monotonic PHI (isMonotonicPHI) or monotonic
+  /// (isMonotonicVal). Within the expression, the conditional update is
+  /// represented as an (unconditional) SCEVAddRec.
+  const SCEVAddRecExpr *Expr = nullptr;
+
+  /// Set the SCEV expression for this descriptor. \p NewExpr must be an affine
+  /// SCEVAddRec.
   bool setSCEV(const SCEV *NewExpr);
 };
 
