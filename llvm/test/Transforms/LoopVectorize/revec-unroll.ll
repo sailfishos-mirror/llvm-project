@@ -15,7 +15,7 @@ define void @load_add_store(ptr noalias %dst, ptr noalias %lhs, ptr noalias %rhs
 ; VF1IC2-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[N]], 2
 ; VF1IC2-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
 ; VF1IC2:       [[VECTOR_PH]]:
-; VF1IC2-NEXT:    [[N_MOD_VF:%.*]] = urem i64 [[N]], 2
+; VF1IC2-NEXT:    [[N_MOD_VF:%.*]] = and i64 [[N]], 1
 ; VF1IC2-NEXT:    [[N_VEC:%.*]] = sub i64 [[N]], [[N_MOD_VF]]
 ; VF1IC2-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; VF1IC2:       [[VECTOR_BODY]]:
