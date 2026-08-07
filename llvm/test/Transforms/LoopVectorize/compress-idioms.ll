@@ -12,7 +12,7 @@ define void @test_compress_store_with_index(ptr writeonly noalias %dst, ptr read
 ; CHECK-IC1-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[N]], 4
 ; CHECK-IC1-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
 ; CHECK-IC1:       [[VECTOR_PH]]:
-; CHECK-IC1-NEXT:    [[N_MOD_VF:%.*]] = urem i64 [[N]], 4
+; CHECK-IC1-NEXT:    [[N_MOD_VF:%.*]] = and i64 [[N]], 3
 ; CHECK-IC1-NEXT:    [[N_VEC:%.*]] = sub i64 [[N]], [[N_MOD_VF]]
 ; CHECK-IC1-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i32> poison, i32 [[C]], i64 0
 ; CHECK-IC1-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <4 x i32> [[BROADCAST_SPLATINSERT]], <4 x i32> poison, <4 x i32> zeroinitializer
@@ -47,7 +47,7 @@ define void @test_compress_store_with_index(ptr writeonly noalias %dst, ptr read
 ; CHECK-TF-NEXT:    br label %[[VECTOR_PH:.*]]
 ; CHECK-TF:       [[VECTOR_PH]]:
 ; CHECK-TF-NEXT:    [[N_RND_UP:%.*]] = add i64 [[N]], 3
-; CHECK-TF-NEXT:    [[N_MOD_VF:%.*]] = urem i64 [[N_RND_UP]], 4
+; CHECK-TF-NEXT:    [[N_MOD_VF:%.*]] = and i64 [[N_RND_UP]], 3
 ; CHECK-TF-NEXT:    [[N_VEC:%.*]] = sub i64 [[N_RND_UP]], [[N_MOD_VF]]
 ; CHECK-TF-NEXT:    [[TRIP_COUNT_MINUS_1:%.*]] = sub i64 [[N]], 1
 ; CHECK-TF-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i64> poison, i64 [[TRIP_COUNT_MINUS_1]], i64 0
@@ -116,7 +116,7 @@ define void @test_expand_load_with_index(ptr noalias %dst, ptr readonly %src, i3
 ; CHECK-IC1-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[N]], 4
 ; CHECK-IC1-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
 ; CHECK-IC1:       [[VECTOR_PH]]:
-; CHECK-IC1-NEXT:    [[N_MOD_VF:%.*]] = urem i64 [[N]], 4
+; CHECK-IC1-NEXT:    [[N_MOD_VF:%.*]] = and i64 [[N]], 3
 ; CHECK-IC1-NEXT:    [[N_VEC:%.*]] = sub i64 [[N]], [[N_MOD_VF]]
 ; CHECK-IC1-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i32> poison, i32 [[C]], i64 0
 ; CHECK-IC1-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <4 x i32> [[BROADCAST_SPLATINSERT]], <4 x i32> poison, <4 x i32> zeroinitializer
@@ -152,7 +152,7 @@ define void @test_expand_load_with_index(ptr noalias %dst, ptr readonly %src, i3
 ; CHECK-TF-NEXT:    br label %[[VECTOR_PH:.*]]
 ; CHECK-TF:       [[VECTOR_PH]]:
 ; CHECK-TF-NEXT:    [[N_RND_UP:%.*]] = add i64 [[N]], 3
-; CHECK-TF-NEXT:    [[N_MOD_VF:%.*]] = urem i64 [[N_RND_UP]], 4
+; CHECK-TF-NEXT:    [[N_MOD_VF:%.*]] = and i64 [[N_RND_UP]], 3
 ; CHECK-TF-NEXT:    [[N_VEC:%.*]] = sub i64 [[N_RND_UP]], [[N_MOD_VF]]
 ; CHECK-TF-NEXT:    [[TRIP_COUNT_MINUS_1:%.*]] = sub i64 [[N]], 1
 ; CHECK-TF-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i64> poison, i64 [[TRIP_COUNT_MINUS_1]], i64 0
@@ -223,7 +223,7 @@ define i32 @test_conditionally_incremented_phi_liveout(ptr writeonly noalias %ds
 ; CHECK-IC1-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[N]], 4
 ; CHECK-IC1-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
 ; CHECK-IC1:       [[VECTOR_PH]]:
-; CHECK-IC1-NEXT:    [[N_MOD_VF:%.*]] = urem i64 [[N]], 4
+; CHECK-IC1-NEXT:    [[N_MOD_VF:%.*]] = and i64 [[N]], 3
 ; CHECK-IC1-NEXT:    [[N_VEC:%.*]] = sub i64 [[N]], [[N_MOD_VF]]
 ; CHECK-IC1-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i32> poison, i32 [[C]], i64 0
 ; CHECK-IC1-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <4 x i32> [[BROADCAST_SPLATINSERT]], <4 x i32> poison, <4 x i32> zeroinitializer
@@ -258,7 +258,7 @@ define i32 @test_conditionally_incremented_phi_liveout(ptr writeonly noalias %ds
 ; CHECK-TF-NEXT:    br label %[[VECTOR_PH:.*]]
 ; CHECK-TF:       [[VECTOR_PH]]:
 ; CHECK-TF-NEXT:    [[N_RND_UP:%.*]] = add i64 [[N]], 3
-; CHECK-TF-NEXT:    [[N_MOD_VF:%.*]] = urem i64 [[N_RND_UP]], 4
+; CHECK-TF-NEXT:    [[N_MOD_VF:%.*]] = and i64 [[N_RND_UP]], 3
 ; CHECK-TF-NEXT:    [[N_VEC:%.*]] = sub i64 [[N_RND_UP]], [[N_MOD_VF]]
 ; CHECK-TF-NEXT:    [[TRIP_COUNT_MINUS_1:%.*]] = sub i64 [[N]], 1
 ; CHECK-TF-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i64> poison, i64 [[TRIP_COUNT_MINUS_1]], i64 0
@@ -326,7 +326,7 @@ define void @test_unconditional_increment(ptr writeonly noalias %dst, ptr readon
 ; CHECK-IC1-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[N]], 4
 ; CHECK-IC1-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
 ; CHECK-IC1:       [[VECTOR_PH]]:
-; CHECK-IC1-NEXT:    [[N_MOD_VF:%.*]] = urem i64 [[N]], 4
+; CHECK-IC1-NEXT:    [[N_MOD_VF:%.*]] = and i64 [[N]], 3
 ; CHECK-IC1-NEXT:    [[N_VEC:%.*]] = sub i64 [[N]], [[N_MOD_VF]]
 ; CHECK-IC1-NEXT:    [[TMP0:%.*]] = trunc i64 [[N_VEC]] to i32
 ; CHECK-IC1-NEXT:    [[TMP6:%.*]] = add i32 15, [[TMP0]]
@@ -358,7 +358,7 @@ define void @test_unconditional_increment(ptr writeonly noalias %dst, ptr readon
 ; CHECK-TF-NEXT:    br label %[[VECTOR_PH:.*]]
 ; CHECK-TF:       [[VECTOR_PH]]:
 ; CHECK-TF-NEXT:    [[N_RND_UP:%.*]] = add i64 [[N]], 3
-; CHECK-TF-NEXT:    [[N_MOD_VF:%.*]] = urem i64 [[N_RND_UP]], 4
+; CHECK-TF-NEXT:    [[N_MOD_VF:%.*]] = and i64 [[N_RND_UP]], 3
 ; CHECK-TF-NEXT:    [[N_VEC:%.*]] = sub i64 [[N_RND_UP]], [[N_MOD_VF]]
 ; CHECK-TF-NEXT:    [[TRIP_COUNT_MINUS_1:%.*]] = sub i64 [[N]], 1
 ; CHECK-TF-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i64> poison, i64 [[TRIP_COUNT_MINUS_1]], i64 0
