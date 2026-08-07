@@ -517,15 +517,12 @@ dlopen-ed/dlclose-d periodically, even frequently.
 
 - Calls made from uninstrumented DSOs are not checked and just work.
 - Calls inside any instrumented DSO are fully protected.
-
-Calls between different instrumented DSOs are also protected, with
-: a performance penalty (in addition to the monolithic CFI overhead).
-
-Calls from an instrumented DSO to an uninstrumented one are
-: unchecked and just work, with performance penalty.
-
-Calls from an instrumented DSO outside of any known DSO are
-: detected as CFI violations.
+- Calls between different instrumented DSOs are also protected, with a
+  performance penalty (in addition to the monolithic CFI overhead).
+- Calls from an instrumented DSO to an uninstrumented one are unchecked and
+  just work, with performance penalty.
+- Calls from an instrumented DSO outside of any known DSO are detected as CFI
+  violations.
 
 In the monolithic scheme a call site is instrumented as
 
