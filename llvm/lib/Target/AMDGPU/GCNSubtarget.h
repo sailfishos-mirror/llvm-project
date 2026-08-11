@@ -487,6 +487,8 @@ public:
   void overridePostRASchedPolicy(MachineSchedPolicy &Policy,
                                  const SchedRegion &Region) const override;
 
+  void overridePipelinerPolicy(MachinePipelinerPolicy &Policy) const override;
+
   void mirFileLoaded(MachineFunction &MF) const override;
 
   unsigned getMaxNumUserSGPRs() const {
