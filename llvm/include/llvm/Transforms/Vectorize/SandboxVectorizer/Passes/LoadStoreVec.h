@@ -38,6 +38,11 @@ class LLVM_ABI LoadStoreVec final : public RegionPass {
   void tryEraseDeadInstrs(ArrayRef<Instruction *> Stores,
                           ArrayRef<Value *> Operands);
 
+  /// Tries to vectorize the store chain \p Bndl into a single vector store.
+  /// \Returns whether it succeeded.
+  bool vectorizeStores(ArrayRef<Instruction *> Bndl, Region &Rgn,
+                       Scheduler &Sched, const Analyses &A);
+
 public:
   LoadStoreVec(StringRef AuxArg) : RegionPass("load-store-vec") {
     assert(AuxArg.empty() && "This pass ignores aux arg!");

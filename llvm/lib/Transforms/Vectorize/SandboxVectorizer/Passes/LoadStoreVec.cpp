@@ -64,14 +64,29 @@ void LoadStoreVec::tryEraseDeadInstrs(ArrayRef<Instruction *> Stores,
       PtrI->eraseFromParent();
 }
 
-bool LoadStoreVec::runOnRegion(Region &Rgn, const Analyses &A) {
-  SmallVector<Instruction *, 8> Bndl(Rgn.getAux().begin(), Rgn.getAux().end());
-  if (Bndl.size() < 2)
+/// Accepts the transaction if vectorizing was profitable, reverts it otherwise.
+/// \Returns true if the transaction was accepted.
+static bool acceptIfProfitable(Context &Ctx, const ScoreBoard &SB,
+                               InstructionCost CostBefore) {
+  InstructionCost CostAfter = SB.getAfterCost() - SB.getBeforeCost();
+  InstructionCost CostGain = CostAfter - CostBefore;
+  LLVM_DEBUG(dbgs() << DEBUG_PREFIX_LOCAL << "CostGain=" << CostGain
+                    << " (After=" << CostAfter << " Before=" << CostBefore
+                    << ")\n");
+  if (CostGain > CostThreshold) {
+    LLVM_DEBUG(dbgs() << DEBUG_PREFIX_LOCAL << "Not profitable, reverting.\n");
+    Ctx.revert();
     return false;
+  }
+  LLVM_DEBUG(dbgs() << DEBUG_PREFIX_LOCAL << "Profitable accepting.\n");
+  Ctx.accept();
+  return true;
+}
+
+bool LoadStoreVec::vectorizeStores(ArrayRef<Instruction *> Bndl, Region &Rgn,
+                                   Scheduler &Sched, const Analyses &A) {
   Function &F = *Bndl[0]->getParent()->getParent();
-  DL = &F.getParent()->getDataLayout();
   auto &Ctx = F.getContext();
-  Scheduler Sched(A.getAA(), Ctx, SchedDirection::BottomUp);
   if (!VecUtils::areConsecutive<StoreInst, Instruction>(
           Bndl, A.getScalarEvolution(), *DL))
     return false;
@@ -184,20 +199,17 @@ bool LoadStoreVec::runOnRegion(Region &Rgn, const Analyses &A) {
 
   tryEraseDeadInstrs(Bndl, Operands);
 
-  // Check the cost.
-  InstructionCost CostAfter = SB.getAfterCost() - SB.getBeforeCost();
-  InstructionCost CostGain = CostAfter - CostBefore;
-  LLVM_DEBUG(dbgs() << DEBUG_PREFIX_LOCAL << "CostGain=" << CostGain
-                    << " (After=" << CostAfter << " Before=" << CostBefore
-                    << ")\n");
-  if (CostGain > CostThreshold) {
-    LLVM_DEBUG(dbgs() << DEBUG_PREFIX_LOCAL << "Not profitable, reverting.\n");
-    Ctx.revert();
+  return acceptIfProfitable(Ctx, SB, CostBefore);
+}
+
+bool LoadStoreVec::runOnRegion(Region &Rgn, const Analyses &A) {
+  SmallVector<Instruction *, 8> Bndl(Rgn.getAux().begin(), Rgn.getAux().end());
+  if (Bndl.size() < 2)
     return false;
-  }
-  LLVM_DEBUG(dbgs() << DEBUG_PREFIX_LOCAL << "Profitable accepting.\n");
-  Ctx.accept();
-  return true;
+  Function &F = *Bndl[0]->getParent()->getParent();
+  DL = &F.getParent()->getDataLayout();
+  Scheduler Sched(A.getAA(), F.getContext(), SchedDirection::BottomUp);
+  return vectorizeStores(Bndl, Rgn, Sched, A);
 }
 
 } // namespace sandboxir
