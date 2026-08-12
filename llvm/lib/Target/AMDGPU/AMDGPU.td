@@ -1607,8 +1607,7 @@ def FeatureSouthernIslands : GCNSubtargetFeatureGeneration<"SOUTHERN_ISLANDS",
   FeatureSadInsts, FeatureMsadInsts, FeatureMqsadPkInsts,
   FeatureCvtPkNormVOP2Insts, FeatureDX10ClampAndIEEEMode, FeatureMTBUFInsts,
   FeatureFormattedMUBUFInsts,
-  FeatureMaxWavesPerEU10,
-  FeatureHalfSIMDs4
+  FeatureMaxWavesPerEU10, FeatureHalfSIMDs4
   ]
 >;
 
@@ -1627,8 +1626,7 @@ def FeatureSeaIslands : GCNSubtargetFeatureGeneration<"SEA_ISLANDS",
   FeatureMqsadInsts, FeatureCvtPkNormVOP2Insts,
   FeatureDX10ClampAndIEEEMode, FeatureInstCacheLineSize64,
   FeatureMTBUFInsts, FeatureFormattedMUBUFInsts,
-  FeatureMaxWavesPerEU10,
-  FeatureHalfSIMDs4
+  FeatureMaxWavesPerEU10, FeatureHalfSIMDs4
   ]
 >;
 
@@ -1650,8 +1648,7 @@ def FeatureVolcanicIslands : GCNSubtargetFeatureGeneration<"VOLCANIC_ISLANDS",
    FeatureMqsadPkInsts, FeatureMqsadInsts,
    FeatureCvtPkNormVOP2Insts, FeatureDX10ClampAndIEEEMode,
    FeatureInstCacheLineSize64, FeatureMTBUFInsts, FeatureFormattedMUBUFInsts,
-   FeatureMaxWavesPerEU10,
-   FeatureHalfSIMDs4
+   FeatureMaxWavesPerEU10, FeatureHalfSIMDs4
   ]
 >;
 
@@ -1741,8 +1738,7 @@ def FeatureGFX11 : GCNSubtargetFeatureGeneration<"GFX11",
    FeatureMqsadInsts, FeatureCvtNormInsts,
    FeatureCvtPkNormVOP2Insts, FeatureCvtPkNormVOP3Insts,
    FeatureInstCacheLineSize128, FeatureMTBUFInsts, FeatureFormattedMUBUFInsts,
-   FeatureMaxWavesPerEU16,
-   FeatureHalfSIMDs2
+   FeatureMaxWavesPerEU16, FeatureHalfSIMDs2
   ]
 >;
 
@@ -1802,8 +1798,7 @@ def FeatureGFX13 : GCNSubtargetFeatureGeneration<"GFX13",
    FeatureAgentScopeFineGrainedRemoteMemoryAtomics, FeatureFlatOffsetBits24,
    FeatureFlatSignedOffset, FeatureInstCacheLineSize128,
    FeatureMTBUFInsts, FeatureFormattedMUBUFInsts,
-   FeatureMaxWavesPerEU16,
-   FeatureHalfSIMDs2
+   FeatureMaxWavesPerEU16, FeatureHalfSIMDs2
   ]
 >;
 //===----------------------------------------------------------------------===//
@@ -1953,8 +1948,7 @@ def FeatureISAVersion9_0_8 : FeatureSet<
      FeatureAtomicBufferGlobalPkAddF16NoRtnInsts,
      FeatureMFMAInlineLiteralBug,
      FeatureImageGather4D16Bug,
-   FeatureMaxWavesPerEU10
-  ])>;
+     FeatureMaxWavesPerEU10])>;
 
 def FeatureISAVersion9_0_9 : FeatureSet<
   !listconcat(FeatureISAVersion9_0_Consumer_Common.Features,
@@ -1978,8 +1972,8 @@ def FeatureISAVersion9_0_A : FeatureSet<
      FeatureAtomicFMinFMaxF64FlatInsts,
      FeatureFlatBufferGlobalAtomicFaddF64Inst,
      FeatureLdsAtomicAddF64,
-   FeatureMaxWavesPerEU8
-  ])>;
+     FeatureMaxWavesPerEU8
+     ])>;
 
 def FeatureISAVersion9_0_C : FeatureSet<
   !listconcat(FeatureISAVersion9_0_Consumer_Common.Features,
@@ -2029,7 +2023,7 @@ def FeatureISAVersion9_4_Common : FeatureSet<
    FeatureLshlAddU64Inst,
    FeatureVMovB64Inst,
    FeatureMaxWavesPerEU8
-  ]>;
+   ]>;
 
 def FeatureISAVersion9_5_Common : FeatureSet<
   !listconcat(FeatureISAVersion9_4_Common.Features,
@@ -2102,8 +2096,7 @@ def FeatureISAVersion10_1_Common : FeatureSet<
      FeatureOffset3fBug,
      FeatureFlatSegmentOffsetBug,
      FeatureNegativeUnalignedScratchOffsetBug,
-   FeatureMaxWavesPerEU20
-  ])>;
+     FeatureMaxWavesPerEU20])>;
 
 def FeatureISAVersion10_1_Generic : FeatureSet<
   !listconcat(FeatureISAVersion10_1_Common.Features,
@@ -2149,8 +2142,7 @@ def FeatureISAVersion10_3_0 : FeatureSet<
      FeatureDot7Insts,
      FeatureDot10Insts,
      FeatureShaderCyclesRegister,
-   FeatureMaxWavesPerEU16
-  ])>;
+     FeatureMaxWavesPerEU16])>;
 
 def FeatureISAVersion10_3_Generic: FeatureSet<
   !listconcat(FeatureISAVersion10_3_0.Features,
@@ -2336,7 +2328,7 @@ def FeatureISAVersion12 : FeatureSet<
    FeatureFormattedMUBUFInsts,
    FeatureDataCacheLineSize128,
    FeatureHalfSIMDs2
-  ]>;
+   ]>;
 
 def FeatureISAVersion12_50_Common : FeatureSet<
   [FeatureGFX12,
@@ -2430,7 +2422,7 @@ def FeatureISAVersion12_50_Common : FeatureSet<
    FeatureVMovB64Inst,
    FeatureVMulU64Inst,
    FeatureHalfSIMDs4
-  ]>;
+]>;
 
 def FeatureISAVersion12_50 : FeatureSet<
   !listconcat(FeatureISAVersion12_50_Common.Features,
