@@ -47,17 +47,6 @@ class AMDGPUGPUInfo<list<int> isa = []> {
   // A pseudo target ("generic"/"generic-hsa") that represents no
   // hardware.
   bit IsPseudoTarget = false;
-
-  // Maximum number of waves an execution unit can hold, ignoring any resource
-  // limit.
-  int MaxWavesPerEU = 10;
-
-  // Number of execution units (SIMDs) whose waves a workgroup must share: the
-  // full set of SIMDs of the functional block, and the count when a workgroup
-  // is restricted to half of them. Hardware that cannot split the block has
-  // the same count for both.
-  int FullSIMDs = 4;
-  int HalfSIMDs = 4;
 }
 
 // An R600 processor that is also a canonical TargetParser GPU.

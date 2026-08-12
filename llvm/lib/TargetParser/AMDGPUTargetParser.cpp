@@ -42,7 +42,6 @@ struct GPUInfo {
   IsaVersion Version;
   StringTable::Offset FamilyName;
   uint8_t MaxWavesPerEU;
-  uint8_t FullSIMDs;
   uint8_t HalfSIMDs;
 };
 
@@ -427,9 +426,9 @@ unsigned AMDGPU::getSGPRAllocGranule(Triple::SubArchType SubArch) {
 
 unsigned AMDGPU::getWorkGroupSIMDs(GPUKind AK, bool FullSIMDMode) {
   const GPUInfo *Info = getAMDGPUInfo(AK);
-  if (!Info)
-    return 4;
-  return FullSIMDMode ? Info->FullSIMDs : Info->HalfSIMDs;
+  if (FullSIMDMode || !Info)
+    return FullSIMDs;
+  return Info->HalfSIMDs;
 }
 
 unsigned AMDGPU::getWorkGroupSIMDs(Triple::SubArchType SubArch,
