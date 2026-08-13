@@ -31,6 +31,7 @@
 
 using RuntimeState = llvm::offload::StateTy;
 using ThreadState = llvm::offload::ThreadStateTy;
+using StreamTy = llvm::offload::StreamTy;
 
 using llvm::offload::convertAndSetLastError;
 using llvm::offload::getQueueFromStream;
@@ -151,6 +152,9 @@ Error_t GetDeviceProperties(DeviceProp_t *DeviceProp, int DeviceNo) {
 }
 
 Error_t StreamCreate(Stream_t *Stream) {
+  if (!Stream)
+    return setLastError(ErrorInvalidValue);
+
   llvm::offload::StreamTy *StreamObj = nullptr;
   ol_result_t Result = RuntimeState::createStream(
       ThreadState::getDefaultDevice(),
@@ -160,7 +164,27 @@ Error_t StreamCreate(Stream_t *Stream) {
   return convertAndSetLastError(Result);
 }
 
+Error_t StreamCreateWithFlags(Stream_t *Stream, unsigned int Flags) {
+  if (!Stream)
+    return setLastError(ErrorInvalidValue);
+
+  if (Flags == StreamDefault)
+    return StreamCreate(Stream);
+  if (Flags != StreamNonBlocking)
+    return setLastError(ErrorInvalidValue);
+
+  llvm::offload::StreamTy *StreamObj = nullptr;
+  ol_result_t Result = RuntimeState::createStream(
+      ThreadState::getDefaultDevice(),
+      llvm::offload::QueueKind::ExplicitNonBlocking, &StreamObj);
+  if (Result == OL_SUCCESS)
+    *Stream = makeLanguageStream(StreamObj);
+  return convertAndSetLastError(Result);
+}
+
 Error_t StreamDestroy(Stream_t Stream) {
+  if (!Stream)
+    return setLastError(ErrorInvalidValue);
   ol_result_t Result = RuntimeState::destroyStream(toInternalStream(Stream));
   return convertAndSetLastError(Result);
 }
