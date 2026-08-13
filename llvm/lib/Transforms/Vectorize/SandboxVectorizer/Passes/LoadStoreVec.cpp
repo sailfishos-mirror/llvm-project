@@ -42,26 +42,51 @@ std::optional<Type *> LoadStoreVec::canVectorize(ArrayRef<Instruction *> Bndl,
   return VecUtils::getCombinedVectorTypeFor(Bndl, *DL);
 }
 
-void LoadStoreVec::tryEraseDeadInstrs(ArrayRef<Instruction *> Stores,
-                                      ArrayRef<Value *> Operands) {
+void LoadStoreVec::eraseDeadAfterVectorize(
+    ArrayRef<Instruction *> Bndl, ArrayRef<Value *> MaybeDeadOperands) {
   SmallPtrSet<Instruction *, 8> DeadCandidates;
-  for (auto *SI : Stores) {
-    if (auto *PtrI =
-            dyn_cast<Instruction>(cast<StoreInst>(SI)->getPointerOperand()))
+  // A store's result type is void, so it always has zero uses and this
+  // erases it unconditionally; a load is only erased once it truly has no
+  // uses left.
+  auto EraseIfDead = [&](Instruction *I) {
+    if (!I->hasNUses(0))
+      return;
+    Value *PtrOp = isa<StoreInst>(I) ? cast<StoreInst>(I)->getPointerOperand()
+                                     : cast<LoadInst>(I)->getPointerOperand();
+    if (auto *PtrI = dyn_cast<Instruction>(PtrOp))
       DeadCandidates.insert(PtrI);
-    SI->eraseFromParent();
-  }
-  for (auto *Op : Operands) {
-    if (auto *LI = dyn_cast<LoadInst>(Op)) {
-      if (auto *PtrI =
-              dyn_cast<Instruction>(cast<LoadInst>(LI)->getPointerOperand()))
-        DeadCandidates.insert(PtrI);
-      cast<LoadInst>(LI)->eraseFromParent();
-    }
-  }
+    I->eraseFromParent();
+  };
+  for (auto *I : Bndl)
+    EraseIfDead(I);
+  for (auto *Op : MaybeDeadOperands)
+    if (auto *LI = dyn_cast<LoadInst>(Op))
+      EraseIfDead(LI);
   for (auto *PtrI : DeadCandidates)
     if (!PtrI->hasNUsesOrMore(1))
       PtrI->eraseFromParent();
+}
+
+Value *LoadStoreVec::createVectorLoad(ArrayRef<Value *> Operands,
+                                      Scheduler &Sched, const Analyses &A,
+                                      Context &Ctx) {
+  SmallVector<Instruction *, 8> Loads;
+  Loads.reserve(Operands.size());
+  for (Value *Op : Operands)
+    Loads.push_back(cast<Instruction>(Op));
+
+  if (!VecUtils::areConsecutive<LoadInst, Instruction>(
+          Loads, A.getScalarEvolution(), *DL))
+    return nullptr;
+  if (!canVectorize(Loads, Sched))
+    return nullptr;
+
+  Type *Ty = VecUtils::getCombinedVectorTypeFor(Loads, *DL);
+  Value *LdPtr = cast<LoadInst>(Loads[0])->getPointerOperand();
+  // TODO: Compute alignment.
+  Align LdAlign(1);
+  auto LdWhereIt = std::next(VecUtils::getLowest(Loads)->getIterator());
+  return LoadInst::create(Ty, LdPtr, LdAlign, LdWhereIt, Ctx, "VecIinitL");
 }
 
 /// Accepts the transaction if vectorizing was profitable, reverts it otherwise.
@@ -197,7 +222,49 @@ bool LoadStoreVec::vectorizeStores(ArrayRef<Instruction *> Bndl, Region &Rgn,
   auto StWhereIt = std::next(VecUtils::getLowest(Bndl)->getIterator());
   StoreInst::create(VecOp, StPtr, StAlign, StWhereIt, Ctx);
 
-  tryEraseDeadInstrs(Bndl, Operands);
+  eraseDeadAfterVectorize(Bndl, Operands);
+
+  return acceptIfProfitable(Ctx, SB, CostBefore);
+}
+
+bool LoadStoreVec::vectorizeLoads(ArrayRef<Instruction *> Bndl, Region &Rgn,
+                                  Scheduler &Sched, const Analyses &A) {
+  Function &F = *Bndl[0]->getParent()->getParent();
+  auto &Ctx = F.getContext();
+
+  const auto &SB = cast<RegionWithScore>(Rgn).getScoreboard();
+  InstructionCost CostBefore = SB.getAfterCost() - SB.getBeforeCost();
+
+  Ctx.save();
+
+  SmallVector<Value *, 8> Operands(Bndl.begin(), Bndl.end());
+  Value *VecLoad = createVectorLoad(Operands, Sched, A, Ctx);
+  if (VecLoad == nullptr) {
+    Ctx.accept();
+    return false;
+  }
+
+  // TODO: Support mixed-type top-level load chains.
+  Type *VecElemTy = cast<FixedVectorType>(VecLoad->getType())->getElementType();
+  if (!all_of(Bndl, [VecElemTy](Instruction *I) {
+        return VecUtils::getElementType(I->getType()) == VecElemTy;
+      })) {
+    Ctx.revert();
+    return false;
+  }
+
+  auto *VecLoadI = cast<Instruction>(VecLoad);
+  BasicBlock::iterator WhereIt = std::next(VecLoadI->getIterator());
+  for (auto [Lane, OrigV] : VecUtils::enumerateLanes(Bndl)) {
+    auto *OrigLoad = cast<LoadInst>(OrigV);
+    if (OrigLoad->hasNUses(0))
+      continue;
+    Value *Unpacked =
+        VecUtils::unpack(VecLoad, OrigLoad->getType(), Lane, WhereIt);
+    OrigLoad->replaceAllUsesWith(Unpacked);
+  }
+
+  eraseDeadAfterVectorize(Bndl, {});
 
   return acceptIfProfitable(Ctx, SB, CostBefore);
 }
@@ -208,8 +275,20 @@ bool LoadStoreVec::runOnRegion(Region &Rgn, const Analyses &A) {
     return false;
   Function &F = *Bndl[0]->getParent()->getParent();
   DL = &F.getParent()->getDataLayout();
+
+  // SeedCollection only ever gives us a homogeneous seed slice: stores and
+  // loads are collected in separate passes over the BB, never mixed into one
+  // Aux (see SeedCollection::runOnFunction).
+  bool IsStoreKind = isa<StoreInst>(Bndl[0]);
+  assert(all_of(Bndl,
+                [&](Instruction *I) {
+                  return isa<StoreInst>(I) == IsStoreKind;
+                }) &&
+         "Expected a homogeneous seed slice!");
+
   Scheduler Sched(A.getAA(), F.getContext(), SchedDirection::BottomUp);
-  return vectorizeStores(Bndl, Rgn, Sched, A);
+  return IsStoreKind ? vectorizeStores(Bndl, Rgn, Sched, A)
+                     : vectorizeLoads(Bndl, Rgn, Sched, A);
 }
 
 } // namespace sandboxir
