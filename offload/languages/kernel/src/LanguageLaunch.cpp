@@ -8,23 +8,20 @@
 
 #include "LanguageLaunch.h"
 #include "LanguageUtils.h"
+#include "OffloadErrors.h"
 #include "State.h"
+#include "Stream.h"
 #include <cstdio>
 
 using RuntimeState = llvm::offload::StateTy;
 using ThreadState = llvm::offload::ThreadStateTy;
+using StreamTy = llvm::offload::StreamTy;
 
-static constexpr ol_error_struct_t InvalidKernelError = {
-    OL_ERRC_INVALID_NULL_HANDLE, "kernel is not registered"};
-
-static constexpr ol_error_struct_t InvalidDeviceError = {OL_ERRC_INVALID_DEVICE,
-                                                         "invalid device"};
-
-static constexpr ol_error_struct_t InvalidArgumentError = {
-    OL_ERRC_INVALID_ARGUMENT, "invalid argument to kernel launch"};
-
-static constexpr ol_error_struct_t InvalidConfigurationError = {
-    OL_ERRC_INVALID_SIZE, "invalid kernel launch configuration"};
+using llvm::offload::convertAndSetLastError;
+using llvm::offload::InvalidArgumentError;
+using llvm::offload::InvalidConfigurationError;
+using llvm::offload::InvalidDeviceError;
+using llvm::offload::InvalidKernelError;
 
 /// Internal kernel launch implementation
 ol_result_t __llvmLaunchKernelImpl(const char *KernelID, dim3 GridDim,
@@ -54,7 +51,7 @@ ol_result_t __llvmLaunchKernelImpl(const char *KernelID, dim3 GridDim,
   LaunchSizeArgs.GroupSize.z = BlockDim.z;
   LaunchSizeArgs.DynSharedMemory = DynamicSharedMem;
 
-  ol_queue_handle_t Queue = Stream ? reinterpret_cast<ol_queue_handle_t>(Stream)
+  ol_queue_handle_t Queue = Stream ? reinterpret_cast<StreamTy *>(Stream)->Queue
                                    : ThreadState::getDefaultQueue();
 
   struct OffloadKernelArgs {

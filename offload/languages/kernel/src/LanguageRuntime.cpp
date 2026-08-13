@@ -19,6 +19,7 @@
 
 #include "LanguageUtils.h"
 #include "State.h"
+#include "Stream.h"
 #include "Types.h"
 
 #include "OffloadAPI.h"
@@ -30,6 +31,12 @@
 
 using RuntimeState = llvm::offload::StateTy;
 using ThreadState = llvm::offload::ThreadStateTy;
+
+using llvm::offload::convertAndSetLastError;
+using llvm::offload::getQueueFromStream;
+using llvm::offload::setLastError;
+using llvm::offload::toInternalStream;
+using llvm::offload::toLanguageStream;
 
 Error_t Malloc(void **DevPtr, size_t Size) {
   ol_device_handle_t Device = ThreadState::getDefaultDevice();
@@ -144,20 +151,17 @@ Error_t GetDeviceProperties(DeviceProp_t *DeviceProp, int DeviceNo) {
 }
 
 Error_t StreamCreate(Stream_t *Stream) {
-  ol_queue_handle_t Queue;
-  ol_result_t Result = olCreateQueue(RuntimeState::getContext(),
-                                     ThreadState::getDefaultDevice(), &Queue);
+  llvm::offload::StreamTy *StreamObj = nullptr;
+  ol_result_t Result = RuntimeState::createStream(
+      ThreadState::getDefaultDevice(),
+      llvm::offload::QueueKind::ExplicitBlocking, &StreamObj);
   if (Result == OL_SUCCESS)
-    *Stream = reinterpret_cast<Stream_t>(Queue);
+    *Stream = toLanguageStream(StreamObj);
   return convertAndSetLastError(Result);
 }
 
 Error_t StreamDestroy(Stream_t Stream) {
-  ol_queue_handle_t Queue;
-  Error_t Err = getQueueFromStream(Stream, &Queue);
-  if (Err != Success)
-    return setLastError(Err);
-  ol_result_t Result = olDestroyQueue(Queue);
+  ol_result_t Result = RuntimeState::destroyStream(toInternalStream(Stream));
   return convertAndSetLastError(Result);
 }
 
