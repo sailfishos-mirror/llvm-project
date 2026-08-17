@@ -76,9 +76,10 @@ namespace {
 // consumes.  Integer (including `_BitInt` up to 128 bits) / pointer / bool /
 // floating-point scalars are handled, as are struct / union / array aggregates,
 // `_Complex`, and a fixed-width vector whose width is a power of two.  Other
-// vectors, packed or padded records, and a union no member of which spans its
-// declared size are reported NYI by classifyX86_64Function so an unsupported
-// signature fails the pass instead of being misclassified.
+// vectors, packed records, a padded record that holds a bit-field access unit
+// or no data at all, and a union no member of which spans its declared size are
+// reported NYI by classifyX86_64Function so an unsupported signature fails the
+// pass instead of being misclassified.
 //===----------------------------------------------------------------------===//
 
 /// Whether a struct's declared argument-passing kind (from the module's
@@ -104,6 +105,19 @@ static llvm::Align recordDeclaredAlign(ModuleOp modOp, cir::RecordType recTy,
   if (!layout)
     return llvm::Align(dl.getTypeABIAlignment(recTy));
   return llvm::Align(layout.getRecordAlign());
+}
+
+/// Whether \p ty contains a bit-field access unit, looking through member
+/// records and array element types.
+static bool reachesBitFieldUnit(mlir::Type ty) {
+  if (auto arrTy = dyn_cast<cir::ArrayType>(ty))
+    return reachesBitFieldUnit(arrTy.getElementType());
+  auto recTy = dyn_cast<cir::RecordType>(ty);
+  if (!recTy)
+    return false;
+  if (llvm::any_of(recTy.getMemberKinds(), cir::isBitFieldUnit))
+    return true;
+  return llvm::any_of(recTy.getMembers(), reachesBitFieldUnit);
 }
 
 /// The CIR types the x86_64 bridge handles.  Scalars: an integer up to 128
@@ -200,9 +214,16 @@ static bool isSupportedType(mlir::Type ty, const DataLayout &dl) {
           return false;
       }
     } else if (recTy.getPadded()) {
-      // A struct's padding is a member the classifier would have to recognize
-      // as padding rather than data, which is not implemented.
-      return false;
+      // A record with no data member classifies Ignore, which this bridge does
+      // not implement.
+      if (recTy.isEmptyForABI())
+        return false;
+      // A bit-field access unit is narrower than the bit-fields it holds, so
+      // classifying around the padding would coerce to the unit's width where
+      // classic CodeGen widens to the declared type's.  The reach matters, not
+      // just the outermost record.
+      if (reachesBitFieldUnit(recTy))
+        return false;
     }
     return llvm::all_of(recTy.getMembers(),
                         [&](mlir::Type m) { return isSupportedType(m, dl); });
@@ -326,16 +347,15 @@ static const llvm::abi::Type *mapCIRType(mlir::Type type,
                                  llvm::abi::StructPacking::Default, flags);
         }
 
-        // isSupportedType rejects packed and padded structs, so every field
-        // here sits at its naturally-aligned offset.
-        uint64_t offsetBits = 0;
-        for (mlir::Type fieldTy : recTy.getMembers()) {
-          const llvm::abi::Type *mappedField =
-              mapCIRType(fieldTy, typeMapper, dl, modOp);
-          offsetBits =
-              llvm::alignTo(offsetBits, dl.getTypeABIAlignment(fieldTy) * 8);
-          fields.push_back(llvm::abi::FieldInfo(mappedField, offsetBits));
-          offsetBits += dl.getTypeSizeInBits(fieldTy).getFixedValue();
+        // The record's full size, set above, still spans the skipped members,
+        // so the eightbyte rules see the bytes they occupy.
+        for (auto [idx, fieldTy, kind] :
+             llvm::enumerate(recTy.getMembers(), recTy.getMemberKinds())) {
+          if (!classifiesAsField(kind))
+            continue;
+          fields.push_back(
+              llvm::abi::FieldInfo(mapCIRType(fieldTy, typeMapper, dl, modOp),
+                                   recTy.getElementOffset(dl, idx) * 8));
         }
         return tb.getRecordType(
             fields, sizeBits, align, llvm::abi::StructPacking::Default,
@@ -373,6 +393,11 @@ static std::optional<ArgClassification>
 convertABIArgInfo(const llvm::abi::ArgInfo &info, MLIRContext *ctx,
                   mlir::Type origTy) {
   if (info.isDirect()) {
+    // The rewriter reads a coercion from the start of the value's storage, so a
+    // classification naming an offset into it has no representation here.  The
+    // classifier names one when the low eightbyte holds no field.
+    if (info.getDirectOffset())
+      return std::nullopt;
     // The classifier names a coerce type even where it matches the natural
     // type, so a non-null coerce does not by itself mean a rewrite is needed.
     const llvm::abi::Type *coerceAbi = info.getCoerceToType();

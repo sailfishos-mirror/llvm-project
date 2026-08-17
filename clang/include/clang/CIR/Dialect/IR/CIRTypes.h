@@ -51,6 +51,13 @@ inline bool isBitFieldUnit(RecordMemberKind kind) {
          kind == RecordMemberKind::EmptyBitField;
 }
 
+/// Whether a member of this kind is classified for argument passing.  Padding
+/// is compiler-inserted and an empty member holds no data, so neither is; a
+/// bit-field access unit is, because its bytes are storage the source declared.
+inline bool classifiesAsField(RecordMemberKind kind) {
+  return kind != RecordMemberKind::Pad && kind != RecordMemberKind::Empty;
+}
+
 /// Returns true if the type is a CIR sized type.
 ///
 /// Types are sized if they implement SizedTypeInterface and
