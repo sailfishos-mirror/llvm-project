@@ -941,11 +941,22 @@ static bool IsTransformableLoop(const parser::OmpDirectiveSpecification &spec) {
   return !IsFullUnroll(spec) && IsLoopTransforming(spec.DirId());
 }
 
+static const parser::OpenMPLoopConstruct *GetOpenMPLoopConstruct(
+    const parser::ExecutionPartConstruct *epc) {
+  if (!epc) {
+    return nullptr;
+  }
+  const auto *exec{parser::Unwrap<parser::ExecutableConstruct>(*epc)};
+  const auto *omp{
+      exec ? parser::Unwrap<parser::OpenMPConstruct>(exec->u) : nullptr};
+  return omp ? std::get_if<parser::OpenMPLoopConstruct>(&omp->u) : nullptr;
+}
+
 static bool IsTransformableLoop(const parser::ExecutionPartConstruct &epc) {
   if (auto *loop{parser::Unwrap<parser::DoConstruct>(epc)}) {
     return loop->IsDoNormal();
   }
-  if (auto *omp{parser::Unwrap<parser::OpenMPLoopConstruct>(epc)}) {
+  if (auto *omp{GetOpenMPLoopConstruct(&epc)}) {
     return IsTransformableLoop(omp->BeginDir());
   }
   return false;
@@ -1637,11 +1648,10 @@ bool IsDoacrossAffected(const parser::OpenMPLoopConstruct &x) {
 /// The k DO loop is affected by the DO construct [2].
 /// For the top-level DO COLLAPSE(5) construct, the k loop is the only
 /// directly affected loop.
-std::optional<std::vector<const parser::DoConstruct *>> CollectAffectedDoLoops(
-    const parser::OpenMPLoopConstruct &x, unsigned version,
-    SemanticsContext *semaCtx) {
+static std::optional<std::vector<const parser::DoConstruct *>>
+CollectAffectedDoLoopsImpl(const parser::OmpDirectiveSpecification &spec,
+    const LoopSequence &sequence, unsigned version, SemanticsContext *semaCtx) {
   std::vector<const parser::DoConstruct *> result;
-  const parser::OmpDirectiveSpecification &spec{x.BeginDir()};
 
   auto [depth, _]{GetAffectedNestDepthWithReason(spec, version, semaCtx)};
 
@@ -1683,7 +1693,7 @@ std::optional<std::vector<const parser::DoConstruct *>> CollectAffectedDoLoops(
       } else {
         --consuming;
       }
-    } else if (auto *omp{parser::Unwrap<parser::OpenMPLoopConstruct>(owner)}) {
+    } else if (auto *omp{GetOpenMPLoopConstruct(owner)}) {
       const parser::OmpDirectiveSpecification &ods{omp->BeginDir()};
       auto [cons, _1]{GetAffectedNestDepthWithReason(ods, version, semaCtx)};
       auto [prod, _2]{GetGeneratedNestDepthWithReason(ods, version, semaCtx)};
@@ -1709,11 +1719,25 @@ std::optional<std::vector<const parser::DoConstruct *>> CollectAffectedDoLoops(
     return success && produced >= level;
   }};
 
-  LoopSequence sequence(std::get<parser::Block>(x.t), version, true, semaCtx);
   if (visit(sequence, visit)) {
     return result;
   }
   return std::nullopt;
+}
+
+std::optional<std::vector<const parser::DoConstruct *>> CollectAffectedDoLoops(
+    const parser::OpenMPLoopConstruct &x, unsigned version,
+    SemanticsContext *semaCtx) {
+  LoopSequence sequence{std::get<parser::Block>(x.t), version, true, semaCtx};
+  return CollectAffectedDoLoopsImpl(x.BeginDir(), sequence, version, semaCtx);
+}
+
+std::optional<std::vector<const parser::DoConstruct *>> CollectAffectedDoLoops(
+    const parser::OmpDirectiveSpecification &spec,
+    const parser::ExecutionPartConstruct &root, unsigned version,
+    SemanticsContext *semaCtx) {
+  LoopSequence sequence{root, version, true, semaCtx};
+  return CollectAffectedDoLoopsImpl(spec, sequence, version, semaCtx);
 }
 
 #ifdef EXPENSIVE_CHECKS
@@ -1795,7 +1819,7 @@ std::unique_ptr<LoopSequence::Construct> LoopSequence::createConstructEntry(
       auto &body{std::get<parser::Block>(loop->t)};
       return std::make_unique<Construct>(body, &code);
     }
-  } else if (auto *omp{parser::Unwrap<parser::OpenMPLoopConstruct>(code)}) {
+  } else if (auto *omp{GetOpenMPLoopConstruct(&code)}) {
     // Allow all loop constructs. This helps with better diagnostics, e.g.
     // "this is not a loop-transforming construct", insted of just "this is
     // not a valid intervening code".
@@ -1880,7 +1904,7 @@ WithReason<int64_t> LoopSequence::calculateLength() const {
     return WithReason<int64_t>(1);
   }
 
-  auto &omp{DEREF(parser::Unwrap<parser::OpenMPLoopConstruct>(*entry_->owner))};
+  auto &omp{DEREF(GetOpenMPLoopConstruct(entry_->owner))};
   const parser::OmpDirectiveSpecification &beginSpec{omp.BeginDir()};
   llvm::omp::Directive dir{beginSpec.DirId()};
   if (!IsLoopTransforming(dir)) {
@@ -2013,7 +2037,7 @@ LoopSequence::Depth LoopSequence::calculateDepths() const {
     return Depth{int64_t(1) + semaDepth, int64_t(1) + perfDepth};
   }
 
-  auto &omp{DEREF(parser::Unwrap<parser::OpenMPLoopConstruct>(*entry_->owner))};
+  auto &omp{DEREF(GetOpenMPLoopConstruct(entry_->owner))};
   const parser::OmpDirectiveSpecification &beginSpec{omp.BeginDir()};
   llvm::omp::Directive dir{beginSpec.DirId()};
   bool isFullUnroll{IsFullUnroll(beginSpec)};
@@ -2130,7 +2154,7 @@ WithReason<int64_t> LoopSequence::calculateHeight() const {
   if (parser::Unwrap<parser::DoConstruct>(*entry_->owner)) {
     return {1, Reason()};
   }
-  if (auto *omp{parser::Unwrap<parser::OpenMPLoopConstruct>(*entry_->owner)}) {
+  if (auto *omp{GetOpenMPLoopConstruct(entry_->owner)}) {
     const parser::OmpDirectiveSpecification &beginSpec{omp->BeginDir()};
     if (IsLoopTransforming(beginSpec.DirId())) {
       return GetHeightWithReason(beginSpec, version_, semaCtx_);
@@ -2151,7 +2175,7 @@ static Reason WhyNotWellFormed(
     const parser::ExecutionPartConstruct &badCode, bool isSequence) {
   Reason reason;
   parser::CharBlock source{*parser::GetSource(badCode)};
-  if (auto *omp{parser::Unwrap<parser::OpenMPLoopConstruct>(badCode)}) {
+  if (auto *omp{GetOpenMPLoopConstruct(&badCode)}) {
     const parser::OmpDirectiveSpecification &beginSpec{omp->BeginDir()};
     if (IsFullUnroll(beginSpec)) {
       reason.Say(source, MsgConstructDoesNotResult, "Fully unrolled loop",
@@ -2422,14 +2446,10 @@ UnsupportedSelectorFeature FindUnsupportedSelectorFeature(
   return UnsupportedSelectorFeature::None;
 }
 
-// Add the construct trait properties implied by an OpenMP directive (e.g.
-// `target` adds `construct_target_target`, `target teams` adds both
-// `construct_target_target` and `construct_teams_teams`) to \p vmi. This
-// decomposes combined/composite construct selectors into their leaf traits.
-static void AppendConstructTraitsForDirective(
-    llvm::omp::Directive dir, llvm::omp::VariantMatchInfo &vmi) {
+void AppendConstructTraitsForDirective(llvm::omp::Directive dir,
+    llvm::SmallVectorImpl<llvm::omp::TraitProperty> &constructTraits) {
   auto add = [&](llvm::omp::TraitProperty prop) {
-    vmi.addTrait(prop, llvm::omp::getOpenMPContextTraitPropertyName(prop, ""));
+    constructTraits.push_back(prop);
   };
   if (llvm::omp::allTargetSet.test(dir))
     add(llvm::omp::TraitProperty::construct_target_target);
@@ -2445,6 +2465,19 @@ static void AppendConstructTraitsForDirective(
   // directive set), so it is matched explicitly.
   if (dir == llvm::omp::Directive::OMPD_dispatch)
     add(llvm::omp::TraitProperty::construct_dispatch_dispatch);
+}
+
+// Add the construct trait properties implied by an OpenMP directive (e.g.
+// `target` adds `construct_target_target`, `target teams` adds both
+// `construct_target_target` and `construct_teams_teams`) to \p vmi.
+static void AppendConstructTraitsToMatchInfo(
+    llvm::omp::Directive dir, llvm::omp::VariantMatchInfo &vmi) {
+  llvm::SmallVector<llvm::omp::TraitProperty, 8> constructTraits;
+  AppendConstructTraitsForDirective(dir, constructTraits);
+  for (llvm::omp::TraitProperty trait : constructTraits) {
+    vmi.addTrait(
+        trait, llvm::omp::getOpenMPContextTraitPropertyName(trait, ""));
+  }
 }
 
 static void AddTraitPropertiesFromSelector(llvm::omp::TraitSet set,
@@ -2498,7 +2531,7 @@ static void AddTraitPropertiesFromSelector(llvm::omp::TraitSet set,
   // Construct trait selector with no properties (e.g. `construct={simd}`):
   // the selector itself implies the property.
   if (const auto *dir{std::get_if<llvm::omp::Directive>(&traitName.u)}) {
-    AppendConstructTraitsForDirective(*dir, vmi);
+    AppendConstructTraitsToMatchInfo(*dir, vmi);
   }
 }
 
@@ -2633,23 +2666,27 @@ std::optional<MetadirectiveCandidateSet> BuildMetadirectiveCandidateSet(
           // score and an unguarded candidate with only the static traits.
           llvm::omp::VariantMatchInfo conditionTrueVMI{staticVMI};
           addConditionTraitForRanking(conditionTrueVMI);
-          result.candidates.push_back({spec, std::move(conditionTrueVMI),
-              isExplicit, dynamicCondition});
-          result.candidates.push_back({spec, std::move(staticVMI), isExplicit});
+          result.candidates.push_back(
+              {spec, std::move(conditionTrueVMI), isExplicit, dynamicCondition,
+                  /*conditionShouldBeTrue=*/true, &clause});
+          result.candidates.push_back({spec, std::move(staticVMI), isExplicit,
+              std::nullopt, /*conditionShouldBeTrue=*/true, &clause});
           continue;
         }
 
         llvm::omp::VariantMatchInfo rankingVMI{staticVMI};
         addConditionTraitForRanking(rankingVMI);
-        result.candidates.push_back({spec, std::move(rankingVMI), isExplicit,
-            dynamicCondition, /*conditionShouldBeTrue=*/!hasMatchNone});
+        result.candidates.push_back(
+            {spec, std::move(rankingVMI), isExplicit, dynamicCondition,
+                /*conditionShouldBeTrue=*/!hasMatchNone, &clause});
         continue;
       }
 
       if (!llvm::omp::isVariantApplicableInContext(rawVMI, matchContext)) {
         continue;
       }
-      result.candidates.push_back({spec, std::move(rawVMI), isExplicit});
+      result.candidates.push_back({spec, std::move(rawVMI), isExplicit,
+          std::nullopt, /*conditionShouldBeTrue=*/true, &clause});
     } else if (const auto *otherwiseClause{
                    std::get_if<parser::OmpClause::Otherwise>(&clause.u)}) {
       if (otherwiseClause->v && otherwiseClause->v->v) {

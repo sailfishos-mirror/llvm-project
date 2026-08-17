@@ -111,6 +111,23 @@ private:
   std::int64_t level_;
   std::map<std::string, std::int64_t> constructNamesAndLevels_;
 };
+
+static std::vector<parser::Name> collectIterationVariables(
+    llvm::ArrayRef<const parser::DoConstruct *> loops) {
+  std::vector<parser::Name> ivs;
+  for (const parser::DoConstruct *loop : loops) {
+    // Skip DO CONCURRENT, since their iteration variables are local.
+    if (loop->IsDoConcurrent()) {
+      continue;
+    }
+    for (auto &control : semantics::omp::GetLoopControls(*loop)) {
+      if (control.iv.symbol) {
+        ivs.push_back(control.iv);
+      }
+    }
+  }
+  return ivs;
+}
 } // namespace
 
 namespace Fortran::semantics {
@@ -494,7 +511,16 @@ void OmpStructureChecker::CheckIterationVariables(
   if (!doLoops) {
     return;
   }
-  const parser::OmpDirectiveSpecification &spec{x.BeginDir()};
+  CheckIterationVariableRestrictions(*doLoops);
+  CheckIterationVariableDataSharingClauses(
+      x.BeginDir(), *doLoops, /*requireResolvedDSA=*/true);
+}
+
+void OmpStructureChecker::CheckIterationVariableDataSharingClauses(
+    const parser::OmpDirectiveSpecification &spec,
+    llvm::ArrayRef<const parser::DoConstruct *> loops,
+    bool requireResolvedDSA) {
+  unsigned version{context_.langOptions().OpenMPVersion};
   llvm::omp::Directive dirId{spec.DirId()};
 
   // Collect symbols from DSA clauses on the construct. These symbols
@@ -533,20 +559,55 @@ void OmpStructureChecker::CheckIterationVariables(
     isLinearAllowed = leafs.back() == llvm::omp::Directive::OMPD_simd;
   }
 
-  std::vector<parser::Name> ivs;
-  for (const parser::DoConstruct *loop : *doLoops) {
-    // Skip DO CONCURRENT, since their iteration variables are local.
-    if (loop->IsDoConcurrent()) {
-      continue;
-    }
-    for (auto &control : GetLoopControls(*loop)) {
-      if (control.iv.symbol) {
-        ivs.push_back(control.iv);
-      }
-    }
-  }
+  std::vector<parser::Name> ivs{collectIterationVariables(loops)};
 
   for (const parser::Name &iv : ivs) {
+    // Get the symbol from the variable that was listed in a DSA clause.
+    const Symbol *host{iv.symbol};
+    while (host && !dsa.count(host)) {
+      host = GetHostSymbol(*host);
+    }
+    if (!host) {
+      continue;
+    }
+    // Check conflict between a predetermined DSA and explicit DSA.
+    if (requireResolvedDSA) {
+      // Ordinary OpenMP name resolution marks the construct-scoped IV symbol.
+      // Metadirective variants have no such symbol, so their clause appearance
+      // is the available evidence that the IV was explicitly listed.
+      assert(iv.symbol->test(Symbol::Flag::OmpPreDetermined) &&
+          "Expecting affected iteration variable to have predetermined DSA");
+      if (!iv.symbol->test(Symbol::Flag::OmpExplicit)) {
+        continue;
+      }
+    }
+    auto range{dsa.equal_range(host)};
+    for (auto found{range.first}; found != range.second; ++found) {
+      llvm::omp::Clause id{found->second.clauseId};
+      if (!llvm::omp::isAllowedClauseForDirective(dirId, id, version)) {
+        continue;
+      }
+      if (id == llvm::omp::Clause::OMPC_private ||
+          id == llvm::omp::Clause::OMPC_lastprivate) {
+        continue;
+      }
+      if (id == llvm::omp::Clause::OMPC_linear && isLinearAllowed) {
+        continue;
+      }
+      context_
+          .Say(found->second.source,
+              "Loop iteration variable with a predetermined data sharing attribute cannot appear in a %s clause"_err_en_US,
+              parser::omp::GetUpperName(id, version))
+          .Attach(iv.source,
+              "'%s' is an iteration variable of an affected loop"_because_en_US,
+              iv.ToString());
+    }
+  }
+}
+
+void OmpStructureChecker::CheckIterationVariableRestrictions(
+    llvm::ArrayRef<const parser::DoConstruct *> loops) {
+  for (const parser::Name &iv : collectIterationVariables(loops)) {
     const auto *type{iv.symbol->GetType()};
     if (!type->IsNumeric(TypeCategory::Integer)) {
       context_.Say(iv.source,
@@ -557,40 +618,6 @@ void OmpStructureChecker::CheckIterationVariables(
       context_.Say(iv.source,
           "Loop iteration variable of an affected loop cannot be THREADPRIVATE"_err_en_US,
           iv.ToString());
-    }
-    // Get the symbol from the variable that was listed in a DSA clause.
-    const Symbol *host{iv.symbol};
-    while (host && !dsa.count(host)) {
-      host = GetHostSymbol(*host);
-    }
-    if (!host) {
-      continue;
-    }
-    // Check conflict between a predetermined DSA and explicit DSA.
-    assert(iv.symbol->test(Symbol::Flag::OmpPreDetermined) &&
-        "Expecting affected iteration variable to have predetermined DSA");
-    if (iv.symbol->test(Symbol::Flag::OmpExplicit)) {
-      auto range{dsa.equal_range(host)};
-      for (auto found{range.first}; found != range.second; ++found) {
-        llvm::omp::Clause id{found->second.clauseId};
-        if (!llvm::omp::isAllowedClauseForDirective(dirId, id, version)) {
-          continue;
-        }
-        if (id == llvm::omp::Clause::OMPC_private ||
-            id == llvm::omp::Clause::OMPC_lastprivate) {
-          continue;
-        }
-        if (id == llvm::omp::Clause::OMPC_linear && isLinearAllowed) {
-          continue;
-        }
-        context_
-            .Say(found->second.source,
-                "Loop iteration variable with a predetermined data sharing attribute cannot appear in a %s clause"_err_en_US,
-                parser::omp::GetUpperName(id, version))
-            .Attach(iv.source,
-                "'%s' is an iteration variable of an affected loop"_because_en_US,
-                iv.ToString());
-      }
     }
   }
 }
@@ -975,6 +1002,16 @@ void OmpStructureChecker::Leave(const parser::DoConstruct &x) {
   assert(doc != nullptr && *doc == &x && "Mismatched constructs");
 #endif
   constructStack_.pop_back();
+
+  // Only a standalone metadirective's associated root loop has this synthetic
+  // marker immediately below it on the construct stack.
+  if (!constructStack_.empty() &&
+      std::holds_alternative<const parser::OmpMetadirectiveDirective *>(
+          constructStack_.back())) {
+    constructStack_.pop_back();
+    CHECK(!metadirectiveConstructContexts_.empty());
+    metadirectiveConstructContexts_.pop_back();
+  }
   Base::Leave(x);
 }
 

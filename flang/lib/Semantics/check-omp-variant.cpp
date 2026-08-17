@@ -28,9 +28,11 @@
 #include "flang/Semantics/tools.h"
 
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SetVector.h"
 #include "llvm/Frontend/OpenMP/OMP.h"
 
 #include <algorithm>
+#include <array>
 #include <list>
 #include <map>
 #include <optional>
@@ -164,7 +166,7 @@ private:
 
 void OmpStructureChecker::CheckDefaultNoneInAssociatedLoop(
     const parser::OmpDirectiveSpecification &spec,
-    const parser::DoConstruct &rootLoop, UnorderedSymbolSet &diagnosed) {
+    const parser::ExecutionPartConstruct &root, UnorderedSymbolSet &diagnosed) {
   if (!HasDefaultNone(spec)) {
     return;
   }
@@ -180,10 +182,10 @@ void OmpStructureChecker::CheckDefaultNoneInAssociatedLoop(
     }
   }
 
-  const Scope &scope{context_.FindScope(*parser::GetSource(rootLoop))};
+  const Scope &scope{context_.FindScope(*parser::GetSource(root))};
   MetadirectiveDefaultNoneChecker checker{
       context_, scope, explicitDSA, diagnosed};
-  parser::Walk(rootLoop, checker);
+  parser::Walk(root, checker);
 }
 
 void OmpStructureChecker::Enter(const parser::OmpClause::When &x) {
@@ -753,11 +755,585 @@ void OmpStructureChecker::Leave(const parser::OmpDirectiveSpecification &x) {
   }
 }
 
-void OmpStructureChecker::Enter(const parser::OmpMetadirectiveDirective &x) {
-  EnterDirectiveNest(MetadirectiveNest);
+void OmpStructureChecker::BeginMetadirectiveSelection() {
+  metadirectiveSelectionStarts_.push_back(metadirectiveLoopVariants_.size());
 }
 
-void OmpStructureChecker::Leave(const parser::OmpMetadirectiveDirective &) {
+bool OmpStructureChecker::IsInvariantMetadirectiveCondition(
+    const MetadirectiveConditionVariable &condition) {
+  const SomeExpr *expr{GetExpr(context_, *condition.expr)};
+  if (!expr)
+    return false;
+  auto symbols{evaluate::CollectSymbols(*expr)};
+  return !symbols.empty() && llvm::all_of(symbols, [](const Symbol &symbol) {
+    if (IsNamedConstant(symbol))
+      return true;
+    return IsIntentIn(symbol) && !IsPointer(symbol) &&
+        !evaluate::IsCoarray(symbol) &&
+        !symbol.attrs().HasAny({Attr::ASYNCHRONOUS, Attr::VOLATILE});
+  });
+}
+
+bool OmpStructureChecker::AreSameMetadirectiveCondition(
+    const MetadirectiveConditionVariable &left,
+    const MetadirectiveConditionVariable &right) {
+  if (!AreSameRepeatableMetadirectiveCondition(
+          *left.expr, *right.expr, context_))
+    return false;
+  // Repeated conditions within one metadirective are evaluated at the same
+  // selection point. Across nested metadirectives, only correlate expressions
+  // whose values cannot have changed between the two selections.
+  return left.owner == right.owner ||
+      (IsInvariantMetadirectiveCondition(left) &&
+          IsInvariantMetadirectiveCondition(right));
+}
+
+unsigned OmpStructureChecker::GetMetadirectiveConditionVariable(
+    const MetadirectiveConditionConstraint &condition, bool forceFresh) {
+  MetadirectiveConditionVariable variable{condition.expr, condition.owner};
+  if (!forceFresh) {
+    for (unsigned i{0}; i < metadirectiveConditionVariables_.size(); ++i) {
+      if (AreSameMetadirectiveCondition(
+              metadirectiveConditionVariables_[i], variable))
+        return i;
+    }
+  }
+  metadirectiveConditionVariables_.push_back(variable);
+  return metadirectiveConditionVariables_.size() - 1;
+}
+
+unsigned OmpStructureChecker::GetMetadirectiveConditionNode(
+    unsigned variable, unsigned low, unsigned high) {
+  if (low == high)
+    return low;
+  auto key{std::tuple{variable, low, high}};
+  auto [it, inserted]{metadirectiveConditionUniqueNodes_.try_emplace(
+      key, metadirectiveConditionNodes_.size())};
+  if (inserted)
+    metadirectiveConditionNodes_.push_back({variable, low, high});
+  return it->second;
+}
+
+unsigned OmpStructureChecker::ApplyMetadirectiveCondition(
+    bool conjunction, unsigned left, unsigned right) {
+  if (left > right)
+    std::swap(left, right);
+  if (left == right)
+    return left;
+  if (conjunction) {
+    if (left == 0 || right == 0)
+      return 0;
+    if (left == 1)
+      return right;
+  } else {
+    if (left == 1 || right == 1)
+      return 1;
+    if (left == 0)
+      return right;
+  }
+
+  auto key{std::tuple{conjunction, left, right}};
+  if (auto it{metadirectiveConditionApplyCache_.find(key)};
+      it != metadirectiveConditionApplyCache_.end())
+    return it->second;
+
+  const MetadirectiveConditionNode &leftNode{
+      metadirectiveConditionNodes_[left]};
+  const MetadirectiveConditionNode &rightNode{
+      metadirectiveConditionNodes_[right]};
+  unsigned variable{std::min(leftNode.variable, rightNode.variable)};
+  unsigned leftLow{leftNode.variable == variable ? leftNode.low : left};
+  unsigned leftHigh{leftNode.variable == variable ? leftNode.high : left};
+  unsigned rightLow{rightNode.variable == variable ? rightNode.low : right};
+  unsigned rightHigh{rightNode.variable == variable ? rightNode.high : right};
+  unsigned low{ApplyMetadirectiveCondition(conjunction, leftLow, rightLow)};
+  unsigned high{ApplyMetadirectiveCondition(conjunction, leftHigh, rightHigh)};
+  unsigned result{GetMetadirectiveConditionNode(variable, low, high)};
+  metadirectiveConditionApplyCache_.emplace(key, result);
+  return result;
+}
+
+unsigned OmpStructureChecker::NegateMetadirectiveCondition(unsigned formula) {
+  if (formula < 2)
+    return 1 - formula;
+  if (auto it{metadirectiveConditionNegationCache_.find(formula)};
+      it != metadirectiveConditionNegationCache_.end())
+    return it->second;
+  const MetadirectiveConditionNode &node{metadirectiveConditionNodes_[formula]};
+  unsigned result{GetMetadirectiveConditionNode(node.variable,
+      NegateMetadirectiveCondition(node.low),
+      NegateMetadirectiveCondition(node.high))};
+  metadirectiveConditionNegationCache_.emplace(formula, result);
+  metadirectiveConditionNegationCache_.emplace(result, formula);
+  return result;
+}
+
+unsigned OmpStructureChecker::AddMetadirectiveCondition(
+    unsigned formula, unsigned variable, bool value) {
+  unsigned literal{value ? GetMetadirectiveConditionNode(variable, 0, 1)
+                         : GetMetadirectiveConditionNode(variable, 1, 0)};
+  return ApplyMetadirectiveCondition(
+      /*conjunction=*/true, formula, literal);
+}
+
+unsigned OmpStructureChecker::AddMetadirectiveCondition(
+    unsigned formula, const MetadirectiveConditionConstraint &condition) {
+  return AddMetadirectiveCondition(
+      formula, GetMetadirectiveConditionVariable(condition), condition.value);
+}
+
+void OmpStructureChecker::EndMetadirectiveSelection(
+    const parser::OmpClauseList &clauses) {
+  CHECK(!metadirectiveSelectionStarts_.empty());
+  std::size_t firstVariant{metadirectiveSelectionStarts_.back()};
+  metadirectiveSelectionStarts_.pop_back();
+  CHECK(!metadirectiveConstructContexts_.empty());
+
+  auto addAlternative =
+      [&](llvm::SmallVectorImpl<MetadirectiveConstructAlternative>
+              &alternatives,
+          MetadirectiveConstructAlternative alternative) {
+        if (alternative.condition == 0)
+          return;
+        for (MetadirectiveConstructAlternative &existing : alternatives) {
+          if (existing.traits == alternative.traits) {
+            existing.condition = ApplyMetadirectiveCondition(
+                /*conjunction=*/false, existing.condition,
+                alternative.condition);
+            return;
+          }
+        }
+        alternatives.push_back(std::move(alternative));
+      };
+
+  using ConstructComponent =
+      llvm::SmallVector<MetadirectiveConstructAlternative, 2>;
+  llvm::SmallVector<ConstructComponent, 8> constructComponents;
+  // Preserve source order without forming the product of enclosing choices.
+  std::size_t metadirectiveContextIndex{0};
+  for (const LoopOrConstruct &item : constructStack_) {
+    bool isMetadirective{
+        std::holds_alternative<const parser::OmpMetadirectiveDirective *>(
+            item)};
+    const auto *construct{std::get_if<const parser::OpenMPConstruct *>(&item)};
+    if (construct)
+      isMetadirective = parser::omp::GetOmpDirectiveName(**construct).v ==
+          llvm::omp::Directive::OMPD_metadirective;
+
+    if (isMetadirective) {
+      CHECK(metadirectiveContextIndex < metadirectiveConstructContexts_.size());
+      const MetadirectiveConstructContext &context{
+          metadirectiveConstructContexts_[metadirectiveContextIndex++]};
+      bool isCurrentMetadirective{
+          metadirectiveContextIndex == metadirectiveConstructContexts_.size()};
+      if (!isCurrentMetadirective) {
+        if (context.alternatives.empty())
+          return;
+        constructComponents.emplace_back(context.alternatives);
+      }
+      continue;
+    }
+
+    if (construct) {
+      MetadirectiveConstructAlternative source;
+      AppendConstructTraitsForDirective(
+          parser::omp::GetOmpDirectiveName(**construct).v, source.traits);
+      constructComponents.push_back({std::move(source)});
+    }
+  }
+
+  struct SymbolicMatchState {
+    ConstructTraitSequence representative;
+    llvm::SmallVector<unsigned, 4> signature;
+    unsigned condition{1};
+  };
+  auto getMatchSignature =
+      [](llvm::ArrayRef<llvm::omp::TraitProperty> traits,
+          llvm::ArrayRef<llvm::omp::TraitProperty> pattern) {
+        llvm::SmallVector<unsigned, 4> signature;
+        signature.push_back(traits.size());
+        std::size_t next{0};
+        for (llvm::omp::TraitProperty property : pattern) {
+          while (next < traits.size() && traits[next] != property)
+            ++next;
+          signature.push_back(next == traits.size() ? 0 : ++next);
+        }
+        return signature;
+      };
+  auto evaluatePattern = [&](llvm::ArrayRef<llvm::omp::TraitProperty> pattern) {
+    llvm::SmallVector<SymbolicMatchState, 4> states;
+    states.push_back({{}, getMatchSignature({}, pattern), 1});
+    for (const ConstructComponent &component : constructComponents) {
+      llvm::SmallVector<SymbolicMatchState, 4> nextStates;
+      std::map<llvm::SmallVector<unsigned, 4>, std::size_t> stateIndex;
+      for (const SymbolicMatchState &state : states) {
+        for (const MetadirectiveConstructAlternative &alternative : component) {
+          SymbolicMatchState next{state};
+          next.representative.append(alternative.traits);
+          next.signature = getMatchSignature(next.representative, pattern);
+          next.condition = ApplyMetadirectiveCondition(
+              /*conjunction=*/true, state.condition, alternative.condition);
+          if (next.condition == 0)
+            continue;
+          auto [it, inserted]{
+              stateIndex.try_emplace(next.signature, nextStates.size())};
+          if (inserted) {
+            nextStates.push_back(std::move(next));
+          } else {
+            SymbolicMatchState &existing{nextStates[it->second]};
+            existing.condition = ApplyMetadirectiveCondition(
+                /*conjunction=*/false, existing.condition, next.condition);
+          }
+        }
+      }
+      states = std::move(nextStates);
+    }
+    return states;
+  };
+
+  struct SymbolicCandidate {
+    MetadirectiveCandidate candidate;
+    unsigned enabled{0};
+    std::array<unsigned, 64> scoreBits{};
+  };
+  // Mirror llvm::omp's context score calculation, but evaluate each concrete
+  // automaton state into Boolean score bits so candidates can be ranked
+  // without constructing their joint sequence-state product.
+  auto getScore = [](const llvm::omp::VariantMatchInfo &vmi,
+                      llvm::ArrayRef<llvm::omp::TraitProperty> traits) {
+    llvm::APInt score(64, 1);
+    unsigned patternSize{static_cast<unsigned>(vmi.ConstructTraits.size())};
+    for (unsigned bit : vmi.RequiredTraits.set_bits()) {
+      auto property{static_cast<llvm::omp::TraitProperty>(bit)};
+      if (auto it{vmi.ScoreMap.find(property)}; it != vmi.ScoreMap.end()) {
+        score += it->second;
+        continue;
+      }
+      if (property == llvm::omp::TraitProperty::device_kind_any ||
+          property == llvm::omp::TraitProperty::target_device_kind_any)
+        continue;
+      switch (llvm::omp::getOpenMPContextTraitSelectorForProperty(property)) {
+      case llvm::omp::TraitSelector::device_kind:
+      case llvm::omp::TraitSelector::target_device_kind:
+        score += llvm::APInt(64, 1).shl(patternSize);
+        break;
+      case llvm::omp::TraitSelector::device_arch:
+      case llvm::omp::TraitSelector::target_device_arch:
+        score += llvm::APInt(64, 1).shl(patternSize + 1);
+        break;
+      case llvm::omp::TraitSelector::device_isa:
+      case llvm::omp::TraitSelector::target_device_isa:
+        score += llvm::APInt(64, 1).shl(patternSize + 2);
+        break;
+      default:
+        break;
+      }
+    }
+    std::size_t next{0};
+    for (llvm::omp::TraitProperty property : vmi.ConstructTraits) {
+      while (next < traits.size() && traits[next] != property)
+        ++next;
+      // With extension(match_any), a non-construct trait can make the
+      // candidate applicable even when its ordered construct pattern is not
+      // fully matched. Only matched construct traits contribute to its score.
+      if (next == traits.size())
+        break;
+      score += llvm::APInt(64, 1).shl(next++);
+    }
+    return score;
+  };
+
+  std::vector<std::vector<std::optional<SymbolicCandidate>>> candidatesByClause;
+  const parser::OmpDirectiveSpecification *fallback{nullptr};
+  for (const parser::OmpClause &clause : clauses.v) {
+    if (const auto *whenClause{
+            std::get_if<parser::OmpClause::When>(&clause.u)}) {
+      const auto &modifiers{std::get<0>(whenClause->v.t)};
+      if (!modifiers || modifiers->size() != 1)
+        return;
+      const auto *selector{std::get_if<parser::modifier::OmpContextSelector>(
+          &modifiers->front().u)};
+      if (!selector ||
+          FindUnsupportedSelectorFeature(*selector, context_) !=
+              UnsupportedSelectorFeature::None)
+        return;
+      llvm::omp::VariantMatchInfo rawMatchInfo;
+      (void)MakeVariantMatchInfo(rawMatchInfo, *selector, context_);
+      auto states{evaluatePattern(rawMatchInfo.ConstructTraits)};
+      std::vector<std::optional<SymbolicCandidate>> clauseCandidates;
+      for (const SymbolicMatchState &state : states) {
+        OmpVariantMatchContext matchContext{context_, state.representative};
+        auto candidateSet{
+            BuildMetadirectiveCandidateSet(clauses, context_, matchContext)};
+        if (!candidateSet)
+          return;
+        llvm::SmallVector<const MetadirectiveCandidate *, 2> matching;
+        for (const MetadirectiveCandidate &candidate : candidateSet->candidates)
+          if (candidate.sourceClause == &clause)
+            matching.push_back(&candidate);
+        if (clauseCandidates.size() < matching.size())
+          clauseCandidates.resize(matching.size());
+        for (std::size_t i{0}; i < matching.size(); ++i) {
+          if (!clauseCandidates[i])
+            clauseCandidates[i].emplace(SymbolicCandidate{*matching[i]});
+          SymbolicCandidate &symbolic{*clauseCandidates[i]};
+          symbolic.enabled = ApplyMetadirectiveCondition(
+              /*conjunction=*/false, symbolic.enabled, state.condition);
+          llvm::APInt score{getScore(matching[i]->vmi, state.representative)};
+          for (unsigned bit{0}; bit < 64; ++bit)
+            if (score[bit])
+              symbolic.scoreBits[bit] = ApplyMetadirectiveCondition(
+                  /*conjunction=*/false, symbolic.scoreBits[bit],
+                  state.condition);
+        }
+      }
+      candidatesByClause.push_back(std::move(clauseCandidates));
+    } else if (const auto *otherwiseClause{
+                   std::get_if<parser::OmpClause::Otherwise>(&clause.u)}) {
+      if (otherwiseClause->v && otherwiseClause->v->v) {
+        const parser::OmpDirectiveSpecification &spec{
+            otherwiseClause->v->v->value()};
+        fallback = spec.DirId() == llvm::omp::Directive::OMPD_nothing ? nullptr
+                                                                      : &spec;
+      }
+    } else if (const auto *defaultClause{
+                   std::get_if<parser::OmpClause::DefaultVariant>(&clause.u)}) {
+      const parser::OmpDirectiveSpecification &spec{defaultClause->v.v.value()};
+      fallback =
+          spec.DirId() == llvm::omp::Directive::OMPD_nothing ? nullptr : &spec;
+    }
+  }
+
+  llvm::SmallVector<SymbolicCandidate, 8> candidates;
+  for (bool explicitOnly : {true, false})
+    for (auto &clauseCandidates : candidatesByClause)
+      for (std::optional<SymbolicCandidate> &candidate : clauseCandidates)
+        if (candidate && candidate->candidate.isExplicit == explicitOnly)
+          candidates.push_back(std::move(*candidate));
+
+  auto strictSubset = [](const llvm::omp::VariantMatchInfo &left,
+                          const llvm::omp::VariantMatchInfo &right) {
+    if (left.RequiredTraits.count() >= right.RequiredTraits.count())
+      return false;
+    for (unsigned bit : left.RequiredTraits.set_bits())
+      if (!right.RequiredTraits.test(bit))
+        return false;
+    auto leftIt{left.ConstructTraits.begin()};
+    auto rightIt{right.ConstructTraits.begin()};
+    while (leftIt != left.ConstructTraits.end()) {
+      if (rightIt == right.ConstructTraits.end())
+        return false;
+      if (*leftIt == *rightIt)
+        ++rightIt;
+      ++leftIt;
+    }
+    return true;
+  };
+  auto compareScores = [&](const SymbolicCandidate &left,
+                           const SymbolicCandidate &right) {
+    unsigned equal{1};
+    unsigned greater{0};
+    for (int bit{63}; bit >= 0; --bit) {
+      unsigned different{ApplyMetadirectiveCondition(
+          /*conjunction=*/false,
+          ApplyMetadirectiveCondition(/*conjunction=*/true, left.scoreBits[bit],
+              NegateMetadirectiveCondition(right.scoreBits[bit])),
+          ApplyMetadirectiveCondition(/*conjunction=*/true,
+              NegateMetadirectiveCondition(left.scoreBits[bit]),
+              right.scoreBits[bit]))};
+      unsigned leftGreater{ApplyMetadirectiveCondition(
+          /*conjunction=*/true, equal,
+          ApplyMetadirectiveCondition(/*conjunction=*/true, left.scoreBits[bit],
+              NegateMetadirectiveCondition(right.scoreBits[bit])))};
+      greater = ApplyMetadirectiveCondition(
+          /*conjunction=*/false, greater, leftGreater);
+      equal = ApplyMetadirectiveCondition(
+          /*conjunction=*/true, equal, NegateMetadirectiveCondition(different));
+    }
+    return std::pair{greater, equal};
+  };
+  auto getWinners = [&](const std::vector<bool> &active) {
+    llvm::SmallVector<unsigned, 8> winners(candidates.size(), 0);
+    unsigned noWinner{1};
+    for (std::size_t i{0}; i < candidates.size(); ++i) {
+      if (!active[i])
+        continue;
+      unsigned enabled{candidates[i].enabled};
+      unsigned newWinner{ApplyMetadirectiveCondition(
+          /*conjunction=*/true, noWinner, enabled)};
+      noWinner = ApplyMetadirectiveCondition(/*conjunction=*/true, noWinner,
+          NegateMetadirectiveCondition(enabled));
+      for (std::size_t j{0}; j < i; ++j) {
+        if (!active[j] || winners[j] == 0)
+          continue;
+        auto [greater, equal]{compareScores(candidates[i], candidates[j])};
+        unsigned replaces{greater};
+        if (strictSubset(
+                candidates[j].candidate.vmi, candidates[i].candidate.vmi))
+          replaces = ApplyMetadirectiveCondition(
+              /*conjunction=*/false, replaces, equal);
+        replaces = ApplyMetadirectiveCondition(
+            /*conjunction=*/true, enabled, replaces);
+        unsigned moved{ApplyMetadirectiveCondition(
+            /*conjunction=*/true, winners[j], replaces)};
+        winners[j] = ApplyMetadirectiveCondition(
+            /*conjunction=*/true, winners[j],
+            NegateMetadirectiveCondition(replaces));
+        newWinner = ApplyMetadirectiveCondition(
+            /*conjunction=*/false, newWinner, moved);
+      }
+      winners[i] = newWinner;
+    }
+    return std::pair{std::move(winners), noWinner};
+  };
+
+  llvm::SmallVector<const parser::OmpDirectiveSpecification *, 4>
+      semanticallyApplicableVariants;
+  llvm::SmallVector<MetadirectiveConstructAlternative, 2> currentAlternatives;
+  struct SelectionState {
+    std::vector<bool> active;
+    unsigned constructCondition;
+    unsigned pathCondition;
+  };
+  llvm::SmallVector<SelectionState, 8> worklist;
+  worklist.push_back({std::vector<bool>(candidates.size(), true), 1, 1});
+  while (!worklist.empty()) {
+    SelectionState state{worklist.pop_back_val()};
+    auto [winners, noWinner]{getWinners(state.active)};
+    unsigned fallbackCondition{ApplyMetadirectiveCondition(
+        /*conjunction=*/true, state.constructCondition, noWinner)};
+    fallbackCondition = ApplyMetadirectiveCondition(
+        /*conjunction=*/true, fallbackCondition, state.pathCondition);
+    if (fallbackCondition != 0) {
+      MetadirectiveConstructAlternative alternative;
+      if (fallback)
+        AppendConstructTraitsForDirective(
+            fallback->DirId(), alternative.traits);
+      alternative.condition = fallbackCondition;
+      addAlternative(currentAlternatives, std::move(alternative));
+    }
+    for (std::size_t i{0}; i < candidates.size(); ++i) {
+      if (!state.active[i] || winners[i] == 0)
+        continue;
+      SymbolicCandidate &symbolic{candidates[i]};
+      unsigned constructCondition{ApplyMetadirectiveCondition(
+          /*conjunction=*/true, state.constructCondition, winners[i])};
+      if (constructCondition == 0)
+        continue;
+      const MetadirectiveCandidate &candidate{symbolic.candidate};
+      unsigned selectedPath{state.pathCondition};
+      std::optional<unsigned> conditionVariable;
+      if (candidate.dynamicCondition) {
+        MetadirectiveConditionConstraint condition{
+            candidate.dynamicCondition->expr, candidate.conditionShouldBeTrue,
+            &clauses};
+        bool forceFresh{!IsRepeatableMetadirectiveCondition(
+            *candidate.dynamicCondition->expr, context_)};
+        conditionVariable =
+            GetMetadirectiveConditionVariable(condition, forceFresh);
+        selectedPath = AddMetadirectiveCondition(
+            selectedPath, *conditionVariable, condition.value);
+      }
+      unsigned selectedCondition{ApplyMetadirectiveCondition(
+          /*conjunction=*/true, constructCondition, selectedPath)};
+      if (selectedCondition != 0) {
+        MetadirectiveConstructAlternative alternative;
+        if (candidate.spec)
+          AppendConstructTraitsForDirective(
+              candidate.spec->DirId(), alternative.traits);
+        alternative.condition = selectedCondition;
+        addAlternative(currentAlternatives, std::move(alternative));
+      }
+      if (candidate.dynamicCondition) {
+        CHECK(conditionVariable);
+        unsigned failedPath{AddMetadirectiveCondition(state.pathCondition,
+            *conditionVariable, !candidate.conditionShouldBeTrue)};
+        if (failedPath != 0) {
+          SelectionState failed{state};
+          failed.active[i] = false;
+          failed.constructCondition = constructCondition;
+          failed.pathCondition = failedPath;
+          worklist.push_back(std::move(failed));
+        }
+      }
+    }
+  }
+
+  // Semantic validation retains every dynamically guarded winner along its
+  // false path, stopping only at a statically selected replacement.
+  llvm::SmallVector<std::pair<std::vector<bool>, unsigned>, 8> semanticWorklist;
+  semanticWorklist.push_back({std::vector<bool>(candidates.size(), true), 1});
+  while (!semanticWorklist.empty()) {
+    auto [active, constructCondition]{semanticWorklist.pop_back_val()};
+    auto [winners, noWinner]{getWinners(active)};
+    if (fallback &&
+        ApplyMetadirectiveCondition(
+            /*conjunction=*/true, constructCondition, noWinner) != 0 &&
+        !llvm::is_contained(semanticallyApplicableVariants, fallback))
+      semanticallyApplicableVariants.push_back(fallback);
+    for (std::size_t i{0}; i < candidates.size(); ++i) {
+      if (!active[i] || winners[i] == 0)
+        continue;
+      unsigned reachable{ApplyMetadirectiveCondition(
+          /*conjunction=*/true, constructCondition, winners[i])};
+      if (reachable == 0)
+        continue;
+      const MetadirectiveCandidate &candidate{candidates[i].candidate};
+      if (candidate.spec &&
+          !llvm::is_contained(semanticallyApplicableVariants, candidate.spec))
+        semanticallyApplicableVariants.push_back(candidate.spec);
+      if (candidate.dynamicCondition) {
+        std::vector<bool> remaining{active};
+        remaining[i] = false;
+        semanticWorklist.push_back({std::move(remaining), reachable});
+      }
+    }
+  }
+  if (currentAlternatives.empty())
+    return;
+
+  // Make every reachable replacement and its accumulated path constraints
+  // available to metadirectives in a delimited body.
+  MetadirectiveConstructContext &currentContext{
+      metadirectiveConstructContexts_.back()};
+  currentContext.alternatives = std::move(currentAlternatives);
+
+  auto first{metadirectiveLoopVariants_.begin() + firstVariant};
+  metadirectiveLoopVariants_.erase(
+      std::remove_if(first, metadirectiveLoopVariants_.end(),
+          [&](const MetadirectiveLoopVariant &variant) {
+            return !llvm::is_contained(
+                semanticallyApplicableVariants, variant.spec);
+          }),
+      metadirectiveLoopVariants_.end());
+}
+
+void OmpStructureChecker::Enter(const parser::OmpMetadirectiveDirective &x) {
+  metadirectiveConstructContexts_.emplace_back();
+  EnterDirectiveNest(MetadirectiveNest);
+  BeginMetadirectiveSelection();
+}
+
+void OmpStructureChecker::Leave(const parser::OmpMetadirectiveDirective &x) {
+  CHECK(!metadirectiveSelectionStarts_.empty());
+  std::size_t firstVariant{metadirectiveSelectionStarts_.back()};
+  EndMetadirectiveSelection(x.v.Clauses());
+  CHECK(!metadirectiveConstructContexts_.empty());
+
+  CHECK(firstVariant <= metadirectiveLoopVariants_.size());
+  bool hasReachableLoopVariant{
+      llvm::any_of(llvm::drop_begin(metadirectiveLoopVariants_, firstVariant),
+          [](const MetadirectiveLoopVariant &variant) {
+            auto association{
+                llvm::omp::getDirectiveAssociation(variant.spec->DirId())};
+            return association == llvm::omp::Association::LoopNest ||
+                association == llvm::omp::Association::LoopSeq;
+          })};
+  if (hasReachableLoopVariant) {
+    pendingStandaloneMetadirectives_.push_back({&x, firstVariant});
+  } else {
+    metadirectiveConstructContexts_.pop_back();
+  }
   ExitDirectiveNest(MetadirectiveNest);
 }
 
@@ -772,13 +1348,39 @@ void OmpStructureChecker::Enter(const parser::ExecutionPartConstruct &x) {
   if (parser::Unwrap<parser::CompilerDirective>(x)) {
     return;
   }
+  const parser::DoConstruct *rootLoop{parser::Unwrap<parser::DoConstruct>(x)};
+  const auto *executable{parser::Unwrap<parser::ExecutableConstruct>(x)};
+  const auto *openMPConstruct{executable
+          ? parser::Unwrap<parser::OpenMPConstruct>(executable->u)
+          : nullptr};
+  const parser::OpenMPLoopConstruct *rootLoopConstruct{openMPConstruct
+          ? std::get_if<parser::OpenMPLoopConstruct>(&openMPConstruct->u)
+          : nullptr};
+  unsigned version{context_.langOptions().OpenMPVersion};
+  bool isLoopGeneratingTransformation{rootLoopConstruct &&
+      IsLoopTransforming(rootLoopConstruct->BeginDir().DirId()) &&
+      !IsFullUnroll(rootLoopConstruct->BeginDir())};
   // This is the first construct after the metadirective. It consumes the
   // pending variants, whether or not it is a loop nest.
-  if (!parser::Unwrap<parser::DoConstruct>(x)) {
+  if (!rootLoop && !isLoopGeneratingTransformation) {
+    if (rootLoopConstruct) {
+      // Preserve the detailed LoopSequence explanation for a construct that
+      // is loop-associated syntactically but cannot generate a loop.
+      LoopSequence invalidRoot{x, version, /*allowAllLoops=*/true, &context_};
+      CheckMetadirectiveVariantsWithoutLoop(
+          /*firstVariant=*/0, &invalidRoot);
+      return;
+    }
     // A non-loop construct follows, so a loop-associated variant has no loop
     // nest to associate with.
     CheckMetadirectiveVariantsWithoutLoop();
     return;
+  }
+
+  if (!pendingStandaloneMetadirectives_.empty()) {
+    constructStack_.push_back(
+        pendingStandaloneMetadirectives_.back().directive);
+    pendingStandaloneMetadirectives_.pop_back();
   }
 
   // A loop nest follows. Take the pending variants off the worklist and
@@ -786,42 +1388,51 @@ void OmpStructureChecker::Enter(const parser::ExecutionPartConstruct &x) {
   std::vector<MetadirectiveLoopVariant> variants;
   variants.swap(metadirectiveLoopVariants_);
 
-  unsigned version{context_.langOptions().OpenMPVersion};
   LoopSequence sequence(x, version, /*allowAllLoops=*/true, &context_);
-  const parser::DoConstruct &rootLoop{*parser::Unwrap<parser::DoConstruct>(x)};
   const auto &[haveSemantic, havePerfect]{sequence.depth()};
 
   const auto MsgRequiresCanonical{
       "This construct requires a canonical loop %s"_err_en_US};
   const auto MsgNotValidAffectedLoop{
       "%s is not a valid affected loop"_because_en_US};
-
-  auto checkRootLoopCanonical =
+  auto checkAssociatedLoopsCanonical =
       [&](const parser::OmpDirectiveSpecification &spec, bool isSequence) {
-        parser::CharBlock source{*parser::GetSource(rootLoop)};
-        Reason reason;
-        if (rootLoop.IsDoWhile()) {
-          reason.Say(source, MsgNotValidAffectedLoop, "DO WHILE loop");
-        } else if (rootLoop.IsDoConcurrent() && !IsDoConcurrentLegal(version)) {
-          reason.Say(source, MsgNotValidAffectedLoop, "DO CONCURRENT loop");
-        } else if (!rootLoop.GetLoopControl()) {
-          reason.Say(
-              source, MsgNotValidAffectedLoop, "DO loop without loop control");
-        }
-
-        if (!reason) {
+        if (rootLoop) {
+          parser::CharBlock source{*parser::GetSource(*rootLoop)};
+          Reason reason;
+          if (rootLoop->IsDoWhile()) {
+            reason.Say(source, MsgNotValidAffectedLoop, "DO WHILE loop");
+          } else if (rootLoop->IsDoConcurrent() &&
+              !IsDoConcurrentLegal(version)) {
+            reason.Say(source, MsgNotValidAffectedLoop, "DO CONCURRENT loop");
+          } else if (!rootLoop->GetLoopControl()) {
+            reason.Say(source, MsgNotValidAffectedLoop,
+                "DO loop without loop control");
+          }
+          if (reason) {
+            auto &msg{context_.Say(spec.DirName().source, MsgRequiresCanonical,
+                isSequence ? "sequence" : "nest")};
+            reason.AttachTo(msg);
+            return false;
+          }
           return true;
         }
 
-        auto &msg{context_.Say(spec.DirName().source, MsgRequiresCanonical,
-            isSequence ? "sequence" : "nest")};
-        reason.AttachTo(msg);
-        return false;
+        WithReason<bool> wellFormed{isSequence ? sequence.isWellFormedSequence()
+                                               : sequence.isWellFormedNest()};
+        if (wellFormed && !*wellFormed.value) {
+          auto &msg{context_.Say(spec.DirName().source, MsgRequiresCanonical,
+              isSequence ? "sequence" : "nest")};
+          wellFormed.reason.AttachTo(msg);
+          return false;
+        }
+        return true;
       };
 
   // Build the matching context once for the static-applicability gate below.
   OmpVariantMatchContext matchContext{context_};
   UnorderedSymbolSet defaultNoneDiagnosed;
+  llvm::SmallSetVector<const parser::DoConstruct *, 4> affectedDoLoops;
 
   for (const MetadirectiveLoopVariant &variant : variants) {
     const parser::OmpDirectiveSpecification *spec{variant.spec};
@@ -832,14 +1443,19 @@ void OmpStructureChecker::Enter(const parser::ExecutionPartConstruct &x) {
     }
     auto assoc{llvm::omp::getDirectiveAssociation(spec->DirId())};
     if (assoc == llvm::omp::Association::LoopNest) {
-      if (!checkRootLoopCanonical(*spec, /*isSequence=*/false)) {
+      if (!checkAssociatedLoopsCanonical(*spec, /*isSequence=*/false)) {
         continue;
+      }
+      if (auto loops{CollectAffectedDoLoops(*spec, x, version, &context_)}) {
+        CheckIterationVariableDataSharingClauses(
+            *spec, *loops, /*requireResolvedDSA=*/false);
+        affectedDoLoops.insert(loops->begin(), loops->end());
       }
 
       // A standalone metadirective does not contain its associated loop in
       // the parse tree, so name resolution cannot apply DEFAULT(NONE) to it.
       if (variant.checkDefaultNoneInAssociatedLoop) {
-        CheckDefaultNoneInAssociatedLoop(*spec, rootLoop, defaultNoneDiagnosed);
+        CheckDefaultNoneInAssociatedLoop(*spec, x, defaultNoneDiagnosed);
       }
 
       auto [needDepth, needPerfect]{
@@ -862,9 +1478,16 @@ void OmpStructureChecker::Enter(const parser::ExecutionPartConstruct &x) {
         CheckRectangularNest(*spec, sequence);
       }
     } else if (assoc == llvm::omp::Association::LoopSeq) {
-      (void)checkRootLoopCanonical(*spec, /*isSequence=*/true);
+      if (checkAssociatedLoopsCanonical(*spec, /*isSequence=*/true)) {
+        if (auto loops{CollectAffectedDoLoops(*spec, x, version, &context_)}) {
+          CheckIterationVariableDataSharingClauses(
+              *spec, *loops, /*requireResolvedDSA=*/false);
+          affectedDoLoops.insert(loops->begin(), loops->end());
+        }
+      }
     }
   }
+  CheckIterationVariableRestrictions(affectedDoLoops.getArrayRef());
 }
 
 // Diagnose loop-associated metadirective variants that are not followed by a
@@ -872,8 +1495,15 @@ void OmpStructureChecker::Enter(const parser::ExecutionPartConstruct &x) {
 // execution part or because a non-loop construct follows it. Variants that
 // cannot be selected on this target are skipped.
 void OmpStructureChecker::CheckMetadirectiveVariantsWithoutLoop(
-    std::size_t firstVariant) {
+    std::size_t firstVariant, const LoopSequence *invalidRoot) {
   CHECK(firstVariant <= metadirectiveLoopVariants_.size());
+  std::size_t pendingToDiscard{0};
+  for (const PendingStandaloneMetadirective &pending :
+      llvm::reverse(pendingStandaloneMetadirectives_)) {
+    if (pending.firstVariant < firstVariant)
+      break;
+    ++pendingToDiscard;
+  }
   std::vector<MetadirectiveLoopVariant> variants;
   if (firstVariant == 0) {
     variants.swap(metadirectiveLoopVariants_);
@@ -886,12 +1516,25 @@ void OmpStructureChecker::CheckMetadirectiveVariantsWithoutLoop(
   OmpVariantMatchContext matchContext{context_};
   const auto MsgShouldContainDoOr{
       "This construct should contain a DO-loop or a loop-%s-generating construct"_err_en_US};
+  const auto MsgRequiresCanonical{
+      "This construct requires a canonical loop %s"_err_en_US};
 
   for (const MetadirectiveLoopVariant &variant : variants) {
     if (!MayVariantBeSelected(variant.selector, context_, matchContext)) {
       continue;
     }
     auto assoc{llvm::omp::getDirectiveAssociation(variant.spec->DirId())};
+    if (invalidRoot &&
+        (assoc == llvm::omp::Association::LoopNest ||
+            assoc == llvm::omp::Association::LoopSeq)) {
+      bool isSequence{assoc == llvm::omp::Association::LoopSeq};
+      auto &msg{context_.Say(variant.spec->DirName().source,
+          MsgRequiresCanonical, isSequence ? "sequence" : "nest")};
+      WithReason<int64_t> generated{
+          isSequence ? invalidRoot->length() : invalidRoot->depth().semantic};
+      generated.reason.AttachTo(msg);
+      continue;
+    }
     if (assoc == llvm::omp::Association::LoopNest) {
       context_.Say(
           variant.spec->DirName().source, MsgShouldContainDoOr, "nest");
@@ -899,6 +1542,24 @@ void OmpStructureChecker::CheckMetadirectiveVariantsWithoutLoop(
       context_.Say(
           variant.spec->DirName().source, MsgShouldContainDoOr, "sequence");
     }
+  }
+
+  while (pendingToDiscard-- > 0) {
+    CHECK(!metadirectiveConstructContexts_.empty());
+    metadirectiveConstructContexts_.pop_back();
+    pendingStandaloneMetadirectives_.pop_back();
+  }
+}
+
+void OmpStructureChecker::CheckMetadirectiveLoopAssociationInterrupted() {
+  std::size_t firstVariant{metadirectiveVariantScopeStarts_.empty()
+          ? 0
+          : metadirectiveVariantScopeStarts_.back()};
+  if (firstVariant < metadirectiveLoopVariants_.size()) {
+    // A declarative directive between a loop-associated metadirective and a
+    // DO construct in the same scope interrupts their association. Preserve
+    // pending variants from enclosing scopes.
+    CheckMetadirectiveVariantsWithoutLoop(firstVariant);
   }
 }
 

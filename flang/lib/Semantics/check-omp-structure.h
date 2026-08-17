@@ -19,9 +19,11 @@
 #include "flang/Parser/parse-tree.h"
 #include "flang/Semantics/openmp-directive-sets.h"
 #include "flang/Semantics/semantics.h"
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/iterator_range.h"
 #include "llvm/Frontend/OpenMP/OMP.h"
+#include "llvm/Frontend/OpenMP/OMPContext.h"
 
 #include <cstddef>
 #include <functional>
@@ -31,6 +33,7 @@
 #include <set>
 #include <string>
 #include <string_view>
+#include <tuple>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -95,6 +98,7 @@ public:
   void Enter(const parser::InternalSubprogram &);
   void Enter(const parser::ModuleSubprogram &);
   void Enter(const parser::ModuleSubprogramPart &);
+  void Enter(const parser::InterfaceBlock &);
   void Enter(const parser::InterfaceBody &);
   void Leave(const parser::InterfaceBody &);
 
@@ -102,11 +106,15 @@ public:
   void Leave(const parser::SpecificationPart &);
   void Enter(const parser::ExecutionPart &);
   void Leave(const parser::ExecutionPart &);
+  void Enter(const parser::EntryStmt &);
+  void Enter(const parser::FormatStmt &);
 
   void Enter(const parser::OpenMPConstruct &);
   void Leave(const parser::OpenMPConstruct &);
   void Enter(const parser::OpenMPDeclarativeConstruct &);
   void Leave(const parser::OpenMPDeclarativeConstruct &);
+  void Enter(const parser::OpenACCDeclarativeConstruct &);
+  void Enter(const parser::OpenACCRoutineConstruct &);
 
   void Enter(const parser::OpenMPMisplacedEndDirective &);
   void Leave(const parser::OpenMPMisplacedEndDirective &);
@@ -119,6 +127,8 @@ public:
   void Enter(const parser::OpenMPInteropConstruct &);
   void Enter(const parser::OmpBlockConstruct &);
   void Leave(const parser::OmpBlockConstruct &);
+  void Enter(const parser::OmpDelimitedMetadirectiveDirective &);
+  void Leave(const parser::OmpDelimitedMetadirectiveDirective &);
   void Enter(const parser::OmpBeginDirective &);
   void Leave(const parser::OmpBeginDirective &);
 
@@ -245,8 +255,9 @@ public:
   void Enter(const parser::OmpClause::When &x);
 
 private:
-  using LoopOrConstruct = std::variant<const parser::DoConstruct *,
-      const parser::OpenMPConstruct *>;
+  using LoopOrConstruct =
+      std::variant<const parser::DoConstruct *, const parser::OpenMPConstruct *,
+          const parser::OmpMetadirectiveDirective *>;
 
   // Most of these functions are defined in check-omp-structure.cpp, but
   // some groups have their own files.
@@ -300,6 +311,12 @@ private:
   void CheckNestedConstruct(const parser::OpenMPLoopConstruct &x);
   const parser::Name GetLoopIndex(const parser::DoConstruct *x);
   void CheckIterationVariables(const parser::OpenMPLoopConstruct &x);
+  void CheckIterationVariableRestrictions(
+      llvm::ArrayRef<const parser::DoConstruct *> loops);
+  void CheckIterationVariableDataSharingClauses(
+      const parser::OmpDirectiveSpecification &spec,
+      llvm::ArrayRef<const parser::DoConstruct *> loops,
+      bool requireResolvedDSA);
   std::int64_t GetOrdCollapseLevel(const parser::OpenMPLoopConstruct &x);
   void CheckAssociatedLoopConstraints(const parser::OpenMPLoopConstruct &x);
   void CheckScanModifier(const parser::OmpClause::Reduction &x);
@@ -310,7 +327,11 @@ private:
   void EndMetadirectiveVariantScope();
 
   // check-omp-variant.cpp
-  void CheckMetadirectiveVariantsWithoutLoop(std::size_t firstVariant = 0);
+  void BeginMetadirectiveSelection();
+  void EndMetadirectiveSelection(const parser::OmpClauseList &);
+  void CheckMetadirectiveVariantsWithoutLoop(std::size_t firstVariant = 0,
+      const omp::LoopSequence *invalidRoot = nullptr);
+  void CheckMetadirectiveLoopAssociationInterrupted();
   void CheckOmpDeclareVariantDirective(
       const parser::OmpDeclareVariantDirective &);
   void CheckDeclareVariantUserConditions(const parser::OmpContextSelector &);
@@ -414,8 +435,8 @@ private:
       llvm::StringRef clause, bool suggestToUseCrayPointer = true);
   void GetSymbolsInObjectList(const parser::OmpObjectList &, SymbolSourceMap &);
   void CheckDefaultNoneInAssociatedLoop(
-      const parser::OmpDirectiveSpecification &, const parser::DoConstruct &,
-      UnorderedSymbolSet &diagnosed);
+      const parser::OmpDirectiveSpecification &,
+      const parser::ExecutionPartConstruct &, UnorderedSymbolSet &diagnosed);
   void CheckDefinableObjects(SymbolSourceMap &, const llvm::omp::Clause);
   void CheckCopyingPolymorphicAllocatable(
       SymbolSourceMap &, const llvm::omp::Clause);
@@ -545,10 +566,63 @@ private:
     const parser::OmpDirectiveSpecification *spec;
     bool checkDefaultNoneInAssociatedLoop;
   };
+  using ConstructTraitSequence = llvm::SmallVector<llvm::omp::TraitProperty, 8>;
+  struct MetadirectiveConditionConstraint {
+    const parser::ScalarExpr *expr;
+    bool value;
+    const parser::OmpClauseList *owner;
+  };
+  struct MetadirectiveConditionVariable {
+    const parser::ScalarExpr *expr;
+    const parser::OmpClauseList *owner;
+  };
+  struct MetadirectiveConditionNode {
+    unsigned variable;
+    unsigned low;
+    unsigned high;
+  };
+  struct MetadirectiveConstructAlternative {
+    ConstructTraitSequence traits;
+    unsigned condition{1};
+  };
+  struct MetadirectiveConstructContext {
+    llvm::SmallVector<MetadirectiveConstructAlternative, 2> alternatives;
+  };
+  struct PendingStandaloneMetadirective {
+    const parser::OmpMetadirectiveDirective *directive;
+    std::size_t firstVariant;
+  };
   std::vector<MetadirectiveLoopVariant> metadirectiveLoopVariants_;
   std::vector<std::size_t> metadirectiveVariantScopeStarts_;
+  std::vector<std::size_t> metadirectiveSelectionStarts_;
+  std::vector<MetadirectiveConstructContext> metadirectiveConstructContexts_;
+  std::vector<PendingStandaloneMetadirective> pendingStandaloneMetadirectives_;
+  std::vector<MetadirectiveConditionVariable> metadirectiveConditionVariables_;
+  std::vector<MetadirectiveConditionNode> metadirectiveConditionNodes_{
+      {~0u, 0, 0}, {~0u, 1, 1}};
+  std::map<std::tuple<unsigned, unsigned, unsigned>, unsigned>
+      metadirectiveConditionUniqueNodes_;
+  std::map<std::tuple<bool, unsigned, unsigned>, unsigned>
+      metadirectiveConditionApplyCache_;
+  std::map<unsigned, unsigned> metadirectiveConditionNegationCache_;
   const parser::traits::OmpContextSelectorSpecification *currentWhenSelector_{
       nullptr};
+
+  bool IsInvariantMetadirectiveCondition(
+      const MetadirectiveConditionVariable &);
+  bool AreSameMetadirectiveCondition(const MetadirectiveConditionVariable &,
+      const MetadirectiveConditionVariable &);
+  unsigned GetMetadirectiveConditionVariable(
+      const MetadirectiveConditionConstraint &, bool forceFresh = false);
+  unsigned GetMetadirectiveConditionNode(
+      unsigned variable, unsigned low, unsigned high);
+  unsigned ApplyMetadirectiveCondition(
+      bool conjunction, unsigned left, unsigned right);
+  unsigned NegateMetadirectiveCondition(unsigned formula);
+  unsigned AddMetadirectiveCondition(
+      unsigned formula, unsigned variable, bool value);
+  unsigned AddMetadirectiveCondition(
+      unsigned formula, const MetadirectiveConditionConstraint &);
 
   std::multimap<const parser::Label,
       std::pair<parser::CharBlock, const parser::OpenMPConstruct *>>

@@ -257,20 +257,28 @@ private:
   std::string features_;
 };
 
+/// Add the construct traits implied by \p dir, decomposing combined and
+/// composite directives into their leaf traits.
+void AppendConstructTraitsForDirective(llvm::omp::Directive dir,
+    llvm::SmallVectorImpl<llvm::omp::TraitProperty> &constructTraits);
+
 struct MetadirectiveCandidate {
   MetadirectiveCandidate(const parser::OmpDirectiveSpecification *spec,
       llvm::omp::VariantMatchInfo vmi, bool isExplicit,
       std::optional<DynamicUserCondition> dynamicCondition = std::nullopt,
-      bool conditionShouldBeTrue = true)
+      bool conditionShouldBeTrue = true,
+      const parser::OmpClause *sourceClause = nullptr)
       : spec{spec}, vmi{std::move(vmi)}, isExplicit{isExplicit},
         dynamicCondition{dynamicCondition},
-        conditionShouldBeTrue{conditionShouldBeTrue} {}
+        conditionShouldBeTrue{conditionShouldBeTrue},
+        sourceClause{sourceClause} {}
 
   const parser::OmpDirectiveSpecification *spec{nullptr};
   llvm::omp::VariantMatchInfo vmi;
   bool isExplicit{false};
   std::optional<DynamicUserCondition> dynamicCondition;
   bool conditionShouldBeTrue{true};
+  const parser::OmpClause *sourceClause;
 };
 
 struct MetadirectiveCandidateSet {
@@ -474,6 +482,13 @@ std::optional<int64_t> GetMinimumSequenceCount(
 /// way that prevented the function from returning an accurate result.
 std::optional<std::vector<const parser::DoConstruct *>> CollectAffectedDoLoops(
     const parser::OpenMPLoopConstruct &x, unsigned version,
+    SemanticsContext *semaCtx = nullptr);
+
+/// Collect the set of DO loops in \p root that would be directly affected by
+/// \p spec when it is selected as a metadirective replacement.
+std::optional<std::vector<const parser::DoConstruct *>> CollectAffectedDoLoops(
+    const parser::OmpDirectiveSpecification &spec,
+    const parser::ExecutionPartConstruct &root, unsigned version,
     SemanticsContext *semaCtx = nullptr);
 
 /// Returns whether the loop nest associated with `x` is a doacross loop nest,

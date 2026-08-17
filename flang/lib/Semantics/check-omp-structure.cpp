@@ -259,6 +259,13 @@ void OmpStructureChecker::Enter(const parser::ModuleSubprogramPart &) {
   }
 }
 
+void OmpStructureChecker::Enter(const parser::InterfaceBlock &) {
+  // A loop-associated directive must be immediately followed by its loop.
+  // An INTERFACE block therefore interrupts a pending association in the
+  // enclosing specification part before any interface bodies are visited.
+  CheckMetadirectiveLoopAssociationInterrupted();
+}
+
 void OmpStructureChecker::Enter(const parser::InterfaceBody &) {
   BeginMetadirectiveVariantScope();
 }
@@ -292,6 +299,18 @@ void OmpStructureChecker::Leave(const parser::ExecutionPart &) {
     CheckMetadirectiveVariantsWithoutLoop();
   }
   partStack_.pop_back();
+}
+
+void OmpStructureChecker::Enter(const parser::EntryStmt &) {
+  // ENTRY is a real alternate entry point and cannot appear between a
+  // loop-associated metadirective and the loop it replaces.
+  CheckMetadirectiveLoopAssociationInterrupted();
+}
+
+void OmpStructureChecker::Enter(const parser::FormatStmt &) {
+  // A FORMAT statement is not part of the loop nest immediately following a
+  // loop-associated metadirective.
+  CheckMetadirectiveLoopAssociationInterrupted();
 }
 
 // 'OmpWorkshareBlockChecker' is used to check the validity of the assignment
@@ -1370,10 +1389,26 @@ void OmpStructureChecker::Leave(const parser::OpenMPConstruct &x) {
     assert(dirName.v == GetContext().directive && "Context mismatch");
     dirContext_.pop_back();
   }
+  if (parser::Unwrap<parser::OmpDelimitedMetadirectiveDirective>(x.u)) {
+    CHECK(!metadirectiveConstructContexts_.empty());
+    metadirectiveConstructContexts_.pop_back();
+  }
   constructStack_.pop_back();
+  // A standalone metadirective followed by a loop transformation uses the
+  // OpenMP loop construct, rather than its nested source DO, as the associated
+  // root. Remove its synthetic construct-context marker when that root ends.
+  if (!constructStack_.empty() &&
+      std::holds_alternative<const parser::OmpMetadirectiveDirective *>(
+          constructStack_.back())) {
+    constructStack_.pop_back();
+    CHECK(!metadirectiveConstructContexts_.empty());
+    metadirectiveConstructContexts_.pop_back();
+  }
 }
 
 void OmpStructureChecker::Enter(const parser::OpenMPDeclarativeConstruct &x) {
+  CheckMetadirectiveLoopAssociationInterrupted();
+
   DirectiveSpellingVisitor visitor(
       [this](parser::CharBlock source, llvm::omp::Directive id) {
         return CheckDirectiveSpelling(source, id);
@@ -1389,6 +1424,14 @@ void OmpStructureChecker::Enter(const parser::OpenMPDeclarativeConstruct &x) {
 
   CheckDirectiveInPureProcedure(dirName.source, dirName.v);
   EnterDirectiveNest(DeclarativeNest);
+}
+
+void OmpStructureChecker::Enter(const parser::OpenACCDeclarativeConstruct &) {
+  CheckMetadirectiveLoopAssociationInterrupted();
+}
+
+void OmpStructureChecker::Enter(const parser::OpenACCRoutineConstruct &) {
+  CheckMetadirectiveLoopAssociationInterrupted();
 }
 
 void OmpStructureChecker::Leave(const parser::OpenMPDeclarativeConstruct &x) {
@@ -1727,6 +1770,20 @@ void OmpStructureChecker::Leave(const parser::OmpBlockConstruct &x) {
   }
 }
 
+void OmpStructureChecker::Enter(
+    const parser::OmpDelimitedMetadirectiveDirective &) {
+  // This scope must start before the begin directive records its variants.
+  // The parser::Block nested in the construct starts too late for that.
+  BeginMetadirectiveVariantScope();
+}
+
+void OmpStructureChecker::Leave(
+    const parser::OmpDelimitedMetadirectiveDirective &) {
+  // Diagnose any replacement that was not consumed inside the delimited body
+  // before a following construct outside END METADIRECTIVE can see it.
+  EndMetadirectiveVariantScope();
+}
+
 void OmpStructureChecker::ChecksOnOrderedAsBlock() {
   if (FindClause(llvm::omp::Clause::OMPC_depend)) {
     context_.Say(GetContext().clauseSource,
@@ -1805,7 +1862,9 @@ void OmpStructureChecker::Enter(const parser::OmpBeginDirective &x) {
   switch (x.DirId()) {
   case llvm::omp::Directive::OMPD_metadirective:
     // Delimited METADIRECTIVE
+    metadirectiveConstructContexts_.emplace_back();
     EnterDirectiveNest(MetadirectiveNest);
+    BeginMetadirectiveSelection();
     break;
   default:
     break;
@@ -1820,6 +1879,7 @@ void OmpStructureChecker::Leave(const parser::OmpBeginDirective &x) {
     break;
   case llvm::omp::Directive::OMPD_metadirective:
     // Delimited METADIRECTIVE
+    EndMetadirectiveSelection(x.Clauses());
     ExitDirectiveNest(MetadirectiveNest);
     break;
   default:
