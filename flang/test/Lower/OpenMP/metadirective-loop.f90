@@ -685,6 +685,46 @@ subroutine test_enclosing_do_iv(n, a)
   end do
 end subroutine
 
+! A predetermined flag left on a sibling transform's IV must not make a
+! selected SINGLE try to privatize that symbol.
+! CHECK-LABEL: func.func @_QPtest_sibling_transform_single(
+! CHECK:         %[[I:.*]]:2 = hlfir.declare {{.*}}Ei"
+! CHECK:         omp.single {
+! CHECK:           %{{.*}} = fir.load %[[I]]#0 : !fir.ref<i32>
+! CHECK:         return
+subroutine test_sibling_transform_single(n, a)
+  integer :: n, a(n), i
+  !$omp unroll partial(2)
+  do i = 1, n
+    a(i) = i
+  end do
+  !$omp begin metadirective &
+  !$omp& when(user={condition(.true.)}: single) &
+  !$omp& otherwise(nothing)
+  a(1) = i
+  !$omp end metadirective
+end subroutine
+
+! A selected TASK must apply its own implicit firstprivate rule instead of
+! inheriting a predetermined flag from a sibling transform.
+! CHECK-LABEL: func.func @_QPtest_sibling_transform_task(
+! CHECK:         omp.task {{.*}}private({{.*}}Ei_firstprivate_i32
+! CHECK:           %[[I:.*]]:2 = hlfir.declare {{.*}}Ei"
+! CHECK:           %{{.*}} = fir.load %[[I]]#0 : !fir.ref<i32>
+! CHECK:         return
+subroutine test_sibling_transform_task(n, a)
+  integer :: n, a(n), i
+  !$omp unroll partial(2)
+  do i = 1, n
+    a(i) = i
+  end do
+  !$omp begin metadirective &
+  !$omp& when(user={condition(.true.)}: task) &
+  !$omp& otherwise(nothing)
+  a(1) = i
+  !$omp end metadirective
+end subroutine
+
 ! A standalone metadirective's selected DO trait remains active while its
 ! sibling loop is traversed. The inner construct selector therefore chooses
 ! NOTHING, leaving the inner loop sequential.
