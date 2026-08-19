@@ -1774,7 +1774,7 @@ bool GCNPassConfig::addIRTranslator() {
 
 void GCNPassConfig::addPreLegalizeMachineIR() {
   bool IsOptNone = getOptLevel() == CodeGenOptLevel::None;
-  addPass(createAMDGPUPreLegalizeCombiner(IsOptNone));
+  addPass(createAMDGPUPreLegalizeCombinerLegacy(IsOptNone));
   addPass(new Localizer());
 }
 

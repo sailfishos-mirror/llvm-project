@@ -209,7 +209,7 @@ runCombiner(MachineFunction &MF, GISelCSEInfo *CSEInfo, GISelValueTracking *VT,
             bool EnableOpt) {
   const GCNSubtarget &STI = MF.getSubtarget<GCNSubtarget>();
   const Function &F = MF.getFunction();
-  CombinerInfo CInfo(/*AllowIllegalOps*/ true, /*ShouldLegalizeIllegal*/ false,
+  CombinerInfo CInfo(/*AllowIllegalOps=*/true, /*ShouldLegalizeIllegal=*/false,
                      nullptr, EnableOpt, F.hasOptSize(), F.hasMinSize());
   // Disable fixed-point iteration to reduce compile-time
   CInfo.MaxIterations = 1;
@@ -300,7 +300,7 @@ INITIALIZE_PASS_END(AMDGPUPreLegalizerCombinerLegacy, DEBUG_TYPE,
                     "Combine AMDGPU machine instrs before legalization", false,
                     false)
 
-FunctionPass *llvm::createAMDGPUPreLegalizeCombiner(bool IsOptNone) {
+FunctionPass *llvm::createAMDGPUPreLegalizeCombinerLegacy(bool IsOptNone) {
   return new AMDGPUPreLegalizerCombinerLegacy(IsOptNone);
 }
 
