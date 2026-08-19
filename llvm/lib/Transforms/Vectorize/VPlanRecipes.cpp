@@ -1581,6 +1581,9 @@ void VPInstruction::addOperand(VPValue *Op) {
 }
 
 void VPInstruction::execute(VPTransformState &State) {
+  if (isMasked()) {
+    dbgs() << *this << " is MASKED!\n";
+  }
   assert(!isMasked() && "cannot execute masked VPInstruction");
   IRBuilderBase::FastMathFlagGuard FMFGuard(State.Builder);
   assert(flagsValidForOpcode(getOpcode()) &&

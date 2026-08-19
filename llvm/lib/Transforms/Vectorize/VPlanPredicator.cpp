@@ -19,6 +19,7 @@
 #include "VPlanTransforms.h"
 #include "VPlanUtils.h"
 #include "llvm/ADT/PostOrderIterator.h"
+#include "llvm/ADT/STLExtras.h"
 
 #define DEBUG_TYPE "vplan-predicator"
 
@@ -443,6 +444,7 @@ public:
   auto begin() const { return Blocks.begin(); }
   auto end() const { return Blocks.end(); }
   unsigned getIndex(const VPBlockBase *BB) const { return BlockIndex.at(BB); }
+  unsigned size() const { return Blocks.size(); }
 };
 
 void VPPredicator::run() {
@@ -466,7 +468,8 @@ void VPPredicator::run() {
     // Mask all VPInstructions in the block.
     for (VPRecipeBase &R : *VPBB) {
       if (auto *VPI = dyn_cast<VPInstruction>(&R))
-        VPI->addMask(BlockMask);
+        if (VPI->getOpcode() != VPInstruction::BranchOnCond)
+          VPI->addMask(BlockMask);
     }
   }
 
@@ -489,11 +492,107 @@ void VPPredicator::run() {
   for (VPBasicBlock *VPBB :
        VPBlockUtils::blocksOnly<VPBasicBlock>(BlocksInCompactRPOT)) {
     LLVM_DEBUG(dbgs() << "Setting successors for " << VPBB->getName() << "\n");
-    bool PreserveUniform = false;
+    auto Successors = to_vector(VPBB->getSuccessors());
+
+    auto PreserveUniform = [&]() -> bool {
+      LLVM_DEBUG(dbgs() << "Checking if can preserve the branch at the end of "
+                        << VPBB->getName() << "\n");
+      auto False = []([[maybe_unused]] StringRef Reason = "") {
+        LLVM_DEBUG(dbgs() << "  can't be preserved"
+                          << (Reason.empty() ? Twine() : (": " + Reason))
+                          << "\n");
+        return false;
+      };
+      if (VPBB->getNumSuccessors() != 2)
+        return False("#Successors != 2");
+      auto *Term = dyn_cast<VPInstruction>(VPBB->getTerminator());
+      if (!Term || Term->getOpcode() != VPInstruction::BranchOnCond)
+        return False("Not a branch");
+
+      bool IsUniformAndAvailable = [&](VPValue *V) {
+        auto *IRV = dyn_cast<VPIRValue>(V);
+        return IRV && isa<Argument, Constant>(IRV->getValue());
+      }(Term->getOperand(0));
+
+      if (!IsUniformAndAvailable)
+        return False("non-uniform");
+
+      // Should not happen in the end-to-end pass pipeline (simplifycfg would
+      // have handled it), but possible when running `loop-vectorize` pass
+      // alone. Just don't preserve so that we won't have to handle that when
+      // executing VPlan.
+      if (all_equal(VPBB->successors()))
+        return False("All successors are the same");
+
+      auto *IPostDomNode = VPPDT.getNode(VPBB)->getIDom();
+      if (!IPostDomNode)
+        return False("no post-dom");
+      auto *IPostDom = dyn_cast<VPBasicBlock>(IPostDomNode->getBlock());
+      if (!IPostDom || !VPDT.properlyDominates(VPBB, IPostDom))
+        return False("doesn't dominate its post-dom");
+
+      LLVM_DEBUG(dbgs() << "IPostDom: " << IPostDom->getName() << "\n";);
+
+      for (VPBlockBase *Pred : IPostDom->getPredecessors()) {
+        if (Pred == VPBB)
+          continue;
+        if (count_if(VPBB->successors(), [&](auto *Succ) {
+              return VPDT.dominates(Succ, Pred);
+            }) != 1)
+          return False("Bailing out due to successors not being independent");
+      }
+
+      if (any_of(*IPostDom, IsaPred<VPBlendRecipe>))
+        return False("Blends at reconvergence");
+
+      LLVM_DEBUG(dbgs() << "...yes, can be preserved.\n");
+      return true;
+    }();
+
     if (PreserveUniform) {
+      for (auto *Succ : Successors)
+        VPBlockUtils::disconnectBlocks(VPBB, Succ);
+
+      auto Deferred = PopDeferred(VPBB);
+      LLVM_DEBUG({
+        dbgs() << "Deferred successors: ";
+        for (auto *B : Deferred) {
+          dbgs() << " " << B->getName();
+        }
+        dbgs() << "\n";
+      });
+
+      VPBlockBase *MinDeferred = nullptr;
+      unsigned MinDeferredIdx = BlocksInCompactRPOT.size() + 1;
+
+      if (!Deferred.empty()) {
+        MinDeferred =
+            *std::min_element(Deferred.begin(), Deferred.end(),
+                              [&](VPBlockBase *A, VPBlockBase *B) {
+                                return BlocksInCompactRPOT.getIndex(A) <
+                                       BlocksInCompactRPOT.getIndex(B);
+                              });
+        MinDeferredIdx = BlocksInCompactRPOT.getIndex(MinDeferred);
+        LLVM_DEBUG(dbgs() << "Min deferred: " << MinDeferred->getName() << "("
+                          << MinDeferredIdx << ")\n");
+      }
+      for (auto *Succ : Successors) {
+        VPBlockBase *Next = BlocksInCompactRPOT.getIndex(Succ) < MinDeferredIdx
+                                ? Succ
+                                : MinDeferred;
+        LLVM_DEBUG(dbgs() << "Original Succ: " << Succ->getName()
+                          << ", connecting to " << Next->getName() << "\n");
+        VPBlockUtils::connectBlocks(VPBB, Next);
+        auto &Entry = DeferredMap[Next];
+        assert(Entry.count(Next) == 0 &&
+               "If that fails, then erase below must be done on Deferred/Succ "
+               "before insertion.");
+        Entry.insert_range(Deferred);
+        Entry.insert(Succ);
+        Entry.erase(Next);
+      }
       /* ... */
     } else {
-      auto Successors = to_vector(VPBB->getSuccessors());
       if (Successors.size() > 1)
         VPBB->getTerminator()->eraseFromParent();
 

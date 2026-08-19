@@ -245,7 +245,11 @@ define void @simplifiable_blend(i1 %c1, i1 %c2, i1 %c3, i32 %x, i32 %y, ptr %p) 
 ; CHECK-NEXT:    [[PREDPHI7:%.*]] = select i1 [[C1]], <4 x i32> [[BROADCAST_SPLAT2]], <4 x i32> [[BROADCAST_SPLAT]]
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
-; CHECK-NEXT:    [[INDEX:%.*]] = phi i32 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[INDEX:%.*]] = phi i32 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[F4:.*]] ]
+; CHECK-NEXT:    br i1 [[C3]], label %[[F4]], label %[[E3:.*]]
+; CHECK:       [[E3]]:
+; CHECK-NEXT:    br label %[[F4]]
+; CHECK:       [[F4]]:
 ; CHECK-NEXT:    [[TMP3:%.*]] = getelementptr i32, ptr [[P]], i32 [[INDEX]]
 ; CHECK-NEXT:    store <4 x i32> [[PREDPHI7]], ptr [[TMP3]], align 4
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
