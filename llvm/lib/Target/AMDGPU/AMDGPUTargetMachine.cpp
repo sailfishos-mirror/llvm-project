@@ -674,7 +674,7 @@ extern "C" LLVM_ABI LLVM_EXTERNAL_VISIBILITY void LLVMInitializeAMDGPUTarget() {
   initializeGCNDPPCombineLegacyPass(*PR);
   initializeSILowerI1CopiesLegacyPass(*PR);
   initializeAMDGPUGlobalISelDivergenceLoweringLegacyPass(*PR);
-  initializeAMDGPURegBankSelectPass(*PR);
+  initializeAMDGPURegBankSelectLegacyPass(*PR);
   initializeAMDGPURegBankLegalizePass(*PR);
   initializeSILowerWWMCopiesLegacyPass(*PR);
   initializeAMDGPUMarkLastScratchLoadLegacyPass(*PR);
@@ -1790,7 +1790,7 @@ void GCNPassConfig::addPreRegBankSelect() {
 }
 
 bool GCNPassConfig::addRegBankSelect() {
-  addPass(createAMDGPURegBankSelectPass());
+  addPass(createAMDGPURegBankSelectLegacyPass());
   addPass(createAMDGPURegBankLegalizePass());
   return false;
 }
