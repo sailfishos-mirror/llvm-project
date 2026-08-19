@@ -20,6 +20,8 @@
 #include "VPlanUtils.h"
 #include "llvm/ADT/PostOrderIterator.h"
 
+#define DEBUG_TYPE "vplan-predicator"
+
 using namespace llvm;
 using namespace VPlanPatternMatch;
 
@@ -400,13 +402,55 @@ void VPPredicator::convertPhisToBlends(VPBasicBlock *VPBB) {
   }
 }
 
+class CompactRPOT {
+  SmallVector<VPBlockBase *> Blocks;
+  DenseMap<const VPBlockBase *, unsigned> BlockIndex;
+
+  template <typename rpo_iterator>
+  void scheduleDomRegion(VPBlockBase *VPBB, rpo_iterator It, rpo_iterator End,
+                         unsigned &NextIndex, const VPDominatorTree &VPDT) {
+    BlockIndex[VPBB] = NextIndex++;
+    for (; It != End; ++It) {
+      auto *DTNode = VPDT.getNode(*It);
+      if (DTNode->getIDom()->getBlock() != VPBB)
+        continue;
+      scheduleDomRegion(*It, It, End, NextIndex, VPDT);
+    }
+  }
+
+public:
+  CompactRPOT(VPBasicBlock *Header, const VPDominatorTree &VPDT) {
+    copy(post_order(VPBlockShallowTraversalWrapper<VPBlockBase *>{Header}),
+         std::back_inserter(Blocks));
+    unsigned Index = 0;
+    // Blocks are in post-order (not reversed), so use reverse iterators while
+    // compacting.
+    scheduleDomRegion(*Blocks.rbegin(), Blocks.rbegin(), Blocks.rend(), Index,
+                      VPDT);
+    sort(Blocks, [&](VPBlockBase *A, VPBlockBase *B) {
+      return BlockIndex[A] < BlockIndex[B];
+    });
+
+    LLVM_DEBUG({
+      dbgs() << "Compact RPOT: ";
+      for (VPBlockBase *VPBB : Blocks) {
+        dbgs() << " " << VPBB->getName();
+      }
+      dbgs() << "\n";
+    });
+  }
+
+  auto begin() const { return Blocks.begin(); }
+  auto end() const { return Blocks.end(); }
+  unsigned getIndex(const VPBlockBase *BB) const { return BlockIndex.at(BB); }
+};
+
 void VPPredicator::run() {
   VPBasicBlock *Header = Plan.getVectorLoopRegion()->getEntryBasicBlock();
-  // Scan the body of the loop in a topological order to visit each basic
-  // block after having visited its predecessor basic blocks.
-  ReversePostOrderTraversal<VPBlockShallowTraversalWrapper<VPBlockBase *>> RPOT(
-      Header);
-  for (VPBlockBase *VPB : RPOT) {
+  // Scan the body of the loop in a topological order to visit each basic block
+  // after having visited its predecessor basic blocks.
+  CompactRPOT BlocksInCompactRPOT(Header, VPDT);
+  for (VPBlockBase *VPB : BlocksInCompactRPOT) {
     // Non-outer regions with VPBBs only are supported at the moment.
     auto *VPBB = cast<VPBasicBlock>(VPB);
     // Introduce the mask for VPBB, which may introduce needed edge masks, and
@@ -426,25 +470,68 @@ void VPPredicator::run() {
     }
   }
 
-  for (VPBlockBase *VPBB : reverse(RPOT))
+  for (VPBlockBase *VPBB : reverse(BlocksInCompactRPOT))
     if (VPBB != Header)
       convertPhisToBlends(cast<VPBasicBlock>(VPBB));
 
-  // Linearize the blocks of the loop into one serial chain.
-  VPBlockBase *PrevVPBB = nullptr;
-  for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(RPOT)) {
-    auto Successors = to_vector(VPBB->getSuccessors());
-    if (Successors.size() > 1)
-      VPBB->getTerminator()->eraseFromParent();
+  using DeferredSuccessorsTy = SmallPtrSet<VPBlockBase *, 4>;
+  DenseMap<VPBlockBase *, DeferredSuccessorsTy> DeferredMap;
+  auto PopDeferred = [&](VPBlockBase *VPBB) -> DeferredSuccessorsTy {
+    auto It = DeferredMap.find(VPBB);
+    if (It != DeferredMap.end()) {
+      DeferredSuccessorsTy Res = std::move(It->second);
+      DeferredMap.erase(It);
+      return Res;
+    }
+    return {};
+  };
 
-    // Flatten the CFG in the loop. To do so, first disconnect VPBB from its
-    // successors. Then connect VPBB to the previously visited VPBB.
-    for (auto *Succ : Successors)
-      VPBlockUtils::disconnectBlocks(VPBB, Succ);
-    if (PrevVPBB)
-      VPBlockUtils::connectBlocks(PrevVPBB, VPBB);
+  for (VPBasicBlock *VPBB :
+       VPBlockUtils::blocksOnly<VPBasicBlock>(BlocksInCompactRPOT)) {
+    LLVM_DEBUG(dbgs() << "Setting successors for " << VPBB->getName() << "\n");
+    bool PreserveUniform = false;
+    if (PreserveUniform) {
+      /* ... */
+    } else {
+      auto Successors = to_vector(VPBB->getSuccessors());
+      if (Successors.size() > 1)
+        VPBB->getTerminator()->eraseFromParent();
 
-    PrevVPBB = VPBB;
+      for (auto *Succ : Successors)
+        VPBlockUtils::disconnectBlocks(VPBB, Succ);
+
+      auto CombinedSuccessors = PopDeferred(VPBB);
+      CombinedSuccessors.insert_range(Successors);
+
+      if (CombinedSuccessors.size() == 0)
+        continue;
+
+      LLVM_DEBUG({
+        dbgs() << "Combined successors: ";
+        for (auto *B : CombinedSuccessors) {
+          dbgs() << " " << B->getName();
+        }
+        dbgs() << "\n";
+      });
+
+      VPBlockBase *Next = *std::min_element(
+          CombinedSuccessors.begin(), CombinedSuccessors.end(),
+          [&](VPBlockBase *A, VPBlockBase *B) {
+            return BlocksInCompactRPOT.getIndex(A) <
+                   BlocksInCompactRPOT.getIndex(B);
+          });
+
+      LLVM_DEBUG(dbgs() << "Connecting to: " << Next->getName() << "\n");
+      VPBlockUtils::connectBlocks(VPBB, Next);
+
+      CombinedSuccessors.erase(Next);
+      auto &Entry = DeferredMap[Next];
+      if (Entry.empty()) {
+        Entry = std::move(CombinedSuccessors);
+      } else {
+        Entry.insert_range(CombinedSuccessors);
+      }
+    }
   }
 }
 
