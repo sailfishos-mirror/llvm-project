@@ -7271,6 +7271,11 @@ Error BitcodeReader::materialize(GlobalValue *GV) {
   // Look for functions that rely on old function attribute behavior.
   UpgradeFunctionAttributes(*F);
 
+  // Upgrade renamed atomic metadata here rather than module-wide, so that it
+  // also happens for functions materialized individually out of a lazily
+  // loaded module.
+  UpgradeAtomicMetadata(*F);
+
   // Bring in any functions that this function forward-referenced via
   // blockaddresses.
   return materializeForwardReferencedFunctions();

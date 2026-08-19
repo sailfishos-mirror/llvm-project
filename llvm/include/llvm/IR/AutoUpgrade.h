@@ -85,6 +85,15 @@ namespace llvm {
   /// Otherwise return the \p TBAANode itself.
   LLVM_ABI MDNode *UpgradeTBAANode(MDNode &TBAANode);
 
+  /// Upgrade legacy metadata attached to atomic instructions, i.e. the AMDGPU
+  /// specific \c !amdgpu.ignore.denormal.mode which was generalized into
+  /// \c !atomic.ignore.denormal.mode.
+  ///
+  /// The per-function overload exists because bitcode may be materialized one
+  /// function at a time, in which case no module-wide pass ever runs.
+  LLVM_ABI void UpgradeAtomicMetadata(Module &M);
+  LLVM_ABI void UpgradeAtomicMetadata(Function &F);
+
   /// This is an auto-upgrade for bitcast between pointers with different
   /// address spaces: the instruction is replaced by a pair ptrtoint+inttoptr.
   LLVM_ABI Instruction *UpgradeBitCastInst(unsigned Opc, Value *V, Type *DestTy,

@@ -56,6 +56,11 @@ Makes programs 10x faster by doing Special New Thing.
   freeing the underlying object (as opposed to only frees through that specific
   pointer). Renamed `!nofree` metadata to `!nofreeobj`, as it has the same
   semantics.
+* Introduced the generic `!atomic.ignore.denormal.mode` metadata for
+  floating-point `atomicrmw` instructions, generalizing the previously
+  AMDGPU-specific `!amdgpu.ignore.denormal.mode`. Old IR using the previous
+  name is automatically upgraded.
+
 
 ### Changes to LLVM infrastructure
 

@@ -5226,7 +5226,7 @@ static Value *upgradeAMDGCNIntrinsicCall(StringRef Name, CallBase *CI,
     MDNode *EmptyMD = MDNode::get(F->getContext(), {});
     RMW->setMetadata("amdgpu.no.fine.grained.memory", EmptyMD);
     if (RMWOp == AtomicRMWInst::FAdd && RetTy->isFloatTy())
-      RMW->setMetadata("amdgpu.ignore.denormal.mode", EmptyMD);
+      RMW->setMetadata(LLVMContext::MD_atomic_ignore_denormal_mode, EmptyMD);
   }
 
   if (AddrSpace == AMDGPUAS::FLAT_ADDRESS) {
@@ -7178,10 +7178,71 @@ struct AMDGPUUnsafeFPAtomicsUpgradeVisitor
     MDNode *Empty = MDNode::get(RMW.getContext(), {});
     RMW.setMetadata("amdgpu.no.fine.grained.host.memory", Empty);
     RMW.setMetadata("amdgpu.no.remote.memory.access", Empty);
-    RMW.setMetadata("amdgpu.ignore.denormal.mode", Empty);
+    RMW.setMetadata(LLVMContext::MD_atomic_ignore_denormal_mode, Empty);
+  }
+};
+
+/// Replace the AMDGPU specific "amdgpu.ignore.denormal.mode" with the target
+/// independent "atomic.ignore.denormal.mode" it was generalized into.
+struct AtomicIgnoreDenormalModeUpgradeVisitor
+    : public InstVisitor<AtomicIgnoreDenormalModeUpgradeVisitor> {
+  unsigned LegacyKindID;
+
+  AtomicIgnoreDenormalModeUpgradeVisitor(unsigned LegacyKindID)
+      : LegacyKindID(LegacyKindID) {}
+
+  void visitAtomicRMWInst(AtomicRMWInst &RMW) {
+    MDNode *MD = RMW.getMetadata(LegacyKindID);
+    if (!MD)
+      return;
+
+    RMW.setMetadata(LLVMContext::MD_atomic_ignore_denormal_mode, MD);
+    RMW.setMetadata(LegacyKindID, nullptr);
   }
 };
 } // namespace
+
+/// Return the metadata kind ID \p Name is registered under, if any. Unlike
+/// Module::getMDKindID this does not register \p Name as a side effect, so it
+/// can be used to check whether legacy metadata is present at all.
+static std::optional<unsigned> lookupMDKindID(const Module &M, StringRef Name) {
+  SmallVector<StringRef, 64> Names;
+  M.getMDKindNames(Names);
+  for (auto [ID, KindName] : enumerate(Names))
+    if (KindName == Name)
+      return ID;
+  return std::nullopt;
+}
+
+// Only atomicrmw ever carried "amdgpu.ignore.denormal.mode", so the name is
+// deliberately left alone anywhere else rather than being renamed wholesale as
+// metadata attachments are parsed.
+static constexpr StringRef LegacyIgnoreDenormalModeName =
+    "amdgpu.ignore.denormal.mode";
+
+void llvm::UpgradeAtomicMetadata(Module &M) {
+  std::optional<unsigned> LegacyKindID =
+      lookupMDKindID(M, LegacyIgnoreDenormalModeName);
+  if (!LegacyKindID)
+    return;
+
+  AtomicIgnoreDenormalModeUpgradeVisitor Visitor(*LegacyKindID);
+  for (Function &F : M)
+    Visitor.visit(F);
+}
+
+void llvm::UpgradeAtomicMetadata(Function &F) {
+  const Module *M = F.getParent();
+  if (!M)
+    return;
+
+  std::optional<unsigned> LegacyKindID =
+      lookupMDKindID(*M, LegacyIgnoreDenormalModeName);
+  if (!LegacyKindID)
+    return;
+
+  AtomicIgnoreDenormalModeUpgradeVisitor(*LegacyKindID).visit(F);
+}
 
 void llvm::UpgradeFunctionAttributes(Function &F) {
   // If a function definition doesn't have the strictfp attribute,
