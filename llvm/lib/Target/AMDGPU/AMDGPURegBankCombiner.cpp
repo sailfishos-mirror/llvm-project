@@ -24,6 +24,8 @@
 #include "llvm/CodeGen/GlobalISel/GISelValueTracking.h"
 #include "llvm/CodeGen/GlobalISel/MIPatternMatch.h"
 #include "llvm/CodeGen/MachineDominators.h"
+#include "llvm/CodeGen/MachineFunctionAnalysisManager.h"
+#include "llvm/CodeGen/MachinePassManager.h"
 #include "llvm/CodeGen/TargetPassConfig.h"
 #include "llvm/Target/TargetMachine.h"
 
@@ -627,14 +629,35 @@ bool AMDGPURegBankCombinerImpl::isClampZeroToOne(MachineInstr *K0,
   return false;
 }
 
+static bool runCombiner(MachineFunction &MF, GISelValueTracking &VT,
+                        MachineDominatorTree *MDT,
+                        const AMDGPURegBankCombinerImplRuleConfig &RuleConfig,
+                        bool EnableOpt) {
+  const Function &F = MF.getFunction();
+  const GCNSubtarget &ST = MF.getSubtarget<GCNSubtarget>();
+  const auto *LI = ST.getLegalizerInfo();
+
+  CombinerInfo CInfo(/*AllowIllegalOps*/ false, /*ShouldLegalizeIllegal*/ true,
+                     LI, EnableOpt, F.hasOptSize(), F.hasMinSize());
+  // Disable fixed-point iteration to reduce compile-time
+  CInfo.MaxIterations = 1;
+  CInfo.ObserverLvl = CombinerInfo::ObserverLevel::SinglePass;
+  // RegBankSelect seems not to leave dead instructions, so a full DCE pass is
+  // unnecessary.
+  CInfo.EnableFullDCE = false;
+  AMDGPURegBankCombinerImpl Impl(MF, CInfo, VT, /*CSEInfo*/ nullptr, RuleConfig,
+                                 ST, MDT, LI);
+  return Impl.combineMachineInstrs();
+}
+
 // Pass boilerplate
 // ================
 
-class AMDGPURegBankCombiner : public MachineFunctionPass {
+class AMDGPURegBankCombinerLegacy : public MachineFunctionPass {
 public:
   static char ID;
 
-  AMDGPURegBankCombiner(bool IsOptNone = false);
+  AMDGPURegBankCombinerLegacy(bool IsOptNone = false);
 
   StringRef getPassName() const override { return "AMDGPURegBankCombiner"; }
 
@@ -648,7 +671,7 @@ private:
 };
 } // end anonymous namespace
 
-void AMDGPURegBankCombiner::getAnalysisUsage(AnalysisUsage &AU) const {
+void AMDGPURegBankCombinerLegacy::getAnalysisUsage(AnalysisUsage &AU) const {
   AU.setPreservesCFG();
   getSelectionDAGFallbackAnalysisUsage(AU);
   AU.addRequired<GISelValueTrackingAnalysisLegacy>();
@@ -659,50 +682,67 @@ void AMDGPURegBankCombiner::getAnalysisUsage(AnalysisUsage &AU) const {
   MachineFunctionPass::getAnalysisUsage(AU);
 }
 
-AMDGPURegBankCombiner::AMDGPURegBankCombiner(bool IsOptNone)
+AMDGPURegBankCombinerLegacy::AMDGPURegBankCombinerLegacy(bool IsOptNone)
     : MachineFunctionPass(ID), IsOptNone(IsOptNone) {
   if (!RuleConfig.parseCommandLineOption())
     report_fatal_error("Invalid rule identifier");
 }
 
-bool AMDGPURegBankCombiner::runOnMachineFunction(MachineFunction &MF) {
+bool AMDGPURegBankCombinerLegacy::runOnMachineFunction(MachineFunction &MF) {
   if (MF.getProperties().hasFailedISel())
     return false;
   const Function &F = MF.getFunction();
   bool EnableOpt =
       MF.getTarget().getOptLevel() != CodeGenOptLevel::None && !skipFunction(F);
 
-  const GCNSubtarget &ST = MF.getSubtarget<GCNSubtarget>();
-  GISelValueTracking *VT =
-      &getAnalysis<GISelValueTrackingAnalysisLegacy>().get(MF);
-
-  const auto *LI = ST.getLegalizerInfo();
+  GISelValueTracking &VT =
+      getAnalysis<GISelValueTrackingAnalysisLegacy>().get(MF);
   MachineDominatorTree *MDT =
       IsOptNone ? nullptr
                 : &getAnalysis<MachineDominatorTreeWrapperPass>().getDomTree();
 
-  CombinerInfo CInfo(/*AllowIllegalOps*/ false, /*ShouldLegalizeIllegal*/ true,
-                     LI, EnableOpt, F.hasOptSize(), F.hasMinSize());
-  // Disable fixed-point iteration to reduce compile-time
-  CInfo.MaxIterations = 1;
-  CInfo.ObserverLvl = CombinerInfo::ObserverLevel::SinglePass;
-  // RegBankSelect seems not to leave dead instructions, so a full DCE pass is
-  // unnecessary.
-  CInfo.EnableFullDCE = false;
-  AMDGPURegBankCombinerImpl Impl(MF, CInfo, *VT, /*CSEInfo*/ nullptr,
-                                 RuleConfig, ST, MDT, LI);
-  return Impl.combineMachineInstrs();
+  return runCombiner(MF, VT, MDT, RuleConfig, EnableOpt);
 }
 
-char AMDGPURegBankCombiner::ID = 0;
-INITIALIZE_PASS_BEGIN(AMDGPURegBankCombiner, DEBUG_TYPE,
+char AMDGPURegBankCombinerLegacy::ID = 0;
+INITIALIZE_PASS_BEGIN(AMDGPURegBankCombinerLegacy, DEBUG_TYPE,
                       "Combine AMDGPU machine instrs after regbankselect",
                       false, false)
 INITIALIZE_PASS_DEPENDENCY(GISelValueTrackingAnalysisLegacy)
-INITIALIZE_PASS_END(AMDGPURegBankCombiner, DEBUG_TYPE,
+INITIALIZE_PASS_END(AMDGPURegBankCombinerLegacy, DEBUG_TYPE,
                     "Combine AMDGPU machine instrs after regbankselect", false,
                     false)
 
-FunctionPass *llvm::createAMDGPURegBankCombiner(bool IsOptNone) {
-  return new AMDGPURegBankCombiner(IsOptNone);
+FunctionPass *llvm::createAMDGPURegBankCombinerLegacy(bool IsOptNone) {
+  return new AMDGPURegBankCombinerLegacy(IsOptNone);
+}
+
+AMDGPURegBankCombinerPass::AMDGPURegBankCombinerPass(bool IsOptNone)
+    : IsOptNone(IsOptNone) {}
+
+PreservedAnalyses
+AMDGPURegBankCombinerPass::run(MachineFunction &MF,
+                               MachineFunctionAnalysisManager &MFAM) {
+  if (MF.getProperties().hasFailedISel())
+    return PreservedAnalyses::all();
+
+  AMDGPURegBankCombinerImplRuleConfig RuleConfig;
+  if (!RuleConfig.parseCommandLineOption())
+    report_fatal_error("Invalid rule identifier");
+
+  const Function &F = MF.getFunction();
+  bool EnableOpt =
+      MF.getTarget().getOptLevel() != CodeGenOptLevel::None && !F.hasOptNone();
+
+  GISelValueTracking &VT = MFAM.getResult<GISelValueTrackingAnalysis>(MF);
+  MachineDominatorTree *MDT =
+      IsOptNone ? nullptr : &MFAM.getResult<MachineDominatorTreeAnalysis>(MF);
+
+  if (!runCombiner(MF, VT, MDT, RuleConfig, EnableOpt))
+    return PreservedAnalyses::all();
+
+  PreservedAnalyses PA = getMachineFunctionPassPreservedAnalyses();
+  PA.preserveSet<CFGAnalyses>();
+  PA.preserve<GISelValueTrackingAnalysis>();
+  return PA;
 }
