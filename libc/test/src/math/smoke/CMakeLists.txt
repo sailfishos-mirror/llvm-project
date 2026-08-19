@@ -2979,6 +2979,7 @@ add_fp_unittest(
   HDRS
     FMaximumNumTest.h
   DEPENDS
+    libc.src.__support.FPUtil.float128
     libc.src.math.fmaximum_numf128
     libc.src.__support.CPP.algorithm
     libc.src.__support.FPUtil.fp_bits
