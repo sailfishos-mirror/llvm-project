@@ -587,6 +587,7 @@ TEST(LlvmLibcSharedMathTest, AllEmuFloat128) {
   EXPECT_FP_EQ(Float128(0.0),
                LIBC_NAMESPACE::shared::atan2f128(Float128(0.0), Float128(0.0)));
   EXPECT_FP_EQ(Float128(0.0), LIBC_NAMESPACE::shared::ceilf128(Float128(0.0)));
+  LIBC_NAMESPACE::shared::fmodf128(Float128(1.0), Float128(1.0));
   EXPECT_FP_EQ(Float128(0.0), LIBC_NAMESPACE::shared::copysignf128(
                                   Float128(0.0), Float128(0.0)));
   EXPECT_FP_EQ(Float128(0.0), LIBC_NAMESPACE::shared::fabsf128(Float128(0.0)));
@@ -734,7 +735,6 @@ TEST(LlvmLibcSharedMathTest, AllFloat128) {
   float128 totalordermagf128_y = float128(0.0);
   EXPECT_EQ(1, LIBC_NAMESPACE::shared::totalordermagf128(&totalordermagf128_x,
                                                          &totalordermagf128_y));
-  LIBC_NAMESPACE::shared::fmodf128(float128(1.0), float128(1.0));
   float128 modff128_iptr = float128(0.0);
   EXPECT_FP_EQ(float128(0.0),
                LIBC_NAMESPACE::shared::modff128(float128(0.0), &modff128_iptr));
