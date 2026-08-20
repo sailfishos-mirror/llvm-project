@@ -2598,6 +2598,7 @@ add_entrypoint_object(
   HDRS
     ../fminimum_mag_numf128.h
   DEPENDS
+    libc.src.__support.CPP.bit
     libc.src.__support.math.fminimum_mag_numf128
 )
 
