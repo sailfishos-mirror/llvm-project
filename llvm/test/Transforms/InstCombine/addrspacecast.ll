@@ -241,3 +241,14 @@ define void @constant_fold_gep_inttoptr() #0 {
   store i32 7, ptr addrspace(4) %cast
   ret void
 }
+
+; nonnull is dropped when a cast-of-cast pair collapses to a single cast.
+define ptr addrspace(1) @drop_nonnull_on_collapsed_castcast(ptr addrspace(3) %p) {
+; CHECK-LABEL: @drop_nonnull_on_collapsed_castcast(
+; CHECK-NEXT:    [[B:%.*]] = addrspacecast ptr addrspace(3) [[P:%.*]] to ptr addrspace(1)
+; CHECK-NEXT:    ret ptr addrspace(1) [[B]]
+;
+  %a = addrspacecast ptr addrspace(3) %p to ptr
+  %b = addrspacecast nonnull ptr %a to ptr addrspace(1)
+  ret ptr addrspace(1) %b
+}
