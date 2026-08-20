@@ -505,6 +505,7 @@ set(TARGET_LIBM_ENTRYPOINTS
     libc.src.math.powf
     libc.src.math.remainder
     libc.src.math.remainderf
+    libc.src.math.remainderf128
     libc.src.math.remainderl
     libc.src.math.remquo
     libc.src.math.remquof

@@ -381,6 +381,9 @@ static_assert(0 == LIBC_NAMESPACE::shared::isnanl(0.0L));
 //===----------------------------------------------------------------------===//
 
 static_assert(Float128(0.0) == LIBC_NAMESPACE::shared::ceilf128(Float128(0.0)));
+static_assert(float128(0.0) ==
+              LIBC_NAMESPACE::shared::remainderf128(Float128(1.0),
+                                                    Float128(1.0)));
 static_assert(0 ==
               LIBC_NAMESPACE::shared::fmodf128(Float128(4.0), Float128(2.0)));
 static_assert(Float128(0.0) ==
@@ -486,9 +489,6 @@ static_assert(float128(0.0) == [] {
   float128 iptr{};
   return LIBC_NAMESPACE::shared::modff128(float128(0.0), &iptr);
 }());
-static_assert(float128(0.0) ==
-              LIBC_NAMESPACE::shared::remainderf128(float128(1.0),
-                                                    float128(1.0)));
 static_assert(float128(0.0) == [] {
   int exp{};
   return LIBC_NAMESPACE::shared::remquof128(float128(1.0), float128(1.0), &exp);
