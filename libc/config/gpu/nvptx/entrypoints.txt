@@ -391,6 +391,7 @@ set(TARGET_LIBM_ENTRYPOINTS
     libc.src.math.fminimuml
     libc.src.math.fminimum_mag
     libc.src.math.fminimum_magf
+    libc.src.math.fminimum_magf128
     libc.src.math.fminimum_magl
     libc.src.math.fminimum_mag_num
     libc.src.math.fminimum_mag_numf
