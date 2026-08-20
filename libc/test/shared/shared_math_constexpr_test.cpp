@@ -381,11 +381,6 @@ static_assert(0 == LIBC_NAMESPACE::shared::isnanl(0.0L));
 //===----------------------------------------------------------------------===//
 
 static_assert(Float128(0.0) == LIBC_NAMESPACE::shared::ceilf128(Float128(0.0)));
-static_assert(float128(0.0) ==
-              LIBC_NAMESPACE::shared::remainderf128(Float128(1.0),
-                                                    Float128(1.0)));
-static_assert(0 ==
-              LIBC_NAMESPACE::shared::fmodf128(Float128(4.0), Float128(2.0)));
 static_assert(Float128(0.0) ==
               LIBC_NAMESPACE::shared::copysignf128(Float128(0.0),
                                                    Float128(0.0)));
@@ -423,6 +418,8 @@ static_assert(Float128(0.0) ==
 static_assert(Float128(0.0) ==
               LIBC_NAMESPACE::shared::fminimum_numf128(Float128(0.0),
                                                        Float128(0.0)));
+static_assert(Float128(0.0) ==
+              LIBC_NAMESPACE::shared::fmodf128(Float128(4.0), Float128(2.0)));
 static_assert(1 == LIBC_NAMESPACE::shared::iscanonicalf128(Float128(0.0)));
 static_assert(0 == LIBC_NAMESPACE::shared::isnanf128(Float128(0.0)));
 static_assert(0.0 == LIBC_NAMESPACE::shared::issignalingf128(Float128(0.0)));
@@ -438,6 +435,9 @@ static_assert(Float128(0.0) ==
 static_assert(Float128(0.0) ==
               LIBC_NAMESPACE::shared::nextafterf128(Float128(0.0),
                                                     Float128(0.0)));
+static_assert(Float128(0.0) ==
+              LIBC_NAMESPACE::shared::remainderf128(Float128(1.0),
+                                                    Float128(1.0)));
 static_assert(Float128(0.0) ==
               LIBC_NAMESPACE::shared::roundf128(Float128(0.0)));
 static_assert(Float128(0.0) ==
@@ -485,10 +485,15 @@ constexpr float128 TOTALORDERMAGF128_Y = float128(0.0);
 static_assert(1 ==
               LIBC_NAMESPACE::shared::totalordermagf128(&TOTALORDERMAGF128_X,
                                                         &TOTALORDERMAGF128_Y));
+static_assert(float128(0.0) ==
+              LIBC_NAMESPACE::shared::fmodf128(float128(4.0), float128(2.0)));
 static_assert(float128(0.0) == [] {
   float128 iptr{};
   return LIBC_NAMESPACE::shared::modff128(float128(0.0), &iptr);
 }());
+static_assert(float128(0.0) ==
+              LIBC_NAMESPACE::shared::remainderf128(float128(1.0),
+                                                    float128(1.0)));
 static_assert(float128(0.0) == [] {
   int exp{};
   return LIBC_NAMESPACE::shared::remquof128(float128(1.0), float128(1.0), &exp);
@@ -587,7 +592,7 @@ constexpr bfloat16 TOTALORDERMAGBF16_Y = bfloat16(0.0);
 static_assert(1 ==
               LIBC_NAMESPACE::shared::totalordermagbf16(&TOTALORDERMAGBF16_X,
                                                         &TOTALORDERMAGBF16_Y));
-static_assert(0 ==
+static_assert(bfloat16(0.0) ==
               LIBC_NAMESPACE::shared::fmodbf16(bfloat16(4.0), bfloat16(2.0)));
 static_assert(bfloat16(0.0) == [] {
   bfloat16 iptr{};
