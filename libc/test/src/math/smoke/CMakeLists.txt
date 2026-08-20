@@ -3069,6 +3069,7 @@ add_fp_unittest(
   HDRS
     FMaximumMagTest.h
   DEPENDS
+    libc.src.__support.FPUtil.float128
     libc.src.math.fmaximum_magf128
     libc.src.__support.CPP.algorithm
     libc.src.__support.FPUtil.basic_operations
