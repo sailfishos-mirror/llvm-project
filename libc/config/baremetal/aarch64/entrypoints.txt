@@ -544,6 +544,7 @@ set(TARGET_LIBM_ENTRYPOINTS
     libc.src.math.nearbyintl
     libc.src.math.nextafter
     libc.src.math.nextafterf
+    libc.src.math.nextafterf128
     libc.src.math.nextafterl
     libc.src.math.nextdown
     libc.src.math.nextdownf
@@ -783,7 +784,6 @@ if(LIBC_TYPES_HAS_NATIVE_FLOAT128)
     libc.src.math.logbf128
     libc.src.math.modff128
     libc.src.math.nanf128
-    libc.src.math.nextafterf128
     libc.src.math.nextdownf128
     libc.src.math.nextupf128
     libc.src.math.remainderf128

@@ -584,6 +584,7 @@ TEST(LlvmLibcSharedMathTest, AllEmuFloat128) {
   EXPECT_FP_EQ(Float128(0.0),
                LIBC_NAMESPACE::shared::atan2f128(Float128(0.0), Float128(0.0)));
   EXPECT_FP_EQ(Float128(0.0), LIBC_NAMESPACE::shared::ceilf128(Float128(0.0)));
+  EXPECT_FP_EQ(float128(0.0), LIBC_NAMESPACE::shared::nextafterf128( Float128(0.0), Float128(0.0)));
   EXPECT_FP_EQ(Float128(0.0), LIBC_NAMESPACE::shared::copysignf128(
                                   Float128(0.0), Float128(0.0)));
   EXPECT_FP_EQ(Float128(0.0), LIBC_NAMESPACE::shared::fabsf128(Float128(0.0)));
@@ -700,8 +701,6 @@ TEST(LlvmLibcSharedMathTest, AllFloat128) {
                LIBC_NAMESPACE::shared::nextdownf128(float128(0.0)));
   float128 min_denormal = FPBits::min_subnormal(Sign ::POS).get_val();
   EXPECT_FP_EQ(min_denormal, LIBC_NAMESPACE::shared::nextupf128(float128(0.0)));
-  EXPECT_FP_EQ(float128(0.0), LIBC_NAMESPACE::shared::nextafterf128(
-                                  float128(0.0), float128(0.0)));
 
 #ifdef LIBC_TYPES_HAS_FLOAT16
   EXPECT_FP_EQ(10.0f16, LIBC_NAMESPACE::shared::f16fmaf128(

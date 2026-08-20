@@ -1304,6 +1304,9 @@ math_test(
     name = "nextafterf128",
     hdrs = ["NextAfterTest.h"],
     deps = ["//libc:__support_sign"],
+    deps = [
+        "//libc:__support_fputil_float128",
+    ],
 )
 
 math_test(
