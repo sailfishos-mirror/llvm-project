@@ -3400,6 +3400,7 @@ add_entrypoint_object(
   HDRS
     ../nextupf128.h
   DEPENDS
+    libc.src.__support.CPP.bit
     libc.src.__support.math.nextupf128
 )
 

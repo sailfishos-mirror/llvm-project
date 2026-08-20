@@ -230,6 +230,7 @@ set(TARGET_LIBM_ENTRYPOINTS
     #libc.src.math.nexttoward
     #libc.src.math.nexttowardf
     #libc.src.math.nexttowardl
+    #libc.src.math.nextupf128
     #libc.src.math.remainderf
     #libc.src.math.remainder
     #libc.src.math.remainderl
