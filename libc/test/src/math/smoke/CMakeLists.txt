@@ -4085,10 +4085,10 @@ add_fp_unittest(
     NextAfterTest.h
   DEPENDS
     libc.hdr.fenv_macros
-    libc.src.__support.FPUtil.float128
     libc.src.math.nextafterf128
     libc.src.__support.CPP.bit
     libc.src.__support.FPUtil.fenv_impl
+    libc.src.__support.FPUtil.float128
     libc.src.__support.FPUtil.fp_bits
 )
 
