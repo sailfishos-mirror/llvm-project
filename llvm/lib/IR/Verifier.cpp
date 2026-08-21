@@ -1123,6 +1123,29 @@ static bool isScope(const Metadata *MD) { return !MD || isa<DIScope>(MD); }
 static bool isDINode(const Metadata *MD) { return !MD || isa<DINode>(MD); }
 static bool isMDTuple(const Metadata *MD) { return !MD || isa<MDTuple>(MD); }
 
+/// Carefully grab the subprogram from a local scope.
+///
+/// This walks the parent chain with dyn_cast, avoiding the assertions in
+/// DILocalScope::getSubprogram(), which requires every parent to be a
+/// DILocalScope. Malformed chains are diagnosed by the caller.
+static DISubprogram *getSubprogram(Metadata *LocalScope) {
+  if (hasDIScopeCycle(LocalScope))
+    return nullptr;
+
+  if (!LocalScope)
+    return nullptr;
+
+  if (auto *SP = dyn_cast<DISubprogram>(LocalScope))
+    return SP;
+
+  if (auto *LB = dyn_cast<DILexicalBlockBase>(LocalScope))
+    return getSubprogram(LB->getRawScope());
+
+  // Just return null; broken scope chains are checked elsewhere.
+  assert(!isa<DILocalScope>(LocalScope) && "Unknown type of local scope");
+  return nullptr;
+}
+
 void Verifier::visitDILocation(const DILocation &N) {
   CheckDI(N.getRawScope() && isa<DILocalScope>(N.getRawScope()),
           "location requires a valid scope", &N, N.getRawScope());
@@ -1598,7 +1621,7 @@ void Verifier::visitDISubprogram(const DISubprogram &N) {
               "invalid retained nodes, retained node is not local", &N, Node,
               RetainedNode);
 
-      DISubprogram *RetainedNodeSP = RetainedNodeScope->getSubprogram();
+      DISubprogram *RetainedNodeSP = getSubprogram(RetainedNodeScope);
       DICompileUnit *RetainedNodeUnit =
           RetainedNodeSP ? RetainedNodeSP->getUnit() : nullptr;
       CheckDI(
@@ -3424,7 +3447,9 @@ void Verifier::visitFunction(const Function &F) {
     if (hasDIScopeCycle(Scope))
       return;
 
-    DISubprogram *SP = Scope->getSubprogram();
+    DISubprogram *SP = getSubprogram(Scope);
+    CheckDI(SP, "DILocalScope scope chain must terminate at a DISubprogram", DL,
+            Scope);
 
     // Scope and SP could be the same MDNode and we don't want to skip
     // validation in that case
@@ -6037,10 +6062,11 @@ void Verifier::visitInstruction(Instruction &I) {
 
     if (auto *DL = dyn_cast<DILocation>(N)) {
       if (DL->getAtomGroup()) {
-        CheckDI(DL->getScope()->getSubprogram()->getKeyInstructionsEnabled(),
+        DISubprogram *SP = getSubprogram(DL->getRawScope());
+        CheckDI(SP && SP->getKeyInstructionsEnabled(),
                 "DbgLoc uses atomGroup but DISubprogram doesn't have Key "
                 "Instructions enabled",
-                DL, DL->getScope()->getSubprogram());
+                DL, SP);
       }
     }
   }
@@ -7195,28 +7221,6 @@ void Verifier::visitIntrinsicCall(Intrinsic::ID ID, CallBase &Call) {
   verifyAMDGPUIntrinsicCall(*this, ID, Call);
 }
 
-/// Carefully grab the subprogram from a local scope.
-///
-/// This carefully grabs the subprogram from a local scope, avoiding the
-/// built-in assertions that would typically fire.
-static DISubprogram *getSubprogram(Metadata *LocalScope) {
-  if (hasDIScopeCycle(LocalScope))
-    return nullptr;
-
-  if (!LocalScope)
-    return nullptr;
-
-  if (auto *SP = dyn_cast<DISubprogram>(LocalScope))
-    return SP;
-
-  if (auto *LB = dyn_cast<DILexicalBlockBase>(LocalScope))
-    return getSubprogram(LB->getRawScope());
-
-  // Just return null; broken scope chains are checked elsewhere.
-  assert(!isa<DILocalScope>(LocalScope) && "Unknown type of local scope");
-  return nullptr;
-}
-
 void Verifier::visit(DbgLabelRecord &DLR) {
   CheckDI(isa<DILabel>(DLR.getRawLabel()),
           "invalid #dbg_label intrinsic variable", &DLR, DLR.getRawLabel());
@@ -7241,8 +7245,7 @@ void Verifier::visit(DbgLabelRecord &DLR) {
 
   CheckDI(LabelSP == LocSP,
           "mismatched subprogram between #dbg_label label and !dbg attachment",
-          &DLR, BB, F, Label, Label->getScope()->getSubprogram(), Loc,
-          Loc->getScope()->getSubprogram());
+          &DLR, BB, F, Label, LabelSP, Loc, LocSP);
 }
 
 void Verifier::visit(DbgVariableRecord &DVR) {
@@ -7331,8 +7334,7 @@ void Verifier::visit(DbgVariableRecord &DVR) {
 
   CheckDI(VarSP == LocSP,
           "mismatched subprogram between #dbg record variable and DILocation",
-          &DVR, BB, F, Var, Var->getScope()->getSubprogram(), Loc,
-          Loc->getScope()->getSubprogram(), BB, F);
+          &DVR, BB, F, Var, VarSP, Loc, LocSP, BB, F);
 
   verifyFnArgs(DVR);
 }
