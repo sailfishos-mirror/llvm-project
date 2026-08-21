@@ -189,11 +189,8 @@ define void @redundant_iv_trunc_for_cse(ptr noalias %src, ptr noalias %dst, i64 
 ; CHECK-NEXT:    [[TMP9:%.*]] = zext i32 [[TMP3]] to i64
 ; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <vscale x 4 x i32> poison, i32 [[TMP3]], i64 0
 ; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <vscale x 4 x i32> [[BROADCAST_SPLATINSERT]], <vscale x 4 x i32> poison, <vscale x 4 x i32> zeroinitializer
-; CHECK-NEXT:    [[TMP4:%.*]] = getelementptr inbounds i32, ptr [[SRC]], i64 [[EVL_BASED_IV]]
-; CHECK-NEXT:    [[VP_OP_LOAD:%.*]] = call <vscale x 4 x i32> @llvm.vp.load.nxv4i32.p0(ptr align 4 [[TMP4]], <vscale x 4 x i1> splat (i1 true), i32 [[TMP3]])
-; CHECK-NEXT:    [[TMP5:%.*]] = icmp eq <vscale x 4 x i32> [[VP_OP_LOAD]], zeroinitializer
 ; CHECK-NEXT:    [[TMP6:%.*]] = shl <vscale x 4 x i32> [[VEC_IND1]], splat (i32 16)
-; CHECK-NEXT:    [[PREDPHI:%.*]] = select <vscale x 4 x i1> [[TMP5]], <vscale x 4 x i32> [[TMP6]], <vscale x 4 x i32> [[VEC_IND]]
+; CHECK-NEXT:    [[PREDPHI:%.*]] = call <vscale x 4 x i32> @llvm.vp.merge.nxv4i32(<vscale x 4 x i1> splat (i1 true), <vscale x 4 x i32> [[VEC_IND]], <vscale x 4 x i32> [[TMP6]], i32 [[TMP3]])
 ; CHECK-NEXT:    [[TMP7:%.*]] = trunc <vscale x 4 x i32> [[PREDPHI]] to <vscale x 4 x i8>
 ; CHECK-NEXT:    [[TMP8:%.*]] = getelementptr inbounds i8, ptr [[DST]], i64 [[EVL_BASED_IV]]
 ; CHECK-NEXT:    call void @llvm.vp.store.nxv4i8.p0(<vscale x 4 x i8> [[TMP7]], ptr align 1 [[TMP8]], <vscale x 4 x i1> splat (i1 true), i32 [[TMP3]])

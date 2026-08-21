@@ -51,14 +51,14 @@ define i16 @reverse_interleave_load_fold_mask() optsize {
 ; CHECK-NEXT:    [[TMP22:%.*]] = phi <2 x i16> [ [[TMP11]], [[PRED_LOAD_CONTINUE]] ], [ [[TMP18]], [[PRED_LOAD_IF3]] ]
 ; CHECK-NEXT:    [[TMP23:%.*]] = phi <2 x i16> [ [[TMP12]], [[PRED_LOAD_CONTINUE]] ], [ [[TMP21]], [[PRED_LOAD_IF3]] ]
 ; CHECK-NEXT:    [[TMP24:%.*]] = add nsw <2 x i16> [[TMP22]], [[TMP23]]
-; CHECK-NEXT:    [[TMP25]] = add <2 x i16> [[VEC_PHI]], [[TMP24]]
+; CHECK-NEXT:    [[TMP26:%.*]] = add <2 x i16> [[VEC_PHI]], [[TMP24]]
+; CHECK-NEXT:    [[TMP25]] = select <2 x i1> [[TMP1]], <2 x i16> [[TMP26]], <2 x i16> [[VEC_PHI]]
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 2
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw <2 x i8> [[VEC_IND]], splat (i8 2)
 ; CHECK-NEXT:    [[TMP27:%.*]] = icmp eq i32 [[INDEX_NEXT]], 42
 ; CHECK-NEXT:    br i1 [[TMP27]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; CHECK:       middle.block:
-; CHECK-NEXT:    [[TMP26:%.*]] = select <2 x i1> [[TMP1]], <2 x i16> [[TMP25]], <2 x i16> [[VEC_PHI]]
-; CHECK-NEXT:    [[TMP28:%.*]] = call i16 @llvm.vector.reduce.add.v2i16(<2 x i16> [[TMP26]])
+; CHECK-NEXT:    [[TMP28:%.*]] = call i16 @llvm.vector.reduce.add.v2i16(<2 x i16> [[TMP25]])
 ; CHECK-NEXT:    br label [[LOOP:%.*]]
 ; CHECK:       exit:
 ; CHECK-NEXT:    ret i16 [[TMP28]]

@@ -22,7 +22,7 @@ define void @diamond_phi2(ptr %a, i1 %c1, i1 %c2) {
 ; CHECK-NEXT:    [[TMP4:%.*]] = select <4 x i1> [[TMP1]], <4 x i1> [[BROADCAST_SPLAT]], <4 x i1> zeroinitializer
 ; CHECK-NEXT:    [[TMP5:%.*]] = select <4 x i1> [[TMP0]], <4 x i1> [[BROADCAST_SPLAT2]], <4 x i1> zeroinitializer
 ; CHECK-NEXT:    [[TMP6:%.*]] = or <4 x i1> [[TMP4]], [[TMP5]]
-; CHECK-NEXT:    [[PREDPHI:%.*]] = select <4 x i1> [[TMP5]], <4 x i64> [[TMP3]], <4 x i64> [[TMP2]]
+; CHECK-NEXT:    [[PREDPHI:%.*]] = select <4 x i1> [[TMP0]], <4 x i64> [[TMP3]], <4 x i64> [[TMP2]]
 ; CHECK-NEXT:    [[TMP21:%.*]] = getelementptr i64, ptr [[A]], i64 [[TMP20]]
 ; CHECK-NEXT:    call void @llvm.masked.store.v4i64.p0(<4 x i64> [[PREDPHI]], ptr align 4 [[TMP21]], <4 x i1> [[TMP6]])
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[TMP20]], 4
@@ -105,11 +105,12 @@ define void @blend_masks(ptr noalias %p, i1 %c0, i1 %c1, i1 %c3, i1 %c4, i1 %c6)
 ; CHECK-NEXT:    [[TMP11:%.*]] = select <4 x i1> [[TMP5]], <4 x i1> [[BROADCAST_SPLAT2]], <4 x i1> zeroinitializer
 ; CHECK-NEXT:    [[TMP12:%.*]] = or <4 x i1> [[TMP11]], [[TMP10]]
 ; CHECK-NEXT:    [[PREDPHI:%.*]] = select <4 x i1> [[TMP10]], <4 x i32> zeroinitializer, <4 x i32> splat (i32 1)
+; CHECK-NEXT:    [[PREDPHI9:%.*]] = select <4 x i1> [[TMP10]], <4 x i32> zeroinitializer, <4 x i32> [[PREDPHI]]
 ; CHECK-NEXT:    br label %[[PRED_STORE_CONTINUE12:.*]]
 ; CHECK:       [[PRED_STORE_CONTINUE12]]:
 ; CHECK-NEXT:    [[TMP26:%.*]] = phi i32 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[PRED_STORE_CONTINUE12]] ]
 ; CHECK-NEXT:    [[TMP27:%.*]] = getelementptr i32, ptr [[P]], i32 [[TMP26]]
-; CHECK-NEXT:    call void @llvm.masked.store.v4i32.p0(<4 x i32> [[PREDPHI]], ptr align 4 [[TMP27]], <4 x i1> [[TMP12]])
+; CHECK-NEXT:    call void @llvm.masked.store.v4i32.p0(<4 x i32> [[PREDPHI9]], ptr align 4 [[TMP27]], <4 x i1> [[TMP12]])
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[TMP26]], 4
 ; CHECK-NEXT:    [[TMP29:%.*]] = icmp eq i32 [[INDEX_NEXT]], 128
 ; CHECK-NEXT:    br i1 [[TMP29]], label %[[MIDDLE_BLOCK:.*]], label %[[PRED_STORE_CONTINUE12]], !llvm.loop [[LOOP3:![0-9]+]]
@@ -182,8 +183,12 @@ define void @blend_masks_triangle_phi(ptr noalias %p, i1 %c0, i1 %c1) {
 ; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <4 x i1> [[BROADCAST_SPLATINSERT]], <4 x i1> poison, <4 x i32> zeroinitializer
 ; CHECK-NEXT:    [[BROADCAST_SPLATINSERT1:%.*]] = insertelement <4 x i1> poison, i1 [[C0]], i64 0
 ; CHECK-NEXT:    [[BROADCAST_SPLAT2:%.*]] = shufflevector <4 x i1> [[BROADCAST_SPLATINSERT1]], <4 x i1> poison, <4 x i32> zeroinitializer
-; CHECK-NEXT:    [[TMP0:%.*]] = select <4 x i1> [[BROADCAST_SPLAT2]], <4 x i1> [[BROADCAST_SPLAT]], <4 x i1> zeroinitializer
-; CHECK-NEXT:    [[PREDPHI:%.*]] = select <4 x i1> [[TMP0]], <4 x i32> zeroinitializer, <4 x i32> splat (i32 1)
+; CHECK-NEXT:    [[TMP0:%.*]] = xor <4 x i1> [[BROADCAST_SPLAT]], splat (i1 true)
+; CHECK-NEXT:    [[TMP4:%.*]] = select <4 x i1> [[BROADCAST_SPLAT2]], <4 x i1> [[TMP0]], <4 x i1> zeroinitializer
+; CHECK-NEXT:    [[TMP5:%.*]] = xor <4 x i1> [[BROADCAST_SPLAT2]], splat (i1 true)
+; CHECK-NEXT:    [[TMP3:%.*]] = or <4 x i1> [[TMP4]], [[TMP5]]
+; CHECK-NEXT:    [[PREDPHI1:%.*]] = select <4 x i1> [[TMP3]], <4 x i32> splat (i32 1), <4 x i32> zeroinitializer
+; CHECK-NEXT:    [[PREDPHI:%.*]] = select <4 x i1> [[TMP3]], <4 x i32> splat (i32 1), <4 x i32> [[PREDPHI1]]
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i32 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]

@@ -29,8 +29,8 @@ define i32 @two_reductions(i64 %N, ptr %a, ptr %b) {
 ; UF1-EMPTY:
 ; UF1-NEXT:  vector.body:
 ; UF1-NEXT:    EMIT-SCALAR vp<%index> = phi [ ir<0>, vector.ph ], [ vp<%index.next>, vector.body ]
-; UF1-NEXT:    WIDEN-REDUCTION-PHI ir<%sum.a> = phi (add) vp<[[VP3]]>, ir<%sum.a.next>
-; UF1-NEXT:    WIDEN-REDUCTION-PHI ir<%sum.b> = phi (add) vp<[[VP3]]>, ir<%sum.b.next>
+; UF1-NEXT:    WIDEN-REDUCTION-PHI ir<%sum.a> = phi (add) vp<[[VP3]]>, vp<%predphi>
+; UF1-NEXT:    WIDEN-REDUCTION-PHI ir<%sum.b> = phi (add) vp<[[VP3]]>, vp<%predphi>.1
 ; UF1-NEXT:    WIDEN-PHI vp<[[VP7:%[0-9]+]]> = phi [ vp<[[VP5]]>, vector.ph ], [ vp<%vec.ind.next>, vector.body ]
 ; UF1-NEXT:    EMIT vp<[[VP8:%[0-9]+]]> = icmp ule vp<[[VP7]]>, vp<[[VP4]]>
 ; UF1-NEXT:    CLONE ir<%ga> = getelementptr inbounds ir<%a>, vp<%index>
@@ -39,6 +39,8 @@ define i32 @two_reductions(i64 %N, ptr %a, ptr %b) {
 ; UF1-NEXT:    WIDEN ir<%lb> = load ir<%gb>, vp<[[VP8]]>
 ; UF1-NEXT:    WIDEN ir<%sum.a.next> = add ir<%sum.a>, ir<%la>
 ; UF1-NEXT:    WIDEN ir<%sum.b.next> = add ir<%sum.b>, ir<%lb>
+; UF1-NEXT:    EMIT vp<%predphi> = select vp<[[VP8]]>, ir<%sum.a.next>, ir<%sum.a>
+; UF1-NEXT:    EMIT vp<%predphi>.1 = select vp<[[VP8]]>, ir<%sum.b.next>, ir<%sum.b>
 ; UF1-NEXT:    EMIT vp<%index.next> = add vp<%index>, ir<4>
 ; UF1-NEXT:    EMIT vp<%vec.ind.next> = add nuw vp<[[VP7]]>, vp<[[VP6]]>
 ; UF1-NEXT:    EMIT vp<[[VP9:%[0-9]+]]> = icmp eq vp<%index.next>, vp<%n.vec>
@@ -65,14 +67,14 @@ define i32 @two_reductions(i64 %N, ptr %a, ptr %b) {
 ; UF4-EMPTY:
 ; UF4-NEXT:  vector.body:
 ; UF4-NEXT:    EMIT-SCALAR vp<%index> = phi [ ir<0>, vector.ph ], [ vp<%index.next>, vector.body ]
-; UF4-NEXT:    WIDEN-REDUCTION-PHI ir<%sum.a> = phi (add) vp<[[VP3]]>, ir<%sum.a.next>
-; UF4-NEXT:    WIDEN-REDUCTION-PHI ir<%sum.a>.1 = phi (add) ir<0>, ir<%sum.a.next>.1
-; UF4-NEXT:    WIDEN-REDUCTION-PHI ir<%sum.a>.2 = phi (add) ir<0>, ir<%sum.a.next>.2
-; UF4-NEXT:    WIDEN-REDUCTION-PHI ir<%sum.a>.3 = phi (add) ir<0>, ir<%sum.a.next>.3
-; UF4-NEXT:    WIDEN-REDUCTION-PHI ir<%sum.b> = phi (add) vp<[[VP3]]>, ir<%sum.b.next>
-; UF4-NEXT:    WIDEN-REDUCTION-PHI ir<%sum.b>.1 = phi (add) ir<0>, ir<%sum.b.next>.1
-; UF4-NEXT:    WIDEN-REDUCTION-PHI ir<%sum.b>.2 = phi (add) ir<0>, ir<%sum.b.next>.2
-; UF4-NEXT:    WIDEN-REDUCTION-PHI ir<%sum.b>.3 = phi (add) ir<0>, ir<%sum.b.next>.3
+; UF4-NEXT:    WIDEN-REDUCTION-PHI ir<%sum.a> = phi (add) vp<[[VP3]]>, vp<%predphi>
+; UF4-NEXT:    WIDEN-REDUCTION-PHI ir<%sum.a>.1 = phi (add) ir<0>, vp<%predphi>.1
+; UF4-NEXT:    WIDEN-REDUCTION-PHI ir<%sum.a>.2 = phi (add) ir<0>, vp<%predphi>.2
+; UF4-NEXT:    WIDEN-REDUCTION-PHI ir<%sum.a>.3 = phi (add) ir<0>, vp<%predphi>.3
+; UF4-NEXT:    WIDEN-REDUCTION-PHI ir<%sum.b> = phi (add) vp<[[VP3]]>, vp<%predphi>.4
+; UF4-NEXT:    WIDEN-REDUCTION-PHI ir<%sum.b>.1 = phi (add) ir<0>, vp<%predphi>.5
+; UF4-NEXT:    WIDEN-REDUCTION-PHI ir<%sum.b>.2 = phi (add) ir<0>, vp<%predphi>.6
+; UF4-NEXT:    WIDEN-REDUCTION-PHI ir<%sum.b>.3 = phi (add) ir<0>, vp<%predphi>.7
 ; UF4-NEXT:    EMIT vp<[[VP5:%[0-9]+]]> = broadcast vp<%index>
 ; UF4-NEXT:    EMIT vp<[[VP6:%[0-9]+]]> = step-vector i64
 ; UF4-NEXT:    EMIT vp<%vec.iv> = add nuw vp<[[VP5]]>, vp<[[VP6]]>
@@ -113,6 +115,14 @@ define i32 @two_reductions(i64 %N, ptr %a, ptr %b) {
 ; UF4-NEXT:    WIDEN ir<%sum.b.next>.1 = add ir<%sum.b>.1, ir<%lb>.1
 ; UF4-NEXT:    WIDEN ir<%sum.b.next>.2 = add ir<%sum.b>.2, ir<%lb>.2
 ; UF4-NEXT:    WIDEN ir<%sum.b.next>.3 = add ir<%sum.b>.3, ir<%lb>.3
+; UF4-NEXT:    EMIT vp<%predphi> = select vp<[[VP13]]>, ir<%sum.a.next>, ir<%sum.a>
+; UF4-NEXT:    EMIT vp<%predphi>.1 = select vp<[[VP14]]>, ir<%sum.a.next>.1, ir<%sum.a>.1
+; UF4-NEXT:    EMIT vp<%predphi>.2 = select vp<[[VP15]]>, ir<%sum.a.next>.2, ir<%sum.a>.2
+; UF4-NEXT:    EMIT vp<%predphi>.3 = select vp<[[VP16]]>, ir<%sum.a.next>.3, ir<%sum.a>.3
+; UF4-NEXT:    EMIT vp<%predphi>.4 = select vp<[[VP13]]>, ir<%sum.b.next>, ir<%sum.b>
+; UF4-NEXT:    EMIT vp<%predphi>.5 = select vp<[[VP14]]>, ir<%sum.b.next>.1, ir<%sum.b>.1
+; UF4-NEXT:    EMIT vp<%predphi>.6 = select vp<[[VP15]]>, ir<%sum.b.next>.2, ir<%sum.b>.2
+; UF4-NEXT:    EMIT vp<%predphi>.7 = select vp<[[VP16]]>, ir<%sum.b.next>.3, ir<%sum.b>.3
 ; UF4-NEXT:    EMIT vp<%index.next> = add vp<%index>, ir<16>
 ; UF4-NEXT:    EMIT vp<[[VP23:%[0-9]+]]> = icmp eq vp<%index.next>, vp<%n.vec>
 ; UF4-NEXT:    EMIT branch-on-cond vp<[[VP23]]>

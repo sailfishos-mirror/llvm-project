@@ -412,7 +412,7 @@ define void @recipe_debug_loc_location(ptr nocapture %src) !dbg !5 {
 ; CHECK-NEXT:    Successor(s): if.then.0
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    if.then.0:
-; CHECK-NEXT:      BLEND ir<%ysd.0> = ir<%psd> vp<%9>/vp<[[VP8]]>, !dbg /tmp/s.c:14:3
+; CHECK-NEXT:      BLEND ir<%ysd.0> = ir<%psd> vp<%9>/vp<[[VP8]]> vp<%9>/vp<[[VP8]]>, !dbg /tmp/s.c:14:3
 ; CHECK-NEXT:      vp<[[VP10:%[0-9]+]]> = vector-pointer inbounds i32, ir<%isd>, ir<1>, !dbg /tmp/s.c:15:3
 ; CHECK-NEXT:      WIDEN store vp<[[VP10]]>, ir<%ysd.0>, !dbg /tmp/s.c:15:3
 ; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>

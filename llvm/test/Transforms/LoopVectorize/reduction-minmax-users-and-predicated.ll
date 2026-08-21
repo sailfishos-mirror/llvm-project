@@ -81,9 +81,9 @@ define i32 @chained_smax(i32 %x, ptr %src) {
 ; CHECK:       [[PRED_LOAD_CONTINUE6]]:
 ; CHECK-NEXT:    [[TMP20:%.*]] = phi <4 x i32> [ [[TMP12]], %[[PRED_LOAD_CONTINUE4]] ], [ [[TMP15]], %[[PRED_LOAD_IF5]] ]
 ; CHECK-NEXT:    [[TMP21:%.*]] = call <4 x i32> @llvm.smax.v4i32(<4 x i32> [[TMP20]], <4 x i32> [[TMP1]])
+; CHECK-NEXT:    [[TMP27:%.*]] = select <4 x i1> <i1 true, i1 true, i1 false, i1 false>, <4 x i32> [[TMP21]], <4 x i32> zeroinitializer
 ; CHECK-NEXT:    br label %[[MIDDLE_BLOCK:.*]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
-; CHECK-NEXT:    [[TMP27:%.*]] = select <4 x i1> <i1 true, i1 true, i1 false, i1 false>, <4 x i32> [[TMP21]], <4 x i32> zeroinitializer
 ; CHECK-NEXT:    [[TMP28:%.*]] = call i32 @llvm.vector.reduce.smax.v4i32(<4 x i32> [[TMP27]])
 ; CHECK-NEXT:    br label %[[EXIT:.*]]
 ; CHECK:       [[EXIT]]:

@@ -528,24 +528,26 @@ define i64 @find_iv_reduction(ptr %a, ptr %b, i64 %n) {
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[VEC_IND:%.*]] = phi <4 x i64> [ <i64 0, i64 1, i64 2, i64 3>, %[[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], %[[VECTOR_BODY]] ]
-; CHECK-NEXT:    [[VEC_PHI:%.*]] = phi <4 x i64> [ splat (i64 -9223372036854775808), %[[VECTOR_PH]] ], [ [[TMP12:%.*]], %[[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[VEC_PHI:%.*]] = phi <4 x i64> [ splat (i64 -1), %[[VECTOR_PH]] ], [ [[TMP17:%.*]], %[[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[TMP10:%.*]] = phi <4 x i1> [ zeroinitializer, %[[VECTOR_PH]] ], [ [[TMP16:%.*]], %[[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[HEADER_MASK:%.*]] = icmp ule <4 x i64> [[VEC_IND]], [[BROADCAST_SPLAT]]
 ; CHECK-NEXT:    [[CLAMPED_HEADER_MASK:%.*]] = and <4 x i1> [[HEADER_MASK]], [[ALIAS_MASK]]
 ; CHECK-NEXT:    [[TMP8:%.*]] = getelementptr inbounds i64, ptr [[A]], i64 [[INDEX]]
 ; CHECK-NEXT:    [[WIDE_MASKED_LOAD:%.*]] = call <4 x i64> @llvm.masked.load.v4i64.p0(ptr align 8 [[TMP8]], <4 x i1> [[CLAMPED_HEADER_MASK]], <4 x i64> poison)
 ; CHECK-NEXT:    [[TMP9:%.*]] = icmp eq <4 x i64> [[WIDE_MASKED_LOAD]], splat (i64 42)
+; CHECK-NEXT:    [[TMP18:%.*]] = select <4 x i1> [[CLAMPED_HEADER_MASK]], <4 x i1> [[TMP9]], <4 x i1> zeroinitializer
+; CHECK-NEXT:    [[TMP14:%.*]] = freeze <4 x i1> [[TMP18]]
+; CHECK-NEXT:    [[TMP15:%.*]] = call i1 @llvm.vector.reduce.or.v4i1(<4 x i1> [[TMP14]])
+; CHECK-NEXT:    [[TMP16]] = select i1 [[TMP15]], <4 x i1> [[TMP18]], <4 x i1> [[TMP10]]
+; CHECK-NEXT:    [[TMP17]] = select i1 [[TMP15]], <4 x i64> [[VEC_IND]], <4 x i64> [[VEC_PHI]]
 ; CHECK-NEXT:    [[TMP11:%.*]] = getelementptr inbounds i64, ptr [[B]], i64 [[INDEX]]
 ; CHECK-NEXT:    call void @llvm.masked.store.v4i64.p0(<4 x i64> [[WIDE_MASKED_LOAD]], ptr align 8 [[TMP11]], <4 x i1> [[CLAMPED_HEADER_MASK]])
-; CHECK-NEXT:    [[TMP17:%.*]] = select <4 x i1> [[CLAMPED_HEADER_MASK]], <4 x i1> [[TMP9]], <4 x i1> zeroinitializer
-; CHECK-NEXT:    [[TMP12]] = select <4 x i1> [[TMP17]], <4 x i64> [[VEC_IND]], <4 x i64> [[VEC_PHI]]
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add i64 [[INDEX]], [[NUM_ACTIVE_LANES]]
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <4 x i64> [[VEC_IND]], [[BROADCAST_SPLAT4]]
 ; CHECK-NEXT:    [[TMP13:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP13]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP16:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
-; CHECK-NEXT:    [[TMP14:%.*]] = call i64 @llvm.vector.reduce.smax.v4i64(<4 x i64> [[TMP12]])
-; CHECK-NEXT:    [[TMP15:%.*]] = icmp ne i64 [[TMP14]], -9223372036854775808
-; CHECK-NEXT:    [[TMP16:%.*]] = select i1 [[TMP15]], i64 [[TMP14]], i64 -1
+; CHECK-NEXT:    [[TMP20:%.*]] = call i64 @llvm.experimental.vector.extract.last.active.v4i64(<4 x i64> [[TMP17]], <4 x i1> [[TMP16]], i64 -1)
 ; CHECK-NEXT:    br [[DONE:label %.*]]
 ; CHECK:       [[SCALAR_PH]]:
 ;

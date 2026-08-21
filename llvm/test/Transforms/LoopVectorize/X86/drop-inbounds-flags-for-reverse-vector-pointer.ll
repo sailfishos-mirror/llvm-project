@@ -13,13 +13,10 @@ define i1 @fn(ptr %nno) #0 {
 ; CHECK-NEXT:    br label [[VECTOR_BODY:%.*]]
 ; CHECK:       vector.body:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, [[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], [[VECTOR_BODY]] ]
-; CHECK-NEXT:    [[VEC_IND:%.*]] = phi <4 x i64> [ <i64 10, i64 9, i64 8, i64 7>, [[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], [[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[VEC_PHI:%.*]] = phi <4 x i32> [ zeroinitializer, [[VECTOR_PH]] ], [ [[TMP11:%.*]], [[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[VEC_IND1:%.*]] = phi <4 x i8> [ <i8 0, i8 1, i8 2, i8 3>, [[VECTOR_PH]] ], [ [[VEC_IND_NEXT3:%.*]], [[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[TMP1:%.*]] = icmp ule <4 x i8> [[VEC_IND1]], splat (i8 10)
 ; CHECK-NEXT:    [[OFFSET_IDX:%.*]] = sub i64 10, [[INDEX]]
-; CHECK-NEXT:    [[TMP2:%.*]] = and <4 x i64> [[VEC_IND]], splat (i64 1)
-; CHECK-NEXT:    [[TMP3:%.*]] = icmp eq <4 x i64> [[TMP2]], zeroinitializer
 ; CHECK-NEXT:    [[TMP23:%.*]] = getelementptr inbounds nuw i32, ptr [[NNO]], i64 [[OFFSET_IDX]]
 ; CHECK-NEXT:    [[TMP6:%.*]] = getelementptr i32, ptr [[TMP23]], i64 -3
 ; CHECK-NEXT:    [[REVERSE:%.*]] = shufflevector <4 x i1> [[TMP1]], <4 x i1> poison, <4 x i32> <i32 3, i32 2, i32 1, i32 0>
@@ -27,16 +24,15 @@ define i1 @fn(ptr %nno) #0 {
 ; CHECK-NEXT:    [[REVERSE1:%.*]] = shufflevector <4 x i32> [[WIDE_MASKED_LOAD]], <4 x i32> poison, <4 x i32> <i32 3, i32 2, i32 1, i32 0>
 ; CHECK-NEXT:    [[TMP7:%.*]] = shl <4 x i32> [[REVERSE1]], splat (i32 1)
 ; CHECK-NEXT:    [[TMP8:%.*]] = urem <4 x i32> [[TMP7]], splat (i32 10)
-; CHECK-NEXT:    [[PREDPHI:%.*]] = select <4 x i1> [[TMP3]], <4 x i32> [[TMP8]], <4 x i32> [[REVERSE1]]
-; CHECK-NEXT:    [[TMP11]] = or <4 x i32> [[PREDPHI]], [[VEC_PHI]]
+; CHECK-NEXT:    [[PREDPHI:%.*]] = select <4 x i1> [[TMP1]], <4 x i32> [[REVERSE1]], <4 x i32> [[TMP8]]
+; CHECK-NEXT:    [[TMP9:%.*]] = or <4 x i32> [[PREDPHI]], [[VEC_PHI]]
+; CHECK-NEXT:    [[TMP11]] = select <4 x i1> [[TMP1]], <4 x i32> [[TMP9]], <4 x i32> [[VEC_PHI]]
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
-; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nsw <4 x i64> [[VEC_IND]], splat (i64 -4)
 ; CHECK-NEXT:    [[VEC_IND_NEXT3]] = add nuw <4 x i8> [[VEC_IND1]], splat (i8 4)
 ; CHECK-NEXT:    [[TMP13:%.*]] = icmp eq i64 [[INDEX_NEXT]], 12
 ; CHECK-NEXT:    br i1 [[TMP13]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; CHECK:       middle.block:
-; CHECK-NEXT:    [[TMP12:%.*]] = select <4 x i1> [[TMP1]], <4 x i32> [[TMP11]], <4 x i32> [[VEC_PHI]]
-; CHECK-NEXT:    [[TMP14:%.*]] = call i32 @llvm.vector.reduce.or.v4i32(<4 x i32> [[TMP12]])
+; CHECK-NEXT:    [[TMP14:%.*]] = call i32 @llvm.vector.reduce.or.v4i32(<4 x i32> [[TMP11]])
 ; CHECK-NEXT:    br label [[FOR_INC35:%.*]]
 ; CHECK:       exit:
 ; CHECK-NEXT:    [[CMP41:%.*]] = icmp eq i32 [[TMP14]], 0

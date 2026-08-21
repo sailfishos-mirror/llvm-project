@@ -236,7 +236,7 @@ define i32 @sink_replicate_region_3_reduction(i32 %x, i8 %y, ptr %ptr) optsize {
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    vector.body:
 ; CHECK-NEXT:      FIRST-ORDER-RECURRENCE-PHI ir<%recur> = phi ir<0>, ir<%recur.next>
-; CHECK-NEXT:      WIDEN-REDUCTION-PHI ir<%and.red> = phi (and) vp<[[VP3]]>, ir<%and.red.next>
+; CHECK-NEXT:      WIDEN-REDUCTION-PHI ir<%and.red> = phi (and) vp<[[VP3]]>, vp<[[VP10:%[0-9]+]]>
 ; CHECK-NEXT:      EMIT vp<[[VP6:%[0-9]+]]> = WIDEN-CANONICAL-INDUCTION nuw vp<[[VP4]]>
 ; CHECK-NEXT:      EMIT vp<[[VP7:%[0-9]+]]> = icmp ule vp<[[VP6]]>, vp<[[VP2]]>
 ; CHECK-NEXT:      EMIT vp<[[VP8:%[0-9]+]]> = first-order splice ir<%recur>, ir<%recur.next>
@@ -260,6 +260,7 @@ define i32 @sink_replicate_region_3_reduction(i32 %x, i8 %y, ptr %ptr) optsize {
 ; CHECK-NEXT:    loop.0:
 ; CHECK-NEXT:      WIDEN ir<%add> = add vp<[[VP9]]>, ir<%recur.next>
 ; CHECK-NEXT:      WIDEN ir<%and.red.next> = and ir<%and.red>, ir<%add>
+; CHECK-NEXT:      BLEND vp<[[VP10]]> = ir<%and.red> ir<%and.red.next>/vp<[[VP7]]>
 ; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP4]]>, vp<[[VP0]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP1]]>
 ; CHECK-NEXT:    No successors
@@ -267,8 +268,7 @@ define i32 @sink_replicate_region_3_reduction(i32 %x, i8 %y, ptr %ptr) optsize {
 ; CHECK-NEXT:  Successor(s): middle.block
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  middle.block:
-; CHECK-NEXT:    EMIT vp<[[VP11:%[0-9]+]]> = select vp<[[VP7]]>, ir<%and.red.next>, ir<%and.red>
-; CHECK-NEXT:    EMIT vp<[[VP12:%[0-9]+]]> = compute-reduction-result (and) vp<[[VP11]]>
+; CHECK-NEXT:    EMIT vp<[[VP12:%[0-9]+]]> = compute-reduction-result (and) vp<[[VP10]]>
 ; CHECK-NEXT:  Successor(s): ir-bb<exit>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<exit>:

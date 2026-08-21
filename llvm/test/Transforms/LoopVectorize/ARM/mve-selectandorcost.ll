@@ -36,9 +36,6 @@ define float @test(ptr nocapture readonly %pA, ptr nocapture readonly %pB, i32 %
 ; CHECK-NEXT:    [[NEXT_GEP2:%.*]] = getelementptr i8, ptr [[PB]], i32 [[OFFSET_IDX]]
 ; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x float>, ptr [[NEXT_GEP]], align 4
 ; CHECK-NEXT:    [[WIDE_LOAD3:%.*]] = load <4 x float>, ptr [[NEXT_GEP2]], align 4
-; CHECK-NEXT:    [[TMP5:%.*]] = fcmp fast une <4 x float> [[WIDE_LOAD]], zeroinitializer
-; CHECK-NEXT:    [[TMP6:%.*]] = fcmp fast une <4 x float> [[WIDE_LOAD3]], zeroinitializer
-; CHECK-NEXT:    [[TMP7:%.*]] = select <4 x i1> [[TMP5]], <4 x i1> splat (i1 true), <4 x i1> [[TMP6]]
 ; CHECK-NEXT:    [[TMP8:%.*]] = call fast <4 x float> @llvm.fabs.v4f32(<4 x float> [[WIDE_LOAD]])
 ; CHECK-NEXT:    [[TMP9:%.*]] = call fast <4 x float> @llvm.fabs.v4f32(<4 x float> [[WIDE_LOAD3]])
 ; CHECK-NEXT:    [[TMP10:%.*]] = fadd fast <4 x float> [[TMP9]], [[TMP8]]
@@ -46,7 +43,7 @@ define float @test(ptr nocapture readonly %pA, ptr nocapture readonly %pB, i32 %
 ; CHECK-NEXT:    [[TMP12:%.*]] = call fast <4 x float> @llvm.fabs.v4f32(<4 x float> [[TMP11]])
 ; CHECK-NEXT:    [[TMP13:%.*]] = fmul fast <4 x float> [[TMP12]], [[TMP10]]
 ; CHECK-NEXT:    [[TMP14:%.*]] = fadd fast <4 x float> [[TMP13]], [[VEC_PHI]]
-; CHECK-NEXT:    [[PREDPHI]] = select <4 x i1> [[TMP7]], <4 x float> [[TMP14]], <4 x float> [[VEC_PHI]]
+; CHECK-NEXT:    [[PREDPHI]] = select i1 true, <4 x float> [[VEC_PHI]], <4 x float> [[TMP14]]
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP15:%.*]] = icmp eq i32 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP15]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]

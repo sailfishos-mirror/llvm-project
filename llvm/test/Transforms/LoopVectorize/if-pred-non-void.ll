@@ -586,7 +586,8 @@ define void @pr30172(ptr nocapture %asd, ptr nocapture %bsd) !dbg !5 {;
 ; CHECK:       [[PRED_SDIV_CONTINUE4]]:
 ; CHECK-NEXT:    [[TMP23:%.*]] = phi <2 x i32> [ [[TMP15]], %[[PRED_SDIV_CONTINUE]] ], [ [[TMP22]], %[[PRED_SDIV_IF3]] ]
 ; CHECK-NEXT:    [[PREDPHI:%.*]] = select <2 x i1> [[TMP7]], <2 x i32> [[TMP23]], <2 x i32> [[TMP2]]
-; CHECK-NEXT:    store <2 x i32> [[PREDPHI]], ptr [[TMP0]], align 4, !alias.scope [[META29]], !noalias [[META32]]
+; CHECK-NEXT:    [[PREDPHI5:%.*]] = select <2 x i1> [[TMP7]], <2 x i32> [[TMP23]], <2 x i32> [[PREDPHI]]
+; CHECK-NEXT:    store <2 x i32> [[PREDPHI5]], ptr [[TMP0]], align 4, !alias.scope [[META29]], !noalias [[META32]]
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 2
 ; CHECK-NEXT:    [[TMP24:%.*]] = icmp eq i64 [[INDEX_NEXT]], 128
 ; CHECK-NEXT:    br i1 [[TMP24]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP36:![0-9]+]]
@@ -670,9 +671,11 @@ define void @pr30172(ptr nocapture %asd, ptr nocapture %bsd) !dbg !5 {;
 ; UNROLL-NO-VF:       [[PRED_SDIV_CONTINUE3]]:
 ; UNROLL-NO-VF-NEXT:    [[TMP26:%.*]] = phi i32 [ poison, %[[PRED_SDIV_CONTINUE]] ], [ [[TMP25]], %[[PRED_SDIV_IF2]] ]
 ; UNROLL-NO-VF-NEXT:    [[PREDPHI:%.*]] = select i1 [[TMP19]], i32 [[TMP23]], i32 [[TMP9]]
+; UNROLL-NO-VF-NEXT:    [[PREDPHI5:%.*]] = select i1 [[TMP19]], i32 [[TMP23]], i32 [[PREDPHI]]
 ; UNROLL-NO-VF-NEXT:    [[PREDPHI4:%.*]] = select i1 [[TMP20]], i32 [[TMP26]], i32 [[TMP10]]
-; UNROLL-NO-VF-NEXT:    store i32 [[PREDPHI]], ptr [[TMP1]], align 4, !alias.scope [[META29]], !noalias [[META32]]
-; UNROLL-NO-VF-NEXT:    store i32 [[PREDPHI4]], ptr [[TMP2]], align 4, !alias.scope [[META29]], !noalias [[META32]]
+; UNROLL-NO-VF-NEXT:    [[PREDPHI6:%.*]] = select i1 [[TMP20]], i32 [[TMP26]], i32 [[PREDPHI4]]
+; UNROLL-NO-VF-NEXT:    store i32 [[PREDPHI5]], ptr [[TMP1]], align 4, !alias.scope [[META29]], !noalias [[META32]]
+; UNROLL-NO-VF-NEXT:    store i32 [[PREDPHI6]], ptr [[TMP2]], align 4, !alias.scope [[META29]], !noalias [[META32]]
 ; UNROLL-NO-VF-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 2
 ; UNROLL-NO-VF-NEXT:    [[TMP27:%.*]] = icmp eq i64 [[INDEX_NEXT]], 128
 ; UNROLL-NO-VF-NEXT:    br i1 [[TMP27]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP36:![0-9]+]]

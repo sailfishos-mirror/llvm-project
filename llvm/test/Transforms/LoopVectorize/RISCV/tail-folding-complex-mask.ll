@@ -30,15 +30,16 @@ define void @test(i64 %n, ptr noalias %src0, ptr noalias %src1, ptr noalias %src
 ; IF-EVL-NEXT:    [[TMP7:%.*]] = call i32 @llvm.experimental.get.vector.length.i64(i64 [[AVL]], i32 4, i1 true)
 ; IF-EVL-NEXT:    [[TMP10:%.*]] = getelementptr i32, ptr [[SRC0]], i64 [[EVL_BASED_IV]]
 ; IF-EVL-NEXT:    [[VP_OP_LOAD:%.*]] = call <vscale x 4 x i32> @llvm.vp.load.nxv4i32.p0(ptr align 4 [[TMP10]], <vscale x 4 x i1> [[BROADCAST_SPLAT]], i32 [[TMP7]])
-; IF-EVL-NEXT:    [[PREDPHI:%.*]] = select <vscale x 4 x i1> [[TMP3]], <vscale x 4 x i32> zeroinitializer, <vscale x 4 x i32> [[VP_OP_LOAD]]
+; IF-EVL-NEXT:    [[PREDPHI:%.*]] = select i1 [[C1]], <vscale x 4 x i32> [[VP_OP_LOAD]], <vscale x 4 x i32> zeroinitializer
 ; IF-EVL-NEXT:    [[TMP11:%.*]] = getelementptr i32, ptr [[SRC1]], i64 [[EVL_BASED_IV]]
 ; IF-EVL-NEXT:    [[VP_OP_LOAD7:%.*]] = call <vscale x 4 x i32> @llvm.vp.load.nxv4i32.p0(ptr align 4 [[TMP11]], <vscale x 4 x i1> [[TMP4]], i32 [[TMP7]])
 ; IF-EVL-NEXT:    [[TMP12:%.*]] = add <vscale x 4 x i32> [[VP_OP_LOAD7]], [[PREDPHI]]
-; IF-EVL-NEXT:    [[PREDPHI8:%.*]] = call <vscale x 4 x i32> @llvm.vp.merge.nxv4i32(<vscale x 4 x i1> [[TMP4]], <vscale x 4 x i32> [[TMP12]], <vscale x 4 x i32> zeroinitializer, i32 [[TMP7]])
+; IF-EVL-NEXT:    [[PREDPHI6:%.*]] = select i1 [[C1]], <vscale x 4 x i32> [[TMP12]], <vscale x 4 x i32> zeroinitializer
+; IF-EVL-NEXT:    [[PREDPHI8:%.*]] = select <vscale x 4 x i1> [[TMP4]], <vscale x 4 x i32> [[TMP12]], <vscale x 4 x i32> [[PREDPHI6]]
 ; IF-EVL-NEXT:    [[TMP18:%.*]] = getelementptr i32, ptr [[SRC2]], i64 [[EVL_BASED_IV]]
 ; IF-EVL-NEXT:    [[WIDE_MASKED_LOAD:%.*]] = call <vscale x 4 x i32> @llvm.vp.load.nxv4i32.p0(ptr align 4 [[TMP18]], <vscale x 4 x i1> [[BROADCAST_SPLAT4]], i32 [[TMP7]])
 ; IF-EVL-NEXT:    [[TMP19:%.*]] = add <vscale x 4 x i32> [[WIDE_MASKED_LOAD]], [[PREDPHI8]]
-; IF-EVL-NEXT:    [[PREDPHI9:%.*]] = select i1 [[C3]], <vscale x 4 x i32> [[TMP19]], <vscale x 4 x i32> [[PREDPHI8]]
+; IF-EVL-NEXT:    [[PREDPHI9:%.*]] = call <vscale x 4 x i32> @llvm.vp.merge.nxv4i32(<vscale x 4 x i1> [[BROADCAST_SPLAT4]], <vscale x 4 x i32> [[TMP19]], <vscale x 4 x i32> [[PREDPHI8]], i32 [[TMP7]])
 ; IF-EVL-NEXT:    [[TMP20:%.*]] = getelementptr inbounds i32, ptr [[DST]], i64 [[EVL_BASED_IV]]
 ; IF-EVL-NEXT:    call void @llvm.vp.store.nxv4i32.p0(<vscale x 4 x i32> [[PREDPHI9]], ptr align 4 [[TMP20]], <vscale x 4 x i1> splat (i1 true), i32 [[TMP7]])
 ; IF-EVL-NEXT:    [[TMP21:%.*]] = zext i32 [[TMP7]] to i64
@@ -78,11 +79,12 @@ define void @test(i64 %n, ptr noalias %src0, ptr noalias %src1, ptr noalias %src
 ; NO-VP-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
 ; NO-VP-NEXT:    [[TMP13:%.*]] = getelementptr i32, ptr [[SRC0]], i64 [[INDEX]]
 ; NO-VP-NEXT:    [[WIDE_MASKED_LOAD:%.*]] = call <vscale x 4 x i32> @llvm.masked.load.nxv4i32.p0(ptr align 4 [[TMP13]], <vscale x 4 x i1> [[BROADCAST_SPLAT2]], <vscale x 4 x i32> poison)
-; NO-VP-NEXT:    [[PREDPHI:%.*]] = select <vscale x 4 x i1> [[TMP10]], <vscale x 4 x i32> zeroinitializer, <vscale x 4 x i32> [[WIDE_MASKED_LOAD]]
+; NO-VP-NEXT:    [[PREDPHI:%.*]] = select i1 [[C1]], <vscale x 4 x i32> [[WIDE_MASKED_LOAD]], <vscale x 4 x i32> zeroinitializer
 ; NO-VP-NEXT:    [[TMP14:%.*]] = getelementptr i32, ptr [[SRC1]], i64 [[INDEX]]
 ; NO-VP-NEXT:    [[WIDE_MASKED_LOAD5:%.*]] = call <vscale x 4 x i32> @llvm.masked.load.nxv4i32.p0(ptr align 4 [[TMP14]], <vscale x 4 x i1> [[TMP8]], <vscale x 4 x i32> poison)
 ; NO-VP-NEXT:    [[TMP15:%.*]] = add <vscale x 4 x i32> [[WIDE_MASKED_LOAD5]], [[PREDPHI]]
-; NO-VP-NEXT:    [[PREDPHI6:%.*]] = select <vscale x 4 x i1> [[TMP8]], <vscale x 4 x i32> [[TMP15]], <vscale x 4 x i32> zeroinitializer
+; NO-VP-NEXT:    [[PREDPHI7:%.*]] = select i1 [[C1]], <vscale x 4 x i32> [[TMP15]], <vscale x 4 x i32> zeroinitializer
+; NO-VP-NEXT:    [[PREDPHI6:%.*]] = select <vscale x 4 x i1> [[TMP8]], <vscale x 4 x i32> [[TMP15]], <vscale x 4 x i32> [[PREDPHI7]]
 ; NO-VP-NEXT:    [[TMP16:%.*]] = getelementptr i32, ptr [[SRC2]], i64 [[INDEX]]
 ; NO-VP-NEXT:    [[WIDE_MASKED_LOAD7:%.*]] = call <vscale x 4 x i32> @llvm.masked.load.nxv4i32.p0(ptr align 4 [[TMP16]], <vscale x 4 x i1> [[TMP12]], <vscale x 4 x i32> poison)
 ; NO-VP-NEXT:    [[TMP17:%.*]] = add <vscale x 4 x i32> [[WIDE_MASKED_LOAD7]], [[PREDPHI6]]

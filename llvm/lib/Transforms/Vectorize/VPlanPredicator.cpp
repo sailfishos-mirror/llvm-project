@@ -27,6 +27,11 @@ namespace {
 class VPPredicator {
   VPlan &Plan;
 
+  // Scan the body of the loop in a topological order to visit each basic
+  // block after having visited its predecessor basic blocks.
+  ReversePostOrderTraversal<VPBlockShallowTraversalWrapper<VPBlockBase *>> RPOT;
+  DenseMap<const VPBlockBase *, unsigned> BlockIndex;
+
   /// Builder to construct recipes to compute masks.
   VPBuilder Builder;
 
@@ -95,7 +100,12 @@ class VPPredicator {
 
 public:
   VPPredicator(VPlan &Plan)
-      : Plan(Plan), VPDT(Plan), VPPDT(Plan), VPPDF(VPPDT) {}
+      : Plan(Plan), RPOT(Plan.getVectorLoopRegion()->getEntryBasicBlock()),
+        VPDT(Plan), VPPDT(Plan), VPPDF(VPPDT) {
+    for (auto [Idx, BB] : enumerate(RPOT)) {
+      BlockIndex[BB] = Idx;
+    }
+  }
 
   /// Returns the *entry* mask for \p VPBB.
   VPValue *getBlockInMask(const VPBasicBlock *VPBB) const {
@@ -374,22 +384,28 @@ void VPPredicator::convertPhisToBlends(VPBasicBlock *VPBB) {
       continue;
     }
 
-    MapVector<VPValue *, SmallVector<EdgeTy>> InValEdgesMap;
-    for (auto [Edge, Val] : computeBlendEdges(PhiR))
-      InValEdgesMap[Val].push_back(Edge);
-    auto InValEdges = InValEdgesMap.takeVector();
+    auto Edge2ValMap = computeBlendEdges(PhiR).takeVector();
+    auto Edge2BlockMask = [&](const EdgeTy &E) -> const VPBasicBlock * {
+      if (E.second == VPBB)
+        return E.first;
 
-    // Sort the incoming value order to match PhiR as much as possible.
-    llvm::stable_sort(InValEdges, [&PhiR](auto &L, auto &R) {
-      auto InVs = PhiR->incoming_values();
-      return std::distance(InVs.begin(), find(InVs, L.first)) <
-             std::distance(InVs.begin(), find(InVs, R.first));
+      return E.second;
+    };
+    sort(Edge2ValMap, [&, this](auto &L, auto &R) {
+      return BlockIndex[Edge2BlockMask(L.first)] < BlockIndex[Edge2BlockMask(R.first)];
+    });
+    unique(Edge2ValMap, [&](auto &L, auto &R) {
+      if (Edge2BlockMask(L.first) != Edge2BlockMask(R.first))
+        return false;
+      assert(L.second == R.second);
+      return true;
     });
 
     SmallVector<VPValue *, 2> OperandsWithMask;
-    for (const auto &[InVPV, Edges] : InValEdges) {
-      OperandsWithMask.push_back(InVPV);
-      OperandsWithMask.push_back(createBlendMaskForEdges(Edges, VPBB));
+    for (auto [Edge, V] : Edge2ValMap) {
+      OperandsWithMask.push_back(V);
+      auto *Mask = getBlockInMask(Edge2BlockMask(Edge));
+      OperandsWithMask.push_back(Mask ? Mask : Plan.getTrue());
     }
     PHINode *IRPhi = cast_or_null<PHINode>(PhiR->getUnderlyingValue());
     auto *Blend =
@@ -402,10 +418,6 @@ void VPPredicator::convertPhisToBlends(VPBasicBlock *VPBB) {
 
 void VPPredicator::run() {
   VPBasicBlock *Header = Plan.getVectorLoopRegion()->getEntryBasicBlock();
-  // Scan the body of the loop in a topological order to visit each basic
-  // block after having visited its predecessor basic blocks.
-  ReversePostOrderTraversal<VPBlockShallowTraversalWrapper<VPBlockBase *>> RPOT(
-      Header);
   for (VPBlockBase *VPB : RPOT) {
     // Non-outer regions with VPBBs only are supported at the moment.
     auto *VPBB = cast<VPBasicBlock>(VPB);
