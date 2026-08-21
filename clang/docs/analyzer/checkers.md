@@ -3200,7 +3200,7 @@ void test() {
 
 (alpha-core-danglingptrderef)=
 
-#### alpha.core.DanglingPtrDeref (C++)
+#### alpha.core.DanglingPtrDeref (C, C++)
 
 Check for dereferences of pointers that refer to an object whose
 lifetime has already ended. Such a pointer is dangling. The checker
@@ -3265,6 +3265,7 @@ void argument_example() {
   is_null(ptr); // false positive: the pointer is compared, not dereferenced
 }
 ```
+
 (alpha-core-dynamictypechecker)=
 
 #### alpha.core.DynamicTypeChecker (ObjC)
