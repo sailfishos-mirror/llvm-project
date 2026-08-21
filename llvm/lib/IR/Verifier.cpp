@@ -380,6 +380,7 @@ private:
 #include "llvm/IR/Metadata.def"
   void visitDIType(const DIType &N);
   void visitDIScope(const DIScope &N);
+  void visitDIScopeChain(const DIScope &N);
   void visitDIVariable(const DIVariable &N);
   void visitDILexicalBlockBase(const DILexicalBlockBase &N);
   void visitDITemplateParameter(const DITemplateParameter &N);
@@ -949,6 +950,41 @@ void Verifier::visitNamedMDNode(const NamedMDNode &NMD) {
   }
 }
 
+/// Parent scope operand of \p S, or null if \p S has no parent (a \c DIFile,
+/// \c DICompileUnit, or non-scope). Mirrors \c DIScope::getScope() without
+/// asserting on unexpected metadata kinds.
+static const Metadata *getRawDIScopeParent(const Metadata *S) {
+  if (auto *T = dyn_cast_or_null<DIType>(S))
+    return T->getRawScope();
+  if (auto *SP = dyn_cast_or_null<DISubprogram>(S))
+    return SP->getRawScope();
+  if (auto *LB = dyn_cast_or_null<DILexicalBlockBase>(S))
+    return LB->getRawScope();
+  if (auto *NS = dyn_cast_or_null<DINamespace>(S))
+    return NS->getRawScope();
+  if (auto *CB = dyn_cast_or_null<DICommonBlock>(S))
+    return CB->getRawScope();
+  if (auto *M = dyn_cast_or_null<DIModule>(S))
+    return M->getRawScope();
+  return nullptr;
+}
+
+/// True if following the scope operand from \p S repeats a node.
+static bool hasDIScopeCycle(const Metadata *S) {
+  SmallPtrSet<const Metadata *, 8> Seen;
+  while (auto *Scope = dyn_cast_or_null<DIScope>(S)) {
+    if (!Seen.insert(Scope).second)
+      return true;
+    S = getRawDIScopeParent(Scope);
+  }
+  return false;
+}
+
+void Verifier::visitDIScopeChain(const DIScope &N) {
+  CheckDI(!hasDIScopeCycle(&N), "DIScope scope chain must not contain a cycle",
+          &N);
+}
+
 void Verifier::visitMDNode(const MDNode &BaseMD,
                            AreDebugLocsAllowed AllowLocs) {
   // Only visit each node once.  Metadata can be mutually recursive, so this
@@ -976,6 +1012,11 @@ void Verifier::visitMDNode(const MDNode &BaseMD,
     break;
 #include "llvm/IR/Metadata.def"
     }
+
+    // A scope chain must terminate. Checked here rather than in the individual
+    // visitors so that every DIScope subclass is covered.
+    if (const auto *S = dyn_cast<DIScope>(CurrentMD))
+      visitDIScopeChain(*S);
 
     for (const Metadata *Op : CurrentMD->operands()) {
       if (!Op)
@@ -3377,6 +3418,10 @@ void Verifier::visitFunction(const Function &F) {
     Check(Scope, "Failed to find DILocalScope", DL);
 
     if (!Seen.insert(Scope).second)
+      return;
+
+    // Cycles are diagnosed when the DIScope nodes themselves are visited.
+    if (hasDIScopeCycle(Scope))
       return;
 
     DISubprogram *SP = Scope->getSubprogram();
@@ -7155,6 +7200,9 @@ void Verifier::visitIntrinsicCall(Intrinsic::ID ID, CallBase &Call) {
 /// This carefully grabs the subprogram from a local scope, avoiding the
 /// built-in assertions that would typically fire.
 static DISubprogram *getSubprogram(Metadata *LocalScope) {
+  if (hasDIScopeCycle(LocalScope))
+    return nullptr;
+
   if (!LocalScope)
     return nullptr;
 
