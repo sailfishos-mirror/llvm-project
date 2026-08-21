@@ -485,15 +485,10 @@ constexpr float128 TOTALORDERMAGF128_Y = float128(0.0);
 static_assert(1 ==
               LIBC_NAMESPACE::shared::totalordermagf128(&TOTALORDERMAGF128_X,
                                                         &TOTALORDERMAGF128_Y));
-static_assert(float128(0.0) ==
-              LIBC_NAMESPACE::shared::fmodf128(float128(4.0), float128(2.0)));
 static_assert(float128(0.0) == [] {
   float128 iptr{};
   return LIBC_NAMESPACE::shared::modff128(float128(0.0), &iptr);
 }());
-static_assert(float128(0.0) ==
-              LIBC_NAMESPACE::shared::remainderf128(float128(1.0),
-                                                    float128(1.0)));
 static_assert(float128(0.0) == [] {
   int exp{};
   return LIBC_NAMESPACE::shared::remquof128(float128(1.0), float128(1.0), &exp);

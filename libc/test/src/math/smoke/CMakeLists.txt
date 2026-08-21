@@ -4682,9 +4682,9 @@ add_fp_unittest(
   DEPENDS
     libc.hdr.errno_macros
     libc.hdr.fenv_macros
-    libc.src.__support.FPUtil.float128
     libc.src.math.fmodf128
     libc.src.__support.FPUtil.fenv_impl
+    libc.src.__support.FPUtil.float128
   # FIXME: Currently fails on the GPU build.
 )
 
