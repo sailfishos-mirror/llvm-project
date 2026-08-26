@@ -28,6 +28,7 @@
 #include "flang/Semantics/tools.h"
 
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/Frontend/OpenMP/OMP.h"
 
 #include <algorithm>
@@ -189,20 +190,6 @@ void OmpStructureChecker::CheckDefaultNoneInAssociatedLoop(
 void OmpStructureChecker::Enter(const parser::OmpClause::When &x) {
   OmpVerifyModifiers(
       x.v, llvm::omp::OMPC_when, GetContext().clauseSource, context_);
-  // Record this WHEN clause's context selector so the variant directive it
-  // controls can be paired with it for static-applicability matching. A
-  // well-formed WHEN clause has exactly one modifier, its context selector;
-  // pair it only in that case, which also makes front() safe. Any other count
-  // is malformed and already diagnosed by OmpVerifyModifiers above.
-  if (const auto &modifiers{std::get<0>(x.v.t)};
-      modifiers && modifiers->size() == 1) {
-    currentWhenSelector_ =
-        &std::get<parser::modifier::OmpContextSelector>(modifiers->front().u);
-  }
-}
-
-void OmpStructureChecker::Leave(const parser::OmpClause::When &) {
-  currentWhenSelector_ = nullptr;
 }
 
 void OmpStructureChecker::CheckContextSelectorSpecification(
@@ -704,6 +691,70 @@ void OmpStructureChecker::CheckTraitSimd(
   }
 }
 
+llvm::SmallVector<OmpStructureChecker::MetadirectiveReplacementBranch, 4>
+OmpStructureChecker::GetReachableMetadirectiveReplacements(
+    const parser::OmpClauseList &clauses) {
+  llvm::SmallVector<MetadirectiveReplacementBranch, 4> result;
+
+  for (const EffectiveDirectivePath &path : GetEnclosingDirectivePaths()) {
+    std::size_t firstBranch{result.size()};
+    llvm::omp::VariantMatchInfo constructVMI;
+    for (auto context{path.rbegin()}; context != path.rend(); ++context) {
+      AppendConstructTraitsForDirective(*context, constructVMI);
+    }
+    llvm::SmallVector<llvm::omp::TraitProperty, 8> constructTraits(
+        constructVMI.ConstructTraits.begin(),
+        constructVMI.ConstructTraits.end());
+    OmpVariantMatchContext matchContext{context_, constructTraits};
+    if (auto candidateSet{
+            BuildMetadirectiveCandidateSet(clauses, context_, matchContext)}) {
+      for (const parser::OmpDirectiveSpecification *spec :
+          GetReachableMetadirectiveVariants(
+              *candidateSet, matchContext, context_)) {
+        if (spec && spec->DirId() == llvm::omp::Directive::OMPD_nothing) {
+          spec = nullptr;
+        }
+        result.push_back({path, spec});
+      }
+      if (result.size() == firstBranch) {
+        result.push_back({path, nullptr});
+      }
+      continue;
+    }
+
+    // Unsupported selectors are diagnosed elsewhere. Retain every explicit
+    // replacement on each path so recovery cannot miss a loop constraint.
+    for (const parser::OmpClause &clause : clauses.v) {
+      const parser::OmpDirectiveSpecification *spec{nullptr};
+      if (const auto *when{std::get_if<parser::OmpClause::When>(&clause.u)}) {
+        const auto &optionalSpec{std::get<1>(when->v.t)};
+        if (optionalSpec) {
+          spec = &optionalSpec->value();
+        }
+      } else if (const auto *otherwise{
+                     std::get_if<parser::OmpClause::Otherwise>(&clause.u)}) {
+        if (otherwise->v && otherwise->v->v) {
+          spec = &otherwise->v->v->value();
+        }
+      } else if (const auto *defaultVariant{
+                     std::get_if<parser::OmpClause::DefaultVariant>(
+                         &clause.u)}) {
+        spec = &defaultVariant->v.v.value();
+      } else {
+        continue;
+      }
+      if (spec && spec->DirId() == llvm::omp::Directive::OMPD_nothing) {
+        spec = nullptr;
+      }
+      result.push_back({path, spec});
+    }
+    if (result.size() == firstBranch) {
+      result.push_back({path, nullptr});
+    }
+  }
+  return result;
+}
+
 void OmpStructureChecker::Enter(const parser::OmpDirectiveSpecification &x) {
   // OmpDirectiveSpecification exists on its own only in clauses on
   // METADIRECTIVE.
@@ -714,11 +765,8 @@ void OmpStructureChecker::Enter(const parser::OmpDirectiveSpecification &x) {
   }
 
   llvm::omp::Directive dirId{x.DirId()};
-  bool checkDefaultNoneInAssociatedLoop{
-      GetDirectiveNest(MetadirectiveNest) != 0};
   if (const parser::OpenMPConstruct *meta{GetCurrentConstruct()}) {
     if (parser::Unwrap<parser::OmpDelimitedMetadirectiveDirective>(meta->u)) {
-      checkDefaultNoneInAssociatedLoop = false;
       unsigned version{context_.langOptions().OpenMPVersion};
       switch (llvm::omp::getDirectiveAssociation(dirId)) {
       case llvm::omp::Association::Block:
@@ -739,21 +787,43 @@ void OmpStructureChecker::Enter(const parser::OmpDirectiveSpecification &x) {
   PushContextAndClauseSets(
       std::get<parser::OmpDirectiveName>(x.t).source, dirId);
 
-  // Record each variant directive. A loop-associated one is later validated
-  // against the loop nest that follows the metadirective.
-  if (dirId != llvm::omp::Directive::OMPD_metadirective) {
-    metadirectiveLoopVariants_.push_back(
-        {currentWhenSelector_, &x, checkDefaultNoneInAssociatedLoop});
+  // Each metadirective group already contains its ranked reachable
+  // replacements. APPLY specifications are separate loop transformations;
+  // retain them only when their containing replacement is reachable.
+  bool reachable{true};
+  if (GetDirectiveNest(MetadirectiveNest)) {
+    reachable = llvm::any_of(pendingLoopDirectiveGroups_,
+        [&x](const PendingLoopDirectiveGroup &group) {
+          return llvm::any_of(group.branches,
+              [&x](const MetadirectiveReplacementBranch &branch) {
+                return branch.spec == &x;
+              });
+        });
+    if (!reachable && GetDirectiveNest(ApplyNest) &&
+        !directiveSpecificationReachability_.empty()) {
+      reachable = directiveSpecificationReachability_.back();
+    }
+  }
+  directiveSpecificationReachability_.push_back(reachable);
+
+  if (GetDirectiveNest(ApplyNest) && reachable &&
+      dirId != llvm::omp::Directive::OMPD_metadirective) {
+    pendingLoopDirectiveGroups_.push_back(
+        {{{EffectiveDirectivePath{}, &x}}, false, false});
   }
 }
 
 void OmpStructureChecker::Leave(const parser::OmpDirectiveSpecification &x) {
   if (GetDirectiveNest(MetadirectiveNest) || GetDirectiveNest(ApplyNest)) {
+    CHECK(!directiveSpecificationReachability_.empty());
+    directiveSpecificationReachability_.pop_back();
     dirContext_.pop_back();
   }
 }
 
 void OmpStructureChecker::Enter(const parser::OmpMetadirectiveDirective &x) {
+  auto branches{GetReachableMetadirectiveReplacements(x.v.Clauses())};
+  pendingLoopDirectiveGroups_.push_back({std::move(branches), true, true});
   EnterDirectiveNest(MetadirectiveNest);
 }
 
@@ -761,12 +831,35 @@ void OmpStructureChecker::Leave(const parser::OmpMetadirectiveDirective &) {
   ExitDirectiveNest(MetadirectiveNest);
 }
 
+void OmpStructureChecker::Enter(
+    const parser::OmpDelimitedMetadirectiveDirective &x) {
+  auto branches{GetReachableMetadirectiveReplacements(x.BeginDir().Clauses())};
+  llvm::SmallVector<EffectiveDirectivePath, 4> paths;
+  for (const MetadirectiveReplacementBranch &branch : branches) {
+    EffectiveDirectivePath path{branch.enclosingPath};
+    if (branch.spec) {
+      path.insert(path.begin(), branch.spec->DirId());
+    }
+    paths.push_back(std::move(path));
+  }
+  activeMetadirectiveReplacements_.push_back(
+      {dirContext_.size(), std::move(paths)});
+  pendingLoopDirectiveGroups_.push_back({std::move(branches), false, false});
+}
+
+void OmpStructureChecker::Leave(
+    const parser::OmpDelimitedMetadirectiveDirective &) {
+  CHECK(!activeMetadirectiveReplacements_.empty());
+  activeMetadirectiveReplacements_.pop_back();
+}
+
 // Check a loop-associated metadirective's variants against the loop nest they
 // apply to. The nest is not attached to the directive in the parse tree. It is
 // the next executable construct, either a following sibling or the first
 // execution-part construct for a declarative metadirective.
 void OmpStructureChecker::Enter(const parser::ExecutionPartConstruct &x) {
-  if (metadirectiveLoopVariants_.empty()) {
+  executionPartReplacementCounts_.push_back(0);
+  if (pendingLoopDirectiveGroups_.empty()) {
     return;
   }
   if (parser::Unwrap<parser::CompilerDirective>(x)) {
@@ -777,14 +870,36 @@ void OmpStructureChecker::Enter(const parser::ExecutionPartConstruct &x) {
   if (!parser::Unwrap<parser::DoConstruct>(x)) {
     // A non-loop construct follows, so a loop-associated variant has no loop
     // nest to associate with.
-    CheckMetadirectiveVariantsWithoutLoop();
+    CheckPendingLoopDirectivesWithoutLoop();
     return;
   }
 
-  // A loop nest follows. Take the pending variants off the worklist and
-  // validate them against it.
-  std::vector<MetadirectiveLoopVariant> variants;
-  variants.swap(metadirectiveLoopVariants_);
+  // A loop nest follows. Take the pending groups off the worklist and validate
+  // their reachable directives against it.
+  std::vector<PendingLoopDirectiveGroup> pending;
+  pending.swap(pendingLoopDirectiveGroups_);
+  for (const PendingLoopDirectiveGroup &group : pending) {
+    if (!group.activatesReplacementContext) {
+      continue;
+    }
+    llvm::SmallVector<EffectiveDirectivePath, 4> paths;
+    for (const MetadirectiveReplacementBranch &branch : group.branches) {
+      EffectiveDirectivePath path{branch.enclosingPath};
+      const parser::OmpDirectiveSpecification *spec{branch.spec};
+      if (spec) {
+        llvm::omp::Association association{
+            llvm::omp::getDirectiveAssociation(spec->DirId())};
+        if (association == llvm::omp::Association::LoopNest ||
+            association == llvm::omp::Association::LoopSeq) {
+          path.insert(path.begin(), spec->DirId());
+        }
+      }
+      paths.push_back(std::move(path));
+    }
+    activeMetadirectiveReplacements_.push_back(
+        {dirContext_.size(), std::move(paths)});
+    ++executionPartReplacementCounts_.back();
+  }
 
   unsigned version{context_.langOptions().OpenMPVersion};
   LoopSequence sequence(x, version, /*allowAllLoops=*/true, &context_);
@@ -819,87 +934,91 @@ void OmpStructureChecker::Enter(const parser::ExecutionPartConstruct &x) {
         return false;
       };
 
-  // Build the matching context once for the static-applicability gate below.
-  OmpVariantMatchContext matchContext{context_};
   UnorderedSymbolSet defaultNoneDiagnosed;
+  llvm::SmallPtrSet<const parser::OmpDirectiveSpecification *, 8>
+      checkedSpecifications;
 
-  for (const MetadirectiveLoopVariant &variant : variants) {
-    const parser::OmpDirectiveSpecification *spec{variant.spec};
-    // Skip variants that can never be selected on this compilation target so
-    // that their associated loop is not diagnosed.
-    if (!MayVariantBeSelected(variant.selector, context_, matchContext)) {
-      continue;
-    }
-    auto assoc{llvm::omp::getDirectiveAssociation(spec->DirId())};
-    if (assoc == llvm::omp::Association::LoopNest) {
-      if (!checkRootLoopCanonical(*spec, /*isSequence=*/false)) {
+  for (const PendingLoopDirectiveGroup &group : pending) {
+    for (const MetadirectiveReplacementBranch &branch : group.branches) {
+      const parser::OmpDirectiveSpecification *spec{branch.spec};
+      if (!spec || !checkedSpecifications.insert(spec).second) {
         continue;
       }
+      auto assoc{llvm::omp::getDirectiveAssociation(spec->DirId())};
+      if (assoc == llvm::omp::Association::LoopNest) {
+        if (!checkRootLoopCanonical(*spec, /*isSequence=*/false)) {
+          continue;
+        }
 
-      // A standalone metadirective does not contain its associated loop in
-      // the parse tree, so name resolution cannot apply DEFAULT(NONE) to it.
-      if (variant.checkDefaultNoneInAssociatedLoop) {
-        CheckDefaultNoneInAssociatedLoop(*spec, rootLoop, defaultNoneDiagnosed);
-      }
+        // A standalone metadirective does not contain its associated loop in
+        // the parse tree, so name resolution cannot apply DEFAULT(NONE) to it.
+        if (group.checkDefaultNoneInAssociatedLoop) {
+          CheckDefaultNoneInAssociatedLoop(
+              *spec, rootLoop, defaultNoneDiagnosed);
+        }
 
-      auto [needDepth, needPerfect]{
-          GetAffectedNestDepthWithReason(*spec, version, &context_)};
-      auto haveDepth{needPerfect ? havePerfect : haveSemantic};
-      if (!needDepth || *needDepth.value <= 0 || !haveDepth ||
-          *haveDepth.value <= 0) {
-        continue;
+        auto [needDepth, needPerfect]{
+            GetAffectedNestDepthWithReason(*spec, version, &context_)};
+        auto haveDepth{needPerfect ? havePerfect : haveSemantic};
+        if (!needDepth || *needDepth.value <= 0 || !haveDepth ||
+            *haveDepth.value <= 0) {
+          continue;
+        }
+        if (*needDepth.value > *haveDepth.value) {
+          std::string_view perfectTxt{needPerfect ? " perfect" : ""};
+          auto &msg{context_.Say(spec->DirName().source,
+              "This construct requires a%s nest of depth %" PRId64
+              ", but the associated nest is a%s nest of depth %" PRId64
+              ""_err_en_US,
+              perfectTxt, *needDepth.value, perfectTxt, *haveDepth.value)};
+          haveDepth.reason.AttachTo(msg);
+          needDepth.reason.AttachTo(msg);
+        } else {
+          CheckRectangularNest(*spec, sequence);
+        }
+      } else if (assoc == llvm::omp::Association::LoopSeq) {
+        (void)checkRootLoopCanonical(*spec, /*isSequence=*/true);
       }
-      if (*needDepth.value > *haveDepth.value) {
-        std::string_view perfectTxt{needPerfect ? " perfect" : ""};
-        auto &msg{context_.Say(spec->DirName().source,
-            "This construct requires a%s nest of depth %" PRId64
-            ", but the associated nest is a%s nest of depth %" PRId64
-            ""_err_en_US,
-            perfectTxt, *needDepth.value, perfectTxt, *haveDepth.value)};
-        haveDepth.reason.AttachTo(msg);
-        needDepth.reason.AttachTo(msg);
-      } else {
-        CheckRectangularNest(*spec, sequence);
-      }
-    } else if (assoc == llvm::omp::Association::LoopSeq) {
-      (void)checkRootLoopCanonical(*spec, /*isSequence=*/true);
     }
   }
 }
 
-// Diagnose loop-associated metadirective variants that are not followed by a
-// loop nest, either because the metadirective is the last construct in the
-// execution part or because a non-loop construct follows it. Variants that
-// cannot be selected on this target are skipped.
-void OmpStructureChecker::CheckMetadirectiveVariantsWithoutLoop(
-    std::size_t firstVariant) {
-  CHECK(firstVariant <= metadirectiveLoopVariants_.size());
-  std::vector<MetadirectiveLoopVariant> variants;
-  if (firstVariant == 0) {
-    variants.swap(metadirectiveLoopVariants_);
-  } else {
-    auto first{metadirectiveLoopVariants_.begin() + firstVariant};
-    variants.assign(first, metadirectiveLoopVariants_.end());
-    metadirectiveLoopVariants_.erase(first, metadirectiveLoopVariants_.end());
-  }
+void OmpStructureChecker::Leave(const parser::ExecutionPartConstruct &) {
+  CHECK(!executionPartReplacementCounts_.empty());
+  std::size_t count{executionPartReplacementCounts_.back()};
+  executionPartReplacementCounts_.pop_back();
+  CHECK(count <= activeMetadirectiveReplacements_.size());
+  activeMetadirectiveReplacements_.resize(
+      activeMetadirectiveReplacements_.size() - count);
+}
 
-  OmpVariantMatchContext matchContext{context_};
+// Diagnose reachable loop-associated directives that are not followed by a
+// loop nest, either because the directive is last in the execution part or
+// because a non-loop construct follows it.
+void OmpStructureChecker::CheckPendingLoopDirectivesWithoutLoop(
+    std::size_t firstDirectiveGroup) {
+  CHECK(firstDirectiveGroup <= pendingLoopDirectiveGroups_.size());
   const auto MsgShouldContainDoOr{
       "This construct should contain a DO-loop or a loop-%s-generating construct"_err_en_US};
+  llvm::SmallPtrSet<const parser::OmpDirectiveSpecification *, 8>
+      checkedSpecifications;
 
-  for (const MetadirectiveLoopVariant &variant : variants) {
-    if (!MayVariantBeSelected(variant.selector, context_, matchContext)) {
-      continue;
-    }
-    auto assoc{llvm::omp::getDirectiveAssociation(variant.spec->DirId())};
-    if (assoc == llvm::omp::Association::LoopNest) {
-      context_.Say(
-          variant.spec->DirName().source, MsgShouldContainDoOr, "nest");
-    } else if (assoc == llvm::omp::Association::LoopSeq) {
-      context_.Say(
-          variant.spec->DirName().source, MsgShouldContainDoOr, "sequence");
+  auto first{pendingLoopDirectiveGroups_.begin() + firstDirectiveGroup};
+  for (auto group{first}; group != pendingLoopDirectiveGroups_.end(); ++group) {
+    for (const MetadirectiveReplacementBranch &branch : group->branches) {
+      const parser::OmpDirectiveSpecification *spec{branch.spec};
+      if (!spec || !checkedSpecifications.insert(spec).second) {
+        continue;
+      }
+      auto assoc{llvm::omp::getDirectiveAssociation(spec->DirId())};
+      if (assoc == llvm::omp::Association::LoopNest) {
+        context_.Say(spec->DirName().source, MsgShouldContainDoOr, "nest");
+      } else if (assoc == llvm::omp::Association::LoopSeq) {
+        context_.Say(spec->DirName().source, MsgShouldContainDoOr, "sequence");
+      }
     }
   }
+  pendingLoopDirectiveGroups_.erase(first, pendingLoopDirectiveGroups_.end());
 }
 
 static const parser::traits::OmpContextSelectorSpecification *
