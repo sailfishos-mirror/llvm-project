@@ -377,7 +377,16 @@ private:
   bool HasInvalidWorksharingNesting(
       const parser::OmpDirectiveName &name, const llvm::omp::DirectiveSet &);
 
-  using EffectiveDirectivePath = llvm::SmallVector<llvm::omp::Directive, 8>;
+  // One entry in an innermost-to-outermost directive path after replacing
+  // enclosing metadirectives. The index identifies a directive on dirContext_;
+  // spec identifies a selected replacement that is not on that stack.
+  struct EffectiveDirectiveContext {
+    llvm::omp::Directive directive;
+    std::optional<std::size_t> actualContextIndex;
+    const parser::OmpDirectiveSpecification *spec{nullptr};
+  };
+  using EffectiveDirectivePath =
+      llvm::SmallVector<EffectiveDirectiveContext, 8>;
 
   struct MetadirectiveReplacementBranch {
     EffectiveDirectivePath enclosingPath;
@@ -392,6 +401,14 @@ private:
   GetEnclosingDirectivePaths() const;
   llvm::SmallVector<MetadirectiveReplacementBranch, 4>
   GetReachableMetadirectiveReplacements(const parser::OmpClauseList &);
+  void CheckMetadirectiveReplacementNesting(
+      llvm::ArrayRef<MetadirectiveReplacementBranch>);
+  bool HasClauseInEffectiveContext(
+      const EffectiveDirectiveContext &, llvm::omp::Clause) const;
+  const parser::OmpClause *FindClauseInEffectiveContext(
+      const EffectiveDirectiveContext &, llvm::omp::Clause) const;
+  bool IsCloselyNestedRegion(
+      const EffectiveDirectivePath &, const llvm::omp::DirectiveSet &) const;
   bool IsCloselyNestedRegion(const llvm::omp::DirectiveSet &set);
   bool IsNestedInDirective(llvm::omp::Directive directive);
   bool IsCombinedParallelWorksharing(llvm::omp::Directive directive) const;
@@ -462,8 +479,14 @@ private:
   std::optional<llvm::omp::Directive> GetCancelType(
       llvm::omp::Directive cancelDir, const parser::CharBlock &cancelSource,
       const std::optional<parser::OmpClauseList> &maybeClauses);
+  std::optional<llvm::omp::Directive> GetCancelType(
+      llvm::omp::Directive cancelDir, const parser::CharBlock &cancelSource,
+      const parser::OmpClauseList &clauses);
   void CheckCancellationNest(
       const parser::CharBlock &source, llvm::omp::Directive type);
+  void CheckCancellationNestInPaths(parser::CharBlock source,
+      llvm::omp::Directive cancelDir, llvm::omp::Directive type,
+      llvm::ArrayRef<EffectiveDirectivePath> enclosingPaths);
   void CheckReductionObjects(
       const parser::OmpObjectList &objects, llvm::omp::Clause clauseId);
   bool CheckReductionOperator(const parser::OmpReductionIdentifier &ident,
@@ -478,7 +501,8 @@ private:
   void CheckBarrierNesting(const parser::OpenMPSimpleStandaloneConstruct &x);
   void CheckScan(const parser::OpenMPSimpleStandaloneConstruct &x);
   void ChecksOnOrderedAsStandalone();
-  void CheckOrderedDependClause(std::optional<std::int64_t> orderedValue);
+  bool CheckOrderedDependClause(std::optional<std::int64_t> orderedValue,
+      const parser::OmpDirectiveSpecification &, bool emitDiagnostic = true);
   void CheckReductionArraySection(
       const parser::OmpObjectList &ompObjectList, llvm::omp::Clause clauseId);
   void CheckArraySection(const parser::ArrayElement &arrayElement,
