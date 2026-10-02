@@ -446,8 +446,8 @@ static void ReportMutexHeldWrongContext(ThreadState *thr, uptr pc) {
   // Release locks before symbolizing and outputting the report to avoid
   // deadlocks.
   {
-    new (rep) ScopedReport(ReportTypeMutexHeldWrongContext);
     ThreadRegistryLock l(&ctx->thread_registry);
+    new (rep) ScopedReport(ReportTypeMutexHeldWrongContext);
     for (uptr i = 0; i < thr->mset.Size(); ++i) {
       MutexSet::Desc desc = thr->mset.Get(i);
       rep->AddMutex(desc.addr, desc.stack_id);
