@@ -61,8 +61,8 @@ static void ReportMutexMisuse(ThreadState *thr, uptr pc, ReportType typ,
   // Release locks before symbolizing and outputting the report to avoid
   // deadlocks.
   {
-    ThreadRegistryLock l(&ctx->thread_registry);
     new (rep) ScopedReport(typ);
+    ThreadRegistryLock l(&ctx->thread_registry);
     rep->AddMutex(addr, creation_stack_id);
     VarSizeStackTrace trace;
     ObtainCurrentStack(thr, pc, &trace);
@@ -543,8 +543,8 @@ void ReportDeadlock(ThreadState *thr, uptr pc, DDReport *r) {
   // Release locks before symbolizing and outputting the report to avoid
   // deadlocks.
   {
-    ThreadRegistryLock l(&ctx->thread_registry);
     new (rep) ScopedReport(ReportTypeDeadlock);
+    ThreadRegistryLock l(&ctx->thread_registry);
     for (int i = 0; i < r->n; i++) {
       rep->AddMutex(r->loop[i].mtx_ctx0, r->loop[i].stk[0]);
       rep->AddUniqueTid((int)r->loop[i].thr_ctx);
@@ -579,12 +579,12 @@ void ReportDestroyLocked(ThreadState *thr, uptr pc, uptr addr,
   // Release locks before symbolizing and outputting the report to avoid
   // deadlocks.
   {
+    new (rep) ScopedReport(ReportTypeMutexDestroyLocked);
     // We need to lock the slot during RestoreStack because it protects
     // the slot journal.
     Lock slot_lock(&ctx->slots[static_cast<uptr>(last_lock.sid())].mtx);
     ThreadRegistryLock l0(&ctx->thread_registry);
     Lock slots_lock(&ctx->slot_mtx);
-    new (rep) ScopedReport(ReportTypeMutexDestroyLocked);
     rep->AddMutex(addr, creation_stack_id);
     VarSizeStackTrace trace;
     ObtainCurrentStack(thr, pc, &trace);
