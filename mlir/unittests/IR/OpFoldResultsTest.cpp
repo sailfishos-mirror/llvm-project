@@ -6,6 +6,12 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "llvm/Support/Compiler.h"
+
+// These tests cover the deprecated legacy fold API. A legacy fold trait warns
+// inside OpDefinition.h, so the suppression must start before the includes.
+LLVM_SUPPRESS_DEPRECATED_DECLARATIONS_PUSH
+
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -1304,3 +1310,5 @@ TEST_F(OpFoldResultsDeathTest, LegacyNullResult) {
 }
 #endif // NDEBUG
 #endif // GTEST_HAS_DEATH_TEST
+
+LLVM_SUPPRESS_DEPRECATED_DECLARATIONS_POP
