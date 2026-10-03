@@ -536,11 +536,26 @@ public:
     if (block)
       block->getOperations().insert(insertPoint, op);
 
-    // Attempt to fold the operation.
-    if (succeeded(tryFold(op, results)) && !results.empty()) {
-      // Erase the operation, if the fold removed the need for this operation.
-      // Note: The fold already populated the results in this case.
-      op->erase();
+    // Attempt to fold the operation. The new op has no uses yet, so every
+    // replaced result is materialized.
+    if (succeeded(tryFold(op, results, /*materializedConstants=*/nullptr,
+                          FoldApplyMode::Partial)) &&
+        !results.empty()) {
+      // Note: The fold already populated the results in this case. The entry
+      // of a kept result is the result of `op`.
+      bool keepsAny = llvm::any_of(
+          llvm::zip_equal(results, op->getResults()),
+          [](auto pair) { return std::get<0>(pair) == std::get<1>(pair); });
+      if (!keepsAny) {
+        // Erase the operation, if the fold removed the need for this
+        // operation.
+        op->erase();
+        return;
+      }
+      // The fold kept some results, so the operation stays. `tryFold` already
+      // notified the listener about the new constants.
+      if (block && listener)
+        listener->notifyOperationInserted(op, /*previous=*/{});
       return;
     }
 
@@ -572,15 +587,42 @@ public:
     return op;
   }
 
+  /// The way `tryFold` reports a fold that replaces only some results.
+  enum class FoldApplyMode {
+    /// A fold that does not replace every result counts as an in-place fold
+    /// if it changed the operation in place, and otherwise as a failure.
+    AllOrNothing,
+    /// Materialize every replaced result.
+    Partial,
+    /// Materialize and report only the replaced results that have uses.
+    PartialLiveOnly,
+  };
+
   /// Attempts to fold the given operation and places new results within
   /// `results`. Returns success if the operation was folded, failure otherwise.
-  /// If the fold was in-place, `results` will not be filled. Optionally, newly
-  /// materialized constant operations can be returned to the caller.
+  /// Optionally, newly materialized constant operations can be returned to the
+  /// caller. If `modifiedInPlace` is not null, it tells whether the fold
+  /// changed the operation in place.
+  ///
+  /// On success, `results` is one of:
+  ///  - Empty: there is nothing to replace. The fold changed the operation in
+  ///    place, or, in `PartialLiveOnly` mode, it replaced only results without
+  ///    uses.
+  ///  - One entry per result, which holds the replacement of the result. In the
+  ///    partial modes, the entry of a kept result is the result of `op` itself.
+  ///    In `PartialLiveOnly` mode, the entry of a replaced result without uses
+  ///    is null.
+  ///
+  /// If a constant fails to materialize, no result is replaced: `AllOrNothing`
+  /// returns failure, and the partial modes return success only if the fold
+  /// changed the operation in place.
   ///
   /// Note: This function does not erase the operation on a successful fold.
   LogicalResult
   tryFold(Operation *op, SmallVectorImpl<Value> &results,
-          SmallVectorImpl<Operation *> *materializedConstants = nullptr);
+          SmallVectorImpl<Operation *> *materializedConstants = nullptr,
+          FoldApplyMode mode = FoldApplyMode::AllOrNothing,
+          bool *modifiedInPlace = nullptr);
 
   /// Creates a deep copy of the specified operation, remapping any operands
   /// that use values outside of the operation using the map that is provided
@@ -625,6 +667,24 @@ private:
   /// before.
   Block::iterator insertPoint;
 };
+
+namespace detail {
+/// Materialize the replacements in `foldResults`, the fold result of `op`.
+/// `replacements` gets one entry per result of `op`:
+///  - a replaced result gets its replacement; an attribute becomes a new
+///    constant;
+///  - a kept result gets null;
+///  - if `liveOnly` is set, a replaced result without uses also gets null and
+///    no constant.
+/// On success, `builder` inserts the new constants and appends them to
+/// `constants`. If a constant fails to materialize, the function inserts no
+/// constant, clears `replacements`, and returns failure.
+LogicalResult materializeFoldResults(OpBuilder &builder, Operation *op,
+                                     const OpFoldResults &foldResults,
+                                     bool liveOnly,
+                                     SmallVectorImpl<Value> &replacements,
+                                     SmallVectorImpl<Operation *> &constants);
+} // namespace detail
 
 /// ImplicitLocOpBuilder maintains a 'current location', allowing use of the
 /// create<> method without specifying the location.  It is otherwise the same

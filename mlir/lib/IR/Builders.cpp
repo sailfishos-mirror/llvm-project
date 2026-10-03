@@ -478,13 +478,67 @@ Operation *OpBuilder::create(Location loc, StringAttr opName,
   return create(state);
 }
 
+LogicalResult mlir::detail::materializeFoldResults(
+    OpBuilder &builder, Operation *op, const OpFoldResults &foldResults,
+    bool liveOnly, SmallVectorImpl<Value> &replacements,
+    SmallVectorImpl<Operation *> &constants) {
+  replacements.assign(op->getNumResults(), Value());
+
+  // A temporary builder used for creating constants during folding.
+  OpBuilder cstBuilder(op->getContext());
+  SmallVector<Operation *, 1> generatedConstants;
+
+  Dialect *dialect = op->getDialect();
+  for (auto [index, result] : llvm::enumerate(op->getResults())) {
+    OpFoldResult foldResult = foldResults[index];
+    if (!foldResult || (liveOnly && result.use_empty()))
+      continue;
+
+    // Normal values are used directly.
+    if (auto value = llvm::dyn_cast_if_present<Value>(foldResult)) {
+      replacements[index] = value;
+      continue;
+    }
+
+    // Otherwise, ask the dialect to materialize a constant operation for this
+    // value.
+    Operation *constOp = dialect ? dialect->materializeConstant(
+                                       cstBuilder, cast<Attribute>(foldResult),
+                                       result.getType(), op->getLoc())
+                                 : nullptr;
+    if (!constOp) {
+      // The generated constants were never inserted, so no listener knows
+      // about them.
+      for (Operation *cst : generatedConstants)
+        cst->erase();
+      replacements.clear();
+      return failure();
+    }
+    assert(constOp->hasTrait<OpTrait::ConstantLike>() &&
+           "materializeConstant produced op that is not a ConstantLike");
+    assert(constOp->getResultTypes()[0] == result.getType() &&
+           "materializeConstant produced incorrect result type");
+
+    generatedConstants.push_back(constOp);
+    replacements[index] = constOp->getResult(0);
+  }
+
+  // If we were successful, insert any generated constants.
+  for (Operation *cst : generatedConstants)
+    builder.insert(cst);
+  llvm::append_range(constants, generatedConstants);
+  return success();
+}
+
 LogicalResult
 OpBuilder::tryFold(Operation *op, SmallVectorImpl<Value> &results,
-                   SmallVectorImpl<Operation *> *materializedConstants) {
+                   SmallVectorImpl<Operation *> *materializedConstants,
+                   FoldApplyMode mode, bool *modifiedInPlace) {
   assert(results.empty() && "expected empty results");
-  ResultRange opResults = op->getResults();
+  bool localModifiedInPlace;
+  bool &inPlace = modifiedInPlace ? *modifiedInPlace : localModifiedInPlace;
+  inPlace = false;
 
-  results.reserve(opResults.size());
   auto cleanupFailure = [&] {
     results.clear();
     return failure();
@@ -494,11 +548,21 @@ OpBuilder::tryFold(Operation *op, SmallVectorImpl<Value> &results,
   if (matchPattern(op, m_Constant()))
     return cleanupFailure();
 
+  // In `AllOrNothing` mode, a fold that does not replace every result counts
+  // as an in-place fold if it changed the operation in place, and otherwise as
+  // a failure.
+  auto foldOp = [&]() {
+    OpFoldResults foldResults = op->fold();
+    if (mode == FoldApplyMode::AllOrNothing && !foldResults.replacesAll())
+      return OpFoldResults(success(foldResults.modifiedInPlace()));
+    return foldResults;
+  };
+
   // Try to fold the operation.
-  SmallVector<OpFoldResult, 4> foldResults;
   LDBG() << "Trying to fold: "
          << OpWithFlags(op, OpPrintingFlags().skipRegions());
-  if (failed(op->fold(foldResults)))
+  OpFoldResults foldResults = foldOp();
+  if (foldResults.failed())
     return cleanupFailure();
 
   // Bound the number of in-place fold iterations. Legitimate chains are very
@@ -508,6 +572,7 @@ OpBuilder::tryFold(Operation *op, SmallVectorImpl<Value> &results,
   constexpr int kMaxInPlaceFolds = 64;
   int count = 0;
   do {
+    inPlace |= foldResults.modifiedInPlace();
     LDBG() << "Folded in place #" << count
            << " times: " << OpWithFlags(op, OpPrintingFlags().skipRegions());
     if (++count >= kMaxInPlaceFolds) {
@@ -516,50 +581,38 @@ OpBuilder::tryFold(Operation *op, SmallVectorImpl<Value> &results,
              << OpWithFlags(op, OpPrintingFlags().skipRegions());
       return cleanupFailure();
     }
-  } while (foldResults.empty() && succeeded(op->fold(foldResults)));
+  } while (!foldResults.replacesAny() && (foldResults = foldOp()).succeeded());
 
   // An in-place fold does not require generation of any constants.
-  if (foldResults.empty())
+  if (!foldResults.replacesAny())
     return success();
 
-  // A temporary builder used for creating constants during folding.
-  OpBuilder cstBuilder(context);
   SmallVector<Operation *, 1> generatedConstants;
-
-  // Populate the results with the folded results.
-  Dialect *dialect = op->getDialect();
-  for (auto [foldResult, expectedType] :
-       llvm::zip_equal(foldResults, opResults.getTypes())) {
-
-    // Normal values get pushed back directly.
-    if (auto value = llvm::dyn_cast_if_present<Value>(foldResult)) {
-      results.push_back(value);
-      continue;
-    }
-
-    // Otherwise, try to materialize a constant operation.
-    if (!dialect)
+  if (failed(detail::materializeFoldResults(*this, op, foldResults,
+                                            /*liveOnly=*/mode ==
+                                                FoldApplyMode::PartialLiveOnly,
+                                            results, generatedConstants))) {
+    if (mode == FoldApplyMode::AllOrNothing)
       return cleanupFailure();
-
-    // Ask the dialect to materialize a constant operation for this value.
-    Attribute attr = cast<Attribute>(foldResult);
-    auto *constOp = dialect->materializeConstant(cstBuilder, attr, expectedType,
-                                                 op->getLoc());
-    if (!constOp) {
-      // Erase any generated constants.
-      for (Operation *cst : generatedConstants)
-        cst->erase();
-      return cleanupFailure();
-    }
-    assert(matchPattern(constOp, m_Constant()));
-
-    generatedConstants.push_back(constOp);
-    results.push_back(constOp->getResult(0));
+    results.clear();
+    return success(inPlace);
   }
 
-  // If we were successful, insert any generated constants.
-  for (Operation *cst : generatedConstants)
-    insert(cst);
+  // Callers read `results` as the new value of each result, so a kept result
+  // maps to itself. In `PartialLiveOnly` mode, a replaced result without uses
+  // stays null.
+  bool replacesLive = false;
+  for (auto [index, value] : llvm::enumerate(results)) {
+    if (!foldResults[index])
+      value = op->getResult(index);
+    else if (value)
+      replacesLive = true;
+  }
+  // If no result with uses gets a new value, there is nothing to replace. A
+  // fold that replaces every result still reports them, so the caller can
+  // erase `op`.
+  if (!replacesLive && !foldResults.replacesAll())
+    results.clear();
 
   // Return materialized constant operations.
   if (materializedConstants)
