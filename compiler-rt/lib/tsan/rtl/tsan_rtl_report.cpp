@@ -843,7 +843,7 @@ void ReportRace(ThreadState *thr, RawShadow *shadow_mem, Shadow cur, Shadow old,
   }
 
   // Use alloca, because malloc during signal handling deadlocks
-  ScopedReport *rep = (ScopedReport *)__builtin_alloca(sizeof(ScopedReport));
+  ScopedReport* rep = (ScopedReport*)__builtin_alloca(sizeof(ScopedReport));
   // Release locks before symbolizing and outputting the report to avoid
   // deadlocks.
   {
