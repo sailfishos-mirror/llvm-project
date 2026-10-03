@@ -627,9 +627,12 @@ bool TailDuplicator::shouldTailDuplicate(bool IsSimple,
     // unwind info emission can't handle multiple prologue setups. In case of
     // DWARF, allow them be duplicated, so that their existence doesn't prevent
     // tail duplication of some basic blocks, that would be duplicated otherwise.
-    if (MI.isNotDuplicable() &&
-        (TailBB.getParent()->getTarget().getTargetTriple().isOSDarwin() ||
-        !MI.isCFIInstruction()))
+    if (MI.isNotDuplicable() && (TailBB.getParent()
+                                     ->getFunction()
+                                     .getParent()
+                                     ->getTargetTriple()
+                                     .isOSDarwin() ||
+                                 !MI.isCFIInstruction()))
       return false;
 
     // Convergent instructions can be duplicated only if doing so doesn't add

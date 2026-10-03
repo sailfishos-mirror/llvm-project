@@ -2842,7 +2842,7 @@ bool ARMTargetLowering::IsEligibleForTailCallOptimization(
   // cannot rely on the linker replacing the tail call with a return.
   if (GlobalAddressSDNode *G = dyn_cast<GlobalAddressSDNode>(Callee)) {
     const GlobalValue *GV = G->getGlobal();
-    const Triple &TT = getTargetMachine().getTargetTriple();
+    const Triple &TT = GV->getParent()->getTargetTriple();
     if (GV->hasExternalWeakLinkage() &&
         (!TT.isOSWindows() || TT.isOSBinFormatELF() ||
          TT.isOSBinFormatMachO())) {
@@ -3326,7 +3326,7 @@ SDValue ARMTargetLowering::LowerBlockAddress(SDValue Op,
 SDValue
 ARMTargetLowering::LowerGlobalTLSAddressDarwin(SDValue Op,
                                                SelectionDAG &DAG) const {
-  assert(getTargetMachine().getTargetTriple().isOSDarwin() &&
+  assert(Subtarget->getTargetTriple().isOSDarwin() &&
          "This function expects a Darwin target");
   SDLoc DL(Op);
 
@@ -3370,7 +3370,7 @@ ARMTargetLowering::LowerGlobalTLSAddressDarwin(SDValue Op,
 SDValue
 ARMTargetLowering::LowerGlobalTLSAddressWindows(SDValue Op,
                                                 SelectionDAG &DAG) const {
-  assert(getTargetMachine().getTargetTriple().isOSWindows() &&
+  assert(Subtarget->getTargetTriple().isOSWindows() &&
          "Windows specific TLS lowering");
 
   SDValue Chain = DAG.getEntryNode();
@@ -3773,7 +3773,7 @@ SDValue ARMTargetLowering::LowerGlobalAddressDarwin(SDValue Op,
 
 SDValue ARMTargetLowering::LowerGlobalAddressWindows(SDValue Op,
                                                      SelectionDAG &DAG) const {
-  assert(getTargetMachine().getTargetTriple().isOSWindows() &&
+  assert(Subtarget->getTargetTriple().isOSWindows() &&
          "non-Windows COFF is not supported");
   assert(Subtarget->useMovt() &&
          "Windows on ARM expects to use movw/movt");
@@ -11715,7 +11715,7 @@ ARMTargetLowering::EmitLowered__chkstk(MachineInstr &MI,
   const TargetInstrInfo &TII = *Subtarget->getInstrInfo();
   DebugLoc DL = MI.getDebugLoc();
 
-  assert(TM.getTargetTriple().isOSWindows() &&
+  assert(Subtarget->getTargetTriple().isOSWindows() &&
          "__chkstk is only supported on Windows");
   assert(Subtarget->isThumb2() && "Windows on ARM requires Thumb-2 mode");
 
@@ -21060,7 +21060,7 @@ SDValue ARMTargetLowering::LowerREM(SDNode *N, SelectionDAG &DAG) const {
 
 SDValue
 ARMTargetLowering::LowerDYNAMIC_STACKALLOC(SDValue Op, SelectionDAG &DAG) const {
-  assert(getTM().getTargetTriple().isOSWindows() &&
+  assert(Subtarget->getTargetTriple().isOSWindows() &&
          "unsupported target platform");
   SDLoc DL(Op);
 

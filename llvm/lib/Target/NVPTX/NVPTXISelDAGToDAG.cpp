@@ -203,8 +203,8 @@ NVPTXDAGToDAGISel::NVPTXDAGToDAGISel(NVPTXTargetMachine &tm,
 
 bool NVPTXDAGToDAGISel::runOnMachineFunction(MachineFunction &MF) {
   Subtarget = &MF.getSubtarget<NVPTXSubtarget>();
-  Scopes = NVPTXScopes(MF.getFunction().getContext(),
-                       MF.getTarget().getTargetTriple());
+  Scopes =
+      NVPTXScopes(MF.getFunction().getContext(), Subtarget->getTargetTriple());
   return SelectionDAGISel::runOnMachineFunction(MF);
 }
 

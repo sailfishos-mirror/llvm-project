@@ -480,7 +480,7 @@ TargetInstrInfo::duplicate(MachineBasicBlock &MBB,
   // CFI instructions are marked as non-duplicable, because Darwin compact
   // unwind info emission can't handle multiple prologue setups.
   assert((!Orig.isNotDuplicable() ||
-          (!MF.getTarget().getTargetTriple().isOSDarwin() &&
+          (!MF.getFunction().getParent()->getTargetTriple().isOSDarwin() &&
            Orig.isCFIInstruction())) &&
          "Instruction cannot be duplicated");
 

@@ -1750,7 +1750,7 @@ bool AMDGPUInstructionSelector::selectRelocConstant(MachineInstr &I) const {
 }
 
 bool AMDGPUInstructionSelector::selectGroupStaticSize(MachineInstr &I) const {
-  Triple::OSType OS = MF->getTarget().getTargetTriple().getOS();
+  Triple::OSType OS = STI.getTargetTriple().getOS();
 
   Register DstReg = I.getOperand(0).getReg();
   const RegisterBank *DstRB = RBI.getRegBank(DstReg, *MRI, TRI);
