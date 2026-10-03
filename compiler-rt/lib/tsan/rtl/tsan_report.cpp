@@ -29,22 +29,6 @@ class Decorator: public __sanitizer::SanitizerCommonDecorator {
   const char *Mutex()   { return Magenta(); }
 };
 
-ReportDesc::ReportDesc()
-    : tag(kExternalTagNone)
-    , stacks()
-    , mops()
-    , locs()
-    , mutexes()
-    , threads()
-    , unique_tids()
-    , sleep()
-    , count() {
-}
-
-ReportMop::ReportMop()
-    : mset() {
-}
-
 ReportDesc::~ReportDesc() {
   // FIXME(dvyukov): it must be leaking a lot of memory.
 }

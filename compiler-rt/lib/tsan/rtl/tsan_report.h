@@ -60,8 +60,6 @@ struct ReportMop {
   Vector<ReportMopMutex> mset;
   StackTrace stack_trace;
   ReportStack *stack;
-
-  ReportMop();
 };
 
 enum ReportLocationType {
@@ -113,7 +111,7 @@ struct AddedLocationAddr {
 class ReportDesc {
  public:
   ReportType typ;
-  uptr tag;
+  uptr tag = kExternalTagNone;
   Vector<ReportStack*> stacks;
   Vector<ReportMop*> mops;
   Vector<ReportLocation*> locs;
@@ -121,11 +119,11 @@ class ReportDesc {
   Vector<ReportMutex*> mutexes;
   Vector<ReportThread*> threads;
   Vector<Tid> unique_tids;
-  ReportStack *sleep;
-  int count;
+  ReportStack* sleep = nullptr;
+  int count = 0;
   int signum = 0;
 
-  ReportDesc();
+  ReportDesc() = default;
   ~ReportDesc();
 
  private:
