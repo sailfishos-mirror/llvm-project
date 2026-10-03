@@ -123,7 +123,7 @@ class ReportDesc {
   int count = 0;
   int signum = 0;
 
-  ReportDesc() = default;
+  ReportDesc();
   ~ReportDesc();
 
  private:

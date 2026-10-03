@@ -29,6 +29,8 @@ class Decorator: public __sanitizer::SanitizerCommonDecorator {
   const char *Mutex()   { return Magenta(); }
 };
 
+ReportDesc::ReportDesc() = default;
+
 ReportDesc::~ReportDesc() {
   // FIXME(dvyukov): it must be leaking a lot of memory.
 }
