@@ -60,6 +60,8 @@ struct ReportMop {
   Vector<ReportMopMutex> mset;
   StackTrace stack_trace;
   ReportStack *stack;
+
+  ReportMop();
 };
 
 enum ReportLocationType {

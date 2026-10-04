@@ -31,6 +31,10 @@ class Decorator: public __sanitizer::SanitizerCommonDecorator {
 
 ReportDesc::ReportDesc() = default;
 
+ReportMop::ReportMop()
+    : mset() {
+}
+
 ReportDesc::~ReportDesc() {
   // FIXME(dvyukov): it must be leaking a lot of memory.
 }
