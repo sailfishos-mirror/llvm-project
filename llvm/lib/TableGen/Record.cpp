@@ -2420,6 +2420,11 @@ const DefInit *VarDefInit::instantiate() {
 }
 
 const Init *VarDefInit::resolveReferences(Resolver &R) const {
+  // The same class instantiation is often referenced many times in the values
+  // being resolved, and resolving the arguments can be expensive.
+  if (const Init *Cached = R.getCachedResult(this))
+    return Cached;
+
   TrackUnresolvedResolver UR(&R);
   bool Changed = false;
   SmallVector<const ArgumentInit *, 8> NewArgs;
@@ -2431,13 +2436,16 @@ const Init *VarDefInit::resolveReferences(Resolver &R) const {
     Changed |= NewArg != Arg;
   }
 
+  const Init *Result = this;
   if (Changed) {
     auto *New = VarDefInit::get(Loc, Class, NewArgs);
-    if (!UR.foundUnresolved())
-      return const_cast<VarDefInit *>(New)->instantiate();
-    return New;
+    if (UR.foundUnresolved())
+      Result = New;
+    else
+      Result = const_cast<VarDefInit *>(New)->instantiate();
   }
-  return this;
+  R.cacheResult(this, Result, UR.foundUnresolved());
+  return Result;
 }
 
 const Init *VarDefInit::Fold() const {
@@ -3223,7 +3231,9 @@ const Init *MapResolver::resolve(const Init *VarName) {
     // Resolve mutual references among the mapped variables, but prevent
     // infinite recursion.
     Map.erase(It);
+    ++NumInProgress;
     I = I->resolveReferences(*this);
+    --NumInProgress;
     Map[VarName] = {I, true};
   }
 
