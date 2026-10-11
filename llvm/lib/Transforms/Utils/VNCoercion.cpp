@@ -1,6 +1,7 @@
 #include "llvm/Transforms/Utils/VNCoercion.h"
 #include "llvm/Analysis/ConstantFolding.h"
 #include "llvm/Analysis/ValueTracking.h"
+#include "llvm/Analysis/VectorUtils.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/IntrinsicInst.h"
 
@@ -318,6 +319,49 @@ int VNCoercion::analyzeLoadFromClobberingMemInst(Type *LoadTy, Value *LoadPtr,
   return -1;
 }
 
+/// Take the lanes of the vector SrcVal that hold the loaded bits, so a poison
+/// lane outside them can't leak into the load. The bits start at ShiftAmt in
+/// the integer the vector bitcasts to. Returns null if a vector load splits
+/// the lanes, as an integer would let one lane's poison reach the others.
+static Value *getVectorLanesForLoad(Value *SrcVal, unsigned ShiftAmt,
+                                    unsigned LoadBits, Type *LoadTy,
+                                    IRBuilderBase &Builder,
+                                    const DataLayout &DL) {
+  auto *VecTy = cast<FixedVectorType>(SrcVal->getType());
+  unsigned NumElts = VecTy->getNumElements();
+  unsigned EltBits = DL.getTypeSizeInBits(VecTy->getElementType());
+
+  // Positions of the lanes holding the loaded bits, from the least
+  // significant one.
+  unsigned FirstPos = ShiftAmt / EltBits;
+  unsigned LastPos = (ShiftAmt + LoadBits - 1) / EltBits;
+  unsigned NumLanes = LastPos - FirstPos + 1;
+  unsigned BitOffset = ShiftAmt - FirstPos * EltBits;
+  bool LinesUp =
+      BitOffset == 0 && DL.getTypeSizeInBits(LoadTy) == NumLanes * EltBits;
+  if (!LinesUp && LoadTy->isVectorTy() && NumLanes > 1)
+    return nullptr;
+
+  unsigned FirstLane = DL.isLittleEndian() ? FirstPos : NumElts - 1 - LastPos;
+  if (NumLanes == 1)
+    SrcVal = Builder.CreateExtractElement(SrcVal, FirstLane);
+  else if (NumLanes != NumElts)
+    SrcVal = Builder.CreateShuffleVector(
+        SrcVal, createSequentialMask(FirstLane, NumLanes, 0));
+  // coerceAvailableValueToLoadType casts the lanes to the loaded type.
+  if (LinesUp)
+    return SrcVal;
+
+  // Shift the loaded bits down within the lanes holding them.
+  if (SrcVal->getType()->isPtrOrPtrVectorTy())
+    SrcVal =
+        Builder.CreatePtrToInt(SrcVal, DL.getIntPtrType(SrcVal->getType()));
+  SrcVal = Builder.CreateBitCast(SrcVal, Builder.getIntNTy(NumLanes * EltBits));
+  if (BitOffset)
+    SrcVal = Builder.CreateLShr(SrcVal, BitOffset);
+  return Builder.CreateTrunc(SrcVal, Builder.getIntNTy(LoadBits));
+}
+
 static Value *getStoreValueForLoadHelper(Value *SrcVal, unsigned Offset,
                                          Type *LoadTy, IRBuilderBase &Builder,
                                          const DataLayout &DL) {
@@ -361,8 +405,21 @@ static Value *getStoreValueForLoadHelper(Value *SrcVal, unsigned Offset,
     ShiftAmt = (StoreSize - LoadSize - Offset) * 8;
 
   Type *SrcTy = SrcVal->getType();
-  // Integers drop provenance, and one poison bit poisons the whole value.
-  if (SrcTy->isByteOrByteVectorTy() ||
+  if (SrcTy->isVectorTy() && !SrcTy->isByteOrByteVectorTy()) {
+    // Read the loaded bits of a constant directly, keeping poison per lane.
+    if (auto *C = dyn_cast<Constant>(SrcVal))
+      if (Constant *Res =
+              ConstantFoldLoadFromConst(C, LoadTy, APInt(32, Offset), DL))
+        return Res;
+    if (Value *V = getVectorLanesForLoad(SrcVal, ShiftAmt, LoadSize * 8, LoadTy,
+                                         Builder, DL))
+      return V;
+  }
+
+  // Integers drop provenance, and one poison bit poisons the whole value. A
+  // vector load that splits the lanes of a vector can't go through an integer
+  // either.
+  if (SrcTy->isByteOrByteVectorTy() || SrcTy->isVectorTy() ||
       (SrcTy->isPtrOrPtrVectorTy() && LoadTy->isByteOrByteVectorTy())) {
     unsigned SrcBits = DL.getTypeSizeInBits(SrcTy).getFixedValue();
     unsigned LoadBits = DL.getTypeSizeInBits(LoadTy).getFixedValue();
