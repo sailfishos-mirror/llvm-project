@@ -41,6 +41,7 @@ void ARMElfTargetObjectFile::initialize(MCContext &Ctx, const TargetMachine &TM,
       ARM_TM.getMCSubtargetInfo().hasFeature(ARM::FeatureExecuteOnly);
 
   TargetLoweringObjectFileELF::initialize(Ctx, TM, M);
+  UsesARMEH = M.getExceptionModel() == ExceptionHandling::ARM;
 
   // Make code section unreadable when in execute-only mode
   if (genExecuteOnly) {
@@ -81,7 +82,7 @@ getIndirectSymViaRWPI(const MCSymbol *Sym) const {
 const MCExpr *ARMElfTargetObjectFile::getTTypeGlobalReference(
     const GlobalValue *GV, unsigned Encoding, const TargetMachine &TM,
     MachineModuleInfo *MMI, MCStreamer &Streamer) const {
-  if (TM.getMCAsmInfo().getExceptionHandlingType() != ExceptionHandling::ARM)
+  if (!UsesARMEH)
     return TargetLoweringObjectFileELF::getTTypeGlobalReference(
         GV, Encoding, TM, MMI, Streamer);
 
