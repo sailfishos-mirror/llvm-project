@@ -2169,8 +2169,7 @@ void OmpVisitor::ProcessReductionSpecifier(
       mangledName = context().SaveTempName(MangleDefinedOperator(name->source));
     } else {
       mangledName = MakeNameFromOperator(
-          std::get<parser::DefinedOperator::IntrinsicOperator>(defOp.u),
-          context());
+          std::get<parser::DefinedOperator::IntrinsicOperator>(defOp.u));
     }
   }
 
