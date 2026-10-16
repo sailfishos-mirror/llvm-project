@@ -1213,8 +1213,7 @@ void CodeGenRegisterClass::extendSuperRegClasses(CodeGenSubRegIndex *SubIdx) {
       if (!ComposedSubIdx)
         continue;
 
-      for (CodeGenRegisterClass *SuperRC : Pair.second)
-        addSuperRegClass(ComposedSubIdx, SuperRC);
+      SuperRegClasses[ComposedSubIdx].insert_range(Pair.second);
     }
   }
 }
