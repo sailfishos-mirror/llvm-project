@@ -201,6 +201,7 @@ else()
       libc.src.__support.math.fmaximum_mag_numf
       libc.src.__support.math.fmaximum_mag_numf128
       libc.src.__support.math.fmaximum_mag_numf16
+      libc.src.__support.math.fmaximum_mag_numf80
       libc.src.__support.math.fmaximum_mag_numl
       libc.src.__support.math.fmaximum_magbf16
       libc.src.__support.math.fmaximum_magf
@@ -235,6 +236,7 @@ else()
       libc.src.__support.math.fminimum_mag_numf
       libc.src.__support.math.fminimum_mag_numf128
       libc.src.__support.math.fminimum_mag_numf16
+      libc.src.__support.math.fminimum_mag_numf80
       libc.src.__support.math.fminimum_mag_numl
       libc.src.__support.math.fminimum_magbf16
       libc.src.__support.math.fminimum_magf
@@ -607,6 +609,7 @@ else()
       libc.src.__support.math.fmaximum_mag_numf
       libc.src.__support.math.fmaximum_mag_numf128
       libc.src.__support.math.fmaximum_mag_numf16
+      libc.src.__support.math.fmaximum_mag_numf80
       libc.src.__support.math.fmaximum_mag_numl
       libc.src.__support.math.fmaximum_magbf16
       libc.src.__support.math.fmaximum_magf
@@ -640,6 +643,7 @@ else()
       libc.src.__support.math.fminimum_mag_numf
       libc.src.__support.math.fminimum_mag_numf128
       libc.src.__support.math.fminimum_mag_numf16
+      libc.src.__support.math.fminimum_mag_numf80
       libc.src.__support.math.fminimum_mag_numl
       libc.src.__support.math.fminimum_magbf16
       libc.src.__support.math.fminimum_magf
