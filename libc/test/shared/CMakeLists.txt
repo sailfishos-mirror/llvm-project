@@ -171,6 +171,7 @@ else()
       libc.src.__support.math.fdimf
       libc.src.__support.math.fdimf128
       libc.src.__support.math.fdimf16
+      libc.src.__support.math.fdimf80
       libc.src.__support.math.fdiml
       libc.src.__support.math.fdiv
       libc.src.__support.math.fdivf128
@@ -585,6 +586,7 @@ else()
       libc.src.__support.math.fdimf
       libc.src.__support.math.fdimf128
       libc.src.__support.math.fdimf16
+      libc.src.__support.math.fdimf80
       libc.src.__support.math.fdiml
       libc.src.__support.math.fdiv
       libc.src.__support.math.fdivf128
