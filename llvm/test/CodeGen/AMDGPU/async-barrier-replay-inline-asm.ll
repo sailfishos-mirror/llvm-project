@@ -19,6 +19,6 @@ define amdgpu_kernel void @protected_inline_asm() {
 define amdgpu_kernel void @split_inline_asm() {
   call void asm sideeffect "ds_atomic_async_barrier_arrive_b64 v0", "~{v0},~{memory}"()
 ; WARN: warning: no recognized replay workaround after 'ds_atomic_async_barrier_arrive_b64' on this GPU
-  call void asm sideeffect "global_load_async_to_lds_b32 v0, v[0:1], off", "~{v0},~{v1},~{memory}"()
+  call void asm sideeffect "s_mov_b32 s7, exec_lo\0As_mov_b32 exec_lo, 0\0Aglobal_load_async_to_lds_b8 v0, v[0:1], off\0As_mov_b32 exec_lo, s7", "~{v0},~{v1},~{s7},~{memory}"()
   ret void
 }
