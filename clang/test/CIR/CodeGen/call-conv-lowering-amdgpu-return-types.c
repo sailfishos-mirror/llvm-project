@@ -10,15 +10,13 @@
 // functions, which use the default convention rather than the kernel one.
 
 // TODO(cir): Add the return cases still NYI in CallConvLowering:
-// - Aggregates of 33 to 64 bits, which classic coerces to [2 x i32].
-//   abiTypeToCIR has no array case yet.
-// - Aggregates over 64 bits that fit the 16-register budget. The classifier
-//   returns Direct with no coerce type, which the bridge rejects.
 // - Larger aggregates, returned through sret in addrspace(5). The bridge
 //   cannot express an indirect address space yet.
 // - Structs with a flexible array member. The bridge does not set that
 //   record flag yet.
 // - 3-element vector returns, blocked on CIRGen's vec3 load and store NYI.
+// - _BitInt wider than 128 bits, returned through sret in addrspace(5). The
+//   bridge cannot express an indirect address space yet.
 
 typedef struct {} empty_t;
 typedef struct { char c; } i8_wrapper_t;
@@ -28,6 +26,8 @@ typedef struct { int *p; } ptr_wrapper_t;
 typedef struct { char a, b; } char2_t;
 typedef struct { char a, b, c; } small_t;
 typedef union { int i; float f; } int_float_t;
+typedef struct { int a, b; } pair_t;
+typedef struct { int a, b, c; } triple_t;
 
 void ret_void(void) {}
 
@@ -156,3 +156,68 @@ int_float_t ret_union(void) {
 
 // CIR: cir.func {{.*}}@ret_union() -> !u32i
 // LLVM: define {{.*}}i32 @ret_union()
+
+// Aggregates of 33 to 64 bits are packed into a pair of i32 registers.
+pair_t ret_pair(void) {
+  pair_t p = {1, 2};
+  return p;
+}
+
+// CIR: cir.func {{.*}}@ret_pair() -> !cir.array<!u32i x 2>
+// CIR:   %[[RETVAL:.*]] = cir.alloca "__retval" {{.*}} : !cir.ptr<!rec_pair_t, target_address_space(5)>
+// CIR:   %[[RET_ARR:.*]] = cir.cast bitcast %[[RETVAL]] : !cir.ptr<!rec_pair_t, target_address_space(5)> -> !cir.ptr<!cir.array<!u32i x 2>, target_address_space(5)>
+// CIR:   %[[RET:.*]] = cir.load align(4) %[[RET_ARR]] : !cir.ptr<!cir.array<!u32i x 2>, target_address_space(5)>, !cir.array<!u32i x 2>
+// CIR:   cir.return %[[RET]] : !cir.array<!u32i x 2>
+// LLVM: define {{.*}}[2 x i32] @ret_pair()
+// LLVM:   %[[RET:.*]] = load [2 x i32], ptr addrspace(5) %{{.*}}, align 4
+// LLVM:   ret [2 x i32] %[[RET]]
+
+// Larger aggregates that fit the register budget return whole.
+triple_t ret_triple(void) {
+  triple_t t = {1, 2, 3};
+  return t;
+}
+
+// CIR: cir.func {{.*}}@ret_triple() -> !rec_triple_t
+// CIR:   %[[RETVAL:.*]] = cir.alloca "__retval" {{.*}} : !cir.ptr<!rec_triple_t, target_address_space(5)>
+// CIR:   %[[RET:.*]] = cir.load %[[RETVAL]] : !cir.ptr<!rec_triple_t, target_address_space(5)>, !rec_triple_t
+// CIR:   cir.return %[[RET]] : !rec_triple_t
+// LLVM: define {{.*}}%struct.triple_t @ret_triple()
+// LLVM:   %[[RET:.*]] = load %struct.triple_t, ptr addrspace(5) %{{.*}}, align 4
+// LLVM:   ret %struct.triple_t %[[RET]]
+
+// The call site unpacks the result the same way.
+void call_ret_pair(void) { pair_t p = ret_pair(); }
+
+// CIR: cir.func {{.*}}@call_ret_pair()
+// CIR:   %[[COERCE:.*]] = cir.alloca "coerce" align(4) : !cir.ptr<!cir.array<!u32i x 2>, target_address_space(5)>
+// CIR:   %[[P:.*]] = cir.alloca "p" {{.*}} : !cir.ptr<!rec_pair_t, target_address_space(5)>
+// CIR:   %[[P_VIEW:.*]] = cir.cast address_space %[[P]] : !cir.ptr<!rec_pair_t, target_address_space(5)> -> !cir.ptr<!rec_pair_t>
+// CIR:   %[[RES:.*]] = cir.call @ret_pair() {{.*}}: () -> !cir.array<!u32i x 2>
+// CIR:   cir.store %[[RES]], %[[COERCE]] : !cir.array<!u32i x 2>, !cir.ptr<!cir.array<!u32i x 2>, target_address_space(5)>
+// CIR:   %[[COERCE_REC:.*]] = cir.cast bitcast %[[COERCE]] : !cir.ptr<!cir.array<!u32i x 2>, target_address_space(5)> -> !cir.ptr<!rec_pair_t, target_address_space(5)>
+// CIR:   cir.copy %[[COERCE_REC]] align(4) to %[[P_VIEW]] align(4)
+// LLVM: define {{.*}}void @call_ret_pair()
+// LLVM:   %[[RES:.*]] = call [2 x i32] @ret_pair()
+// LLVM:   store [2 x i32] %[[RES]], ptr addrspace(5) %{{.*}}, align 4
+
+// A _Complex up to 64 bits is packed like a small aggregate.
+_Complex float ret_cfloat(void) { return 0; }
+
+// CIR: cir.func {{.*}}@ret_cfloat() -> !cir.array<!u32i x 2>
+// CIR:   %[[RET_PTR:.*]] = cir.cast bitcast %{{.*}} : !cir.ptr<!cir.complex<!cir.float>, target_address_space(5)> -> !cir.ptr<!cir.array<!u32i x 2>, target_address_space(5)>
+// CIR-NEXT:   %[[RET:.*]] = cir.load %[[RET_PTR]] : !cir.ptr<!cir.array<!u32i x 2>, target_address_space(5)>, !cir.array<!u32i x 2>
+// CIR-NEXT:   cir.return %[[RET]] : !cir.array<!u32i x 2>
+// LLVM: define {{.*}}[2 x i32] @ret_cfloat()
+// LLVM:   %[[RET:.*]] = load [2 x i32], ptr addrspace(5) %{{.*}}, align 4
+// LLVM-NEXT:   ret [2 x i32] %[[RET]]
+
+// A wider _Complex that fits the register budget returns whole.
+_Complex double ret_cdouble(void) { return 0; }
+
+// CIR: cir.func {{.*}}@ret_cdouble() -> !cir.complex<!cir.double>
+// CIR:   %[[RET:.*]] = cir.load %{{.*}} : !cir.ptr<!cir.complex<!cir.double>, target_address_space(5)>, !cir.complex<!cir.double>
+// CIR-NEXT:   cir.return %[[RET]] : !cir.complex<!cir.double>
+// LLVM: define {{.*}}{ double, double } @ret_cdouble()
+// LLVM:   %[[RET:.*]] = load { double, double }, ptr addrspace(5) %{{.*}}, align 8
+// LLVM-NEXT:   ret { double, double } %[[RET]]
