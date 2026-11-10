@@ -2063,6 +2063,15 @@ LogicalResult cir::ScopeOp::fold(FoldAdaptor /*adaptor*/,
   return success();
 }
 
+/// Erases a scope that yields no value and contains only its terminator.
+LogicalResult cir::ScopeOp::canonicalize(ScopeOp op,
+                                         PatternRewriter &rewriter) {
+  if (op.getNumResults() != 0 || !op.isEmpty())
+    return failure();
+  rewriter.eraseOp(op);
+  return success();
+}
+
 //===----------------------------------------------------------------------===//
 // CleanupScopeOp
 //===----------------------------------------------------------------------===//
@@ -2344,6 +2353,17 @@ void cir::CaseOp::build(OpBuilder &builder, OperationState &result,
 //===----------------------------------------------------------------------===//
 // SwitchOp
 //===----------------------------------------------------------------------===//
+
+/// Erases a switch whose body contains only its terminator.
+LogicalResult cir::SwitchOp::canonicalize(SwitchOp op,
+                                          PatternRewriter &rewriter) {
+  Region &body = op.getBody();
+  if (!body.hasOneBlock() || !llvm::hasSingleElement(body.front()) ||
+      !isa<cir::YieldOp>(body.front().front()))
+    return failure();
+  rewriter.eraseOp(op);
+  return success();
+}
 
 void cir::SwitchOp::build(OpBuilder &builder, OperationState &result,
                           Value cond, BuilderOpStateCallbackRef switchBuilder) {
