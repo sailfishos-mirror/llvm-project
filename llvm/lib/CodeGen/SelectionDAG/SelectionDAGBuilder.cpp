@@ -4241,8 +4241,29 @@ void SelectionDAGBuilder::visitIntToPtr(const User &I) {
 void SelectionDAGBuilder::visitBitCast(const User &I) {
   SDValue N = getValue(I.getOperand(0));
   SDLoc dl = getCurSDLoc();
-  EVT DestVT = DAG.getTargetLoweringInfo().getValueType(DAG.getDataLayout(),
-                                                        I.getType());
+  const TargetLowering &TLI = DAG.getTargetLoweringInfo();
+  Type *SrcTy = I.getOperand(0)->getType();
+  Type *DestTy = I.getType();
+  EVT DestVT = TLI.getValueType(DAG.getDataLayout(), DestTy);
+
+  // A bitcast between pointers and bytes reinterprets the in-memory bits of
+  // the pointer. The register type of a pointer may be wider than its memory
+  // type, so go through the memory type, like ptrtoint and inttoptr do.
+  bool SrcIsPtr = SrcTy->isPtrOrPtrVectorTy();
+  bool DestIsPtr = DestTy->isPtrOrPtrVectorTy();
+  if (SrcIsPtr != DestIsPtr) {
+    if (SrcIsPtr) {
+      EVT PtrMemVT = TLI.getMemValueType(DAG.getDataLayout(), SrcTy);
+      N = DAG.getPtrExtOrTrunc(N, dl, PtrMemVT);
+      N = DAG.getBitcast(DestVT, N);
+    } else {
+      EVT PtrMemVT = TLI.getMemValueType(DAG.getDataLayout(), DestTy);
+      N = DAG.getBitcast(PtrMemVT, N);
+      N = DAG.getPtrExtOrTrunc(N, dl, DestVT);
+    }
+    setValue(&I, N);
+    return;
+  }
 
   // BitCast assures us that source and destination are the same size so this is
   // either a BITCAST or a no-op.
@@ -4294,10 +4315,19 @@ void SelectionDAGBuilder::visitBitInsert(const User &I) {
   SDValue Base = getValue(I.getOperand(0));
   SDValue Val = getValue(I.getOperand(1));
   SDValue Offset = getValue(I.getOperand(2));
-  EVT BaseVT = Base.getValueType();
-  EVT ValVT = Val.getValueType();
   const TargetLowering &TLI = DAG.getTargetLoweringInfo();
   SDLoc dl = getCurSDLoc();
+
+  // Insert the in-memory bits of a pointer, which may be narrower than its
+  // register type.
+  Type *ValTy = I.getOperand(1)->getType();
+  if (ValTy->isPtrOrPtrVectorTy()) {
+    EVT PtrMemVT = TLI.getMemValueType(DAG.getDataLayout(), ValTy);
+    Val = DAG.getPtrExtOrTrunc(Val, dl, PtrMemVT);
+  }
+
+  EVT BaseVT = Base.getValueType();
+  EVT ValVT = Val.getValueType();
 
   assert(BaseVT.getScalarSizeInBits() >= ValVT.getScalarSizeInBits() &&
          "bitinsert val wider than base should be rejected by verifier");
@@ -4334,7 +4364,13 @@ void SelectionDAGBuilder::visitBitExtract(const User &I) {
   SDValue Offset = getValue(I.getOperand(1));
   EVT SrcVT = Src.getValueType();
   const TargetLowering &TLI = DAG.getTargetLoweringInfo();
-  EVT ResultVT = TLI.getValueType(DAG.getDataLayout(), I.getType());
+  Type *ResultTy = I.getType();
+
+  // Extract a pointer in its memory type, which may be narrower than its
+  // register type, and extend it afterwards.
+  bool IsPtr = ResultTy->isPtrOrPtrVectorTy();
+  EVT ResultVT = IsPtr ? TLI.getMemValueType(DAG.getDataLayout(), ResultTy)
+                       : TLI.getValueType(DAG.getDataLayout(), ResultTy);
   SDLoc dl = getCurSDLoc();
 
   assert(ResultVT.getScalarSizeInBits() <= SrcVT.getScalarSizeInBits() &&
@@ -4356,6 +4392,11 @@ void SelectionDAGBuilder::visitBitExtract(const User &I) {
   } else {
     // Normal integer path
     Result = DAG.getNode(ISD::TRUNCATE, dl, ResultVT, Shifted);
+  }
+
+  if (IsPtr) {
+    EVT PtrVT = TLI.getValueType(DAG.getDataLayout(), ResultTy);
+    Result = DAG.getPtrExtOrTrunc(Result, dl, PtrVT);
   }
 
   setValue(&I, Result);
