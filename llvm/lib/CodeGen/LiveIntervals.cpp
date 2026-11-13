@@ -253,15 +253,11 @@ LiveRange *LiveIntervals::createRegUnitRange() {
 }
 
 void LiveIntervals::destroyInterval(LiveInterval *LI) {
-  if (!LI)
-    return;
   LI->~LiveInterval();
   IntervalRecycler.Deallocate(RangeAllocator, LI);
 }
 
 void LiveIntervals::destroyRegUnitRange(LiveRange *LR) {
-  if (!LR)
-    return;
   LR->~LiveRange();
   RegUnitRangeRecycler.Deallocate(RangeAllocator, LR);
 }
