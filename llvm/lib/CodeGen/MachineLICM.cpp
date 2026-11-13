@@ -163,13 +163,22 @@ namespace {
     // Track 'estimated' register pressure.
     SmallDenseSet<Register> RegSeen;
     SmallVector<unsigned, 8> RegPressure;
+    // Maximum estimate in the current block's scanned prefix.
+    SmallVector<unsigned, 8> PeakPressure;
 
     // Register pressure "limit" per register pressure set. If the pressure
     // is higher than the limit, then it's considered high.
     SmallVector<unsigned, 8> RegLimit;
 
+    struct RegPressureInfo {
+      // Boundary estimate saved before scanning the block, adjusted by hoists.
+      SmallVector<unsigned, 8> Snapshot;
+      // Peak saved from the previous scope, adjusted by hoists.
+      SmallVector<unsigned, 8> Peak;
+    };
+
     // Register pressure on path leading from loop preheader to current BB.
-    SmallVector<SmallVector<unsigned, 8>, 16> BackTrace;
+    SmallVector<RegPressureInfo, 16> BackTrace;
 
     // For each opcode per preheader, keep a list of potential CSE instructions.
     DenseMap<MachineBasicBlock *,
@@ -195,6 +204,7 @@ namespace {
     void releaseMemory() {
       RegSeen.clear();
       RegPressure.clear();
+      PeakPressure.clear();
       RegLimit.clear();
       BackTrace.clear();
       CSEMap.clear();
@@ -261,7 +271,8 @@ namespace {
                                                   bool ConsiderUnseenAsDef);
 
     void UpdateRegPressure(const MachineInstr *MI,
-                           bool ConsiderUnseenAsDef = false);
+                           bool ConsiderUnseenAsDef = false,
+                           bool SkipPeakUpdate = false);
 
     MachineInstr *ExtractHoistableLoad(MachineInstr *MI, MachineLoop *CurLoop);
 
@@ -408,6 +419,7 @@ bool MachineLICMImpl::run(MachineFunction &MF) {
     // Estimate register pressure during pre-regalloc pass.
     unsigned NumRPS = TRI->getNumRegPressureSets();
     RegPressure.resize(NumRPS);
+    PeakPressure.resize(NumRPS);
     llvm::fill(RegPressure, 0);
     RegLimit.resize(NumRPS);
     for (unsigned i = 0, e = NumRPS; i != e; ++i)
@@ -787,12 +799,14 @@ bool MachineLICMImpl::IsGuaranteedToExecute(MachineBasicBlock *BB,
 void MachineLICMImpl::EnterScope(MachineBasicBlock *MBB) {
   LLVM_DEBUG(dbgs() << "Entering " << printMBBReference(*MBB) << '\n');
 
-  // Remember livein register pressure.
-  BackTrace.push_back(RegPressure);
+  // Save the previous scope's state, then start this block's prefix peak.
+  BackTrace.push_back({RegPressure, PeakPressure});
+  PeakPressure = RegPressure;
 }
 
 void MachineLICMImpl::ExitScope(MachineBasicBlock *MBB) {
   LLVM_DEBUG(dbgs() << "Exiting " << printMBBReference(*MBB) << '\n');
+  PeakPressure = std::move(BackTrace.back().Peak);
   BackTrace.pop_back();
 }
 
@@ -924,6 +938,7 @@ void MachineLICMImpl::HoistOutOfLoop(MachineDomTreeNode *HeaderN,
 /// through (livein but not used) registers.
 void MachineLICMImpl::InitRegPressure(MachineBasicBlock *BB) {
   llvm::fill(RegPressure, 0);
+  llvm::fill(PeakPressure, 0);
 
   // If the preheader has only a single predecessor and it ends with a
   // fallthrough or an unconditional branch, then scan its predecessor for live
@@ -936,19 +951,29 @@ void MachineLICMImpl::InitRegPressure(MachineBasicBlock *BB) {
       InitRegPressure(*BB->pred_begin());
   }
 
-  for (const MachineInstr &MI : *BB)
-    UpdateRegPressure(&MI, /*ConsiderUnseenAsDef=*/true);
+  for (const MachineInstr &MI : *BB) {
+    UpdateRegPressure(&MI, /*ConsiderUnseenAsDef=*/true,
+                      /*SkipPeakUpdate=*/true);
+  }
+
+  // Seed the loop-entry peak. Hoists inserted before the preheader terminators
+  // do not extend live ranges across earlier preheader instructions.
+  PeakPressure = RegPressure;
 }
 
 /// Update estimate of register pressure after the specified instruction.
 void MachineLICMImpl::UpdateRegPressure(const MachineInstr *MI,
-                                        bool ConsiderUnseenAsDef) {
+                                        bool ConsiderUnseenAsDef,
+                                        bool SkipPeakUpdate) {
   auto Cost = calcRegisterCost(MI, /*ConsiderSeen=*/true, ConsiderUnseenAsDef);
   for (const auto &[Class, Weight] : Cost) {
     if (static_cast<int>(RegPressure[Class]) < -Weight)
       RegPressure[Class] = 0;
     else
       RegPressure[Class] += Weight;
+
+    if (!SkipPeakUpdate)
+      PeakPressure[Class] = std::max(PeakPressure[Class], RegPressure[Class]);
   }
 }
 
@@ -1237,9 +1262,14 @@ bool MachineLICMImpl::CanCauseHighRegPressure(
     if (CheapInstr && !HoistCheapInsts)
       return true;
 
-    for (const auto &RP : BackTrace)
-      if (static_cast<int>(RP[Class]) + Weight >= Limit)
+    if (static_cast<int>(PeakPressure[Class]) + Weight >= Limit)
+      return true;
+
+    for (const RegPressureInfo &RP : BackTrace) {
+      if (static_cast<int>(RP.Snapshot[Class]) + Weight >= Limit ||
+          static_cast<int>(RP.Peak[Class]) + Weight >= Limit)
         return true;
+    }
   }
 
   return false;
@@ -1255,9 +1285,20 @@ void MachineLICMImpl::UpdateBackTraceRegPressure(const MachineInstr *MI) {
                                /*ConsiderUnseenAsDef=*/false);
 
   // Update register pressure of blocks from loop header to current block.
-  for (auto &RP : BackTrace)
-    for (const auto &[Class, Weight] : Cost)
-      RP[Class] += Weight;
+  for (const auto &[Class, Weight] : Cost) {
+    auto AdjustPeak = [Weight = Weight](unsigned &Peak) {
+      if (static_cast<int>(Peak) < -Weight)
+        Peak = 0;
+      else
+        Peak += Weight;
+    };
+
+    AdjustPeak(PeakPressure[Class]);
+    for (RegPressureInfo &RP : BackTrace) {
+      RP.Snapshot[Class] += Weight;
+      AdjustPeak(RP.Peak[Class]);
+    }
+  }
 }
 
 /// Return true if it is potentially profitable to hoist the given loop
