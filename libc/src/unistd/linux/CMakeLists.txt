@@ -210,15 +210,16 @@ add_entrypoint_object(
     ../fork.h
   DEPENDS
     libc.hdr.types.pid_t
-    libc.hdr.fcntl_macros
-    libc.hdr.signal_macros
-    libc.include.unistd
-    libc.include.sys_syscall
+    libc.hdr.unistd_macros
+    libc.src.__support.OSUtil.linux.syscall_wrappers.fork
+    libc.src.__support.OSUtil.linux.syscall_wrappers.gettid
+    libc.src.__support.common
+    libc.src.__support.libc_errno
+    libc.src.__support.macros.config
     libc.src.__support.threads.fork_callbacks
-    libc.src.__support.OSUtil.osutil
+    libc.src.__support.threads.identifier
     libc.src.__support.threads.thread
     libc.src.errno.errno
-    libc.src.__support.threads.identifier
 )
 
 add_entrypoint_object(
