@@ -39868,6 +39868,7 @@ X86TargetLowering::EmitInstrWithCustomInserter(MachineInstr &MI,
     Register SrcReg = MI.getOperand(1).getReg();
     unsigned Idx = MI.getOperand(2).getImm();
     BuildMI(*BB, MI, MIMD, TII->get(X86::TILEMOVCOLtri), DstReg)
+        .addReg(DstReg, RegState::Undef)
         .addReg(SrcReg)
         .addImm(Idx);
     MI.eraseFromParent();
@@ -39877,6 +39878,7 @@ X86TargetLowering::EmitInstrWithCustomInserter(MachineInstr &MI,
     unsigned DstReg = TMMImmToTMMReg(MI.getOperand(0).getImm());
     Register SrcReg = MI.getOperand(1).getReg();
     BuildMI(*BB, MI, MIMD, TII->get(X86::TILEMOVCOLtre), DstReg)
+        .addReg(DstReg, RegState::Undef)
         .addReg(SrcReg)
         .addReg(MI.getOperand(2).getReg());
     MI.eraseFromParent();
@@ -39887,6 +39889,7 @@ X86TargetLowering::EmitInstrWithCustomInserter(MachineInstr &MI,
     Register SrcReg = MI.getOperand(1).getReg();
     unsigned Idx = MI.getOperand(2).getImm();
     BuildMI(*BB, MI, MIMD, TII->get(X86::TILEMOVROWtri), DstReg)
+        .addReg(DstReg, RegState::Undef)
         .addReg(SrcReg)
         .addImm(Idx);
     MI.eraseFromParent();
@@ -39896,6 +39899,7 @@ X86TargetLowering::EmitInstrWithCustomInserter(MachineInstr &MI,
     unsigned DstReg = TMMImmToTMMReg(MI.getOperand(0).getImm());
     Register SrcReg = MI.getOperand(1).getReg();
     BuildMI(*BB, MI, MIMD, TII->get(X86::TILEMOVROWtre), DstReg)
+        .addReg(DstReg, RegState::Undef)
         .addReg(SrcReg)
         .addReg(MI.getOperand(2).getReg());
     MI.eraseFromParent();
