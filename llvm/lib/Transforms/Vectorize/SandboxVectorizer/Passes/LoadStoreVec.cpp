@@ -315,17 +315,9 @@ bool LoadStoreVec::vectorizeStores(BndlRef<Instruction *> Stores, Region &Rgn) {
   BasicBlock *BB = Stores[0]->getParent();
   // TODO: For now we only support load operands.
   // TODO: For now we don't cross BBs.
-  // TODO: For now don't vectorize if the loads have external uses.
   bool AllLoads = all_of(Operands, [BB](Value *V) {
     auto *LI = dyn_cast<LoadInst>(V);
-    if (LI == nullptr)
-      return false;
-    // TODO: For now we don't cross BBs.
-    if (LI->getParent() != BB)
-      return false;
-    if (LI->hasNUsesOrMore(2))
-      return false;
-    return true;
+    return LI != nullptr && LI->getParent() == BB;
   });
   bool AllConstants =
       all_of(Operands, [](Value *V) { return isa<Constant>(V); });
@@ -341,7 +333,11 @@ bool LoadStoreVec::vectorizeStores(BndlRef<Instruction *> Stores, Region &Rgn) {
     Loads.reserve(Operands.size());
     for (Value *Op : Operands)
       Loads.push_back(cast<Instruction>(Op));
-    if (!canVectorize(Loads)) {
+    std::optional<Type *> LoadsVecTy = canVectorize(Loads);
+    if (!LoadsVecTy || !canUnpack(cast<FixedVectorType>(*LoadsVecTy),
+                                  map_range(Loads, [](Instruction *I) {
+                                    return I->getType();
+                                  }))) {
       Ctx->accept();
       return false;
     }
@@ -367,9 +363,14 @@ bool LoadStoreVec::vectorizeStores(BndlRef<Instruction *> Stores, Region &Rgn) {
   Utils::propagateMetadata(VecS, Stores);
 
   DeadInstrMorgue.collectPotentiallyDeadInstrs(Stores);
-  if (AllLoads)
-    DeadInstrMorgue.collectPotentiallyDeadInstrs<Instruction>(Loads);
   DeadInstrMorgue.tryEraseDeadInstrs();
+  if (AllLoads) {
+    // The scalar stores are gone, so any remaining uses of the loads are
+    // external.
+    unpackIfNeeded(cast<LoadInst>(VecOp), Loads);
+    DeadInstrMorgue.collectPotentiallyDeadInstrs<Instruction>(Loads);
+    DeadInstrMorgue.tryEraseDeadInstrs();
+  }
 
   return acceptOrRevert();
 }
