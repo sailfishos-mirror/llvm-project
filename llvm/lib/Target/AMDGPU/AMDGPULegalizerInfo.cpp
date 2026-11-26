@@ -2182,6 +2182,19 @@ AMDGPULegalizerInfo::AMDGPULegalizerInfo(const GCNSubtarget &ST_,
     auto &Builder =
         getActionDefinitionsBuilder(Op)
             .legalIf(all(isRegisterType(ST, 0), isRegisterType(ST, 1)))
+            // A merge/unmerge whose combined type is wider than the largest
+            // register class is still fine to leave alone as long as each
+            // individual piece is already a legal, maximally-sized register
+            // type: nothing ever needs to select the aggregate as a single
+            // physical register, it only ever exists as a name for a group
+            // of independently legal pieces.
+            .legalIf([=](const LegalityQuery &Query) {
+              const LLT BigTy = Query.Types[BigTyIdx];
+              const LLT LitTy = Query.Types[LitTyIdx];
+              return isRegisterType(ST, LitTy) &&
+                     BigTy.getSizeInBits() > MaxScalar.getSizeInBits() &&
+                     BigTy.getSizeInBits() % LitTy.getSizeInBits() == 0;
+            })
             .lowerFor({{S16, V2S16}})
             .lowerIf([=](const LegalityQuery &Query) {
               const LLT BigTy = Query.Types[BigTyIdx];
