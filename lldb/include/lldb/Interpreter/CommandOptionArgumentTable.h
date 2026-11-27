@@ -420,6 +420,7 @@ static constexpr CommandObject::ArgumentTableEntry g_argument_table[] = {
     { lldb::eArgTypeBreakpointResolverMask, "resolver-mask", lldb::CompletionType::eNoCompletion, g_resolver_mask_values, { nullptr, false }, "Specify the breakpoint resolver type your override will handle. Can be specified more than once to specify a mask of resolver types." },
     { lldb::eArgTypeScriptedExtension, "scripting-extension", lldb::CompletionType::eScriptedExtensionCompletion, {}, { ScriptedExtensionHelpTextCallback, false }, nullptr },
     { lldb::eArgTypeDynamicValueType, "dynamic-value-type", lldb::CompletionType::eNoCompletion, g_dynamic_value_types, { nullptr, false }, "Whether to calculate the dynamic type of values, and whether the target may be run to do so." },
+    { lldb::eArgTypeLogFilter, "log-filter", lldb::CompletionType::eNoCompletion, {}, { nullptr, false }, "A log message filter rule: '{action} {attribute} {op}', where action is accept or reject and op is match <text> or regex <regex>. Quote the rule if it contains spaces." },
     // clang-format on
 };
 
